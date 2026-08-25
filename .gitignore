@@ -56,6 +56,9 @@ dist-ssr/
 *.local
 .vite/
 
+# Runner de commit e plano da entrega — ferramenta local, nunca versionar
+*.local.mjs
+
 # =========================================================================
 # Ambiente / segredos
 # =========================================================================
