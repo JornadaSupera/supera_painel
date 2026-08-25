@@ -1,4 +1,4 @@
-import { ModuloEmConstrucao, PageHeader, StatusBadge } from "@/components/shared";
+import { UnderConstruction, PageHeader, StatusBadge } from "@/components/shared";
 
 /**
  * Estatísticas operacionais
@@ -10,8 +10,8 @@ export function EstatisticasOperacionaisPage() {
   return (
     <>
       <PageHeader
-        titulo="Estatísticas operacionais"
-        subtitulo="Operação da clínica"
+        title="Estatísticas operacionais"
+        subtitle="Operação da clínica"
         badge={
           <StatusBadge tone="primary" pill size="sm">
             MÉDIO
@@ -19,10 +19,10 @@ export function EstatisticasOperacionaisPage() {
         }
       />
 
-      <ModuloEmConstrucao
-        fase={13}
-        prototipo="https://strawti.com.br/prototipos/jornada-supera/admin/estatisticas/operacionais/"
-        entrega={[
+      <UnderConstruction
+        phase={13}
+        prototypeUrl="https://strawti.com.br/prototipos/jornada-supera/admin/estatisticas/operacionais/"
+        deliverables={[
           "Indicadores: tempo de resposta no chat, taxa de falta, atendimentos e mensagens",
           "Volume mensal com linhas de meta e de capacidade máxima",
           "Comparativo por especialidade — não por profissional nominal",

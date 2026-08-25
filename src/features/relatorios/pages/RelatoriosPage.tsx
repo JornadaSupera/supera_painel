@@ -1,4 +1,4 @@
-import { ModuloEmConstrucao, PageHeader } from "@/components/shared";
+import { UnderConstruction, PageHeader } from "@/components/shared";
 
 /**
  * Relatórios
@@ -10,14 +10,14 @@ export function RelatoriosPage() {
   return (
     <>
       <PageHeader
-        titulo="Relatórios"
-        subtitulo="12 relatórios pré-definidos · período padrão: últimos 30 dias"
+        title="Relatórios"
+        subtitle="12 relatórios pré-definidos · período padrão: últimos 30 dias"
       />
 
-      <ModuloEmConstrucao
-        fase={8}
-        prototipo="https://strawti.com.br/prototipos/jornada-supera/admin/relatorios/"
-        entrega={[
+      <UnderConstruction
+        phase={8}
+        prototypeUrl="https://strawti.com.br/prototipos/jornada-supera/admin/relatorios/"
+        deliverables={[
           "Quatro categorias: Pacientes, Clínico, Operacional e Qualidade & experiência",
           "Motor genérico com 12 definições declarativas — nunca 12 páginas copiadas",
           "Filtros por relatório e alternância entre tabela e gráfico",

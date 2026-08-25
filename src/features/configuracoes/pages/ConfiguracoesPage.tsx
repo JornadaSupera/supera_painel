@@ -1,4 +1,4 @@
-import { ModuloEmConstrucao, PageHeader } from "@/components/shared";
+import { UnderConstruction, PageHeader } from "@/components/shared";
 
 /**
  * Configurações
@@ -10,14 +10,14 @@ export function ConfiguracoesPage() {
   return (
     <>
       <PageHeader
-        titulo="Configurações"
-        subtitulo="Identidade visual, mensagens, alertas, atendimento e termos"
+        title="Configurações"
+        subtitle="Identidade visual, mensagens, alertas, atendimento e termos"
       />
 
-      <ModuloEmConstrucao
-        fase={9}
-        prototipo="https://strawti.com.br/prototipos/jornada-supera/admin/configuracoes/"
-        entrega={[
+      <UnderConstruction
+        phase={9}
+        prototypeUrl="https://strawti.com.br/prototipos/jornada-supera/admin/configuracoes/"
+        deliverables={[
           "Identidade visual: logo 512×512 e cor primária, com pré-visualização",
           "Sete gatilhos de alerta: febre, vômito, dor, sangramento, confusão, diarreia e fadiga",
           "Horário de atendimento do chat e resposta automática fora do horário",

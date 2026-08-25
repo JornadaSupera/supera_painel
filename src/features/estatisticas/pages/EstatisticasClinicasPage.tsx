@@ -1,4 +1,4 @@
-import { ModuloEmConstrucao, PageHeader, StatusBadge } from "@/components/shared";
+import { UnderConstruction, PageHeader, StatusBadge } from "@/components/shared";
 
 /**
  * Estatísticas clínicas
@@ -10,8 +10,8 @@ export function EstatisticasClinicasPage() {
   return (
     <>
       <PageHeader
-        titulo="Estatísticas clínicas"
-        subtitulo="Cruzamento Protocolo × Efeito × Grau"
+        title="Estatísticas clínicas"
+        subtitle="Cruzamento Protocolo × Efeito × Grau"
         badge={
           <StatusBadge tone="primary" pill size="sm">
             MÉDIO
@@ -19,10 +19,10 @@ export function EstatisticasClinicasPage() {
         }
       />
 
-      <ModuloEmConstrucao
-        fase={12}
-        prototipo="https://strawti.com.br/prototipos/jornada-supera/admin/estatisticas/clinicas/"
-        entrega={[
+      <UnderConstruction
+        phase={12}
+        prototypeUrl="https://strawti.com.br/prototipos/jornada-supera/admin/estatisticas/clinicas/"
+        deliverables={[
           "Mapa de calor de prevalência por protocolo e efeito adverso",
           "Filtros: período, grau mínimo, CID, especialidade e apenas pacientes ativos",
           "Comparação entre protocolos e alertas de atenção clínica",

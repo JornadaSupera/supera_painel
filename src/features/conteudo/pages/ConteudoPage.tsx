@@ -1,4 +1,4 @@
-import { ModuloEmConstrucao, PageHeader } from "@/components/shared";
+import { UnderConstruction, PageHeader } from "@/components/shared";
 
 /**
  * Aprovação de conteúdo
@@ -10,14 +10,14 @@ export function ConteudoPage() {
   return (
     <>
       <PageHeader
-        titulo="Aprovação de conteúdo"
-        subtitulo="Workflow editorial · orientações esperam aprovação antes de chegar aos pacientes"
+        title="Aprovação de conteúdo"
+        subtitle="Workflow editorial · orientações esperam aprovação antes de chegar aos pacientes"
       />
 
-      <ModuloEmConstrucao
-        fase={7}
-        prototipo="https://strawti.com.br/prototipos/jornada-supera/admin/conteudo/"
-        entrega={[
+      <UnderConstruction
+        phase={7}
+        prototypeUrl="https://strawti.com.br/prototipos/jornada-supera/admin/conteudo/"
+        deliverables={[
           "Fila \"Aguardando revisão\" com autor, especialidade, versão e horário",
           "Ações por item: Aprovar, Revisar texto e Rejeitar, com comentário do revisor",
           "Tabela \"Publicados\" com título, categoria e visualizações",

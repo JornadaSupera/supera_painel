@@ -1,4 +1,4 @@
-import { ModuloEmConstrucao, PageHeader, StatusBadge } from "@/components/shared";
+import { UnderConstruction, PageHeader, StatusBadge } from "@/components/shared";
 
 /**
  * Auditoria & logs
@@ -10,8 +10,8 @@ export function AuditoriaPage() {
   return (
     <>
       <PageHeader
-        titulo="Auditoria & logs"
-        subtitulo="Rastro de acesso a dados sensíveis · retenção de 5 anos · registros imutáveis"
+        title="Auditoria & logs"
+        subtitle="Rastro de acesso a dados sensíveis · retenção de 5 anos · registros imutáveis"
         badge={
           <StatusBadge tone="primary" pill size="sm">
             MÉDIO
@@ -19,10 +19,10 @@ export function AuditoriaPage() {
         }
       />
 
-      <ModuloEmConstrucao
-        fase={10}
-        prototipo="https://strawti.com.br/prototipos/jornada-supera/admin/auditoria/"
-        entrega={[
+      <UnderConstruction
+        phase={10}
+        prototypeUrl="https://strawti.com.br/prototipos/jornada-supera/admin/auditoria/"
+        deliverables={[
           "Contadores de 24 h: leitura, edição, exclusão, sigiloso e exportação",
           "Tabela com usuário, ação, dado acessado, horário e IP",
           "Filtros por usuário, paciente, período e tipo de ação",
