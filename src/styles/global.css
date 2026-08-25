@@ -8,8 +8,15 @@
     @apply border-border outline-ring/50;
   }
 
+  /* Acompanha o tema aplicado, não a preferência do sistema: o padrão do
+     painel é claro, e `light dark` faria scrollbar e seletor de data nativos
+     saírem escuros para quem usa o SO no escuro — sobre uma página clara. */
   html {
-    color-scheme: light dark;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   body {
