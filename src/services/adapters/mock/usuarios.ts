@@ -4,7 +4,7 @@ import {
   type Especialidade,
   type StatusUsuario,
 } from "@/lib/enums";
-import { mascararEmail } from "@/lib/mask";
+import { maskEmail } from "@/lib/mask";
 import { resolverPermissoes } from "@/lib/rbac";
 import { acessos } from "@/mocks/acessos";
 import { concedidas } from "@/mocks/permissoes";
@@ -263,7 +263,7 @@ export async function resetPassword({
     // O painel dispara o link; quem escolhe a senha é a própria pessoa. Um
     // administrador que define senha de terceiro quebra o não-repúdio da
     // trilha de auditoria.
-    return okOne({ enviado: true as const, destino: mascararEmail(row.email) });
+    return okOne({ enviado: true as const, destino: maskEmail(row.email) });
   });
 }
 

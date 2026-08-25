@@ -25,7 +25,7 @@ export function useProfissionais(especialidade?: Especialidade) {
   };
 
   const query = useQuery({
-    queryKey: queryKeys.usuarios.list(params),
+    queryKey: queryKeys.users.list(params),
     queryFn: () => call(() => usuariosApi.list(params)),
     staleTime: CINCO_MINUTOS,
   });

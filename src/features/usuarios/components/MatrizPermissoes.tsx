@@ -47,9 +47,9 @@ export function MatrizPermissoes() {
     });
   }, [matriz, rascunho]);
 
-  if (isLoading) return <SkeletonTable colunas={4} linhas={10} />;
+  if (isLoading) return <SkeletonTable columns={4} rows={10} />;
   if (isError || !matriz) return <ErrorState error={error} onRetry={() => void refetch()} />;
-  if (!rascunho) return <SkeletonTable colunas={4} linhas={10} />;
+  if (!rascunho) return <SkeletonTable columns={4} rows={10} />;
 
   const alternar = (papel: Papel, permissao: Permissao) => {
     setRascunho((atual) => {

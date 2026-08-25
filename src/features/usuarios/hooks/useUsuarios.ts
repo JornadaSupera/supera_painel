@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { auditar } from "@/lib/audit";
+import { audit } from "@/lib/audit";
 import { STATUS_USUARIO_LABEL, type StatusUsuario } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, permissoesApi, usuariosApi } from "@/services/apiClient";
@@ -45,7 +45,7 @@ export function useUsuarios() {
   };
 
   const query = useQuery({
-    queryKey: queryKeys.usuarios.list(params),
+    queryKey: queryKeys.users.list(params),
     queryFn: () => call(() => usuariosApi.list(params)),
     placeholderData: (anterior) => anterior,
   });
@@ -60,7 +60,7 @@ export function useUsuarios() {
 
 export function useUsuario(id: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.usuarios.detail(id ?? ""),
+    queryKey: queryKeys.users.detail(id ?? ""),
     enabled: Boolean(id),
     queryFn: async () => (await call(() => usuariosApi.getById({ id: id as string }))).data,
   });
@@ -69,7 +69,7 @@ export function useUsuario(id: string | undefined) {
 /** Contagem por especialidade — a faixa de sete cartões no topo da tela. */
 export function useDistribuicao() {
   return useQuery({
-    queryKey: [...queryKeys.usuarios.all, "distribuicao"],
+    queryKey: [...queryKeys.users.all, "distribuicao"],
     queryFn: async () => (await call(() => usuariosApi.getDistribuicao())).data,
   });
 }
@@ -77,14 +77,14 @@ export function useDistribuicao() {
 /** Histórico de acessos de um profissional. Só busca quando a gaveta abre. */
 export function useAcessos(id: string | undefined, aberto: boolean) {
   return useQuery({
-    queryKey: queryKeys.usuarios.accessLogs(id ?? ""),
+    queryKey: queryKeys.users.accessLogs(id ?? ""),
     enabled: Boolean(id) && aberto,
     queryFn: async () => {
       const resultado = await call(() =>
         usuariosApi.listAccessLogs({ id: id as string, page: 1, pageSize: 50 }),
       );
       // Consultar o rastro de outra pessoa também deixa rastro.
-      auditar.leitura("usuarios/acessos", id);
+      audit.read("usuarios/acessos", id);
       return resultado;
     },
   });
@@ -96,7 +96,7 @@ export function useAcessos(id: string | undefined, aberto: boolean) {
 
 function useInvalidarUsuarios() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: queryKeys.usuarios.all });
+  return () => queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
 }
 
 export function useCriarUsuario() {
@@ -108,7 +108,7 @@ export function useCriarUsuario() {
       return data;
     },
     onSuccess: async (usuario) => {
-      if (usuario) auditar.edicao(RECURSO, usuario.id, { operacao: "criacao", papel: usuario.papel });
+      if (usuario) audit.update(RECURSO, usuario.id, { operacao: "criacao", papel: usuario.papel });
       await invalidar();
       toast.success("Profissional cadastrado", {
         description: "Ele recebe por e-mail o link para definir a própria senha.",
@@ -127,7 +127,7 @@ export function useAtualizarUsuario(id: string) {
       return data;
     },
     onSuccess: async (usuario) => {
-      auditar.edicao(RECURSO, id, { papel: usuario?.papel, especialidade: usuario?.especialidade });
+      audit.update(RECURSO, id, { papel: usuario?.papel, especialidade: usuario?.especialidade });
       await invalidar();
       toast.success("Cadastro atualizado");
     },
@@ -141,7 +141,7 @@ export function useAlterarStatus() {
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: StatusUsuario }) => {
       const { data } = await call(() => usuariosApi.setStatus({ id, status }));
-      auditar.edicao(RECURSO, id, { operacao: "status", status });
+      audit.update(RECURSO, id, { operacao: "status", status });
       return data;
     },
     onSuccess: async (usuario) => {
@@ -158,7 +158,7 @@ export function useResetarSenha() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { data } = await call(() => usuariosApi.resetPassword({ id }));
-      auditar.edicao(RECURSO, id, { operacao: "reset_senha" });
+      audit.update(RECURSO, id, { operacao: "reset_senha" });
       return data;
     },
     onSuccess: (resultado) =>
@@ -176,7 +176,7 @@ export function useAlterarMfa() {
   return useMutation({
     mutationFn: async ({ id, ativo, motivo }: { id: string; ativo: boolean; motivo?: string }) => {
       const { data } = await call(() => usuariosApi.setMfa({ id, ativo, motivo }));
-      auditar.edicao(RECURSO, id, { operacao: "mfa", ativo, motivo });
+      audit.update(RECURSO, id, { operacao: "mfa", ativo, motivo });
       return data;
     },
     onSuccess: async (usuario) => {
@@ -193,7 +193,7 @@ export function useAlterarMfa() {
 
 export function useMatrizPermissoes() {
   return useQuery({
-    queryKey: queryKeys.permissoes.matrix(),
+    queryKey: queryKeys.permissions.matrix(),
     queryFn: async () => (await call(() => permissoesApi.getMatrix())).data,
   });
 }
@@ -204,7 +204,7 @@ export function useSalvarMatriz() {
   return useMutation<MatrizPermissoes | null, Error, Record<Papel, Permissao[]>>({
     mutationFn: async (concedidas) => {
       const { data } = await call(() => permissoesApi.updateMatrix({ concedidas }));
-      auditar.edicao("permissoes", "matriz", {
+      audit.update("permissoes", "matriz", {
         papeis: Object.fromEntries(
           Object.entries(concedidas).map(([papel, lista]) => [papel, lista.length]),
         ),
@@ -213,8 +213,8 @@ export function useSalvarMatriz() {
     },
     onSuccess: async () => {
       // Invalida usuários também: as permissões efetivas de cada um mudam junto.
-      await queryClient.invalidateQueries({ queryKey: queryKeys.permissoes.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.usuarios.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
 
       toast.success("Permissões atualizadas", {
         description: "Cada pessoa passa a usar as novas permissões no próximo acesso.",

@@ -9,7 +9,7 @@ import {
   PageHeader,
   SearchInput,
   StatusBadge,
-  TONE_STATUS_USUARIO,
+  TONE_USER_STATUS,
   UserAvatar,
   type Column,
 } from "@/components/shared";
@@ -30,7 +30,7 @@ import {
   STATUS_USUARIO_LABEL,
   toOptions,
 } from "@/lib/enums";
-import { formatarNumero } from "@/lib/format";
+import { formatNumber } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { temRecorte, useUsuariosStore } from "@/stores/usuarios";
 import type { UsuarioListItem } from "@/types/usuario";
@@ -56,7 +56,7 @@ const TODOS = "todos";
 
 export function UsuariosPage() {
   const navigate = useNavigate();
-  const { pode } = useAuth();
+  const { can } = useAuth();
 
   const [historicoDe, setHistoricoDe] = useState<UsuarioListItem | null>(null);
 
@@ -94,7 +94,7 @@ export function UsuariosPage() {
       width: "34%",
       render: (usuario) => (
         <div className="flex items-center gap-3">
-          <UserAvatar nome={usuario.nome} size="sm" colorido className="shrink-0" />
+          <UserAvatar name={usuario.nome} size="sm" colorful className="shrink-0" />
 
           <div className="min-w-0">
             <p className="text-foreground truncate text-sm font-medium">
@@ -153,7 +153,7 @@ export function UsuariosPage() {
       width: 110,
       render: (usuario) => (
         <div className="flex items-center gap-1.5">
-          <StatusBadge tone={TONE_STATUS_USUARIO[usuario.status]} size="sm" dot>
+          <StatusBadge tone={TONE_USER_STATUS[usuario.status]} size="sm" dot>
             {STATUS_USUARIO_LABEL[usuario.status]}
           </StatusBadge>
 
@@ -183,17 +183,17 @@ export function UsuariosPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Gestão"
-        titulo="Usuários"
-        nivel="MVP"
-        subtitulo={
+        title="Usuários"
+        level="MVP"
+        subtitle={
           isLoading && total === 0
             ? "Carregando equipe…"
             : filtrada
-              ? `${formatarNumero(total)} usuários no recorte atual`
-              : `${formatarNumero(total)} usuários cadastrados · ${assistenciais} profissionais em ${especialidades} especialidades`
+              ? `${formatNumber(total)} usuários no recorte atual`
+              : `${formatNumber(total)} usuários cadastrados · ${assistenciais} profissionais em ${especialidades} especialidades`
         }
         actions={
-          <Can permissao={PERMISSAO.USUARIOS_MANAGE}>
+          <Can permission={PERMISSAO.USUARIOS_MANAGE}>
             <Button onClick={() => navigate("/usuarios/novo")}>
               <UserPlus />
               Novo usuário
@@ -205,7 +205,7 @@ export function UsuariosPage() {
       <Tabs defaultValue="profissionais" className="flex flex-col gap-5">
         {/* Sem permissão de editar permissões, não há segunda aba — e uma aba
             sozinha é ruído. */}
-        {pode(PERMISSAO.PERMISSOES_MANAGE) && (
+        {can(PERMISSAO.PERMISSOES_MANAGE) && (
           <TabsList>
             <TabsTrigger value="profissionais">Profissionais</TabsTrigger>
             <TabsTrigger value="permissoes">Permissões por papel</TabsTrigger>
@@ -274,15 +274,15 @@ export function UsuariosPage() {
               columns={colunas}
               data={usuarios}
               caption="Profissionais cadastrados, com especialidade, registro no conselho, horário de atendimento no chat e status."
-              rotulo="profissionais"
+              label="profissionais"
               loading={isLoading}
               error={isError ? error : null}
               onRetry={() => void refetch()}
               sort={sort}
               onSortChange={setSort}
-              filtrada={filtrada}
+              filtered={filtrada}
               onRowClick={
-                pode(PERMISSAO.USUARIOS_MANAGE)
+                can(PERMISSAO.USUARIOS_MANAGE)
                   ? (usuario) => navigate(`/usuarios/${usuario.id}`)
                   : undefined
               }
@@ -295,17 +295,17 @@ export function UsuariosPage() {
               }}
               emptyState={
                 <EmptyState
-                  variant={filtrada ? "busca" : "vazio"}
-                  titulo={
+                  variant={filtrada ? "search" : "empty"}
+                  title={
                     filtrada ? "Nenhum profissional no recorte" : "Nenhum profissional cadastrado"
                   }
-                  descricao={
+                  description={
                     filtrada
                       ? "Nenhum cadastro corresponde à busca e aos filtros aplicados."
                       : "Cadastre a equipe para liberar o acesso ao painel e ao chat com pacientes."
                   }
                   action={
-                    <Can permissao={PERMISSAO.USUARIOS_MANAGE}>
+                    <Can permission={PERMISSAO.USUARIOS_MANAGE}>
                       <Button onClick={() => navigate("/usuarios/novo")}>
                         <UserPlus />
                         Novo usuário

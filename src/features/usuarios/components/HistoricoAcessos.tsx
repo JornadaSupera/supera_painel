@@ -1,4 +1,4 @@
-import { ErrorState, StatusBadge, TONE_ACAO_AUDITORIA } from "@/components/shared";
+import { ErrorState, StatusBadge, TONE_AUDIT_ACTION } from "@/components/shared";
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ACAO_AUDITORIA_LABEL, ORIGEM_AUDITORIA_LABEL } from "@/lib/enums";
-import { formatarDataHora, tempoRelativo } from "@/lib/format";
+import { formatDateTime, relativeTime } from "@/lib/format";
 import { useAcessos } from "../hooks/useUsuarios";
 import type { UsuarioListItem } from "@/types/usuario";
 
@@ -53,7 +53,7 @@ export function HistoricoAcessos({
           </div>
         )}
 
-        {isError && <ErrorState error={error} onRetry={() => void refetch()} compacto />}
+        {isError && <ErrorState error={error} onRetry={() => void refetch()} compact />}
 
         {!isLoading && !isError && logs.length === 0 && (
           <p className="text-muted-foreground py-8 text-center text-sm">
@@ -66,7 +66,7 @@ export function HistoricoAcessos({
             {logs.map((log) => (
               <li key={log.id} className="flex items-center justify-between gap-4 py-2.5">
                 <div className="flex min-w-0 items-center gap-3">
-                  <StatusBadge tone={TONE_ACAO_AUDITORIA[log.acao]} size="sm">
+                  <StatusBadge tone={TONE_AUDIT_ACTION[log.acao]} size="sm">
                     {ACAO_AUDITORIA_LABEL[log.acao]}
                   </StatusBadge>
 
@@ -79,9 +79,9 @@ export function HistoricoAcessos({
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <p className="text-xs tabular-nums">{tempoRelativo(log.criado_em)}</p>
+                  <p className="text-xs tabular-nums">{relativeTime(log.criado_em)}</p>
                   <p className="text-muted-foreground font-mono text-[11px]">{log.ip}</p>
-                  <p className="sr-only">{formatarDataHora(log.criado_em)}</p>
+                  <p className="sr-only">{formatDateTime(log.criado_em)}</p>
                 </div>
               </li>
             ))}

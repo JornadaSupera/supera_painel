@@ -59,7 +59,7 @@ export function AcoesUsuario({
             Histórico de acessos
           </DropdownMenuItem>
 
-          <Can permissao={PERMISSAO.USUARIOS_MANAGE}>
+          <Can permission={PERMISSAO.USUARIOS_MANAGE}>
             <DropdownMenuItem onSelect={() => navigate(`/usuarios/${usuario.id}`)}>
               <SquarePen />
               Editar cadastro
@@ -110,13 +110,13 @@ export function AcoesUsuario({
         open={confirmandoMfa}
         onOpenChange={setConfirmandoMfa}
         tone="warning"
-        titulo="Desativar o segundo fator?"
-        descricao={`${usuario.nome} passará a entrar apenas com e-mail e senha. O painel dá acesso a prontuário oncológico — trate isto como exceção temporária.`}
+        title="Desativar o segundo fator?"
+        description={`${usuario.nome} passará a entrar apenas com e-mail e senha. O painel dá acesso a prontuário oncológico — trate isto como exceção temporária.`}
         confirmLabel="Desativar"
-        exigirMotivo
+        requireReason
         loading={alterarMfa.isPending}
-        onConfirm={({ motivo }) => {
-          alterarMfa.mutate({ id: usuario.id, ativo: false, motivo });
+        onConfirm={({ reason }) => {
+          alterarMfa.mutate({ id: usuario.id, ativo: false, motivo: reason });
           setConfirmandoMfa(false);
         }}
       />

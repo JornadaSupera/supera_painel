@@ -90,8 +90,8 @@ export function UsuarioFormPage() {
   if (edicao && isLoading) {
     return (
       <div className="flex flex-col gap-5">
-        <PageHeader eyebrow="Gestão" titulo="Editar profissional" />
-        <SkeletonForm campos={7} className="max-w-2xl" />
+        <PageHeader eyebrow="Gestão" title="Editar profissional" />
+        <SkeletonForm fields={7} className="max-w-2xl" />
       </div>
     );
   }
@@ -115,13 +115,13 @@ export function UsuarioFormPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Gestão"
-        titulo={edicao ? `Editar ${usuario?.nome}` : "Novo usuário"}
-        nivel="MVP"
+        title={edicao ? `Editar ${usuario?.nome}` : "Novo usuário"}
+        level="MVP"
         breadcrumb={[
           { label: "Usuários", to: "/usuarios" },
           { label: edicao ? (usuario?.nome ?? "Editar") : "Novo usuário" },
         ]}
-        subtitulo={
+        subtitle={
           edicao
             ? "Alterações de papel e permissão ficam registradas na trilha de auditoria."
             : "O profissional recebe por e-mail o link para definir a própria senha."
