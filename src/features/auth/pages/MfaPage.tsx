@@ -22,7 +22,7 @@ import { CODIGO_MFA_DEV } from "../dev-credenciais";
 const TAMANHO_CODIGO = 6;
 
 export function MfaPage() {
-  const { desafioMfa, confirmarMfa, cancelarMfa, autenticado } = useAuth();
+  const { mfaChallenge, confirmMfa, cancelMfa, isAuthenticated } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -35,12 +35,12 @@ export function MfaPage() {
 
   /* Contagem regressiva de validade do código. */
   useEffect(() => {
-    if (!desafioMfa) return undefined;
+    if (!mfaChallenge) return undefined;
 
     const atualizar = () => {
       const restante = Math.max(
         0,
-        Math.round((new Date(desafioMfa.expira_em).getTime() - Date.now()) / 1000),
+        Math.round((new Date(mfaChallenge.expira_em).getTime() - Date.now()) / 1000),
       );
       setSegundosRestantes(restante);
     };
@@ -48,14 +48,14 @@ export function MfaPage() {
     atualizar();
     const timer = setInterval(atualizar, 1000);
     return () => clearInterval(timer);
-  }, [desafioMfa]);
+  }, [mfaChallenge]);
 
   const confirmar = async (valor: string) => {
     setErro(null);
     setEnviando(true);
 
     try {
-      await confirmarMfa(valor);
+      await confirmMfa(valor);
     } catch (e) {
       setErro((e as Error).message ?? "Código inválido.");
       // Limpa para que a próxima tentativa comece do zero, sem apagar dígito
@@ -74,16 +74,16 @@ export function MfaPage() {
   };
 
   const voltar = () => {
-    cancelarMfa();
+    cancelMfa();
     navigate("/login", { replace: true, state: location.state });
   };
 
-  if (autenticado) {
+  if (isAuthenticated) {
     const destino = (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? "/dashboard";
     return <Navigate to={destino} replace />;
   }
 
-  if (!desafioMfa) return <Navigate to="/login" replace />;
+  if (!mfaChallenge) return <Navigate to="/login" replace />;
 
   const expirado = segundosRestantes === 0;
   const minutos = Math.floor((segundosRestantes ?? 0) / 60);
@@ -91,21 +91,21 @@ export function MfaPage() {
 
   return (
     <AuthLayout
-      titulo="Verificação em duas etapas"
-      descricao={
-        desafioMfa.metodo === "totp" ? (
+      title="Verificação em duas etapas"
+      description={
+        mfaChallenge.metodo === "totp" ? (
           <>
-            Abra <strong className="text-foreground">{desafioMfa.destino}</strong> e informe o
+            Abra <strong className="text-foreground">{mfaChallenge.destino}</strong> e informe o
             código de {TAMANHO_CODIGO} dígitos.
           </>
         ) : (
           <>
             Enviamos um código de {TAMANHO_CODIGO} dígitos para{" "}
-            <strong className="text-foreground font-mono">{desafioMfa.destino}</strong>.
+            <strong className="text-foreground font-mono">{mfaChallenge.destino}</strong>.
           </>
         )
       }
-      rodape={
+      footer={
         <button
           type="button"
           onClick={voltar}

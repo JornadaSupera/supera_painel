@@ -5,26 +5,26 @@ import { useAuth } from "@/contexts/auth-context";
 import type { Permissao } from "@/lib/rbac";
 
 /**
- * Exige permissão, além de sessão.
+ * Requires a permission, on top of a session.
  *
- * Renderiza "sem permissão" em vez de redirecionar: mandar a pessoa para outra
- * tela sem explicação faz parecer bug. Dizer que o acesso existe mas não é dela
- * é informação acionável — ela sabe a quem pedir.
+ * It renders "forbidden" instead of redirecting: sending someone to another
+ * screen with no explanation reads as a bug. Telling them the access exists
+ * but is not theirs is actionable — they know who to ask.
  *
- * @param permissao  uma ou várias — todas exigidas (E lógico)
- * @param alguma     lista alternativa — basta uma (OU lógico)
+ * @param permission  one or many — all of them required (logical AND)
+ * @param anyOf       alternative list — one is enough (logical OR)
  */
 export interface PermissionRouteProps {
-  permissao?: Permissao | readonly Permissao[];
-  alguma?: readonly Permissao[];
+  permission?: Permissao | readonly Permissao[];
+  anyOf?: readonly Permissao[];
 }
 
-export function PermissionRoute({ permissao, alguma }: PermissionRouteProps) {
-  const { pode, podeAlguma } = useAuth();
+export function PermissionRoute({ permission, anyOf }: PermissionRouteProps) {
+  const { can, canAny } = useAuth();
 
-  const autorizado = alguma ? podeAlguma(alguma) : permissao ? pode(permissao) : true;
+  const allowed = anyOf ? canAny(anyOf) : permission ? can(permission) : true;
 
-  if (!autorizado) return <ErrorState variant="forbidden" />;
+  if (!allowed) return <ErrorState variant="forbidden" />;
 
   return <Outlet />;
 }

@@ -55,9 +55,9 @@ export function NovaSenhaPage() {
   if (!token) {
     return (
       <AuthLayout
-        titulo="Link inválido"
-        descricao="Este link de redefinição não é válido ou já foi usado."
-        rodape={
+        title="Link inválido"
+        description="Este link de redefinição não é válido ou já foi usado."
+        footer={
           <Link to="/recuperar-senha" className="text-primary font-medium underline underline-offset-4">
             Solicitar um novo link
           </Link>
@@ -76,7 +76,7 @@ export function NovaSenhaPage() {
   const enviando = form.formState.isSubmitting;
 
   return (
-    <AuthLayout titulo="Criar nova senha" descricao="Escolha uma senha que você não use em outro serviço.">
+    <AuthLayout title="Criar nova senha" description="Escolha uma senha que você não use em outro serviço.">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(enviar)} className="flex flex-col gap-5" noValidate>
           {erro && (

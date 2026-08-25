@@ -47,15 +47,15 @@ export function RecuperarSenhaPage() {
   if (enviado) {
     return (
       <AuthLayout
-        titulo="Confira seu e-mail"
-        descricao={
+        title="Confira seu e-mail"
+        description={
           <>
             Se houver uma conta ativa para{" "}
             <strong className="text-foreground font-mono">{enviado}</strong>, o link de redefinição
             chega em alguns minutos.
           </>
         }
-        rodape={
+        footer={
           <Link to="/login" className="hover:text-foreground inline-flex items-center gap-2 underline underline-offset-4">
             <ArrowLeft size={14} aria-hidden="true" />
             Voltar para o acesso
@@ -82,9 +82,9 @@ export function RecuperarSenhaPage() {
 
   return (
     <AuthLayout
-      titulo="Recuperar senha"
-      descricao="Informe seu e-mail corporativo e enviaremos um link para criar uma nova senha."
-      rodape={
+      title="Recuperar senha"
+      description="Informe seu e-mail corporativo e enviaremos um link para criar uma nova senha."
+      footer={
         <Link to="/login" className="hover:text-foreground inline-flex items-center gap-2 underline underline-offset-4">
           <ArrowLeft size={14} aria-hidden="true" />
           Voltar para o acesso

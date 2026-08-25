@@ -13,20 +13,21 @@ import { PermissionRoute } from "./PermissionRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 /**
- * Árvore de rotas — as 9 telas do escopo MVP + Médio.
+ * Route tree — the nine screens of the MVP + Médio scope.
  *
- * Cada área protegida passa por dois portões: `ProtectedRoute` exige sessão,
- * `PermissionRoute` exige a permissão do módulo. Manter os dois separados
- * deixa clara, na leitura, a diferença entre "não está logada" e "está logada
- * mas não pode".
+ * Every protected area passes through two gates: `ProtectedRoute` requires a
+ * session, `PermissionRoute` requires the module permission. Keeping them apart
+ * makes the difference between "not signed in" and "signed in but not allowed"
+ * legible at a glance.
  *
- * Ver `src/layouts/navegacao.ts` — a sidebar sai da mesma lista de permissões,
- * para que menu e rota nunca discordem.
+ * See `src/layouts/navigation.ts` — the sidebar reads the same permission list,
+ * so menu and route never disagree.
  */
 
-/* Cada módulo em seu próprio chunk: o painel carrega só a tela aberta.
-   As telas de autenticação ficam no bundle principal — são o primeiro
-   destino de quem chega, e um carregamento extra ali é atrito visível. */
+/* One chunk per module: the panel loads only the screen being opened.
+   The authentication screens stay in the main bundle — they are the first
+   destination for anyone arriving, and an extra load there is visible
+   friction. */
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
 const PacientesPage = lazy(() => import("@/features/pacientes/pages/PacientesPage"));
 const PacienteNovoPage = lazy(() => import("@/features/pacientes/pages/PacienteNovoPage"));
@@ -52,53 +53,53 @@ export function AppRoutes() {
 
       <Suspense fallback={<Loading />}>
         <Routes>
-          {/* ------------------------------------------------------ público */}
+          {/* ------------------------------------------------------- public */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/login/mfa" element={<MfaPage />} />
           <Route path="/recuperar-senha" element={<RecuperarSenhaPage />} />
           <Route path="/nova-senha" element={<NovaSenhaPage />} />
 
-          {/* ---------------------------------------------------- protegido */}
+          {/* ---------------------------------------------------- protected */}
           <Route element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
-              <Route element={<PermissionRoute permissao={PERMISSAO.DASHBOARD_READ} />}>
+              <Route element={<PermissionRoute permission={PERMISSAO.DASHBOARD_READ} />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
               </Route>
 
-              {/* Cadastrar exige escrita, não leitura — por isso é um grupo
-                  próprio. O Router escolhe a rota mais específica, então
-                  "/pacientes/novo" ganha de "/pacientes/:id" independente da
-                  ordem em que as duas aparecem. */}
-              <Route element={<PermissionRoute permissao={PERMISSAO.PACIENTES_WRITE} />}>
+              {/* Creating requires write access, not read — hence its own
+                  group. The Router picks the most specific route, so
+                  "/pacientes/novo" beats "/pacientes/:id" regardless of the
+                  order the two appear in. */}
+              <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_WRITE} />}>
                 <Route path="/pacientes/novo" element={<PacienteNovoPage />} />
               </Route>
 
-              <Route element={<PermissionRoute permissao={PERMISSAO.PACIENTES_READ} />}>
+              <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
                 <Route path="/pacientes" element={<PacientesPage />} />
                 <Route path="/pacientes/:id" element={<PacienteFichaPage />} />
               </Route>
 
-              {/* Cadastrar e editar profissional é gestão de acesso: exige
-                  `usuarios:manage`, não a leitura da lista. */}
-              <Route element={<PermissionRoute permissao={PERMISSAO.USUARIOS_MANAGE} />}>
+              {/* Creating and editing a professional is access management: it
+                  requires `usuarios:manage`, not the list read. */}
+              <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_MANAGE} />}>
                 <Route path="/usuarios/novo" element={<UsuarioFormPage />} />
                 <Route path="/usuarios/:id" element={<UsuarioFormPage />} />
               </Route>
 
-              <Route element={<PermissionRoute permissao={PERMISSAO.USUARIOS_READ} />}>
+              <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_READ} />}>
                 <Route path="/usuarios" element={<UsuariosPage />} />
               </Route>
 
-              <Route element={<PermissionRoute permissao={PERMISSAO.CONTEUDO_READ} />}>
+              <Route element={<PermissionRoute permission={PERMISSAO.CONTEUDO_READ} />}>
                 <Route path="/conteudo" element={<ConteudoPage />} />
               </Route>
 
-              <Route element={<PermissionRoute permissao={PERMISSAO.RELATORIOS_READ} />}>
+              <Route element={<PermissionRoute permission={PERMISSAO.RELATORIOS_READ} />}>
                 <Route path="/relatorios" element={<RelatoriosPage />} />
               </Route>
 
               <Route
-                element={<PermissionRoute permissao={PERMISSAO.ESTATISTICAS_CLINICAS_READ} />}
+                element={<PermissionRoute permission={PERMISSAO.ESTATISTICAS_CLINICAS_READ} />}
               >
                 <Route path="/estatisticas/clinicas" element={<EstatisticasClinicasPage />} />
               </Route>
@@ -106,7 +107,7 @@ export function AppRoutes() {
               <Route
                 element={
                   <PermissionRoute
-                    alguma={[PERMISSAO.ESTATISTICAS_READ_ALL, PERMISSAO.ESTATISTICAS_READ_SELF]}
+                    anyOf={[PERMISSAO.ESTATISTICAS_READ_ALL, PERMISSAO.ESTATISTICAS_READ_SELF]}
                   />
                 }
               >
@@ -116,20 +117,20 @@ export function AppRoutes() {
                 />
               </Route>
 
-              <Route element={<PermissionRoute permissao={PERMISSAO.AUDITORIA_READ} />}>
+              <Route element={<PermissionRoute permission={PERMISSAO.AUDITORIA_READ} />}>
                 <Route path="/auditoria" element={<AuditoriaPage />} />
               </Route>
 
-              <Route element={<PermissionRoute permissao={PERMISSAO.CONFIGURACOES_READ} />}>
+              <Route element={<PermissionRoute permission={PERMISSAO.CONFIGURACOES_READ} />}>
                 <Route path="/configuracoes" element={<ConfiguracoesPage />} />
               </Route>
 
-              {/* Galeria de componentes — ferramenta interna. */}
+              {/* Component gallery — internal tool. */}
               {import.meta.env.DEV && (
                 <Route path="/design-system" element={<DesignSystemPreview />} />
               )}
 
-              {/* "Estatísticas" sozinho não é tela: leva ao primeiro filho. */}
+              {/* "Estatísticas" alone is not a screen: it leads to the first child. */}
               <Route
                 path="/estatisticas"
                 element={<Navigate to="/estatisticas/clinicas" replace />}

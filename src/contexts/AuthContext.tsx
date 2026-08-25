@@ -1,205 +1,206 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { auditar } from "@/lib/audit";
+import { audit } from "@/lib/audit";
 import { SESSION } from "@/lib/env";
 import { can, canAny, resolverPermissoes, type Permissao } from "@/lib/rbac";
 import { authApi, call } from "@/services/apiClient";
 import type { DesafioMfa, Sessao } from "@/types/auth";
-import { AuthContext, type AuthContextValue, type MotivoLogout } from "./auth-context";
+import { AuthContext, type AuthContextValue, type LogoutReason } from "./auth-context";
 
 /**
- * Provedor de autenticação.
+ * Authentication provider.
  *
- * A sessão vive **apenas em memória**. Nem `localStorage` nem `sessionStorage`:
- * qualquer script da página lê esses armazenamentos, inclusive um XSS vindo do
- * editor de conteúdo. O preço é que recarregar a página derruba a sessão —
- * comportamento pretendido nesta fase. Na Fase 15 o Supabase restaura a sessão
- * a partir de um cookie `httpOnly`, que o JavaScript não consegue ler.
+ * The session lives **in memory only**. Neither `localStorage` nor
+ * `sessionStorage`: any script on the page can read those, including an XSS
+ * coming through the content editor. The price is that reloading the page
+ * drops the session — intended behaviour at this stage. Once Supabase is in
+ * place it restores the session from an `httpOnly` cookie, which JavaScript
+ * cannot read.
  */
 
-const UM_MINUTO = 60_000;
-/** De quanto em quanto tempo o relógio de inatividade é conferido. */
-const INTERVALO_TICK = 15_000;
+const ONE_MINUTE = 60_000;
+/** How often the idle clock is checked. */
+const TICK_INTERVAL = 15_000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [sessao, setSessao] = useState<Sessao | null>(null);
-  const [desafioMfa, setDesafioMfa] = useState<DesafioMfa | null>(null);
-  const [carregando, setCarregando] = useState(true);
-  const [segundosParaExpirar, setSegundosParaExpirar] = useState<number | null>(null);
+  const [session, setSession] = useState<Sessao | null>(null);
+  const [mfaChallenge, setMfaChallenge] = useState<DesafioMfa | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [secondsUntilExpiry, setSecondsUntilExpiry] = useState<number | null>(null);
 
-  /** Ref, e não state: atualiza a cada movimento do mouse e não deve rerenderizar. */
-  const ultimaAtividade = useRef(Date.now());
+  /** A ref, not state: it updates on every mouse move and must not rerender. */
+  const lastActivity = useRef(Date.now());
 
-  /* ---------------------------------------------------------- restauração */
+  /* ------------------------------------------------------------- restore */
 
   useEffect(() => {
-    let ativo = true;
+    let active = true;
 
     void (async () => {
       try {
         const { data } = await call(() => authApi.getSession());
-        if (ativo && data) {
-          setSessao(data);
-          ultimaAtividade.current = Date.now();
+        if (active && data) {
+          setSession(data);
+          lastActivity.current = Date.now();
         }
       } catch {
-        // Sem sessão restaurável é o caminho normal enquanto o backend não
-        // existe — não é erro que o usuário precise ver.
+        // Having no restorable session is the normal path while the backend
+        // does not exist — not an error the user needs to see.
       } finally {
-        if (ativo) setCarregando(false);
+        if (active) setIsLoading(false);
       }
     })();
 
     return () => {
-      ativo = false;
+      active = false;
     };
   }, []);
 
-  /* ---------------------------------------------------------------- ações */
+  /* ------------------------------------------------------------- actions */
 
-  const renovarAtividade = useCallback(() => {
-    ultimaAtividade.current = Date.now();
+  const renewActivity = useCallback(() => {
+    lastActivity.current = Date.now();
   }, []);
 
-  const sair = useCallback(
-    async (motivo: MotivoLogout = "usuario") => {
-      const usuarioId = sessao?.usuario.id;
+  const signOut = useCallback(
+    async (reason: LogoutReason = "user") => {
+      const userId = session?.usuario.id;
 
-      setSessao(null);
-      setDesafioMfa(null);
-      setSegundosParaExpirar(null);
+      setSession(null);
+      setMfaChallenge(null);
+      setSecondsUntilExpiry(null);
 
-      if (usuarioId) auditar.logout(usuarioId, motivo);
+      if (userId) audit.logout(userId, reason);
 
       try {
         await authApi.signOut();
       } catch {
-        // Falhar ao avisar o servidor não pode impedir a saída local:
-        // manter o usuário conectado seria o pior dos dois resultados.
+        // Failing to tell the server must not block the local sign-out:
+        // keeping the user signed in would be the worse of the two outcomes.
       }
     },
-    [sessao],
+    [session],
   );
 
-  const entrar = useCallback(async ({ email, senha }: { email: string; senha: string }) => {
-    const { data } = await call(() => authApi.signIn({ email, senha }));
+  const signIn = useCallback(async ({ email, password }: { email: string; password: string }) => {
+    const { data } = await call(() => authApi.signIn({ email, senha: password }));
     if (!data) throw new Error("Não foi possível iniciar o acesso.");
 
-    // Nunca há sessão nesta etapa: o segundo fator é obrigatório.
-    setDesafioMfa(data.mfa);
+    // There is never a session at this step: the second factor is mandatory.
+    setMfaChallenge(data.mfa);
   }, []);
 
-  const confirmarMfa = useCallback(
-    async (codigo: string) => {
-      if (!desafioMfa) throw new Error("Nenhum acesso em andamento. Entre novamente.");
+  const confirmMfa = useCallback(
+    async (code: string) => {
+      if (!mfaChallenge) throw new Error("Nenhum acesso em andamento. Entre novamente.");
 
       const { data } = await call(() =>
-        authApi.verifyMfa({ desafio_id: desafioMfa.desafio_id, codigo }),
+        authApi.verifyMfa({ desafio_id: mfaChallenge.desafio_id, codigo: code }),
       );
       if (!data) throw new Error("Não foi possível concluir o acesso.");
 
-      setSessao(data);
-      setDesafioMfa(null);
-      ultimaAtividade.current = Date.now();
-      auditar.login(data.usuario.id);
+      setSession(data);
+      setMfaChallenge(null);
+      lastActivity.current = Date.now();
+      audit.login(data.usuario.id);
     },
-    [desafioMfa],
+    [mfaChallenge],
   );
 
-  const cancelarMfa = useCallback(() => setDesafioMfa(null), []);
+  const cancelMfa = useCallback(() => setMfaChallenge(null), []);
 
-  /* ------------------------------------------------------------ permissões */
+  /* --------------------------------------------------------- permissions */
 
-  const permissoes = useMemo(() => {
-    if (!sessao) return new Set<Permissao>();
+  const permissions = useMemo(() => {
+    if (!session) return new Set<Permissao>();
 
     return resolverPermissoes({
-      papel: sessao.usuario.papel,
-      especialidade: sessao.usuario.especialidade,
-      permissoesExtras: sessao.usuario.permissoes_extras,
+      papel: session.usuario.papel,
+      especialidade: session.usuario.especialidade,
+      permissoesExtras: session.usuario.permissoes_extras,
     });
-  }, [sessao]);
+  }, [session]);
 
-  const pode = useCallback(
-    (requeridas: Permissao | readonly Permissao[]) => can(permissoes, requeridas),
-    [permissoes],
+  const canDo = useCallback(
+    (required: Permissao | readonly Permissao[]) => can(permissions, required),
+    [permissions],
   );
 
-  const podeAlguma = useCallback(
-    (requeridas: readonly Permissao[]) => canAny(permissoes, requeridas),
-    [permissoes],
+  const canAnyOf = useCallback(
+    (required: readonly Permissao[]) => canAny(permissions, required),
+    [permissions],
   );
 
-  /* ---------------------------------------------- inatividade e expiração */
+  /* ------------------------------------------------ idle and expiration */
 
   useEffect(() => {
-    if (!sessao) return undefined;
+    if (!session) return undefined;
 
-    const eventos = ["pointerdown", "keydown", "scroll", "focus"] as const;
-    const marcar = () => renovarAtividade();
+    const events = ["pointerdown", "keydown", "scroll", "focus"] as const;
+    const mark = () => renewActivity();
 
-    eventos.forEach((evento) => window.addEventListener(evento, marcar, { passive: true }));
+    events.forEach((event) => window.addEventListener(event, mark, { passive: true }));
 
     const timer = setInterval(() => {
-      const limiteInatividade = SESSION.idleMinutes * UM_MINUTO;
-      const ocioso = Date.now() - ultimaAtividade.current;
-      const restanteInatividade = limiteInatividade - ocioso;
+      const idleLimit = SESSION.idleMinutes * ONE_MINUTE;
+      const idleFor = Date.now() - lastActivity.current;
+      const idleRemaining = idleLimit - idleFor;
 
-      // A sessão também tem prazo próprio: o menor dos dois manda.
-      const restanteSessao = new Date(sessao.expira_em).getTime() - Date.now();
-      const restante = Math.min(restanteInatividade, restanteSessao);
+      // The session has its own deadline too: the smaller of the two wins.
+      const sessionRemaining = new Date(session.expira_em).getTime() - Date.now();
+      const remaining = Math.min(idleRemaining, sessionRemaining);
 
-      if (restante <= 0) {
-        void sair(restanteSessao <= 0 ? "sessao_expirada" : "inatividade");
+      if (remaining <= 0) {
+        void signOut(sessionRemaining <= 0 ? "session_expired" : "idle");
         return;
       }
 
-      setSegundosParaExpirar(Math.round(restante / 1000));
-    }, INTERVALO_TICK);
+      setSecondsUntilExpiry(Math.round(remaining / 1000));
+    }, TICK_INTERVAL);
 
     return () => {
-      eventos.forEach((evento) => window.removeEventListener(evento, marcar));
+      events.forEach((event) => window.removeEventListener(event, mark));
       clearInterval(timer);
     };
-  }, [sessao, sair, renovarAtividade]);
+  }, [session, signOut, renewActivity]);
 
-  const expirandoEmBreve =
-    segundosParaExpirar !== null && segundosParaExpirar <= SESSION.warnMinutes * 60;
+  const isExpiringSoon =
+    secondsUntilExpiry !== null && secondsUntilExpiry <= SESSION.warnMinutes * 60;
 
-  /* ---------------------------------------------------------------- valor */
+  /* ----------------------------------------------------------- the value */
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      sessao,
-      usuario: sessao?.usuario ?? null,
-      permissoes,
-      autenticado: Boolean(sessao),
-      carregando,
-      desafioMfa,
-      entrar,
-      confirmarMfa,
-      cancelarMfa,
-      sair,
-      pode,
-      podeAlguma,
-      renovarAtividade,
-      segundosParaExpirar,
-      expirandoEmBreve,
+      session,
+      user: session?.usuario ?? null,
+      permissions,
+      isAuthenticated: Boolean(session),
+      isLoading,
+      mfaChallenge,
+      signIn,
+      confirmMfa,
+      cancelMfa,
+      signOut,
+      can: canDo,
+      canAny: canAnyOf,
+      renewActivity,
+      secondsUntilExpiry,
+      isExpiringSoon,
     }),
     [
-      sessao,
-      permissoes,
-      carregando,
-      desafioMfa,
-      entrar,
-      confirmarMfa,
-      cancelarMfa,
-      sair,
-      pode,
-      podeAlguma,
-      renovarAtividade,
-      segundosParaExpirar,
-      expirandoEmBreve,
+      session,
+      permissions,
+      isLoading,
+      mfaChallenge,
+      signIn,
+      confirmMfa,
+      cancelMfa,
+      signOut,
+      canDo,
+      canAnyOf,
+      renewActivity,
+      secondsUntilExpiry,
+      isExpiringSoon,
     ],
   );
 

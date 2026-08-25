@@ -13,18 +13,18 @@ import { useAuth } from "@/contexts/auth-context";
  * Montado uma vez, dentro da área autenticada.
  */
 export function AvisoSessao() {
-  const { expirandoEmBreve, segundosParaExpirar, renovarAtividade, autenticado } = useAuth();
+  const { isExpiringSoon, secondsUntilExpiry, renewActivity, isAuthenticated } = useAuth();
 
   /** Evita reemitir o mesmo aviso a cada tick do relógio. */
   const avisoAtivo = useRef<string | number | null>(null);
 
   useEffect(() => {
-    if (!autenticado) {
+    if (!isAuthenticated) {
       avisoAtivo.current = null;
       return;
     }
 
-    if (!expirandoEmBreve) {
+    if (!isExpiringSoon) {
       // Voltou a ter tempo: o aviso perdeu a razão de existir.
       if (avisoAtivo.current !== null) {
         toast.dismiss(avisoAtivo.current);
@@ -35,7 +35,7 @@ export function AvisoSessao() {
 
     if (avisoAtivo.current !== null) return;
 
-    const minutos = Math.max(1, Math.ceil((segundosParaExpirar ?? 0) / 60));
+    const minutos = Math.max(1, Math.ceil((secondsUntilExpiry ?? 0) / 60));
 
     avisoAtivo.current = toast.warning("Sua sessão está prestes a expirar", {
       description: `Por inatividade, o acesso será encerrado em cerca de ${minutos} ${
@@ -45,12 +45,12 @@ export function AvisoSessao() {
       action: {
         label: "Continuar conectada",
         onClick: () => {
-          renovarAtividade();
+          renewActivity();
           avisoAtivo.current = null;
         },
       },
     });
-  }, [autenticado, expirandoEmBreve, segundosParaExpirar, renovarAtividade]);
+  }, [isAuthenticated, isExpiringSoon, secondsUntilExpiry, renewActivity]);
 
   return null;
 }

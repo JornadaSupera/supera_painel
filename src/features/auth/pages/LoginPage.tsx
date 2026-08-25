@@ -30,7 +30,7 @@ import { loginSchema, type LoginForm } from "../schemas";
  * sucedido leva sempre a `/login/mfa`.
  */
 export function LoginPage() {
-  const { entrar, autenticado, desafioMfa } = useAuth();
+  const { signIn, isAuthenticated, mfaChallenge } = useAuth();
   const location = useLocation();
   const [erro, setErro] = useState<string | null>(null);
 
@@ -45,19 +45,19 @@ export function LoginPage() {
 
   const emailAtual = form.watch("email");
 
-  if (autenticado) {
+  if (isAuthenticated) {
     const destino = (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? "/dashboard";
     return <Navigate to={destino} replace />;
   }
 
   // Recarregar a página no meio do fluxo não deve reabrir o formulário de
   // credenciais com um desafio de MFA já em curso.
-  if (desafioMfa) return <Navigate to="/login/mfa" replace state={location.state} />;
+  if (mfaChallenge) return <Navigate to="/login/mfa" replace state={location.state} />;
 
   const enviar = async (dados: LoginForm) => {
     setErro(null);
     try {
-      await entrar(dados);
+      await signIn({ email: dados.email, password: dados.senha });
     } catch (e) {
       const codigo = (e as { code?: string }).code;
 
@@ -75,9 +75,9 @@ export function LoginPage() {
 
   return (
     <AuthLayout
-      titulo="Entrar no painel"
-      descricao="Use seu e-mail corporativo. Depois da senha, pediremos o código de verificação."
-      rodape={
+      title="Entrar no painel"
+      description="Use seu e-mail corporativo. Depois da senha, pediremos o código de verificação."
+      footer={
         <p>
           Problemas para acessar?{" "}
           <Link to="/recuperar-senha" className="text-primary font-medium underline underline-offset-4">

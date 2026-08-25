@@ -4,21 +4,21 @@ import { Loading } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
 
 /**
- * Exige sessão válida.
+ * Requires a valid session.
  *
- * Guarda o destino em `state.from` para devolver a pessoa exatamente onde ela
- * estava depois do login — perder o contexto é um atrito pequeno que se repete
- * o dia inteiro num painel.
+ * It stores the destination in `state.from` to bring the person back exactly
+ * where they were after signing in — losing that context is a small friction
+ * that repeats all day long in a panel.
  */
 export function ProtectedRoute() {
-  const { autenticado, carregando } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
-  // Sem isto, a restauração da sessão empurraria todo mundo para /login no
-  // primeiro frame.
-  if (carregando) return <Loading mensagem="Verificando acesso…" />;
+  // Without this, restoring the session would push everyone to /login on the
+  // first frame.
+  if (isLoading) return <Loading message="Verificando acesso…" />;
 
-  if (!autenticado) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 

@@ -4,44 +4,44 @@ import type { Permissao } from "@/lib/rbac";
 import type { DesafioMfa, Sessao, UsuarioAutenticado } from "@/types/auth";
 
 /**
- * Contexto de autenticação.
+ * Authentication context.
  *
- * Separado do provider (`AuthContext.tsx`) para que o arquivo do componente
- * exporte apenas componentes — requisito do Fast Refresh do Vite.
+ * Kept apart from the provider (`AuthContext.tsx`) so the component file
+ * exports components only — a requirement of Vite's Fast Refresh.
  */
 
 export interface AuthContextValue {
-  /** `null` quando não há sessão. */
-  sessao: Sessao | null;
-  usuario: UsuarioAutenticado | null;
-  /** Conjunto efetivo — papel + especialidade + extras. Ver `lib/rbac.ts`. */
-  permissoes: ReadonlySet<Permissao>;
-  autenticado: boolean;
-  /** Verdadeiro durante a restauração inicial da sessão. */
-  carregando: boolean;
+  /** `null` when there is no session. */
+  session: Sessao | null;
+  user: UsuarioAutenticado | null;
+  /** Effective set — role + specialty + extras. See `lib/rbac.ts`. */
+  permissions: ReadonlySet<Permissao>;
+  isAuthenticated: boolean;
+  /** True while the initial session restore is running. */
+  isLoading: boolean;
 
-  /** Desafio de MFA em curso; a tela `/login/mfa` depende dele. */
-  desafioMfa: DesafioMfa | null;
+  /** MFA challenge in progress; the `/login/mfa` screen depends on it. */
+  mfaChallenge: DesafioMfa | null;
 
-  entrar(params: { email: string; senha: string }): Promise<void>;
-  confirmarMfa(codigo: string): Promise<void>;
-  cancelarMfa(): void;
-  sair(motivo?: MotivoLogout): Promise<void>;
+  signIn(params: { email: string; password: string }): Promise<void>;
+  confirmMfa(code: string): Promise<void>;
+  cancelMfa(): void;
+  signOut(reason?: LogoutReason): Promise<void>;
 
-  /** `can("pacientes:write")` — aceita uma ou várias (E lógico). */
-  pode(permissao: Permissao | readonly Permissao[]): boolean;
-  /** Verdadeiro se tiver ao menos uma (OU lógico). */
-  podeAlguma(permissoes: readonly Permissao[]): boolean;
+  /** `can("pacientes:write")` — accepts one or many (logical AND). */
+  can(permission: Permissao | readonly Permissao[]): boolean;
+  /** True when at least one is held (logical OR). */
+  canAny(permissions: readonly Permissao[]): boolean;
 
-  /** Marca atividade do usuário, adiando o logout por inatividade. */
-  renovarAtividade(): void;
-  /** Segundos restantes até o logout automático; `null` sem sessão. */
-  segundosParaExpirar: number | null;
-  /** Verdadeiro quando falta pouco e o aviso deve aparecer. */
-  expirandoEmBreve: boolean;
+  /** Marks user activity, pushing the idle logout further out. */
+  renewActivity(): void;
+  /** Seconds left until the automatic logout; `null` without a session. */
+  secondsUntilExpiry: number | null;
+  /** True when little time is left and the warning should appear. */
+  isExpiringSoon: boolean;
 }
 
-export type MotivoLogout = "usuario" | "inatividade" | "sessao_expirada";
+export type LogoutReason = "user" | "idle" | "session_expired";
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -53,7 +53,7 @@ export function useAuth(): AuthContextValue {
   return context;
 }
 
-/** Atalho para quando só a checagem de permissão importa. */
-export function usePode() {
-  return useAuth().pode;
+/** Shortcut for when only the permission check matters. */
+export function useCan() {
+  return useAuth().can;
 }
