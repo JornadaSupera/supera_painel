@@ -35,6 +35,13 @@ export interface UserAvatarProps {
   size?: AvatarSize;
   /** Deriva a cor do nome em vez de usar a primária. */
   colorido?: boolean;
+  /**
+   * `suave` é o padrão do protótipo: fundo tingido e iniciais na cor cheia.
+   * Numa lista de vinte linhas, vinte círculos sólidos competem com o nome —
+   * que é o dado que a pessoa está procurando. `solido` fica para quando o
+   * avatar é o próprio assunto.
+   */
+  tom?: "suave" | "solido";
   className?: string;
 }
 
@@ -43,14 +50,23 @@ export function UserAvatar({
   src,
   size = "md",
   colorido = false,
+  tom = "suave",
   className,
 }: UserAvatarProps) {
+  const cor = colorido ? corDoNome(nome) : "var(--primary)";
+
   return (
     <Avatar className={cn(TAMANHOS[size], className)} title={nome || undefined}>
       {src && <AvatarImage src={src} alt={nome} />}
       <AvatarFallback
-        className="font-semibold tracking-wide text-white"
-        style={{ backgroundColor: colorido ? corDoNome(nome) : "var(--primary)" }}
+        className="font-semibold tracking-wide"
+        style={
+          tom === "suave"
+            ? // `color-mix` em vez de uma classe `bg-*/10` porque a cor pode vir
+              // do nome, e Tailwind não gera utilitário para valor dinâmico.
+              { backgroundColor: `color-mix(in oklab, ${cor} 12%, transparent)`, color: cor }
+            : { backgroundColor: cor, color: "var(--primary-foreground)" }
+        }
       >
         {iniciais(nome)}
       </AvatarFallback>

@@ -169,11 +169,14 @@ export function DataTable<T>({
       {/* A rolagem horizontal fica DENTRO da tabela — o corpo da página nunca
           rola na horizontal. */}
       <div className="min-w-0 overflow-x-auto">
-        <Table>
+        {/* O primitivo do shadcn usa `p-2` em toda célula. O protótipo respira
+            16 px nas bordas do cartão e 12 px entre colunas — a diferença é
+            visível quando a tabela encosta na borda do card. */}
+        <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
           {caption && <caption className="sr-only">{caption}</caption>}
 
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
+            <TableRow className="bg-muted/30 hover:bg-muted/30">
               {selectable && (
                 <TableHead className="w-11">
                   <Checkbox
@@ -193,7 +196,7 @@ export function DataTable<T>({
                     key={coluna.key}
                     style={coluna.width ? { width: coluna.width } : undefined}
                     className={cn(
-                      "text-2xs font-semibold tracking-wide whitespace-nowrap uppercase",
+                      "text-muted-foreground h-9 text-[10px] font-medium tracking-wider whitespace-nowrap uppercase",
                       alinhamento(coluna.align),
                     )}
                     // Anuncia a ordenação para tecnologia assistiva.
