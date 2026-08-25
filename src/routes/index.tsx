@@ -29,7 +29,10 @@ import { ProtectedRoute } from "./ProtectedRoute";
    destino de quem chega, e um carregamento extra ali é atrito visível. */
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
 const PacientesPage = lazy(() => import("@/features/pacientes/pages/PacientesPage"));
+const PacienteNovoPage = lazy(() => import("@/features/pacientes/pages/PacienteNovoPage"));
+const PacienteFichaPage = lazy(() => import("@/features/pacientes/pages/PacienteFichaPage"));
 const UsuariosPage = lazy(() => import("@/features/usuarios/pages/UsuariosPage"));
+const UsuarioFormPage = lazy(() => import("@/features/usuarios/pages/UsuarioFormPage"));
 const ConteudoPage = lazy(() => import("@/features/conteudo/pages/ConteudoPage"));
 const RelatoriosPage = lazy(() => import("@/features/relatorios/pages/RelatoriosPage"));
 const EstatisticasClinicasPage = lazy(
@@ -62,8 +65,24 @@ export function AppRoutes() {
                 <Route path="/dashboard" element={<DashboardPage />} />
               </Route>
 
+              {/* Cadastrar exige escrita, não leitura — por isso é um grupo
+                  próprio. O Router escolhe a rota mais específica, então
+                  "/pacientes/novo" ganha de "/pacientes/:id" independente da
+                  ordem em que as duas aparecem. */}
+              <Route element={<PermissionRoute permissao={PERMISSAO.PACIENTES_WRITE} />}>
+                <Route path="/pacientes/novo" element={<PacienteNovoPage />} />
+              </Route>
+
               <Route element={<PermissionRoute permissao={PERMISSAO.PACIENTES_READ} />}>
                 <Route path="/pacientes" element={<PacientesPage />} />
+                <Route path="/pacientes/:id" element={<PacienteFichaPage />} />
+              </Route>
+
+              {/* Cadastrar e editar profissional é gestão de acesso: exige
+                  `usuarios:manage`, não a leitura da lista. */}
+              <Route element={<PermissionRoute permissao={PERMISSAO.USUARIOS_MANAGE} />}>
+                <Route path="/usuarios/novo" element={<UsuarioFormPage />} />
+                <Route path="/usuarios/:id" element={<UsuarioFormPage />} />
               </Route>
 
               <Route element={<PermissionRoute permissao={PERMISSAO.USUARIOS_READ} />}>
