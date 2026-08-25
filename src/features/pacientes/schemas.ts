@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { FASE_TRATAMENTO, RISCO } from "@/lib/enums";
-import { somenteDigitos } from "@/lib/mask";
-import { cpfValido, nascimentoValido, telefoneValido } from "@/lib/validacao";
+import { digitsOnly } from "@/lib/mask";
+import { isValidCpf, isValidBirthDate, isValidPhone } from "@/lib/validation";
 import type { PacienteEntrada } from "@/types/paciente";
 
 /**
@@ -35,12 +35,12 @@ export const pacienteSchema = z.object({
   /* ------------------------------------------------------- identificação */
   nome: z.string().min(3, "Informe o nome completo.").max(120, "Nome muito longo."),
 
-  cpf: z.string().min(1, CAMPO_OBRIGATORIO).refine(cpfValido, "CPF inválido — confira os dígitos."),
+  cpf: z.string().min(1, CAMPO_OBRIGATORIO).refine(isValidCpf, "CPF inválido — confira os dígitos."),
 
   nascimento: z
     .string()
     .min(1, CAMPO_OBRIGATORIO)
-    .refine(nascimentoValido, "Data de nascimento inválida."),
+    .refine(isValidBirthDate, "Data de nascimento inválida."),
 
   sexo: z.enum(["feminino", "masculino"], { required_error: CAMPO_OBRIGATORIO }),
 
@@ -67,7 +67,7 @@ export const pacienteSchema = z.object({
   telefone: z
     .string()
     .min(1, CAMPO_OBRIGATORIO)
-    .refine(telefoneValido, "Telefone inválido — informe DDD e número."),
+    .refine(isValidPhone, "Telefone inválido — informe DDD e número."),
 
   email: z.string().min(1, CAMPO_OBRIGATORIO).email("E-mail inválido."),
 
@@ -91,7 +91,7 @@ export type PacienteForm = z.infer<typeof pacienteSchema>;
  */
 export const pacienteEdicaoSchema = pacienteSchema.extend({
   cpf: z.string(),
-  telefone: z.string().refine((valor) => !valor || telefoneValido(valor), "Telefone inválido."),
+  telefone: z.string().refine((valor) => !valor || isValidPhone(valor), "Telefone inválido."),
   email: z
     .string()
     .refine((valor) => !valor || z.string().email().safeParse(valor).success, "E-mail inválido."),
@@ -130,10 +130,10 @@ export function paraEntrada(valores: PacienteForm): PacienteEntrada {
 
   return {
     nome: valores.nome.trim().replace(/\s+/g, " "),
-    cpf: somenteDigitos(valores.cpf),
+    cpf: digitsOnly(valores.cpf),
     nascimento: valores.nascimento,
     sexo: valores.sexo,
-    telefone: somenteDigitos(valores.telefone),
+    telefone: digitsOnly(valores.telefone),
     email: valores.email.trim().toLowerCase(),
     cid: valores.cid,
     protocolo_id: valores.protocolo_id,

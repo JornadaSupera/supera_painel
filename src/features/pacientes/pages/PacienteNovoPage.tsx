@@ -28,10 +28,10 @@ export function PacienteNovoPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Gestão"
-        titulo="Novo paciente"
-        nivel="MVP"
+        title="Novo paciente"
+        level="MVP"
         breadcrumb={[{ label: "Pacientes", to: "/pacientes" }, { label: "Novo paciente" }]}
-        subtitulo="O convite de acesso ao aplicativo é enviado por SMS ao final do cadastro."
+        subtitle="O convite de acesso ao aplicativo é enviado por SMS ao final do cadastro."
       />
 
       <PacienteForm

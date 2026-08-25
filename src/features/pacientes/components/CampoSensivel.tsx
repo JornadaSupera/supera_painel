@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/auth-context";
-import { formatarCpf, formatarTelefone } from "@/lib/mask";
+import { formatCpf, formatPhone } from "@/lib/mask";
 import { PERMISSAO } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 import type { CampoPii } from "@/types/paciente";
@@ -21,8 +21,8 @@ import { useRevelarPii } from "../hooks/usePacientes";
  */
 
 const FORMATADOR: Record<CampoPii, (valor: string) => string> = {
-  cpf: formatarCpf,
-  telefone: formatarTelefone,
+  cpf: formatCpf,
+  telefone: formatPhone,
   email: (valor) => valor,
 };
 
@@ -49,11 +49,11 @@ export function CampoSensivel({
   nomePaciente,
   className,
 }: CampoSensivelProps) {
-  const { pode } = useAuth();
+  const { can } = useAuth();
   const [revelado, setRevelado] = useState<string | null>(null);
   const revelar = useRevelarPii(pacienteId);
 
-  const autorizado = pode(PERMISSAO.PACIENTES_REVEAL_PII);
+  const autorizado = can(PERMISSAO.PACIENTES_REVEAL_PII);
   const visivel = revelado !== null;
 
   const alternar = () => {

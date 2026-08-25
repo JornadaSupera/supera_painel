@@ -18,8 +18,8 @@ import {
   PageHeader,
   SkeletonForm,
   StatusBadge,
-  TONE_RISCO,
-  TONE_STATUS_PACIENTE,
+  TONE_RISK,
+  TONE_PATIENT_STATUS,
   UserAvatar,
 } from "@/components/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -32,7 +32,7 @@ import {
   STATUS_PACIENTE,
   STATUS_PACIENTE_LABEL,
 } from "@/lib/enums";
-import { formatarData, formatarDataHora, idade, tempoRelativo } from "@/lib/format";
+import { formatDate, formatDateTime, ageInYears, relativeTime } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { STATUS_CONVITE_LABEL, type PacienteDetalhe } from "@/types/paciente";
 import { CampoSensivel } from "../components/CampoSensivel";
@@ -140,8 +140,8 @@ export function PacienteFichaPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-5">
-        <PageHeader eyebrow="Gestão" titulo="Ficha do paciente" />
-        <SkeletonForm campos={8} className="max-w-3xl" />
+        <PageHeader eyebrow="Gestão" title="Ficha do paciente" />
+        <SkeletonForm fields={8} className="max-w-3xl" />
       </div>
     );
   }
@@ -159,13 +159,13 @@ export function PacienteFichaPage() {
       <div className="flex flex-col gap-5">
         <PageHeader
           eyebrow="Gestão"
-          titulo={`Editar ${paciente.nome}`}
+          title={`Editar ${paciente.nome}`}
           breadcrumb={[
             { label: "Pacientes", to: "/pacientes" },
             { label: paciente.nome, to: `/pacientes/${paciente.id}` },
             { label: "Editar" },
           ]}
-          subtitulo={`${paciente.codigo} · alterações ficam registradas na trilha de auditoria`}
+          subtitle={`${paciente.codigo} · alterações ficam registradas na trilha de auditoria`}
         />
 
         <PacienteForm
@@ -216,18 +216,18 @@ export function PacienteFichaPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Gestão"
-        titulo={paciente.nome}
+        title={paciente.nome}
         breadcrumb={[{ label: "Pacientes", to: "/pacientes" }, { label: paciente.nome }]}
         badge={
-          <StatusBadge tone={TONE_STATUS_PACIENTE[paciente.status]} size="sm" dot>
+          <StatusBadge tone={TONE_PATIENT_STATUS[paciente.status]} size="sm" dot>
             {STATUS_PACIENTE_LABEL[paciente.status]}
           </StatusBadge>
         }
-        subtitulo={
+        subtitle={
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="tabular-nums">{paciente.codigo}</span>
             <span aria-hidden="true">·</span>
-            <span className="tabular-nums">{idade(paciente.nascimento)} anos</span>
+            <span className="tabular-nums">{ageInYears(paciente.nascimento)} anos</span>
             <span aria-hidden="true">·</span>
             <span>CPF</span>
             <CampoSensivel
@@ -240,7 +240,7 @@ export function PacienteFichaPage() {
         }
         actions={
           <>
-            <Can permissao={PERMISSAO.PACIENTES_WRITE}>
+            <Can permission={PERMISSAO.PACIENTES_WRITE}>
               <Button
                 variant="outline"
                 disabled={inativo || convite.isPending}
@@ -259,7 +259,7 @@ export function PacienteFichaPage() {
               </Button>
             </Can>
 
-            <Can permissao={PERMISSAO.PACIENTES_DEACTIVATE}>
+            <Can permission={PERMISSAO.PACIENTES_DEACTIVATE}>
               <Button
                 variant="outline"
                 disabled={inativo}
@@ -279,7 +279,7 @@ export function PacienteFichaPage() {
           <TriangleAlert />
           <AlertTitle>Paciente inativo</AlertTitle>
           <AlertDescription>
-            Desativado em {formatarDataHora(paciente.desativado_em)}
+            Desativado em {formatDateTime(paciente.desativado_em)}
             {paciente.motivo_desativacao ? ` · ${paciente.motivo_desativacao}` : ""}
           </AlertDescription>
         </Alert>
@@ -288,7 +288,7 @@ export function PacienteFichaPage() {
       <div className="grid max-w-5xl gap-4 lg:grid-cols-2">
         <Secao titulo="Identificação" icone={<User size={15} />}>
           <div className="flex items-center gap-3">
-            <UserAvatar nome={paciente.nome} size="lg" />
+            <UserAvatar name={paciente.nome} size="lg" />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{paciente.nome}</p>
               <p className="text-muted-foreground text-xs capitalize">{paciente.sexo}</p>
@@ -297,7 +297,7 @@ export function PacienteFichaPage() {
 
           <dl className="grid grid-cols-2 gap-4">
             <Campo rotulo="Nascimento">
-              <span className="tabular-nums">{formatarData(paciente.nascimento)}</span>
+              <span className="tabular-nums">{formatDate(paciente.nascimento)}</span>
             </Campo>
 
             <Campo rotulo="CPF">
@@ -343,13 +343,13 @@ export function PacienteFichaPage() {
             </Campo>
 
             <Campo rotulo="Risco">
-              <StatusBadge tone={TONE_RISCO[paciente.risco]} size="sm">
+              <StatusBadge tone={TONE_RISK[paciente.risco]} size="sm">
                 {RISCO_LABEL[paciente.risco]}
               </StatusBadge>
             </Campo>
 
             <Campo rotulo="Diagnóstico em">
-              <span className="tabular-nums">{formatarData(paciente.diagnostico_em)}</span>
+              <span className="tabular-nums">{formatDate(paciente.diagnostico_em)}</span>
             </Campo>
 
             <Campo rotulo="Médico responsável">{paciente.medico_responsavel_nome ?? "—"}</Campo>
@@ -422,15 +422,15 @@ export function PacienteFichaPage() {
             <Campo rotulo="Convite">{STATUS_CONVITE_LABEL[paciente.convite_status]}</Campo>
 
             <Campo rotulo="Enviado em">
-              <span className="tabular-nums">{formatarDataHora(paciente.convite_enviado_em)}</span>
+              <span className="tabular-nums">{formatDateTime(paciente.convite_enviado_em)}</span>
             </Campo>
 
             <Campo rotulo="Último acesso">
-              {paciente.ultimo_acesso_app_em ? tempoRelativo(paciente.ultimo_acesso_app_em) : "Nunca acessou"}
+              {paciente.ultimo_acesso_app_em ? relativeTime(paciente.ultimo_acesso_app_em) : "Nunca acessou"}
             </Campo>
 
             <Campo rotulo="Cadastrado em">
-              <span className="tabular-nums">{formatarData(paciente.criado_em)}</span>
+              <span className="tabular-nums">{formatDate(paciente.criado_em)}</span>
             </Campo>
           </dl>
         </Secao>
@@ -439,13 +439,13 @@ export function PacienteFichaPage() {
       <ConfirmDialog
         open={confirmando}
         onOpenChange={setConfirmando}
-        titulo={`Desativar ${paciente.nome}?`}
-        descricao="A ficha continua no sistema e o histórico é preservado, mas o paciente deixa de aparecer como ativo e perde o acesso ao aplicativo."
+        title={`Desativar ${paciente.nome}?`}
+        description="A ficha continua no sistema e o histórico é preservado, mas o paciente deixa de aparecer como ativo e perde o acesso ao aplicativo."
         confirmLabel="Desativar"
-        exigirMotivo
+        requireReason
         loading={desativar.isPending}
-        onConfirm={({ motivo }) => {
-          desativar.mutate({ id: paciente.id, motivo }, { onSuccess: () => navigate("/pacientes") });
+        onConfirm={({ reason }) => {
+          desativar.mutate({ id: paciente.id, motivo: reason }, { onSuccess: () => navigate("/pacientes") });
           setConfirmando(false);
         }}
       />

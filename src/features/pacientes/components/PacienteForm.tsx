@@ -33,7 +33,7 @@ import {
   toOptions,
 } from "@/lib/enums";
 import { cn } from "@/lib/utils";
-import { aplicarMascaraCpf, aplicarMascaraTelefone } from "@/lib/validacao";
+import { applyCpfMask, applyPhoneMask } from "@/lib/validation";
 import {
   ETAPAS,
   pacienteEdicaoSchema,
@@ -176,7 +176,7 @@ export function PacienteForm({
                           inputMode="numeric"
                           placeholder="000.000.000-00"
                           disabled={edicao}
-                          onChange={(evento) => field.onChange(aplicarMascaraCpf(evento.target.value))}
+                          onChange={(evento) => field.onChange(applyCpfMask(evento.target.value))}
                         />
                       </FormControl>
                       <FormDescription>
@@ -456,7 +456,7 @@ export function PacienteForm({
                           inputMode="tel"
                           placeholder={edicao ? contatoAtual?.telefone : "(48) 99999-9999"}
                           onChange={(evento) =>
-                            field.onChange(aplicarMascaraTelefone(evento.target.value))
+                            field.onChange(applyPhoneMask(evento.target.value))
                           }
                         />
                       </FormControl>

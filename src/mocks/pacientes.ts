@@ -8,7 +8,7 @@ import { usuarios } from "./usuarios";
  * Base de pacientes — os 81 do cabeçalho do protótipo.
  *
  * As 25 primeiras linhas são exatamente as que a tela mostra, na mesma ordem,
- * com o mesmo nome, idade, final de CPF, CID, protocolo e fase. As demais
+ * com o mesmo nome, ageInYears, final de CPF, CID, protocolo e fase. As demais
  * completam a contagem e dão variedade aos filtros, à paginação e aos estados.
  *
  * Campos em `snake_case`: são as colunas da futura tabela `pacientes`.
@@ -51,9 +51,9 @@ export interface PacienteMock {
 
 /* -------------------------------------------------------------------------
    LINHAS DE ORIGEM
-   [nome, sexo, idade, final do CPF, CID, protocolo, fase]
+   [nome, sexo, ageInYears, final do CPF, CID, protocolo, fase]
 
-   Idade em vez de data de nascimento porque idade é o que o protótipo mostra;
+   Idade em vez de data de nascimento porque ageInYears é o que o protótipo mostra;
    a data é derivada adiante, que é como o dado existe de verdade no banco.
    ------------------------------------------------------------------------- */
 
@@ -213,7 +213,7 @@ export const pacientes: PacienteMock[] = LINHAS.map((linha, i) => {
   const criado = REFERENCIA - i * 2 * DIA;
 
   // Meses de janeiro a julho garantem que o aniversário já passou em qualquer
-  // ponto do segundo semestre — a idade exibida bate com a do protótipo.
+  // ponto do segundo semestre — a ageInYears exibida bate com a do protótipo.
   const mes = String((i % 7) + 1).padStart(2, "0");
   const dia = String((i % 27) + 1).padStart(2, "0");
 

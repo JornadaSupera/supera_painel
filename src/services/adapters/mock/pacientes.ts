@@ -1,6 +1,6 @@
 import { FASE_TRATAMENTO_LABEL, RISCO_LABEL, STATUS_PACIENTE, STATUS_PACIENTE_LABEL } from "@/lib/enums";
-import { formatarData, idade } from "@/lib/format";
-import { mascararCpf, mascararEmail, mascararTelefone, somenteDigitos } from "@/lib/mask";
+import { formatDate, ageInYears } from "@/lib/format";
+import { maskCpf, maskEmail, maskPhone, digitsOnly } from "@/lib/mask";
 import { cids } from "@/mocks/cids";
 import { pacientes, type PacienteMock } from "@/mocks/pacientes";
 import { protocolos } from "@/mocks/protocolos";
@@ -65,7 +65,7 @@ function toListItem(row: PacienteMock): PacienteListItem {
     id: row.id,
     codigo: row.codigo,
     nome: row.nome,
-    cpf_mascarado: mascararCpf(row.cpf),
+    cpf_mascarado: maskCpf(row.cpf),
     nascimento: row.nascimento,
     sexo: row.sexo,
     cid: row.cid,
@@ -84,8 +84,8 @@ function toListItem(row: PacienteMock): PacienteListItem {
 function toDetalhe(row: PacienteMock): PacienteDetalhe {
   return {
     ...toListItem(row),
-    telefone_mascarado: mascararTelefone(row.telefone),
-    email_mascarado: mascararEmail(row.email),
+    telefone_mascarado: maskPhone(row.telefone),
+    email_mascarado: maskEmail(row.email),
     estadiamento: row.estadiamento,
     diagnostico_em: row.diagnostico_em,
     alergias: row.alergias,
@@ -116,7 +116,7 @@ const CAMPOS_BUSCA = ["nome", "codigo", "cpf"];
  */
 function normalizarBusca(search?: string): string {
   const termo = (search ?? "").trim();
-  return /^[\d.\-\s/]+$/.test(termo) && termo.length > 0 ? somenteDigitos(termo) : termo;
+  return /^[\d.\-\s/]+$/.test(termo) && termo.length > 0 ? digitsOnly(termo) : termo;
 }
 
 const ORDENACAO_PADRAO = { field: "criado_em", direction: "desc" } as const;
@@ -189,7 +189,7 @@ function proximoCodigo(): string {
 
 export async function create(entrada: PacienteEntrada): Promise<SingleResult<PacienteDetalhe>> {
   return simulate(() => {
-    const cpf = somenteDigitos(entrada.cpf);
+    const cpf = digitsOnly(entrada.cpf);
 
     // CPF é a chave natural do paciente: duplicá-lo cria duas fichas para a
     // mesma pessoa, e o app do paciente não saberia em qual escrever.
@@ -206,7 +206,7 @@ export async function create(entrada: PacienteEntrada): Promise<SingleResult<Pac
       cpf,
       nascimento: entrada.nascimento,
       sexo: entrada.sexo,
-      telefone: somenteDigitos(entrada.telefone),
+      telefone: digitsOnly(entrada.telefone),
       email: entrada.email.trim().toLowerCase(),
       cid: entrada.cid,
       protocolo_id: entrada.protocolo_id,
@@ -250,7 +250,7 @@ export async function update({
       nome: dados.nome?.trim() ?? row.nome,
       nascimento: dados.nascimento ?? row.nascimento,
       sexo: dados.sexo ?? row.sexo,
-      telefone: dados.telefone ? somenteDigitos(dados.telefone) : row.telefone,
+      telefone: dados.telefone ? digitsOnly(dados.telefone) : row.telefone,
       email: dados.email?.trim().toLowerCase() ?? row.email,
       cid: dados.cid ?? row.cid,
       protocolo_id: dados.protocolo_id ?? row.protocolo_id,
@@ -321,7 +321,7 @@ export async function sendInvite({ id }: { id: string }): Promise<SingleResult<R
 
     return okOne<ResultadoConvite>({
       paciente_id: row.id,
-      destino: mascararTelefone(row.telefone),
+      destino: maskPhone(row.telefone),
       enviado_em: enviado,
     });
   });
@@ -355,8 +355,8 @@ export async function exportar(params: ListParams = {}): Promise<ListResult<Reco
     const linhas = filtrados.data.map((row) => ({
       Código: row.codigo,
       Paciente: row.nome,
-      CPF: mascararCpf(row.cpf),
-      Idade: String(idade(row.nascimento) ?? ""),
+      CPF: maskCpf(row.cpf),
+      Idade: String(ageInYears(row.nascimento) ?? ""),
       Sexo: row.sexo,
       CID: row.cid,
       Diagnóstico: descricaoCid(row.cid),
@@ -366,7 +366,7 @@ export async function exportar(params: ListParams = {}): Promise<ListResult<Reco
       Risco: RISCO_LABEL[row.risco],
       Status: STATUS_PACIENTE_LABEL[row.status],
       Convite: STATUS_CONVITE_LABEL[row.convite_status],
-      "Cadastrado em": formatarData(row.criado_em),
+      "Cadastrado em": formatDate(row.criado_em),
     }));
 
     return ok(linhas, linhas.length);

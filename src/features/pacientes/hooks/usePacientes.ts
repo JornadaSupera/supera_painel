@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { auditar } from "@/lib/audit";
-import { baixarCsv } from "@/lib/csv";
+import { audit } from "@/lib/audit";
+import { downloadCsv } from "@/lib/csv";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, pacientesApi } from "@/services/apiClient";
 import type { ListParams } from "@/services/contracts";
@@ -52,7 +52,7 @@ export function usePacientes() {
   };
 
   const query = useQuery({
-    queryKey: queryKeys.pacientes.list(params),
+    queryKey: queryKeys.patients.list(params),
     queryFn: () => call(() => pacientesApi.list(params)),
     // Mantém a página anterior visível durante a troca de página: sem isso a
     // tabela pisca para o esqueleto a cada clique na paginação.
@@ -70,11 +70,11 @@ export function usePacientes() {
 /** Ficha completa. O acesso a uma ficha individual é um evento de auditoria. */
 export function usePaciente(id: string | undefined) {
   return useQuery({
-    queryKey: queryKeys.pacientes.detail(id ?? ""),
+    queryKey: queryKeys.patients.detail(id ?? ""),
     enabled: Boolean(id),
     queryFn: async () => {
       const { data } = await call(() => pacientesApi.getById({ id: id as string }));
-      if (data) auditar.leitura(RECURSO, data.id, data.id);
+      if (data) audit.read(RECURSO, data.id, data.id);
       return data;
     },
   });
@@ -94,7 +94,7 @@ export function usePaciente(id: string | undefined) {
 export function useRevelarPii(pacienteId: string) {
   return useMutation<PiiRevelada, Error, CampoPii[]>({
     mutationFn: async (campos) => {
-      auditar.sigiloso(RECURSO, pacienteId, pacienteId);
+      audit.confidential(RECURSO, pacienteId, pacienteId);
       const { data } = await call(() => pacientesApi.revealPii({ id: pacienteId, campos }));
       return data ?? {};
     },
@@ -108,7 +108,7 @@ export function useRevelarPii(pacienteId: string) {
 
 function useInvalidarPacientes() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: queryKeys.pacientes.all });
+  return () => queryClient.invalidateQueries({ queryKey: queryKeys.patients.all });
 }
 
 export function useCriarPaciente() {
@@ -120,7 +120,7 @@ export function useCriarPaciente() {
       return data;
     },
     onSuccess: async (paciente) => {
-      if (paciente) auditar.edicao(RECURSO, paciente.id, { operacao: "criacao" });
+      if (paciente) audit.update(RECURSO, paciente.id, { operacao: "criacao" });
       await invalidar();
       toast.success("Paciente cadastrado", {
         description: paciente ? `${paciente.nome} · ${paciente.codigo}` : undefined,
@@ -139,7 +139,7 @@ export function useAtualizarPaciente(id: string) {
       return data;
     },
     onSuccess: async (paciente) => {
-      auditar.edicao(RECURSO, id, { campos: paciente ? Object.keys(paciente).length : 0 });
+      audit.update(RECURSO, id, { campos: paciente ? Object.keys(paciente).length : 0 });
       await invalidar();
       toast.success("Ficha atualizada");
     },
@@ -154,7 +154,7 @@ export function useDesativarPaciente() {
   return useMutation({
     mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
       const { data } = await call(() => pacientesApi.deactivate({ id, motivo }));
-      auditar.exclusao(RECURSO, id, motivo);
+      audit.delete(RECURSO, id, motivo);
       return data;
     },
     onSuccess: async (paciente) => {
@@ -173,7 +173,7 @@ export function useEnviarConvite() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { data } = await call(() => pacientesApi.sendInvite({ id }));
-      auditar.edicao(RECURSO, id, { operacao: "convite_sms" });
+      audit.update(RECURSO, id, { operacao: "convite_sms" });
       return data;
     },
     onSuccess: async (resultado) => {
@@ -199,12 +199,12 @@ export function useEnviarConvite() {
 export function useExportarPacientes(params: ListParams) {
   return useMutation({
     mutationFn: async () => {
-      auditar.exportacao(RECURSO, { formato: "csv", filtros: params.filters, busca: params.search });
+      audit.export(RECURSO, { formato: "csv", filtros: params.filters, busca: params.search });
 
       const { data, count } = await call(() => pacientesApi.export(params));
       if (count === 0) return 0;
 
-      baixarCsv(data, "pacientes");
+      downloadCsv(data, "pacientes");
       return count;
     },
     onSuccess: (quantidade) => {

@@ -53,7 +53,7 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
             Ver ficha
           </DropdownMenuItem>
 
-          <Can permissao={PERMISSAO.PACIENTES_WRITE}>
+          <Can permission={PERMISSAO.PACIENTES_WRITE}>
             <DropdownMenuItem
               disabled={inativo}
               onSelect={() => navigate(`/pacientes/${paciente.id}?editar=1`)}
@@ -71,7 +71,7 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
             </DropdownMenuItem>
           </Can>
 
-          <Can permissao={PERMISSAO.PACIENTES_DEACTIVATE}>
+          <Can permission={PERMISSAO.PACIENTES_DEACTIVATE}>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
@@ -88,13 +88,13 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
       <ConfirmDialog
         open={confirmando}
         onOpenChange={setConfirmando}
-        titulo={`Desativar ${paciente.nome}?`}
-        descricao="A ficha continua no sistema e o histórico é preservado, mas o paciente deixa de aparecer como ativo e perde o acesso ao aplicativo."
+        title={`Desativar ${paciente.nome}?`}
+        description="A ficha continua no sistema e o histórico é preservado, mas o paciente deixa de aparecer como ativo e perde o acesso ao aplicativo."
         confirmLabel="Desativar"
-        exigirMotivo
+        requireReason
         loading={desativar.isPending}
-        onConfirm={({ motivo }) => {
-          desativar.mutate({ id: paciente.id, motivo });
+        onConfirm={({ reason }) => {
+          desativar.mutate({ id: paciente.id, motivo: reason });
           setConfirmando(false);
         }}
       />

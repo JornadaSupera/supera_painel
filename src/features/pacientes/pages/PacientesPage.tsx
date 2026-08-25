@@ -7,14 +7,14 @@ import {
   EmptyState,
   PageHeader,
   StatusBadge,
-  TONE_STATUS_PACIENTE,
+  TONE_PATIENT_STATUS,
   UserAvatar,
   type Column,
 } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FASE_TRATAMENTO_LABEL, STATUS_PACIENTE_LABEL } from "@/lib/enums";
-import { formatarNumero, idade } from "@/lib/format";
+import { formatNumber, ageInYears } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { temRecorte, usePacientesStore } from "@/stores/pacientes";
 import type { PacienteListItem } from "@/types/paciente";
@@ -61,13 +61,13 @@ export function PacientesPage() {
       width: "38%",
       render: (paciente) => (
         <div className="flex items-center gap-3">
-          <UserAvatar nome={paciente.nome} size="sm" className="shrink-0" />
+          <UserAvatar name={paciente.nome} size="sm" className="shrink-0" />
 
           <div className="min-w-0">
             <p className="text-foreground truncate text-sm font-medium">{paciente.nome}</p>
 
             <p className="text-muted-foreground flex items-center gap-1 text-[11px]">
-              <span className="tabular-nums">{idade(paciente.nascimento)} anos</span>
+              <span className="tabular-nums">{ageInYears(paciente.nascimento)} anos</span>
               <span aria-hidden="true">·</span>
               <span>CPF</span>
               <CampoSensivel
@@ -123,7 +123,7 @@ export function PacientesPage() {
       sortable: true,
       width: 110,
       render: (paciente) => (
-        <StatusBadge tone={TONE_STATUS_PACIENTE[paciente.status]} size="sm" dot>
+        <StatusBadge tone={TONE_PATIENT_STATUS[paciente.status]} size="sm" dot>
           {STATUS_PACIENTE_LABEL[paciente.status]}
         </StatusBadge>
       ),
@@ -139,16 +139,16 @@ export function PacientesPage() {
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Gestão"
-        titulo="Pacientes"
-        nivel="MVP"
-        subtitulo={
+        title="Pacientes"
+        level="MVP"
+        subtitle={
           isLoading && total === 0
             ? "Carregando cadastro…"
-            : `${formatarNumero(total)} ${filtrada ? "pacientes no recorte atual" : "pacientes cadastrados"} · convite por SMS no cadastro`
+            : `${formatNumber(total)} ${filtrada ? "pacientes no recorte atual" : "pacientes cadastrados"} · convite por SMS no cadastro`
         }
         actions={
           <>
-            <Can permissao={PERMISSAO.PACIENTES_EXPORT}>
+            <Can permission={PERMISSAO.PACIENTES_EXPORT}>
               <Button
                 variant="outline"
                 onClick={() => exportar.mutate()}
@@ -159,7 +159,7 @@ export function PacientesPage() {
               </Button>
             </Can>
 
-            <Can permissao={PERMISSAO.PACIENTES_WRITE}>
+            <Can permission={PERMISSAO.PACIENTES_WRITE}>
               <Button onClick={() => navigate("/pacientes/novo")}>
                 <UserPlus />
                 Novo paciente
@@ -176,13 +176,13 @@ export function PacientesPage() {
           columns={colunas}
           data={pacientes}
           caption="Pacientes cadastrados, com CID, protocolo, fase do tratamento e status."
-          rotulo="pacientes"
+          label="pacientes"
           loading={isLoading}
           error={isError ? error : null}
           onRetry={() => void refetch()}
           sort={sort}
           onSortChange={setSort}
-          filtrada={filtrada}
+          filtered={filtrada}
           onRowClick={(paciente) => navigate(`/pacientes/${paciente.id}`)}
           pagination={{
             page,
@@ -193,15 +193,15 @@ export function PacientesPage() {
           }}
           emptyState={
             <EmptyState
-              variant={filtrada ? "busca" : "vazio"}
-              titulo={filtrada ? "Nenhum paciente no recorte" : "Nenhum paciente cadastrado"}
-              descricao={
+              variant={filtrada ? "search" : "empty"}
+              title={filtrada ? "Nenhum paciente no recorte" : "Nenhum paciente cadastrado"}
+              description={
                 filtrada
                   ? "Nenhuma ficha corresponde à busca e aos filtros aplicados."
                   : "Cadastre o primeiro paciente para começar o acompanhamento pelo aplicativo."
               }
               action={
-                <Can permissao={PERMISSAO.PACIENTES_WRITE}>
+                <Can permission={PERMISSAO.PACIENTES_WRITE}>
                   <Button onClick={() => navigate("/pacientes/novo")}>
                     <UserPlus />
                     Novo paciente
