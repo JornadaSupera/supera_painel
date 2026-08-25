@@ -18,7 +18,7 @@ const UMA_HORA = 60 * 60 * 1000;
 
 export function useCids() {
   return useQuery({
-    queryKey: queryKeys.catalogos.cids(),
+    queryKey: queryKeys.catalogs.cids(),
     queryFn: async () => (await call(() => catalogosApi.listCids())).data,
     staleTime: UMA_HORA,
   });
@@ -26,7 +26,7 @@ export function useCids() {
 
 export function useProtocolos() {
   return useQuery({
-    queryKey: queryKeys.catalogos.protocolos(),
+    queryKey: queryKeys.catalogs.protocols(),
     queryFn: async () => (await call(() => catalogosApi.listProtocolos())).data,
     staleTime: UMA_HORA,
   });
@@ -34,7 +34,7 @@ export function useProtocolos() {
 
 export function useEspecialidades() {
   return useQuery({
-    queryKey: queryKeys.catalogos.especialidades(),
+    queryKey: queryKeys.catalogs.specialties(),
     queryFn: async () => (await call(() => catalogosApi.listEspecialidades())).data,
     staleTime: UMA_HORA,
   });
@@ -42,7 +42,7 @@ export function useEspecialidades() {
 
 export function useEfeitosAdversos() {
   return useQuery({
-    queryKey: queryKeys.catalogos.efeitos(),
+    queryKey: queryKeys.catalogs.effects(),
     queryFn: async () => (await call(() => catalogosApi.listEfeitos())).data,
     staleTime: UMA_HORA,
   });

@@ -13,7 +13,7 @@ import {
 } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Periodo } from "@/lib/enums";
-import { formatarDataExtenso, formatarNumero } from "@/lib/format";
+import { formatLongDate, formatNumber } from "@/lib/format";
 import { BotaoExportar } from "../components/BotaoExportar";
 import { PeriodoToggle } from "../components/PeriodoToggle";
 import { useKpis, useSeries } from "../hooks/useDashboard";
@@ -69,11 +69,11 @@ export function DashboardPage() {
     <div className="flex flex-col gap-6">
       <PageHeader
         eyebrow="Painel executivo"
-        titulo="Visão geral"
-        nivel="MVP"
-        subtitulo={
+        title="Visão geral"
+        level="MVP"
+        subtitle={
           <>
-            {formatarDataExtenso(new Date().toISOString())} ·{" "}
+            {formatLongDate(new Date().toISOString())} ·{" "}
             <span className="text-muted-foreground">
               todos os números são agregados anonimizados
             </span>
@@ -91,7 +91,7 @@ export function DashboardPage() {
         {/* ------------------------------------------------------------ KPIs */}
         <section aria-label="Indicadores">
           {kpis.isError ? (
-            <ErrorState error={kpis.error} onRetry={() => void kpis.refetch()} compacto />
+            <ErrorState error={kpis.error} onRetry={() => void kpis.refetch()} compact />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               {kpis.isLoading
@@ -104,16 +104,16 @@ export function DashboardPage() {
                       <StatCard
                         key={kpi.id}
                         label={kpi.label}
-                        valor={formatarNumero(kpi.valor)}
-                        unidade={kpi.unidade}
-                        variacao={kpi.variacao}
-                        variacaoUnidade={kpi.variacao_unidade}
-                        periodo={kpi.variacao_periodo}
-                        contexto={kpi.contexto}
-                        inverterCor={kpi.inverter_cor}
-                        icone={Icone ? <Icone /> : undefined}
-                        acento={visual?.acento}
-                        nivel={kpi.nivel}
+                        value={formatNumber(kpi.valor)}
+                        unit={kpi.unidade}
+                        delta={kpi.variacao}
+                        deltaUnit={kpi.variacao_unidade}
+                        period={kpi.variacao_periodo}
+                        context={kpi.contexto}
+                        invertColor={kpi.inverter_cor}
+                        icon={Icone ? <Icone /> : undefined}
+                        accent={visual?.acento}
+                        level={kpi.nivel}
                         // Drill-down: cada indicador abre o relatório que o
                         // detalha (Fase 8).
                         onClick={
@@ -131,9 +131,9 @@ export function DashboardPage() {
         {/* -------------------------------------------------------- gráficos */}
         <div className="grid gap-4 lg:grid-cols-3">
           <ChartCard
-            largo
-            titulo="Sessões de quimioterapia"
-            descricao={
+            wide
+            title="Sessões de quimioterapia"
+            description={
               series.data ? (
                 <>
                   Últimos 7 meses · meta de{" "}
@@ -153,52 +153,55 @@ export function DashboardPage() {
               loading={series.isLoading}
               error={erroSeries}
               onRetry={recarregarSeries}
-              altura={ALTURA_GRAFICO}
+              height={ALTURA_GRAFICO}
             />
           </ChartCard>
 
-          <ChartCard titulo="Pacientes por CID" descricao="Distribuição atual">
+          <ChartCard title="Pacientes por CID" description="Distribuição atual">
             <DonutChart
-              data={series.data?.pacientes_por_cid ?? []}
+              data={(series.data?.pacientes_por_cid ?? []).map((fatia) => ({
+                name: fatia.nome,
+                value: fatia.valor,
+              }))}
               totalLabel="pacientes"
               loading={series.isLoading}
               error={erroSeries}
               onRetry={recarregarSeries}
-              altura={ALTURA_GRAFICO}
+              height={ALTURA_GRAFICO}
             />
           </ChartCard>
 
           <ChartCard
-            largo
-            titulo="Efeitos adversos por protocolo"
-            descricao="% de pacientes com grau 2+ · pergunta levantada na reunião com a Dra."
+            wide
+            title="Efeitos adversos por protocolo"
+            description="% de pacientes com grau 2+ · pergunta levantada na reunião com a Dra."
           >
             <BarChart
               data={series.data?.efeitos_por_protocolo ?? []}
               xKey="protocolo"
               series={SERIES_EFEITOS}
-              sufixo="%"
-              legenda
+              suffix="%"
+              legend
               loading={series.isLoading}
               error={erroSeries}
               onRetry={recarregarSeries}
-              altura={ALTURA_GRAFICO}
+              height={ALTURA_GRAFICO}
             />
           </ChartCard>
 
           <ChartCard
-            titulo="Engajamento ao longo das semanas"
-            descricao="% de pacientes ativos no app"
+            title="Engajamento ao longo das semanas"
+            description="% de pacientes ativos no app"
           >
             <LineChart
               data={series.data?.engajamento ?? []}
               xKey="periodo"
               series={[{ key: "engajamento", label: "Ativos no app" }]}
-              sufixo="%"
+              suffix="%"
               loading={series.isLoading}
               error={erroSeries}
               onRetry={recarregarSeries}
-              altura={ALTURA_GRAFICO}
+              height={ALTURA_GRAFICO}
             />
           </ChartCard>
         </div>

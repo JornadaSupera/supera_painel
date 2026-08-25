@@ -12,9 +12,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/auth-context";
-import { auditar } from "@/lib/audit";
-import { formatarDataHora } from "@/lib/format";
-import { carimboDeTempo, exportarPdf, exportarPng } from "@/lib/pdf";
+import { audit } from "@/lib/audit";
+import { formatDateTime } from "@/lib/format";
+import { timestamp, exportPdf, exportPng } from "@/lib/pdf";
 
 /**
  * Exportação da captura do dashboard (MVP §5).
@@ -30,7 +30,7 @@ export function BotaoExportar({
   alvo: RefObject<HTMLElement | null>;
   nomeBase: string;
 }) {
-  const { usuario } = useAuth();
+  const { user } = useAuth();
   const [exportando, setExportando] = useState<"pdf" | "png" | null>(null);
 
   const exportar = async (formato: "pdf" | "png") => {
@@ -39,19 +39,19 @@ export function BotaoExportar({
 
     setExportando(formato);
 
-    const nome = `${nomeBase}_${carimboDeTempo()}`;
-    const rodape = usuario
-      ? `Jornada Supera · exportado por ${usuario.nome} em ${formatarDataHora(new Date().toISOString())}`
+    const nome = `${nomeBase}_${timestamp()}`;
+    const rodape = user
+      ? `Jornada Supera · exportado por ${user.nome} em ${formatDateTime(new Date().toISOString())}`
       : undefined;
 
     try {
       if (formato === "pdf") {
-        await exportarPdf({ elemento, nome, rodape });
+        await exportPdf({ element: elemento, name: nome, footer: rodape });
       } else {
-        await exportarPng({ elemento, nome });
+        await exportPng({ element: elemento, name: nome });
       }
 
-      auditar.exportacao("dashboard", { formato, arquivo: nome });
+      audit.export("dashboard", { formato, arquivo: nome });
       toast.success(`Captura exportada em ${formato.toUpperCase()}`);
     } catch {
       toast.error("Não foi possível exportar", {
