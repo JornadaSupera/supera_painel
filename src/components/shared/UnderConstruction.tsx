@@ -4,23 +4,23 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
 /**
- * Espaço reservado de um módulo ainda não construído.
+ * Placeholder for a module that has not been built yet.
  *
- * Existe para que a navegação da Fase 3 esteja completa e navegável desde já:
- * cada item da sidebar leva a uma tela real, com o cabeçalho definitivo e a
- * guarda de permissão já ativa. Só o miolo chega depois.
+ * It exists so the navigation is complete and walkable from day one: every
+ * sidebar item leads to a real screen, with its final header and its permission
+ * guard already active. Only the body arrives later.
  *
- * Cada arquivo destes é substituído pela tela real na fase indicada.
+ * Each of these files is replaced by the real screen when its turn comes.
  */
-export interface ModuloEmConstrucaoProps {
-  fase: number;
-  /** Link da tela correspondente no protótipo oficial. */
-  prototipo: string;
-  /** O que a fase entrega — os itens do plano. */
-  entrega: string[];
+export interface UnderConstructionProps {
+  phase: number;
+  /** Link to the matching screen in the official reference prototype. */
+  prototypeUrl: string;
+  /** What the phase delivers — the planned items. */
+  deliverables: string[];
 }
 
-export function ModuloEmConstrucao({ fase, prototipo, entrega }: ModuloEmConstrucaoProps) {
+export function UnderConstruction({ phase, prototypeUrl, deliverables }: UnderConstructionProps) {
   return (
     <Card className="border-dashed">
       <CardContent className="flex flex-col items-center gap-6 py-12 text-center">
@@ -29,7 +29,7 @@ export function ModuloEmConstrucao({ fase, prototipo, entrega }: ModuloEmConstru
         </span>
 
         <div className="flex max-w-[52ch] flex-col gap-2">
-          <p className="text-base font-semibold">Módulo previsto para a Fase {fase}</p>
+          <p className="text-base font-semibold">Módulo previsto para a Fase {phase}</p>
           <p className="text-muted-foreground text-sm leading-relaxed">
             A navegação, o cabeçalho e a guarda de permissão desta tela já estão no lugar. O
             conteúdo chega na fase indicada.
@@ -37,7 +37,7 @@ export function ModuloEmConstrucao({ fase, prototipo, entrega }: ModuloEmConstru
         </div>
 
         <ul className="text-muted-foreground flex max-w-[52ch] flex-col gap-1.5 text-left text-sm">
-          {entrega.map((item) => (
+          {deliverables.map((item) => (
             <li key={item} className="flex gap-2">
               <span aria-hidden="true" className="text-primary">
                 •
@@ -49,7 +49,7 @@ export function ModuloEmConstrucao({ fase, prototipo, entrega }: ModuloEmConstru
 
         {import.meta.env.DEV && (
           <Button variant="outline" size="sm" asChild>
-            <a href={prototipo} target="_blank" rel="noreferrer noopener">
+            <a href={prototypeUrl} target="_blank" rel="noreferrer noopener">
               <ExternalLink />
               Abrir no protótipo
             </a>
@@ -60,4 +60,4 @@ export function ModuloEmConstrucao({ fase, prototipo, entrega }: ModuloEmConstru
   );
 }
 
-export default ModuloEmConstrucao;
+export default UnderConstruction;

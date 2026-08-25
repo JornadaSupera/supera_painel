@@ -4,18 +4,18 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
- * Campo de busca das listagens.
+ * Search field used by the listings.
  *
- * Componente controlado. O atraso entre digitar e consultar é
- * responsabilidade de quem usa — via `useDebouncedValue` — porque o valor
- * exibido precisa acompanhar a digitação, enquanto só a consulta espera.
+ * A controlled component. The delay between typing and querying belongs to the
+ * caller — through `useDebouncedValue` — because the displayed value has to
+ * follow the keystrokes while only the query waits.
  */
 
 export interface SearchInputProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  /** Nome acessível; não fica visível. */
+  /** Accessible name; never visible. */
   label?: string;
   className?: string;
 }
@@ -41,7 +41,7 @@ export function SearchInput({
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-label={label}
-        // Esconde o "x" nativo do WebKit: temos o nosso, com rótulo acessível.
+        // Hides the native WebKit "x": we have our own, with an accessible label.
         className="pr-9 pl-9 [&::-webkit-search-cancel-button]:appearance-none"
       />
 

@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 /**
- * Cabeçalho de página e trilha de navegação.
+ * Page header and navigation trail.
  */
 
 export interface BreadcrumbItem {
@@ -13,7 +13,7 @@ export interface BreadcrumbItem {
   to?: string;
 }
 
-/** O último item é sempre a página atual, e não vira link. */
+/** The last item is always the current page, and never becomes a link. */
 export function Breadcrumb({ items, className }: { items: BreadcrumbItem[]; className?: string }) {
   if (items.length === 0) return null;
 
@@ -23,16 +23,16 @@ export function Breadcrumb({ items, className }: { items: BreadcrumbItem[]; clas
       className={cn("text-muted-foreground flex items-center gap-2 text-xs", className)}
     >
       {items.map((item, i) => {
-        const ultimo = i === items.length - 1;
+        const isLast = i === items.length - 1;
 
         return (
           <span key={`${item.label}-${i}`} className="inline-flex items-center gap-2">
             {i > 0 && <ChevronRight size={12} className="text-border" aria-hidden="true" />}
 
-            {ultimo || !item.to ? (
+            {isLast || !item.to ? (
               <span
-                aria-current={ultimo ? "page" : undefined}
-                className={cn(ultimo && "text-foreground font-medium")}
+                aria-current={isLast ? "page" : undefined}
+                className={cn(isLast && "text-foreground font-medium")}
               >
                 {item.label}
               </span>
@@ -49,63 +49,57 @@ export function Breadcrumb({ items, className }: { items: BreadcrumbItem[]; clas
 }
 
 /**
- * Pílula de nível do escopo contratado.
+ * Scope-level pill.
  *
- * O protótipo marca cada tela como MVP ou Médio. Reproduzimos porque o cliente
- * usa esse rótulo para conferir o que foi contratado — some da entrega final,
- * não da fase de construção.
+ * The reference screens mark each page as MVP or Médio. We reproduce it because
+ * the client uses that label to check what was contracted — it disappears from
+ * the final delivery, not from the build phase.
  */
-export function NivelBadge({
-  nivel,
-  className,
-}: {
-  nivel: "MVP" | "Médio";
-  className?: string;
-}) {
+export function LevelBadge({ level, className }: { level: "MVP" | "Médio"; className?: string }) {
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-wide whitespace-nowrap",
-        nivel === "MVP"
+        level === "MVP"
           ? "bg-primary/10 text-primary border-primary/20"
           : "bg-supera-uniao/15 text-supera-uniao border-supera-uniao/25",
         className,
       )}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
-      {nivel}
+      {level}
     </span>
   );
 }
 
 export interface PageHeaderProps {
   /**
-   * Rótulo pequeno acima do título — a área do painel: "Painel executivo",
-   * "Gestão", "Conteúdo". É o que o protótipo usa para situar a tela sem
-   * repetir o item de menu.
+   * Small label above the title — the panel area: "Painel executivo",
+   * "Gestão", "Conteúdo". It is what the reference uses to place the screen
+   * without repeating the menu item.
    */
   eyebrow?: string;
-  titulo: string;
+  title: string;
   /**
-   * Carrega contexto e contagem, como no protótipo:
+   * Carries context and counts, as in the reference:
    * "81 pacientes cadastrados · convite por SMS no cadastro".
    */
-  subtitulo?: ReactNode;
+  subtitle?: ReactNode;
   actions?: ReactNode;
   breadcrumb?: BreadcrumbItem[];
-  nivel?: "MVP" | "Médio";
-  /** Substitui a pílula de nível por um badge próprio. */
+  level?: "MVP" | "Médio";
+  /** Replaces the level pill with a badge of your own. */
   badge?: ReactNode;
   className?: string;
 }
 
 export function PageHeader({
   eyebrow,
-  titulo,
-  subtitulo,
+  title,
+  subtitle,
   actions,
   breadcrumb,
-  nivel,
+  level,
   badge,
   className,
 }: PageHeaderProps) {
@@ -121,13 +115,11 @@ export function PageHeader({
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">{titulo}</h1>
-          {badge ?? (nivel && <NivelBadge nivel={nivel} />)}
+          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">{title}</h1>
+          {badge ?? (level && <LevelBadge level={level} />)}
         </div>
 
-        {subtitulo && (
-          <p className="text-muted-foreground mt-1 text-sm leading-snug">{subtitulo}</p>
-        )}
+        {subtitle && <p className="text-muted-foreground mt-1 text-sm leading-snug">{subtitle}</p>}
       </div>
 
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}

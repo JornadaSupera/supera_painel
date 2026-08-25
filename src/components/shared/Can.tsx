@@ -4,35 +4,36 @@ import { useAuth } from "@/contexts/auth-context";
 import type { Permissao } from "@/lib/rbac";
 
 /**
- * Guarda de interface.
+ * Interface guard.
  *
- *   <Can permissao={PERMISSAO.PACIENTES_WRITE}>
+ *   <Can permission={PERMISSAO.PACIENTES_WRITE}>
  *     <Button>Novo paciente</Button>
  *   </Can>
  *
- * > [!] Esconder não é proteger.
- * Este componente evita que a pessoa veja uma ação que não pode executar — o
- * que reduz erro honesto e ruído na tela. Ele **não** impede quem abre o
- * DevTools. Toda ação protegida por `<Can>` precisa também de rota guardada
- * (`PermissionRoute`) e, na Fase 15, de política RLS no Postgres.
+ * > [!] Hiding is not protecting.
+ * This component keeps someone from seeing an action they cannot perform,
+ * which cuts honest mistakes and screen noise. It does **not** stop anyone who
+ * opens the DevTools. Every action wrapped in `<Can>` also needs a guarded
+ * route (`PermissionRoute`) and, once the backend exists, a row level security
+ * policy in Postgres.
  *
- * @param permissao  uma ou várias — todas exigidas (E lógico)
- * @param alguma     lista alternativa — basta uma (OU lógico)
- * @param fallback   o que renderizar quando não há permissão
+ * @param permission  one or many — all of them required (logical AND)
+ * @param anyOf       alternative list — one is enough (logical OR)
+ * @param fallback    what to render when the permission is missing
  */
 export interface CanProps {
-  permissao?: Permissao | readonly Permissao[];
-  alguma?: readonly Permissao[];
+  permission?: Permissao | readonly Permissao[];
+  anyOf?: readonly Permissao[];
   fallback?: ReactNode;
   children: ReactNode;
 }
 
-export function Can({ permissao, alguma, fallback = null, children }: CanProps) {
-  const { pode, podeAlguma } = useAuth();
+export function Can({ permission, anyOf, fallback = null, children }: CanProps) {
+  const { can, canAny } = useAuth();
 
-  const autorizado = alguma ? podeAlguma(alguma) : permissao ? pode(permissao) : true;
+  const allowed = anyOf ? canAny(anyOf) : permission ? can(permission) : true;
 
-  return <>{autorizado ? children : fallback}</>;
+  return <>{allowed ? children : fallback}</>;
 }
 
 export default Can;

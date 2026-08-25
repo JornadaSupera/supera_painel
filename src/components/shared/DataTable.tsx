@@ -17,29 +17,29 @@ import { SkeletonTable } from "./Skeletons";
 import { EmptyState, ErrorState, type ErrorLike } from "./StateBlock";
 
 /**
- * Tabela de dados do painel.
+ * Data table used across the panel.
  *
- * Colunas são declarativas — a tabela não sabe nada de domínio:
+ * Columns are declarative — the table knows nothing about the domain:
  *
- *   const colunas: Column<Paciente>[] = [
- *     { key: "nome", header: "Paciente", sortable: true,
- *       render: (row) => <CelulaPaciente paciente={row} /> },
+ *   const columns: Column<Patient>[] = [
+ *     { key: "name", header: "Paciente", sortable: true,
+ *       render: (row) => <PatientCell patient={row} /> },
  *     { key: "cid", header: "CID", mono: true, width: 110 },
  *   ];
  *
- * Ordenação e paginação são CONTROLADAS: quem usa mantém o estado e repassa
- * ao `apiClient`. É o que permite ordenar no servidor sem trocar de componente
- * quando o Supabase entrar.
+ * Sorting and pagination are CONTROLLED: the caller holds the state and passes
+ * it to `apiClient`. That is what lets us sort on the server without swapping
+ * the component once Supabase is in place.
  */
 
 export interface Column<T> {
-  /** Também é o campo de ordenação enviado ao backend. */
+  /** Also the sort field sent to the backend. */
   key: string;
   header: ReactNode;
   sortable?: boolean;
   width?: number | string;
   align?: "left" | "right" | "center";
-  /** Números, IDs, CPF e datas — alinham na vertical entre linhas. */
+  /** Numbers, IDs, CPF and dates — they line up vertically across rows. */
   mono?: boolean;
   render?: (row: T) => ReactNode;
 }
@@ -47,7 +47,7 @@ export interface Column<T> {
 export interface DataTableProps<T> {
   columns: Column<T>[];
   data: T[];
-  /** Padrão: `row.id`. */
+  /** Defaults to `row.id`. */
   getRowId?: (row: T) => string;
   loading?: boolean;
   error?: ErrorLike;
@@ -57,16 +57,16 @@ export interface DataTableProps<T> {
   selectable?: boolean;
   selectedIds?: string[];
   onSelectionChange?: (ids: string[]) => void;
-  /** Ações da barra que aparece quando há seleção. */
+  /** Actions in the bar that appears once there is a selection. */
   bulkActions?: ReactNode;
   onRowClick?: (row: T) => void;
   density?: "comfortable" | "compact";
-  pagination?: Omit<PaginationProps, "rotulo">;
+  pagination?: Omit<PaginationProps, "label">;
   emptyState?: ReactNode;
-  /** Há filtros aplicados — muda a copy do estado vazio. */
-  filtrada?: boolean;
-  rotulo?: string;
-  /** Descrição da tabela para leitor de tela. */
+  /** Filters are applied — changes the empty-state copy. */
+  filtered?: boolean;
+  label?: string;
+  /** Table description for screen readers. */
   caption?: string;
   className?: string;
 }
@@ -88,41 +88,41 @@ export function DataTable<T>({
   density = "comfortable",
   pagination,
   emptyState,
-  filtrada = false,
-  rotulo = "registros",
+  filtered = false,
+  label = "registros",
   caption,
   className,
 }: DataTableProps<T>) {
-  const selecionados = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
 
-  const idsVisiveis = data.map(getRowId);
-  const todosSelecionados = idsVisiveis.length > 0 && idsVisiveis.every((id) => selecionados.has(id));
-  const algunsSelecionados = idsVisiveis.some((id) => selecionados.has(id)) && !todosSelecionados;
+  const visibleIds = data.map(getRowId);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
+  const someSelected = visibleIds.some((id) => selected.has(id)) && !allSelected;
 
-  const alternarTodos = () => onSelectionChange?.(todosSelecionados ? [] : idsVisiveis);
+  const toggleAll = () => onSelectionChange?.(allSelected ? [] : visibleIds);
 
-  const alternarLinha = (id: string) => {
-    const proximos = new Set(selecionados);
-    if (proximos.has(id)) proximos.delete(id);
-    else proximos.add(id);
-    onSelectionChange?.([...proximos]);
+  const toggleRow = (id: string) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onSelectionChange?.([...next]);
   };
 
-  const ordenarPor = (coluna: Column<T>) => {
-    if (!coluna.sortable || !onSortChange) return;
+  const sortBy = (column: Column<T>) => {
+    if (!column.sortable || !onSortChange) return;
 
-    const mesmaColuna = sort?.field === coluna.key;
+    const sameColumn = sort?.field === column.key;
     onSortChange({
-      field: coluna.key,
-      direction: mesmaColuna && sort?.direction === "asc" ? "desc" : "asc",
+      field: column.key,
+      direction: sameColumn && sort?.direction === "asc" ? "desc" : "asc",
     });
   };
 
-  const totalColunas = columns.length + (selectable ? 1 : 0);
-  const alinhamento = (align?: Column<T>["align"]) =>
+  const totalColumns = columns.length + (selectable ? 1 : 0);
+  const alignment = (align?: Column<T>["align"]) =>
     align === "right" ? "text-right" : align === "center" ? "text-center" : undefined;
 
-  /* ---------------------------------------------------------------- estados */
+  /* ----------------------------------------------------------------- states */
 
   if (error) {
     return (
@@ -136,8 +136,8 @@ export function DataTable<T>({
     return (
       <div className={className}>
         <SkeletonTable
-          colunas={totalColunas}
-          linhas={pagination?.pageSize ? Math.min(pagination.pageSize, 8) : 8}
+          columns={totalColumns}
+          rows={pagination?.pageSize ? Math.min(pagination.pageSize, 8) : 8}
         />
       </div>
     );
@@ -146,32 +146,32 @@ export function DataTable<T>({
   if (data.length === 0) {
     return (
       <div className={className}>
-        {emptyState ?? <EmptyState variant={filtrada ? "busca" : "vazio"} />}
+        {emptyState ?? <EmptyState variant={filtered ? "search" : "empty"} />}
       </div>
     );
   }
 
-  /* --------------------------------------------------------------- conteúdo */
+  /* ---------------------------------------------------------------- content */
 
-  const celula = density === "compact" ? "py-2" : "py-3";
+  const cellPadding = density === "compact" ? "py-2" : "py-3";
 
   return (
     <div className={cn("flex min-w-0 flex-col", className)}>
-      {selectable && selecionados.size > 0 && (
+      {selectable && selected.size > 0 && (
         <div className="bg-primary/10 border-primary/25 flex items-center justify-between gap-4 border-b px-5 py-3 text-sm">
           <span className="font-medium">
-            {selecionados.size} {selecionados.size === 1 ? "selecionado" : "selecionados"}
+            {selected.size} {selected.size === 1 ? "selecionado" : "selecionados"}
           </span>
           <div className="flex items-center gap-2">{bulkActions}</div>
         </div>
       )}
 
-      {/* A rolagem horizontal fica DENTRO da tabela — o corpo da página nunca
-          rola na horizontal. */}
+      {/* Horizontal scrolling stays INSIDE the table — the page body never
+          scrolls sideways. */}
       <div className="min-w-0 overflow-x-auto">
-        {/* O primitivo do shadcn usa `p-2` em toda célula. O protótipo respira
-            16 px nas bordas do cartão e 12 px entre colunas — a diferença é
-            visível quando a tabela encosta na borda do card. */}
+        {/* The shadcn primitive uses `p-2` on every cell. The reference gives
+            16px at the card edges and 12px between columns — the difference
+            shows when the table meets the card border. */}
         <Table className="[&_td:first-child]:pl-4 [&_td:last-child]:pr-4 [&_th:first-child]:pl-4 [&_th:last-child]:pr-4">
           {caption && <caption className="sr-only">{caption}</caption>}
 
@@ -180,48 +180,48 @@ export function DataTable<T>({
               {selectable && (
                 <TableHead className="w-11">
                   <Checkbox
-                    checked={todosSelecionados ? true : algunsSelecionados ? "indeterminate" : false}
-                    onCheckedChange={alternarTodos}
+                    checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                    onCheckedChange={toggleAll}
                     aria-label="Selecionar todos os registros desta página"
                   />
                 </TableHead>
               )}
 
-              {columns.map((coluna) => {
-                const ativo = sort?.field === coluna.key;
-                const Icone = !ativo ? ChevronsUpDown : sort?.direction === "asc" ? ArrowUp : ArrowDown;
+              {columns.map((column) => {
+                const active = sort?.field === column.key;
+                const Icon = !active ? ChevronsUpDown : sort?.direction === "asc" ? ArrowUp : ArrowDown;
 
                 return (
                   <TableHead
-                    key={coluna.key}
-                    style={coluna.width ? { width: coluna.width } : undefined}
+                    key={column.key}
+                    style={column.width ? { width: column.width } : undefined}
                     className={cn(
                       "text-muted-foreground h-9 text-[10px] font-medium tracking-wider whitespace-nowrap uppercase",
-                      alinhamento(coluna.align),
+                      alignment(column.align),
                     )}
-                    // Anuncia a ordenação para tecnologia assistiva.
+                    // Announces the sort state to assistive technology.
                     aria-sort={
-                      ativo ? (sort?.direction === "asc" ? "ascending" : "descending") : undefined
+                      active ? (sort?.direction === "asc" ? "ascending" : "descending") : undefined
                     }
                   >
-                    {coluna.sortable && onSortChange ? (
+                    {column.sortable && onSortChange ? (
                       <button
                         type="button"
-                        onClick={() => ordenarPor(coluna)}
+                        onClick={() => sortBy(column)}
                         className={cn(
                           "hover:text-foreground inline-flex items-center gap-1 rounded-sm transition-colors",
-                          ativo && "text-foreground",
+                          active && "text-foreground",
                         )}
                       >
-                        {coluna.header}
-                        <Icone
+                        {column.header}
+                        <Icon
                           size={13}
                           aria-hidden="true"
-                          className={cn("shrink-0 opacity-40", ativo && "text-primary opacity-100")}
+                          className={cn("shrink-0 opacity-40", active && "text-primary opacity-100")}
                         />
                       </button>
                     ) : (
-                      coluna.header
+                      column.header
                     )}
                   </TableHead>
                 );
@@ -232,7 +232,7 @@ export function DataTable<T>({
           <TableBody>
             {data.map((row) => {
               const id = getRowId(row);
-              const estaSelecionada = selecionados.has(id);
+              const isSelected = selected.has(id);
 
               return (
                 <TableRow
@@ -240,36 +240,36 @@ export function DataTable<T>({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                   className={cn(
                     onRowClick && "cursor-pointer",
-                    // Linha selecionada tem fundo E checkbox marcado — cor não
-                    // é o único sinal.
-                    estaSelecionada && "bg-primary/8 hover:bg-primary/12",
+                    // A selected row has a background AND a checked box —
+                    // colour is not the only signal.
+                    isSelected && "bg-primary/8 hover:bg-primary/12",
                   )}
                 >
                   {selectable && (
                     <TableCell
-                      className={cn("w-11", celula)}
-                      // O clique no checkbox não deve abrir a linha.
+                      className={cn("w-11", cellPadding)}
+                      // Clicking the checkbox must not open the row.
                       onClick={(event) => event.stopPropagation()}
                     >
                       <Checkbox
-                        checked={estaSelecionada}
-                        onCheckedChange={() => alternarLinha(id)}
+                        checked={isSelected}
+                        onCheckedChange={() => toggleRow(id)}
                         aria-label="Selecionar registro"
                       />
                     </TableCell>
                   )}
 
-                  {columns.map((coluna) => (
+                  {columns.map((column) => (
                     <TableCell
-                      key={coluna.key}
+                      key={column.key}
                       className={cn(
-                        celula,
-                        coluna.mono && "font-mono text-xs",
-                        alinhamento(coluna.align),
-                        coluna.key === "acoes" && "w-px text-right whitespace-nowrap",
+                        cellPadding,
+                        column.mono && "font-mono text-xs",
+                        alignment(column.align),
+                        column.key === "actions" && "w-px text-right whitespace-nowrap",
                       )}
                     >
-                      {coluna.render ? coluna.render(row) : String((row as Record<string, unknown>)[coluna.key] ?? "")}
+                      {column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? "")}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -279,7 +279,7 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      {pagination && <Pagination {...pagination} rotulo={rotulo} />}
+      {pagination && <Pagination {...pagination} label={label} />}
     </div>
   );
 }

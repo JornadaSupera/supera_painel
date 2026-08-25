@@ -19,17 +19,18 @@ import { SkeletonChart } from "./Skeletons";
 import { EmptyState, ErrorState, type ErrorLike } from "./StateBlock";
 
 /**
- * Wrappers de gráfico.
+ * Chart wrappers.
  *
- * Existem para que nenhuma tela configure Recharts na mão: a paleta, os eixos,
- * o tooltip e os estados vazio/erro/carregando ficam iguais em todo o painel.
+ * They exist so no screen configures Recharts by hand: the palette, the axes,
+ * the tooltip and the empty/error/loading states stay identical across the
+ * whole panel.
  */
 
 /**
- * Paleta das séries.
+ * Series palette.
  *
- * A ordem é fixa: `--chart-1` é sempre a primeira série. O leitor associa cor
- * a categoria entre telas — reordenar quebra essa leitura.
+ * The order is fixed: `--chart-1` is always the first series. Readers associate
+ * a colour with a category across screens — reordering breaks that reading.
  */
 export const CHART_COLORS = [
   "var(--chart-1)",
@@ -39,13 +40,13 @@ export const CHART_COLORS = [
   "var(--chart-5)",
 ] as const;
 
-export interface Serie {
+export interface Series {
   key: string;
   label: string;
 }
 
-const formatarValor = (valor: unknown): string =>
-  typeof valor === "number" ? valor.toLocaleString("pt-BR") : String(valor ?? "");
+const formatValue = (value: unknown): string =>
+  typeof value === "number" ? value.toLocaleString("pt-BR") : String(value ?? "");
 
 /* --------------------------------------------------------------- tooltip */
 
@@ -61,12 +62,12 @@ function ChartTooltip({
   active,
   payload,
   label,
-  sufixo = "",
+  suffix = "",
 }: {
   active?: boolean;
   payload?: TooltipItem[];
   label?: unknown;
-  sufixo?: string;
+  suffix?: string;
 }) {
   if (!active || !payload?.length) return null;
 
@@ -85,8 +86,8 @@ function ChartTooltip({
           />
           <span className="text-muted-foreground flex-1">{item.name}</span>
           <span className="font-mono font-medium">
-            {formatarValor(item.value)}
-            {sufixo}
+            {formatValue(item.value)}
+            {suffix}
           </span>
         </p>
       ))}
@@ -94,45 +95,46 @@ function ChartTooltip({
   );
 }
 
-/* ----------------------------------------------------------------- casca */
+/* ------------------------------------------------------------------ shell */
 
 /**
- * Trata carregando, erro e vazio ANTES de montar o gráfico.
- * Montar Recharts com array vazio produz eixos fantasma — melhor não montar.
+ * Handles loading, error and empty BEFORE mounting the chart.
+ * Mounting Recharts with an empty array produces ghost axes — better not to
+ * mount at all.
  */
 function ChartFrame({
   loading,
   error,
   onRetry,
-  vazio,
-  altura = 280,
+  empty,
+  height = 280,
   children,
 }: {
   loading?: boolean;
   error?: ErrorLike;
   onRetry?: () => void;
-  vazio: boolean;
-  altura?: number;
+  empty: boolean;
+  height?: number;
   children: ReactElement;
 }) {
   if (loading) return <SkeletonChart />;
-  if (error) return <ErrorState error={error} onRetry={onRetry} compacto />;
+  if (error) return <ErrorState error={error} onRetry={onRetry} compact />;
 
-  if (vazio) {
+  if (empty) {
     return (
       <EmptyState
-        compacto
-        titulo="Sem dados no período"
-        descricao="Ajuste o período ou os filtros para ver resultados."
+        compact
+        title="Sem dados no período"
+        description="Ajuste o período ou os filtros para ver resultados."
       />
     );
   }
 
   return (
-    // As classes globais abaixo ligam os eixos e a legenda do Recharts aos
-    // tokens do tema — inclusive na troca claro/escuro sem recarregar.
+    // The global classes below wire the Recharts axes and legend to the theme
+    // tokens — including a light/dark switch without a reload.
     <div
-      style={{ height: altura }}
+      style={{ height }}
       className="w-full min-w-0 [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-axis-tick_text]:font-mono [&_.recharts-cartesian-axis-tick_text]:text-[11px] [&_.recharts-cartesian-grid_line]:stroke-border [&_.recharts-legend-item-text]:!text-muted-foreground [&_.recharts-legend-item-text]:!text-xs"
     >
       <ResponsiveContainer width="100%" height="100%">
@@ -142,57 +144,57 @@ function ChartFrame({
   );
 }
 
-const EIXO = { axisLine: false, tickLine: false, tickMargin: 8 } as const;
-const MARGEM = { top: 8, right: 8, bottom: 0, left: -12 } as const;
+const AXIS = { axisLine: false, tickLine: false, tickMargin: 8 } as const;
+const MARGIN = { top: 8, right: 8, bottom: 0, left: -12 } as const;
 
 interface ChartBaseProps {
-  altura?: number;
+  height?: number;
   loading?: boolean;
   error?: ErrorLike;
   onRetry?: () => void;
-  legenda?: boolean;
-  sufixo?: string;
+  legend?: boolean;
+  suffix?: string;
 }
 
-/* ----------------------------------------------------------------- barras */
+/* -------------------------------------------------------------------- bar */
 
 export interface BarChartProps<T> extends ChartBaseProps {
   data: T[];
   xKey: string;
-  series: Serie[];
-  empilhado?: boolean;
+  series: Series[];
+  stacked?: boolean;
 }
 
 export function BarChart<T>({
   data,
   xKey,
   series,
-  empilhado = false,
-  sufixo = "",
-  altura,
+  stacked = false,
+  suffix = "",
+  height,
   loading,
   error,
   onRetry,
-  legenda = false,
+  legend = false,
 }: BarChartProps<T>) {
   return (
-    <ChartFrame loading={loading} error={error} onRetry={onRetry} vazio={data.length === 0} altura={altura}>
-      <RBarChart data={data} margin={MARGEM}>
+    <ChartFrame loading={loading} error={error} onRetry={onRetry} empty={data.length === 0} height={height}>
+      <RBarChart data={data} margin={MARGIN}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey={xKey} {...EIXO} />
-        <YAxis {...EIXO} tickFormatter={formatarValor} />
-        <Tooltip content={<ChartTooltip sufixo={sufixo} />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
-        {legenda && <Legend iconType="circle" iconSize={8} />}
+        <XAxis dataKey={xKey} {...AXIS} />
+        <YAxis {...AXIS} tickFormatter={formatValue} />
+        <Tooltip content={<ChartTooltip suffix={suffix} />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
+        {legend && <Legend iconType="circle" iconSize={8} />}
 
-        {series.map((serie, i) => (
+        {series.map((item, i) => (
           <Bar
-            key={serie.key}
-            dataKey={serie.key}
-            name={serie.label}
-            stackId={empilhado ? "total" : undefined}
+            key={item.key}
+            dataKey={item.key}
+            name={item.label}
+            stackId={stacked ? "total" : undefined}
             fill={CHART_COLORS[i % CHART_COLORS.length]}
-            // Arredonda só o topo da última série da pilha.
-            radius={empilhado && i < series.length - 1 ? 0 : [4, 4, 0, 0]}
+            // Rounds only the top of the last series in the stack.
+            radius={stacked && i < series.length - 1 ? 0 : [4, 4, 0, 0]}
             maxBarSize={48}
           />
         ))}
@@ -201,40 +203,40 @@ export function BarChart<T>({
   );
 }
 
-/* ------------------------------------------------------------------ linha */
+/* ------------------------------------------------------------------- line */
 
 export interface LineChartProps<T> extends ChartBaseProps {
   data: T[];
   xKey: string;
-  series: Serie[];
+  series: Series[];
 }
 
 export function LineChart<T>({
   data,
   xKey,
   series,
-  sufixo = "",
-  altura,
+  suffix = "",
+  height,
   loading,
   error,
   onRetry,
-  legenda = false,
+  legend = false,
 }: LineChartProps<T>) {
   return (
-    <ChartFrame loading={loading} error={error} onRetry={onRetry} vazio={data.length === 0} altura={altura}>
-      <RLineChart data={data} margin={MARGEM}>
+    <ChartFrame loading={loading} error={error} onRetry={onRetry} empty={data.length === 0} height={height}>
+      <RLineChart data={data} margin={MARGIN}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
-        <XAxis dataKey={xKey} {...EIXO} />
-        <YAxis {...EIXO} tickFormatter={formatarValor} />
-        <Tooltip content={<ChartTooltip sufixo={sufixo} />} cursor={{ stroke: "var(--border)" }} />
-        {legenda && <Legend iconType="circle" iconSize={8} />}
+        <XAxis dataKey={xKey} {...AXIS} />
+        <YAxis {...AXIS} tickFormatter={formatValue} />
+        <Tooltip content={<ChartTooltip suffix={suffix} />} cursor={{ stroke: "var(--border)" }} />
+        {legend && <Legend iconType="circle" iconSize={8} />}
 
-        {series.map((serie, i) => (
+        {series.map((item, i) => (
           <Line
-            key={serie.key}
+            key={item.key}
             type="monotone"
-            dataKey={serie.key}
-            name={serie.label}
+            dataKey={item.key}
+            name={item.label}
             stroke={CHART_COLORS[i % CHART_COLORS.length]}
             strokeWidth={2}
             dot={false}
@@ -246,37 +248,37 @@ export function LineChart<T>({
   );
 }
 
-/* ------------------------------------------------------------------ rosca */
+/* ------------------------------------------------------------------ donut */
 
 export interface DonutDatum {
-  nome: string;
-  valor: number;
+  name: string;
+  value: number;
 }
 
 /**
- * Distribuição — pacientes por CID, por especialidade.
- * O total no centro evita que o leitor tenha de somar as fatias.
+ * Distribution — patients by ICD code, by specialty.
+ * The total in the centre saves the reader from adding the slices up.
  */
 export function DonutChart({
   data,
   totalLabel = "total",
-  altura = 280,
+  height = 280,
   loading,
   error,
   onRetry,
 }: ChartBaseProps & { data: DonutDatum[]; totalLabel?: string }) {
-  const total = data.reduce((soma, item) => soma + (Number(item.valor) || 0), 0);
+  const total = data.reduce((sum, item) => sum + (Number(item.value) || 0), 0);
 
   return (
-    <ChartFrame loading={loading} error={error} onRetry={onRetry} vazio={data.length === 0} altura={altura}>
+    <ChartFrame loading={loading} error={error} onRetry={onRetry} empty={data.length === 0} height={height}>
       <RPieChart>
         <Tooltip content={<ChartTooltip />} />
         <Legend iconType="circle" iconSize={8} verticalAlign="bottom" />
 
         <Pie
           data={data}
-          dataKey="valor"
-          nameKey="nome"
+          dataKey="value"
+          nameKey="name"
           innerRadius="58%"
           outerRadius="82%"
           paddingAngle={2}
@@ -284,7 +286,7 @@ export function DonutChart({
           strokeWidth={2}
         >
           {data.map((item, i) => (
-            <Cell key={item.nome} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+            <Cell key={item.name} fill={CHART_COLORS[i % CHART_COLORS.length]} />
           ))}
 
           <text
@@ -293,7 +295,7 @@ export function DonutChart({
             textAnchor="middle"
             className="fill-foreground font-mono text-2xl font-semibold"
           >
-            {formatarValor(total)}
+            {formatValue(total)}
           </text>
           <text
             x="50%"

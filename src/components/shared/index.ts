@@ -1,18 +1,17 @@
 /**
- * Componentes compartilhados — composições nossas sobre os primitivos do
- * shadcn/ui.
+ * Shared components — our own compositions on top of the shadcn/ui primitives.
  *
  *   import { DataTable, StatCard, EmptyState } from "@/components/shared";
  *
- * Os primitivos ficam em `@/components/ui` e vêm do CLI do shadcn.
- * Nada aqui conhece domínio — nenhuma menção a "paciente" ou "protocolo".
+ * The primitives live in `@/components/ui` and come from the shadcn CLI.
+ * Nothing here knows about the domain — no mention of "patient" or "protocol".
  */
 
 export { Can } from "./Can";
 export type { CanProps } from "./Can";
 
 export { BarChart, CHART_COLORS, DonutChart, LineChart } from "./Charts";
-export type { DonutDatum, Serie } from "./Charts";
+export type { DonutDatum, Series } from "./Charts";
 
 export { ChartCard } from "./ChartCard";
 export type { ChartCardProps } from "./ChartCard";
@@ -23,10 +22,10 @@ export type { ConfirmDialogProps } from "./ConfirmDialog";
 export { DataTable } from "./DataTable";
 export type { Column, DataTableProps } from "./DataTable";
 
-export { ModuloEmConstrucao } from "./ModuloEmConstrucao";
-export type { ModuloEmConstrucaoProps } from "./ModuloEmConstrucao";
+export { UnderConstruction } from "./UnderConstruction";
+export type { UnderConstructionProps } from "./UnderConstruction";
 
-export { Breadcrumb, NivelBadge, PageHeader } from "./PageHeader";
+export { Breadcrumb, LevelBadge, PageHeader } from "./PageHeader";
 export type { BreadcrumbItem, PageHeaderProps } from "./PageHeader";
 
 export { Pagination } from "./Pagination";
@@ -44,15 +43,15 @@ export type { StatCardProps } from "./StatCard";
 
 export { StatusBadge } from "./StatusBadge";
 export {
-  TONE_ACAO_AUDITORIA,
-  TONE_FASE,
-  TONE_RISCO,
-  TONE_SEVERIDADE,
-  TONE_STATUS_CONTEUDO,
-  TONE_STATUS_PACIENTE,
-  TONE_STATUS_USUARIO,
+  TONE_AUDIT_ACTION,
+  TONE_CONTENT_STATUS,
+  TONE_PATIENT_STATUS,
+  TONE_PHASE,
+  TONE_RISK,
+  TONE_SEVERITY,
+  TONE_USER_STATUS,
 } from "./status-tones";
 export type { StatusTone } from "./StatusBadge";
 
 export { AvatarGroup, UserAvatar } from "./UserAvatar";
-export type { AvatarSize, Pessoa } from "./UserAvatar";
+export type { AvatarSize, Person } from "./UserAvatar";

@@ -42,7 +42,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { mascararCpf } from "@/lib/mask";
+import { maskCpf } from "@/lib/mask";
 import { ERROR_CODE, type Sort } from "@/services/contracts";
 import { useThemeStore } from "@/stores/theme";
 
@@ -58,7 +58,7 @@ import { useThemeStore } from "@/stores/theme";
 interface PacienteExemplo {
   id: string;
   nome: string;
-  idade: number;
+  ageInYears: number;
   cpf: string;
   cid: string;
   protocolo: string;
@@ -66,9 +66,9 @@ interface PacienteExemplo {
 }
 
 const PACIENTES: PacienteExemplo[] = [
-  { id: "1", nome: "Maria Aparecida Souza", idade: 62, cpf: "52998224412", cid: "C18.9", protocolo: "FOLFOX", fase: "ativo" },
-  { id: "2", nome: "João Carlos Meneghel", idade: 58, cpf: "11144477735", cid: "C20", protocolo: "CAPOX", fase: "seguimento" },
-  { id: "3", nome: "Rita de Cássia Prado", idade: 47, cpf: "39053344705", cid: "C81.9", protocolo: "ABVD", fase: "manutencao" },
+  { id: "1", nome: "Maria Aparecida Souza", ageInYears: 62, cpf: "52998224412", cid: "C18.9", protocolo: "FOLFOX", fase: "ativo" },
+  { id: "2", nome: "João Carlos Meneghel", ageInYears: 58, cpf: "11144477735", cid: "C20", protocolo: "CAPOX", fase: "seguimento" },
+  { id: "3", nome: "Rita de Cássia Prado", ageInYears: 47, cpf: "39053344705", cid: "C81.9", protocolo: "ABVD", fase: "manutencao" },
 ];
 
 const SERIE_MESES = [
@@ -81,20 +81,20 @@ const SERIE_MESES = [
 ];
 
 const DISTRIBUICAO_CID = [
-  { nome: "C18.9", valor: 24 },
-  { nome: "C50.9", valor: 19 },
-  { nome: "C34.9", valor: 15 },
-  { nome: "C20", valor: 12 },
-  { nome: "Outros", valor: 11 },
+  { name: "C18.9", value: 24 },
+  { name: "C50.9", value: 19 },
+  { name: "C34.9", value: 15 },
+  { name: "C20", value: 12 },
+  { name: "Outros", value: 11 },
 ];
 
 const EQUIPE = [
-  { id: "a", nome: "Ana Beatriz Rocha" },
-  { id: "b", nome: "Carlos Eduardo Lima" },
-  { id: "c", nome: "Letícia Mafra" },
-  { id: "d", nome: "Rafael dos Santos" },
-  { id: "e", nome: "Camila Souza" },
-  { id: "f", nome: "Pedro Henrique Alves" },
+  { id: "a", name: "Ana Beatriz Rocha" },
+  { id: "b", name: "Carlos Eduardo Lima" },
+  { id: "c", name: "Letícia Mafra" },
+  { id: "d", name: "Rafael dos Santos" },
+  { id: "e", name: "Camila Souza" },
+  { id: "f", name: "Pedro Henrique Alves" },
 ];
 
 const TONE_FASE_EXEMPLO = {
@@ -110,11 +110,11 @@ const COLUNAS: Column<PacienteExemplo>[] = [
     sortable: true,
     render: (row) => (
       <div className="flex items-center gap-3">
-        <UserAvatar nome={row.nome} size="sm" colorido />
+        <UserAvatar name={row.nome} size="sm" colorful />
         <div className="flex flex-col">
           <span className="font-medium">{row.nome}</span>
           <span className="text-muted-foreground text-xs">
-            {row.idade} anos · <span className="font-mono">{mascararCpf(row.cpf)}</span>
+            {row.ageInYears} anos · <span className="font-mono">{maskCpf(row.cpf)}</span>
           </span>
         </div>
       </div>
@@ -291,11 +291,11 @@ export function DesignSystemPreview() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <UserAvatar nome="Ana Beatriz Rocha" size="xs" colorido />
-            <UserAvatar nome="Carlos Eduardo Lima" size="sm" colorido />
-            <UserAvatar nome="Letícia Mafra" size="md" colorido />
-            <UserAvatar nome="Rafael dos Santos" size="lg" colorido />
-            <AvatarGroup pessoas={EQUIPE} max={4} />
+            <UserAvatar name="Ana Beatriz Rocha" size="xs" colorful />
+            <UserAvatar name="Carlos Eduardo Lima" size="sm" colorful />
+            <UserAvatar name="Letícia Mafra" size="md" colorful />
+            <UserAvatar name="Rafael dos Santos" size="lg" colorful />
+            <AvatarGroup people={EQUIPE} max={4} />
           </div>
         </Secao>
 
@@ -304,27 +304,27 @@ export function DesignSystemPreview() {
           <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(230px,1fr))]">
             <StatCard
               label="Pacientes ativos"
-              valor="81"
-              variacao={6.4}
-              periodo="vs. mês anterior"
-              icone={<Users size={16} />}
+              value="81"
+              delta={6.4}
+              period="vs. mês anterior"
+              icon={<Users size={16} />}
               onClick={() => toast.info("Drill-down abriria o relatório de pacientes ativos")}
             />
             <StatCard
               label="Novos no mês"
-              valor="14"
-              variacao={-8.2}
-              periodo="vs. mês anterior"
-              icone={<UserRound size={16} />}
+              value="14"
+              delta={-8.2}
+              period="vs. mês anterior"
+              icon={<UserRound size={16} />}
             />
             <StatCard
               label="Tempo médio de resposta"
-              valor="7"
-              unidade="min"
-              variacao={-18.5}
-              periodo="vs. semana anterior"
-              inverterCor
-              icone={<Activity size={16} />}
+              value="7"
+              unit="min"
+              delta={-18.5}
+              period="vs. semana anterior"
+              invertColor
+              icon={<Activity size={16} />}
             />
             <StatCard label="Alertas pendentes" loading />
           </div>
@@ -346,8 +346,8 @@ export function DesignSystemPreview() {
                     { key: "sessoes", label: "Sessões" },
                     { key: "faltas", label: "Faltas" },
                   ]}
-                  legenda
-                  altura={240}
+                  legend
+                  height={240}
                 />
               </CardContent>
             </Card>
@@ -358,7 +358,7 @@ export function DesignSystemPreview() {
                 <CardDescription>Distribuição atual</CardDescription>
               </CardHeader>
               <CardContent>
-                <DonutChart data={DISTRIBUICAO_CID} totalLabel="pacientes" altura={240} />
+                <DonutChart data={DISTRIBUICAO_CID} totalLabel="pacientes" height={240} />
               </CardContent>
             </Card>
 
@@ -372,7 +372,7 @@ export function DesignSystemPreview() {
                   data={SERIE_MESES}
                   xKey="mes"
                   series={[{ key: "sessoes", label: "Acessos" }]}
-                  altura={200}
+                  height={200}
                 />
               </CardContent>
             </Card>
@@ -383,7 +383,7 @@ export function DesignSystemPreview() {
                 <CardDescription>Estado vazio do gráfico</CardDescription>
               </CardHeader>
               <CardContent>
-                <DonutChart data={[]} altura={200} />
+                <DonutChart data={[]} height={200} />
               </CardContent>
             </Card>
           </div>
@@ -392,8 +392,8 @@ export function DesignSystemPreview() {
         {/* ---------------------------------------------------------- tabela */}
         <Secao titulo="Tabela">
           <PageHeader
-            titulo="Pacientes"
-            subtitulo="81 pacientes cadastrados · convite por SMS no cadastro"
+            title="Pacientes"
+            subtitle="81 pacientes cadastrados · convite por SMS no cadastro"
             badge={<StatusBadge tone="success" pill size="sm">MVP</StatusBadge>}
             actions={
               <Button>
@@ -428,7 +428,7 @@ export function DesignSystemPreview() {
                   Exportar selecionados
                 </Button>
               }
-              rotulo="pacientes"
+              label="pacientes"
               pagination={{
                 page: 1,
                 pageSize: 20,
@@ -445,22 +445,22 @@ export function DesignSystemPreview() {
           <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(320px,1fr))]">
             <Card>
               <CardHeader><CardTitle>Carregando</CardTitle></CardHeader>
-              <Loading compacto />
+              <Loading compact />
             </Card>
 
             <Card>
               <CardHeader><CardTitle>Vazio</CardTitle></CardHeader>
-              <EmptyState compacto action={<Button size="sm">Novo paciente</Button>} />
+              <EmptyState compact action={<Button size="sm">Novo paciente</Button>} />
             </Card>
 
             <Card>
               <CardHeader><CardTitle>Busca sem resultado</CardTitle></CardHeader>
-              <EmptyState variant="busca" compacto />
+              <EmptyState variant="search" compact />
             </Card>
 
             <Card>
               <CardHeader><CardTitle>Sem permissão</CardTitle></CardHeader>
-              <ErrorState variant="forbidden" compacto />
+              <ErrorState variant="forbidden" compact />
             </Card>
 
             <Card>
@@ -468,13 +468,13 @@ export function DesignSystemPreview() {
               <ErrorState
                 error={{ code: ERROR_CODE.NETWORK }}
                 onRetry={() => toast.info("Refazendo a consulta…")}
-                compacto
+                compact
               />
             </Card>
 
             <Card>
               <CardHeader><CardTitle>Ainda não implementado</CardTitle></CardHeader>
-              <ErrorState error={{ code: ERROR_CODE.NOT_IMPLEMENTED }} compacto />
+              <ErrorState error={{ code: ERROR_CODE.NOT_IMPLEMENTED }} compact />
             </Card>
           </div>
         </Secao>
@@ -558,14 +558,14 @@ export function DesignSystemPreview() {
       <ConfirmDialog
         open={confirmAberto}
         onOpenChange={setConfirmAberto}
-        onConfirm={({ motivo }) => {
+        onConfirm={({ reason }) => {
           setConfirmAberto(false);
-          toast.success("Paciente desativado", { description: `Motivo registrado: ${motivo}` });
+          toast.success("Paciente desativado", { description: `Motivo registrado: ${reason}` });
         }}
-        titulo="Desativar paciente?"
-        descricao="O paciente perde o acesso ao aplicativo. O histórico é preservado e a ação fica registrada na trilha de auditoria."
+        title="Desativar paciente?"
+        description="O paciente perde o acesso ao aplicativo. O histórico é preservado e a ação fica registrada na trilha de auditoria."
         confirmLabel="Desativar"
-        exigirMotivo
+        requireReason
       />
     </div>
   );

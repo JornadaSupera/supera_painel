@@ -16,54 +16,54 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 /**
- * Confirmação de ação sensível.
+ * Confirmation for a sensitive action.
  *
- * Toda ação destrutiva do painel passa por aqui: desativar paciente, desativar
- * profissional, excluir conteúdo, exportar dados.
+ * Every destructive action in the panel goes through here: deactivating a
+ * patient, deactivating a professional, deleting content, exporting data.
  *
- * Sobre `AlertDialog` (não `Dialog`): ele usa `role="alertdialog"` e **não
- * fecha por clique fora** — o gesto acidental é exatamente o que este diálogo
- * existe para impedir.
+ * On `AlertDialog` (not `Dialog`): it uses `role="alertdialog"` and **does not
+ * close on an outside click** — the accidental gesture is exactly what this
+ * dialog exists to prevent.
  */
 
 export interface ConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (dados: { motivo: string }) => void;
-  titulo: string;
-  descricao?: string;
+  onConfirm: (data: { reason: string }) => void;
+  title: string;
+  description?: string;
   tone?: "danger" | "warning";
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Pede justificativa — o texto vai para a trilha de auditoria. */
-  exigirMotivo?: boolean;
+  /** Asks for a justification — the text goes to the audit trail. */
+  requireReason?: boolean;
   loading?: boolean;
 }
 
-const MOTIVO_MINIMO = 5;
+const MIN_REASON_LENGTH = 5;
 
 export function ConfirmDialog({
   open,
   onOpenChange,
   onConfirm,
-  titulo,
-  descricao,
+  title,
+  description,
   tone = "danger",
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
-  exigirMotivo = false,
+  requireReason = false,
   loading = false,
 }: ConfirmDialogProps) {
-  const motivoId = useId();
-  const [motivo, setMotivo] = useState("");
+  const reasonId = useId();
+  const [reason, setReason] = useState("");
 
-  // Limpa o motivo a cada abertura: justificativa de uma ação nunca deve
-  // vazar para a próxima.
+  // Clears the reason on every open: the justification for one action must
+  // never leak into the next.
   useEffect(() => {
-    if (open) setMotivo("");
+    if (open) setReason("");
   }, [open]);
 
-  const motivoValido = !exigirMotivo || motivo.trim().length >= MOTIVO_MINIMO;
+  const reasonIsValid = !requireReason || reason.trim().length >= MIN_REASON_LENGTH;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -81,15 +81,15 @@ export function ConfirmDialog({
             </span>
 
             <div className="flex min-w-0 flex-col gap-2 text-left">
-              <AlertDialogTitle>{titulo}</AlertDialogTitle>
-              {descricao && <AlertDialogDescription>{descricao}</AlertDialogDescription>}
+              <AlertDialogTitle>{title}</AlertDialogTitle>
+              {description && <AlertDialogDescription>{description}</AlertDialogDescription>}
             </div>
           </div>
         </AlertDialogHeader>
 
-        {exigirMotivo && (
+        {requireReason && (
           <div className="flex flex-col gap-2">
-            <Label htmlFor={motivoId}>
+            <Label htmlFor={reasonId}>
               Motivo
               <span className="text-destructive" aria-hidden="true">
                 *
@@ -98,17 +98,17 @@ export function ConfirmDialog({
             </Label>
 
             <Textarea
-              id={motivoId}
-              value={motivo}
-              onChange={(event) => setMotivo(event.target.value)}
+              id={reasonId}
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
               maxLength={280}
               rows={3}
               placeholder="Descreva o motivo desta ação"
-              aria-describedby={`${motivoId}-hint`}
+              aria-describedby={`${reasonId}-hint`}
             />
 
-            <p id={`${motivoId}-hint`} className="text-muted-foreground text-xs">
-              Registrado na trilha de auditoria. Mínimo de {MOTIVO_MINIMO} caracteres.
+            <p id={`${reasonId}-hint`} className="text-muted-foreground text-xs">
+              Registrado na trilha de auditoria. Mínimo de {MIN_REASON_LENGTH} caracteres.
             </p>
           </div>
         )}
@@ -117,14 +117,14 @@ export function ConfirmDialog({
           <AlertDialogCancel disabled={loading}>{cancelLabel}</AlertDialogCancel>
 
           <AlertDialogAction
-            disabled={!motivoValido || loading}
+            disabled={!reasonIsValid || loading}
             onClick={(event) => {
-              // Impede o fechamento automático quando a validação não passou.
-              if (!motivoValido) {
+              // Blocks the automatic close when validation did not pass.
+              if (!reasonIsValid) {
                 event.preventDefault();
                 return;
               }
-              onConfirm({ motivo: motivo.trim() });
+              onConfirm({ reason: reason.trim() });
             }}
             className={cn(
               tone === "danger" &&

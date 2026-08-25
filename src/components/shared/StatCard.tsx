@@ -2,54 +2,55 @@ import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { NivelBadge } from "./PageHeader";
+import { LevelBadge } from "./PageHeader";
 import { cn } from "@/lib/utils";
 
 /**
- * Cartão de indicador (KPI).
+ * Indicator card (KPI).
  *
- * Estrutura do protótipo, de cima para baixo:
+ * Reference structure, top to bottom:
  *
  *     ┌──────────────────────────────┐
- *     │ [ícone]            [+8 mês]  │  ← acento à esquerda, variação à direita
+ *     │ [icon]             [+8 mês]  │  ← accent on the left, delta on the right
  *     │                              │
- *     │ PACIENTES ATIVOS             │  ← rótulo, maiúsculo e pequeno
- *     │ 127                          │  ← valor, o único elemento grande
- *     │ em tratamento                │  ← contexto
+ *     │ PACIENTES ATIVOS             │  ← label, uppercase and small
+ *     │ 127                          │  ← value, the only large element
+ *     │ em tratamento                │  ← context
  *     └──────────────────────────────┘
  *
- * O valor usa `tabular-nums`, não fonte monoespaçada: mantém a face Geist do
- * resto da interface e ainda assim alinha os dígitos em coluna entre cartões.
+ * The value uses `tabular-nums` rather than a monospaced font: it keeps the
+ * Geist face of the rest of the interface and still lines the digits up in a
+ * column across cards.
  */
 
 export interface StatCardProps {
   label: string;
-  valor?: string | number;
-  /** Sufixo colado ao valor: "%", "min". */
-  unidade?: string;
-  /** Variação: positivo sobe, negativo desce. */
-  variacao?: number;
+  value?: string | number;
+  /** Suffix glued to the value: "%", "min". */
+  unit?: string;
+  /** Delta: positive goes up, negative goes down. */
+  delta?: number;
   /**
-   * Unidade da variação. "%" percentual · "pp" pontos percentuais ·
-   * "" absoluto. Somar pontos percentuais como se fossem porcentagem é um erro
-   * clássico de leitura — por isso a distinção é explícita.
+   * Unit of the delta. "%" percentage · "pp" percentage points · "" absolute.
+   * Adding percentage points as if they were percentages is a classic reading
+   * mistake — hence the explicit distinction.
    */
-  variacaoUnidade?: string;
-  /** Base de comparação, exibida dentro da pílula: "mês", "semana". */
-  periodo?: string;
-  /** Linha sob o valor: "em tratamento". */
-  contexto?: string;
-  /** Quando cair é bom — alertas ativos, tempo de resposta. */
-  inverterCor?: boolean;
-  icone?: ReactNode;
-  /** Classes do acento do ícone: `bg-supera-uniao/10 text-supera-uniao`. */
-  acento?: string;
+  deltaUnit?: string;
+  /** Comparison basis, shown inside the pill: "mês", "semana". */
+  period?: string;
+  /** Line under the value: "em tratamento". */
+  context?: string;
+  /** For when falling is good — open alerts, response time. */
+  invertColor?: boolean;
+  icon?: ReactNode;
+  /** Classes for the icon accent: `bg-supera-uniao/10 text-supera-uniao`. */
+  accent?: string;
   /**
-   * Nível do escopo. Indicador de nível Médio recebe a pílula do protótipo no
-   * canto do cartão — é assim que o cliente confere o que foi contratado.
+   * Scope level. A Médio-level indicator gets the reference pill in the card
+   * corner — that is how the client checks what was contracted.
    */
-  nivel?: "mvp" | "medio";
-  /** Drill-down para o relatório correspondente. */
+  level?: "mvp" | "medio";
+  /** Drill-down to the matching report. */
   onClick?: () => void;
   loading?: boolean;
   className?: string;
@@ -59,24 +60,24 @@ const BASE = "bg-card text-card-foreground flex min-w-0 flex-col rounded-2xl bor
 
 export function StatCard({
   label,
-  valor,
-  unidade,
-  variacao,
-  variacaoUnidade = "%",
-  periodo,
-  contexto,
-  inverterCor = false,
-  icone,
-  acento = "bg-primary/10 text-primary",
-  nivel,
+  value,
+  unit,
+  delta,
+  deltaUnit = "%",
+  period,
+  context,
+  invertColor = false,
+  icon,
+  accent = "bg-primary/10 text-primary",
+  level,
   onClick,
   loading = false,
   className,
 }: StatCardProps) {
   if (loading) {
     return (
-      // Mesma altura do conteúdo final: a linha de KPIs não "pula" quando os
-      // dados chegam.
+      // Same height as the final content: the KPI row does not jump when the
+      // data arrives.
       <div className={cn(BASE, className)} aria-busy="true">
         <div className="flex items-start justify-between">
           <Skeleton className="size-7 rounded-lg" />
@@ -92,41 +93,41 @@ export function StatCard({
     );
   }
 
-  const temVariacao = typeof variacao === "number" && Number.isFinite(variacao);
-  const subiu = temVariacao && variacao > 0;
-  const caiu = temVariacao && variacao < 0;
-  const bom = inverterCor ? caiu : subiu;
-  const ruim = inverterCor ? subiu : caiu;
+  const hasDelta = typeof delta === "number" && Number.isFinite(delta);
+  const wentUp = hasDelta && delta > 0;
+  const wentDown = hasDelta && delta < 0;
+  const good = invertColor ? wentDown : wentUp;
+  const bad = invertColor ? wentUp : wentDown;
 
-  const TrendIcon = subiu ? TrendingUp : caiu ? TrendingDown : Minus;
+  const TrendIcon = wentUp ? TrendingUp : wentDown ? TrendingDown : Minus;
 
-  const conteudo = (
+  const content = (
     <>
       <div className="flex items-start justify-between gap-2">
-        {icone && (
-          <span aria-hidden="true" className={cn("rounded-lg p-1.5 [&_svg]:size-4", acento)}>
-            {icone}
+        {icon && (
+          <span aria-hidden="true" className={cn("rounded-lg p-1.5 [&_svg]:size-4", accent)}>
+            {icon}
           </span>
         )}
 
-        {temVariacao && (
+        {hasDelta && (
           <span
             className={cn(
               "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold [&_svg]:size-3",
-              // A escala de grau do projeto: mood-1 é o verde-limão do "bom",
-              // mood-5 o vermelho do "ruim".
-              bom
+              // The project's grade scale: mood-1 is the lime green of "good",
+              // mood-5 the red of "bad".
+              good
                 ? "bg-mood-1/10 text-mood-1"
-                : ruim
+                : bad
                   ? "bg-mood-5/10 text-mood-5"
                   : "bg-muted text-muted-foreground",
             )}
           >
             <TrendIcon aria-hidden="true" />
-            {variacao > 0 ? "+" : ""}
-            {variacao.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
-            {variacaoUnidade}
-            {periodo && ` ${periodo}`}
+            {delta > 0 ? "+" : ""}
+            {delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+            {deltaUnit}
+            {period && ` ${period}`}
           </span>
         )}
       </div>
@@ -136,38 +137,38 @@ export function StatCard({
           {label}
         </p>
         <p className="mt-0.5 text-2xl font-semibold tabular-nums">
-          {valor}
-          {unidade}
+          {value}
+          {unit}
         </p>
-        {contexto && <p className="text-muted-foreground text-[11px]">{contexto}</p>}
+        {context && <p className="text-muted-foreground text-[11px]">{context}</p>}
       </div>
     </>
   );
 
-  const cartao = onClick ? (
+  const card = onClick ? (
     <button
       type="button"
       onClick={onClick}
       className={cn(
         BASE,
         "hover:border-primary/40 h-full w-full cursor-pointer text-left transition-[border-color,box-shadow] hover:shadow-sm",
-        !nivel && className,
+        !level && className,
       )}
     >
-      {conteudo}
+      {content}
     </button>
   ) : (
-    <div className={cn(BASE, "h-full", !nivel && className)}>{conteudo}</div>
+    <div className={cn(BASE, "h-full", !level && className)}>{content}</div>
   );
 
-  if (nivel !== "medio") return cartao;
+  if (level !== "medio") return card;
 
-  // A pílula de nível flutua sobre o canto do cartão, como no protótipo.
-  // O wrapper `relative` existe só para ancorá-la.
+  // The level pill floats over the card corner, as in the reference. The
+  // `relative` wrapper exists only to anchor it.
   return (
     <div className={cn("relative", className)}>
-      {cartao}
-      <NivelBadge nivel="Médio" className="absolute right-2 bottom-2" />
+      {card}
+      <LevelBadge level="Médio" className="absolute right-2 bottom-2" />
     </div>
   );
 }

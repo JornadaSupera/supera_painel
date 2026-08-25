@@ -2,47 +2,47 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 /**
- * Esqueletos com a FORMA do conteúdo final.
+ * Skeletons shaped like the final content.
  *
- * Spinner genérico esconde a estrutura e faz a página "pular" quando os dados
- * chegam. O esqueleto reserva o espaço certo desde o primeiro frame.
+ * A generic spinner hides the structure and makes the page jump once the data
+ * arrives. A skeleton reserves the right space from the first frame.
  *
- * Os blocos são decorativos; o container carrega `aria-busy` e o texto em
- * `sr-only` para quem usa leitor de tela.
+ * The blocks are decorative; the container carries `aria-busy` and the
+ * `sr-only` text for anyone using a screen reader.
  */
 
 export interface SkeletonTableProps {
-  linhas?: number;
-  colunas?: number;
-  /** `grid-template-columns`; por padrão colunas iguais. */
+  rows?: number;
+  columns?: number;
+  /** `grid-template-columns`; equal columns by default. */
   template?: string;
   className?: string;
 }
 
-export function SkeletonTable({ linhas = 8, colunas = 5, template, className }: SkeletonTableProps) {
-  const grid = { gridTemplateColumns: template ?? `repeat(${colunas}, 1fr)` };
+export function SkeletonTable({ rows = 8, columns = 5, template, className }: SkeletonTableProps) {
+  const grid = { gridTemplateColumns: template ?? `repeat(${columns}, 1fr)` };
 
   return (
     <div className={cn("w-full", className)} aria-busy="true">
       <div className="border-border grid items-center gap-4 border-b px-5 py-3" style={grid}>
-        {Array.from({ length: colunas }, (_, i) => (
+        {Array.from({ length: columns }, (_, i) => (
           <Skeleton key={i} className="h-2.5 w-3/5" />
         ))}
       </div>
 
-      {Array.from({ length: linhas }, (_, linha) => (
+      {Array.from({ length: rows }, (_, row) => (
         <div
-          key={linha}
+          key={row}
           className="border-border grid h-14 items-center gap-4 border-b px-5 last:border-b-0"
           style={grid}
         >
-          {Array.from({ length: colunas }, (_, coluna) => (
+          {Array.from({ length: columns }, (_, column) => (
             <Skeleton
-              key={coluna}
+              key={column}
               className="h-3"
-              // Larguras variadas evitam o efeito de "grade perfeita", que não
-              // se parece com dado de verdade.
-              style={{ width: coluna === 0 ? "85%" : `${45 + ((linha + coluna) % 4) * 12}%` }}
+              // Varied widths avoid the "perfect grid" effect, which looks
+              // nothing like real data.
+              style={{ width: column === 0 ? "85%" : `${45 + ((row + column) % 4) * 12}%` }}
             />
           ))}
         </div>
@@ -53,13 +53,13 @@ export function SkeletonTable({ linhas = 8, colunas = 5, template, className }: 
   );
 }
 
-export function SkeletonCards({ quantidade = 4, className }: { quantidade?: number; className?: string }) {
+export function SkeletonCards({ count = 4, className }: { count?: number; className?: string }) {
   return (
     <div
       className={cn("grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(240px,1fr))]", className)}
       aria-busy="true"
     >
-      {Array.from({ length: quantidade }, (_, i) => (
+      {Array.from({ length: count }, (_, i) => (
         <div key={i} className="border-border bg-card flex flex-col gap-3 rounded-lg border p-5">
           <Skeleton className="h-2.5 w-2/5" />
           <Skeleton className="h-8 w-3/5" />
@@ -71,10 +71,10 @@ export function SkeletonCards({ quantidade = 4, className }: { quantidade?: numb
   );
 }
 
-export function SkeletonChart({ barras = 7, className }: { barras?: number; className?: string }) {
+export function SkeletonChart({ bars = 7, className }: { bars?: number; className?: string }) {
   return (
     <div className={cn("flex h-55 items-end gap-3 p-5", className)} aria-busy="true">
-      {Array.from({ length: barras }, (_, i) => (
+      {Array.from({ length: bars }, (_, i) => (
         <Skeleton
           key={i}
           className="flex-1 rounded-b-none"
@@ -86,10 +86,10 @@ export function SkeletonChart({ barras = 7, className }: { barras?: number; clas
   );
 }
 
-export function SkeletonForm({ campos = 5, className }: { campos?: number; className?: string }) {
+export function SkeletonForm({ fields = 5, className }: { fields?: number; className?: string }) {
   return (
     <div className={cn("flex flex-col gap-5", className)} aria-busy="true">
-      {Array.from({ length: campos }, (_, i) => (
+      {Array.from({ length: fields }, (_, i) => (
         <div key={i} className="flex flex-col gap-2">
           <Skeleton className="h-2.5 w-28" />
           <Skeleton className="h-9 rounded-md" />

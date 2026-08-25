@@ -3,45 +3,43 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Cartão de gráfico do painel.
+ * Chart card used across the panel.
  *
- * Estrutura do protótipo: `rounded-2xl border bg-card p-5`, cabeçalho com
- * título pequeno e semibold, descrição em 11 px, gráfico com altura fixa de
- * 220 px.
+ * Reference structure: `rounded-2xl border bg-card p-5`, header with a small
+ * semibold title, an 11px description, and a chart with a fixed height of
+ * 220px.
  *
- * Separado do `Card` do shadcn de propósito: o `Card` traz `gap-6` e blocos de
- * padding próprios, pensados para conteúdo de texto. Aqui o gráfico precisa
- * encostar nas bordas do padding, sem espaçamento extra entre header e corpo.
+ * Deliberately separate from the shadcn `Card`: that one brings `gap-6` and its
+ * own padding blocks, designed for text content. Here the chart has to reach
+ * the padding edges, with no extra spacing between header and body.
  */
 export interface ChartCardProps {
-  titulo: string;
-  descricao?: ReactNode;
-  /** Ações no canto do cabeçalho — filtro, alternador de visualização. */
-  acoes?: ReactNode;
-  /** Ocupa duas colunas na grade de três. */
-  largo?: boolean;
+  title: string;
+  description?: ReactNode;
+  /** Actions in the header corner — filter, view switch. */
+  actions?: ReactNode;
+  /** Spans two columns on the three-column grid. */
+  wide?: boolean;
   className?: string;
   children: ReactNode;
 }
 
 export function ChartCard({
-  titulo,
-  descricao,
-  acoes,
-  largo = false,
+  title,
+  description,
+  actions,
+  wide = false,
   className,
   children,
 }: ChartCardProps) {
   return (
-    <section
-      className={cn("bg-card rounded-2xl border p-5", largo && "lg:col-span-2", className)}
-    >
+    <section className={cn("bg-card rounded-2xl border p-5", wide && "lg:col-span-2", className)}>
       <header className="mb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold">{titulo}</h2>
-          {descricao && <p className="text-muted-foreground text-[11px]">{descricao}</p>}
+          <h2 className="text-sm font-semibold">{title}</h2>
+          {description && <p className="text-muted-foreground text-[11px]">{description}</p>}
         </div>
-        {acoes && <div className="flex shrink-0 items-center gap-2">{acoes}</div>}
+        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </header>
 
       {children}

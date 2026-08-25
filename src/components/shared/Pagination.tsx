@@ -4,36 +4,36 @@ import { cn } from "@/lib/utils";
 import { PAGE_SIZE_OPTIONS, paginationMeta } from "@/services/contracts";
 
 /**
- * Barra de paginação.
+ * Pagination bar.
  *
- * Trabalha com `count` — o total sem paginação, que vem do contrato de dados.
- * É o que produz "Exibindo 1–20 de 81".
+ * It works from `count` — the unpaginated total that comes with the data
+ * contract. That is what produces "Exibindo 1–20 de 81".
  */
 
 /**
- * Sequência de páginas com reticências.
- * Sempre mostra a primeira, a última e uma janela ao redor da atual, para que a
- * barra não mude de largura conforme se navega.
+ * Page sequence with ellipses.
+ * It always shows the first page, the last one and a window around the current
+ * one, so the bar does not change width as you navigate.
  */
-function sequencia(atual: number, total: number, janela = 1): (number | "…")[] {
+function pageSequence(current: number, total: number, window = 1): (number | "…")[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
 
-  const paginas = new Set<number>([1, total, atual]);
-  for (let i = 1; i <= janela; i += 1) {
-    if (atual - i > 1) paginas.add(atual - i);
-    if (atual + i < total) paginas.add(atual + i);
+  const pages = new Set<number>([1, total, current]);
+  for (let i = 1; i <= window; i += 1) {
+    if (current - i > 1) pages.add(current - i);
+    if (current + i < total) pages.add(current + i);
   }
 
-  const ordenadas = [...paginas].sort((a, b) => a - b);
-  const resultado: (number | "…")[] = [];
+  const sorted = [...pages].sort((a, b) => a - b);
+  const result: (number | "…")[] = [];
 
-  ordenadas.forEach((pagina, i) => {
-    const anterior = ordenadas[i - 1];
-    if (anterior !== undefined && pagina - anterior > 1) resultado.push("…");
-    resultado.push(pagina);
+  sorted.forEach((page, i) => {
+    const previous = sorted[i - 1];
+    if (previous !== undefined && page - previous > 1) result.push("…");
+    result.push(page);
   });
 
-  return resultado;
+  return result;
 }
 
 export interface PaginationProps {
@@ -43,11 +43,11 @@ export interface PaginationProps {
   onPageChange: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   /** "pacientes", "registros"… */
-  rotulo?: string;
+  label?: string;
   className?: string;
 }
 
-const BOTAO =
+const BUTTON =
   "text-muted-foreground hover:bg-muted hover:text-foreground inline-flex h-7.5 min-w-7.5 items-center justify-center rounded-sm border border-transparent px-2 font-mono text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent";
 
 export function Pagination({
@@ -56,15 +56,15 @@ export function Pagination({
   count,
   onPageChange,
   onPageSizeChange,
-  rotulo = "registros",
+  label = "registros",
   className,
 }: PaginationProps) {
   const meta = paginationMeta({ page, pageSize, count });
 
   if (count === 0) return null;
 
-  const irPara = (destino: number) => {
-    if (destino >= 1 && destino <= meta.totalPages && destino !== page) onPageChange(destino);
+  const goTo = (target: number) => {
+    if (target >= 1 && target <= meta.totalPages && target !== page) onPageChange(target);
   };
 
   return (
@@ -76,7 +76,7 @@ export function Pagination({
         Exibindo <span className="text-foreground font-mono font-medium">{meta.firstItem}</span>–
         <span className="text-foreground font-mono font-medium">{meta.lastItem}</span> de{" "}
         <span className="text-foreground font-mono font-medium">{count.toLocaleString("pt-BR")}</span>{" "}
-        {rotulo}
+        {label}
       </p>
 
       <div className="flex items-center gap-4">
@@ -88,9 +88,9 @@ export function Pagination({
               onChange={(event) => onPageSizeChange(Number(event.target.value))}
               className="border-input bg-card text-foreground h-7.5 cursor-pointer rounded-sm border px-2 text-xs"
             >
-              {PAGE_SIZE_OPTIONS.map((opcao) => (
-                <option key={opcao} value={opcao}>
-                  {opcao}
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
                 </option>
               ))}
             </select>
@@ -100,15 +100,15 @@ export function Pagination({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className={BOTAO}
-            onClick={() => irPara(page - 1)}
+            className={BUTTON}
+            onClick={() => goTo(page - 1)}
             disabled={!meta.hasPrev}
             aria-label="Página anterior"
           >
             <ChevronLeft size={15} aria-hidden="true" />
           </button>
 
-          {sequencia(page, meta.totalPages).map((item, i) =>
+          {pageSequence(page, meta.totalPages).map((item, i) =>
             item === "…" ? (
               <span
                 key={`gap-${i}`}
@@ -121,11 +121,11 @@ export function Pagination({
               <button
                 key={item}
                 type="button"
-                onClick={() => irPara(item)}
+                onClick={() => goTo(item)}
                 aria-label={`Página ${item}`}
                 aria-current={item === page ? "page" : undefined}
                 className={cn(
-                  BOTAO,
+                  BUTTON,
                   item === page &&
                     "bg-primary text-primary-foreground border-primary hover:bg-primary hover:text-primary-foreground font-medium",
                 )}
@@ -137,8 +137,8 @@ export function Pagination({
 
           <button
             type="button"
-            className={BOTAO}
-            onClick={() => irPara(page + 1)}
+            className={BUTTON}
+            onClick={() => goTo(page + 1)}
             disabled={!meta.hasNext}
             aria-label="Próxima página"
           >

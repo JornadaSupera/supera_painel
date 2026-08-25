@@ -4,13 +4,14 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Badge de status clínico e operacional.
+ * Clinical and operational status badge.
  *
- * Separado do `ui/badge` do shadcn porque o painel precisa de tons semânticos
- * (sucesso, atenção, perigo, informação) que o primitivo não tem.
+ * Separate from the shadcn `ui/badge` because the panel needs semantic tones
+ * (success, warning, danger, info) the primitive does not have.
  *
- * REGRA: cor nunca é o único portador de significado — o texto sempre diz o
- * estado. Quem não distingue verde de vermelho lê "Ativo" e "Inativo".
+ * RULE: colour is never the only carrier of meaning — the text always states
+ * the state. Someone who cannot tell green from red reads "Ativo" and
+ * "Inativo".
  */
 
 const statusBadge = cva(
@@ -41,7 +42,7 @@ const statusBadge = cva(
 export type StatusTone = NonNullable<VariantProps<typeof statusBadge>["tone"]>;
 
 export interface StatusBadgeProps extends VariantProps<typeof statusBadge> {
-  /** Ponto colorido antes do texto. Reforço visual, nunca substituto. */
+  /** Coloured dot before the text. Visual reinforcement, never a substitute. */
   dot?: boolean;
   className?: string;
   children: ReactNode;

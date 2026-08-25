@@ -1,16 +1,16 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { iniciais } from "@/lib/format";
+import { initials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * Avatar de pessoa, com iniciais e cor estável.
+ * Person avatar, with initials and a stable colour.
  *
- * A cor é derivada do nome: a mesma pessoa tem sempre a mesma cor em qualquer
- * tela, sem precisar guardar isso no banco. Usa a paleta de gráficos para não
- * inventar cor fora do sistema.
+ * The colour is derived from the name: the same person always gets the same
+ * colour on every screen, with nothing stored in the database. It draws from
+ * the chart palette so no colour is invented outside the system.
  */
 
-const TAMANHOS = {
+const SIZES = {
   xs: "size-6 text-2xs",
   sm: "size-7.5 text-xs",
   md: "size-9.5 text-sm",
@@ -18,105 +18,106 @@ const TAMANHOS = {
   xl: "size-18 text-xl",
 } as const;
 
-export type AvatarSize = keyof typeof TAMANHOS;
+export type AvatarSize = keyof typeof SIZES;
 
-function corDoNome(nome: string): string {
+function colorFromName(name: string): string {
   let hash = 0;
-  for (let i = 0; i < nome.length; i += 1) {
-    hash = (hash * 31 + nome.charCodeAt(i)) % 997;
+  for (let i = 0; i < name.length; i += 1) {
+    hash = (hash * 31 + name.charCodeAt(i)) % 997;
   }
   return `var(--chart-${(hash % 5) + 1})`;
 }
 
 export interface UserAvatarProps {
-  /** Obrigatório: gera iniciais, cor e texto alternativo. */
-  nome: string;
+  /** Required: drives the initials, the colour and the alt text. */
+  name: string;
   src?: string;
   size?: AvatarSize;
-  /** Deriva a cor do nome em vez de usar a primária. */
-  colorido?: boolean;
+  /** Derives the colour from the name instead of using the primary. */
+  colorful?: boolean;
   /**
-   * `suave` é o padrão do protótipo: fundo tingido e iniciais na cor cheia.
-   * Numa lista de vinte linhas, vinte círculos sólidos competem com o nome —
-   * que é o dado que a pessoa está procurando. `solido` fica para quando o
-   * avatar é o próprio assunto.
+   * `soft` is the reference default: tinted background with full-colour
+   * initials. In a twenty-row list, twenty solid circles compete with the name
+   * — which is the data the person is looking for. `solid` is for when the
+   * avatar is the subject itself.
    */
-  tom?: "suave" | "solido";
+  tone?: "soft" | "solid";
   className?: string;
 }
 
 export function UserAvatar({
-  nome,
+  name,
   src,
   size = "md",
-  colorido = false,
-  tom = "suave",
+  colorful = false,
+  tone = "soft",
   className,
 }: UserAvatarProps) {
-  const cor = colorido ? corDoNome(nome) : "var(--primary)";
+  const color = colorful ? colorFromName(name) : "var(--primary)";
 
   return (
-    <Avatar className={cn(TAMANHOS[size], className)} title={nome || undefined}>
-      {src && <AvatarImage src={src} alt={nome} />}
+    <Avatar className={cn(SIZES[size], className)} title={name || undefined}>
+      {src && <AvatarImage src={src} alt={name} />}
       <AvatarFallback
         className="font-semibold tracking-wide"
         style={
-          tom === "suave"
-            ? // `color-mix` em vez de uma classe `bg-*/10` porque a cor pode vir
-              // do nome, e Tailwind não gera utilitário para valor dinâmico.
-              { backgroundColor: `color-mix(in oklab, ${cor} 12%, transparent)`, color: cor }
-            : { backgroundColor: cor, color: "var(--primary-foreground)" }
+          tone === "soft"
+            ? // `color-mix` instead of a `bg-*/10` class because the colour can
+              // come from the name, and Tailwind generates no utility for a
+              // dynamic value.
+              { backgroundColor: `color-mix(in oklab, ${color} 12%, transparent)`, color }
+            : { backgroundColor: color, color: "var(--primary-foreground)" }
         }
       >
-        {iniciais(nome)}
+        {initials(name)}
       </AvatarFallback>
     </Avatar>
   );
 }
 
-export interface Pessoa {
+export interface Person {
   id: string;
-  nome: string;
+  name: string;
   src?: string;
 }
 
-/** Avatares empilhados com contador de excedente. */
+/** Stacked avatars with an overflow counter. */
 export function AvatarGroup({
-  pessoas = [],
+  people = [],
   max = 4,
   size = "sm",
   className,
 }: {
-  pessoas?: Pessoa[];
+  people?: Person[];
   max?: number;
   size?: AvatarSize;
   className?: string;
 }) {
-  const visiveis = pessoas.slice(0, max);
-  const excedente = pessoas.length - visiveis.length;
+  const visible = people.slice(0, max);
+  const overflow = people.length - visible.length;
 
   return (
     <span className={cn("inline-flex items-center *:not-first:-ml-2", className)}>
-      {visiveis.map((pessoa) => (
+      {visible.map((person) => (
         <UserAvatar
-          key={pessoa.id}
-          nome={pessoa.nome}
-          src={pessoa.src}
+          key={person.id}
+          name={person.name}
+          src={person.src}
           size={size}
-          colorido
+          colorful
           className="border-card border-2"
         />
       ))}
 
-      {excedente > 0 && (
+      {overflow > 0 && (
         <span
-          title={`mais ${excedente}`}
+          title={`mais ${overflow}`}
           className={cn(
             "bg-muted text-muted-foreground border-card inline-flex items-center justify-center rounded-full border-2 font-semibold",
-            TAMANHOS[size],
+            SIZES[size],
           )}
         >
-          +{excedente}
+          +{overflow}
         </span>
       )}
     </span>
