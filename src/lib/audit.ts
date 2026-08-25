@@ -2,99 +2,99 @@ import type { AcaoAuditoria, OrigemAuditoria } from "./enums";
 import { ACAO_AUDITORIA, ORIGEM_AUDITORIA } from "./enums";
 
 /**
- * TRILHA DE AUDITORIA
+ * AUDIT TRAIL
  * =============================================================================
- * Emissor único dos eventos que precisam de rastro: quem acessou, quando, de
- * onde e qual ação realizou (PDF §6 — Auditoria Detalhada).
+ * Single emitter for the events that need a trace: who accessed what, when,
+ * from where and which action they performed.
  *
- * Toda ação sensível chama daqui. Nenhuma tela monta evento na mão — assim o
- * formato é o mesmo em todo o painel e a tabela da Fase 10 sabe ler tudo.
+ * Every sensitive action goes through here. No screen builds an event by hand,
+ * so the shape is the same across the whole panel and the audit table can read
+ * all of it.
  *
- * > [!] O registro definitivo é do backend.
- * O front-end **relata** a intenção; quem grava de forma imutável é o Postgres
- * (Fase 15), preferencialmente por trigger. Um log que só existisse no cliente
- * seria falsificável por quem quisesse — e um log de auditoria falsificável não
- * é auditoria.
+ * > [!] The definitive record belongs to the backend.
+ * The front-end **reports** the intent; what writes it immutably is Postgres,
+ * preferably through a trigger. A log that existed only on the client would be
+ * forgeable by anyone who cared — and a forgeable audit log is not an audit.
  */
 
-export interface EventoAuditoria {
-  acao: AcaoAuditoria;
-  /** O que foi tocado: "pacientes", "usuarios", "relatorios/nps". */
-  recurso: string;
-  /** Id do registro específico, quando houver. */
-  recurso_id?: string;
-  /** Preenchido quando a ação envolve dados de um paciente. */
-  paciente_id?: string;
-  origem?: OrigemAuditoria;
-  /** Justificativa informada pelo usuário — vem do ConfirmDialog. */
-  motivo?: string;
-  /** Contexto adicional. Nunca colocar PHI aqui. */
-  detalhes?: Record<string, unknown>;
+export interface AuditEvent {
+  action: AcaoAuditoria;
+  /** What was touched: "pacientes", "usuarios", "relatorios/nps". */
+  resource: string;
+  /** Id of the specific record, when there is one. */
+  resource_id?: string;
+  /** Filled in when the action involves a patient's data. */
+  patient_id?: string;
+  origin?: OrigemAuditoria;
+  /** Justification typed by the user — comes from the ConfirmDialog. */
+  reason?: string;
+  /** Extra context. Never put PHI here. */
+  details?: Record<string, unknown>;
 }
 
-interface EventoRegistrado extends EventoAuditoria {
-  origem: OrigemAuditoria;
-  criado_em: string;
+interface RecordedEvent extends AuditEvent {
+  origin: OrigemAuditoria;
+  created_at: string;
 }
 
 /**
- * Fila em memória.
+ * In-memory queue.
  *
- * Enquanto o backend não existe, os eventos ficam aqui para alimentar a tela
- * de Auditoria (Fase 10) durante o desenvolvimento. Não persiste — e não deve:
- * evento de auditoria em `localStorage` é PHI no navegador.
+ * While the backend does not exist, events stay here to feed the audit screen
+ * during development. It does not persist — and must not: an audit event in
+ * `localStorage` is PHI in the browser.
  */
-const fila: EventoRegistrado[] = [];
-const LIMITE_FILA = 200;
+const queue: RecordedEvent[] = [];
+const QUEUE_LIMIT = 200;
 
-/** Registra um evento. */
-export function registrar(evento: EventoAuditoria): void {
-  const registrado: EventoRegistrado = {
-    ...evento,
-    origem: evento.origem ?? ORIGEM_AUDITORIA.PAINEL,
-    criado_em: new Date().toISOString(),
+/** Records one event. */
+export function record(event: AuditEvent): void {
+  const recorded: RecordedEvent = {
+    ...event,
+    origin: event.origin ?? ORIGEM_AUDITORIA.PAINEL,
+    created_at: new Date().toISOString(),
   };
 
-  fila.push(registrado);
-  if (fila.length > LIMITE_FILA) fila.shift();
+  queue.push(recorded);
+  if (queue.length > QUEUE_LIMIT) queue.shift();
 
-  // Fase 15: enfileirar para a Edge Function / trigger no Postgres.
+  // Once the backend exists: enqueue for the Edge Function / Postgres trigger.
 }
 
-/** Eventos da sessão atual, do mais recente para o mais antigo. */
-export function eventosDaSessao(): readonly EventoRegistrado[] {
-  return [...fila].reverse();
+/** Events from the current session, newest first. */
+export function sessionEvents(): readonly RecordedEvent[] {
+  return [...queue].reverse();
 }
 
 /* -------------------------------------------------------------------------
-   ATALHOS
-   Cobrem os casos que se repetem no painel, para que ninguém precise lembrar
-   qual `acao` usar.
+   SHORTCUTS
+   They cover the cases that repeat across the panel, so nobody has to
+   remember which `action` to use.
    ------------------------------------------------------------------------- */
 
-export const auditar = {
-  login: (usuario_id: string) =>
-    registrar({ acao: ACAO_AUDITORIA.LOGIN, recurso: "auth", recurso_id: usuario_id }),
+export const audit = {
+  login: (user_id: string) =>
+    record({ action: ACAO_AUDITORIA.LOGIN, resource: "auth", resource_id: user_id }),
 
-  logout: (usuario_id: string, motivo?: string) =>
-    registrar({ acao: ACAO_AUDITORIA.LOGOUT, recurso: "auth", recurso_id: usuario_id, motivo }),
+  logout: (user_id: string, reason?: string) =>
+    record({ action: ACAO_AUDITORIA.LOGOUT, resource: "auth", resource_id: user_id, reason }),
 
-  leitura: (recurso: string, recurso_id?: string, paciente_id?: string) =>
-    registrar({ acao: ACAO_AUDITORIA.LEITURA, recurso, recurso_id, paciente_id }),
+  read: (resource: string, resource_id?: string, patient_id?: string) =>
+    record({ action: ACAO_AUDITORIA.LEITURA, resource, resource_id, patient_id }),
 
-  edicao: (recurso: string, recurso_id: string, detalhes?: Record<string, unknown>) =>
-    registrar({ acao: ACAO_AUDITORIA.EDICAO, recurso, recurso_id, detalhes }),
+  update: (resource: string, resource_id: string, details?: Record<string, unknown>) =>
+    record({ action: ACAO_AUDITORIA.EDICAO, resource, resource_id, details }),
 
-  exclusao: (recurso: string, recurso_id: string, motivo: string) =>
-    registrar({ acao: ACAO_AUDITORIA.EXCLUSAO, recurso, recurso_id, motivo }),
+  delete: (resource: string, resource_id: string, reason: string) =>
+    record({ action: ACAO_AUDITORIA.EXCLUSAO, resource, resource_id, reason }),
 
-  exportacao: (recurso: string, detalhes?: Record<string, unknown>) =>
-    registrar({ acao: ACAO_AUDITORIA.EXPORTACAO, recurso, detalhes }),
+  export: (resource: string, details?: Record<string, unknown>) =>
+    record({ action: ACAO_AUDITORIA.EXPORTACAO, resource, details }),
 
   /**
-   * Acesso a dado sigiloso — inclui revelar CPF, telefone ou e-mail completos.
-   * É a razão pela qual o mascaramento é o padrão: cada revelação deixa rastro.
+   * Access to confidential data — includes revealing a full CPF, phone or
+   * e-mail. It is why masking is the default: every reveal leaves a trace.
    */
-  sigiloso: (recurso: string, recurso_id?: string, paciente_id?: string) =>
-    registrar({ acao: ACAO_AUDITORIA.SIGILOSO, recurso, recurso_id, paciente_id }),
+  confidential: (resource: string, resource_id?: string, patient_id?: string) =>
+    record({ action: ACAO_AUDITORIA.SIGILOSO, resource, resource_id, patient_id }),
 };

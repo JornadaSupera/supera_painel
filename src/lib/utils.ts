@@ -2,13 +2,13 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 /**
- * Combina classes Tailwind resolvendo conflitos.
+ * Merges Tailwind classes, resolving conflicts.
  *
- * `clsx` monta a lista condicional; `twMerge` garante que a última classe
- * conflitante vença — sem ela, `cn("p-2", "p-4")` deixaria as duas no DOM e a
- * ordem no CSS decidiria, não a intenção de quem chamou.
+ * `clsx` builds the conditional list; `twMerge` makes the last conflicting
+ * class win — without it, `cn("p-2", "p-4")` would leave both in the DOM and
+ * the CSS order would decide, not the caller's intent.
  *
- * É o utilitário que o shadcn/ui espera em `@/lib/utils`.
+ * This is the helper shadcn/ui expects at `@/lib/utils`.
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

@@ -1,72 +1,72 @@
 /**
- * Exportação CSV.
+ * CSV export.
  *
- * A camada de dados decide QUAIS colunas saem (ver `pacientes.export`); este
- * arquivo só serializa e entrega o arquivo. A separação importa: se a escolha
- * de colunas vivesse aqui, bastaria alterar o front para exportar campo que a
- * clínica não autorizou.
+ * The data layer decides WHICH columns come out (see `patients.export`); this
+ * file only serializes and hands over the file. The split matters: if the
+ * column choice lived here, changing the front-end would be enough to export a
+ * field the clinic never authorized.
  *
- * Nenhuma chamada daqui registra auditoria — quem registra é a tela, antes de
- * pedir os dados, para que a intenção fique gravada mesmo se o download falhar.
+ * Nothing here writes to the audit trail — the screen does, before asking for
+ * the data, so the intent is recorded even when the download fails.
  */
 
 const BOM = "﻿";
 
 /**
- * Separador ponto e vírgula.
+ * Semicolon separator.
  *
- * O Excel em português trata a vírgula como separador decimal e, com CSV
- * separado por vírgula, joga a planilha inteira numa coluna só. O padrão
- * brasileiro é `;` — e o BOM acima é o que faz o Excel reconhecer o UTF-8 e
- * não transformar "José" em "JosÃ©".
+ * Brazilian Excel reads the comma as a decimal separator and, with a
+ * comma-separated CSV, drops the whole spreadsheet into a single column. The
+ * local convention is `;` — and the BOM above is what makes Excel recognize
+ * UTF-8 instead of turning "José" into "JosÃ©".
  */
-const SEPARADOR = ";";
+const SEPARATOR = ";";
 
-function escapar(valor: unknown): string {
-  const texto = String(valor ?? "");
+function escapeValue(value: unknown): string {
+  const text = String(value ?? "");
 
-  // Aspas duplas viram duas aspas, e o campo inteiro é envolvido quando contém
-  // separador, aspas ou quebra de linha (RFC 4180).
-  return /["\n\r;,]/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  // Double quotes are doubled, and the whole field is wrapped when it contains
+  // a separator, a quote or a line break (RFC 4180).
+  return /["\n\r;,]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** Converte linhas homogêneas em texto CSV. A ordem das colunas é a da 1ª linha. */
-export function paraCsv(linhas: readonly Record<string, unknown>[]): string {
-  const primeira = linhas[0];
-  if (!primeira) return "";
+/** Turns homogeneous rows into CSV text. Column order comes from the 1st row. */
+export function toCsv(rows: readonly Record<string, unknown>[]): string {
+  const first = rows[0];
+  if (!first) return "";
 
-  const colunas = Object.keys(primeira);
-  const cabecalho = colunas.map(escapar).join(SEPARADOR);
-  const corpo = linhas.map((linha) => colunas.map((coluna) => escapar(linha[coluna])).join(SEPARADOR));
+  const columns = Object.keys(first);
+  const header = columns.map(escapeValue).join(SEPARATOR);
+  const body = rows.map((row) => columns.map((column) => escapeValue(row[column])).join(SEPARATOR));
 
-  return [cabecalho, ...corpo].join("\r\n");
+  return [header, ...body].join("\r\n");
 }
 
 /** "pacientes" → "pacientes-2026-08-25.csv" */
-export function nomeComData(base: string, extensao = "csv"): string {
-  const dia = new Date().toISOString().slice(0, 10);
-  return `${base}-${dia}.${extensao}`;
+export function nameWithDate(base: string, extension = "csv"): string {
+  const day = new Date().toISOString().slice(0, 10);
+  return `${base}-${day}.${extension}`;
 }
 
-/** Dispara o download no navegador e libera a URL temporária. */
-export function baixarArquivo(conteudo: string, nome: string, tipo = "text/csv;charset=utf-8"): void {
-  const blob = new Blob([BOM + conteudo], { type: tipo });
+/** Starts the browser download and releases the temporary URL. */
+export function downloadFile(content: string, name: string, type = "text/csv;charset=utf-8"): void {
+  const blob = new Blob([BOM + content], { type });
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement("a");
   link.href = url;
-  link.download = nome;
+  link.download = name;
   link.rel = "noopener";
   document.body.appendChild(link);
   link.click();
   link.remove();
 
-  // Sem isso o blob fica retido até a aba fechar — e ele contém dado de
-  // paciente.
+  // Without this the blob is held until the tab closes — and it holds patient
+  // data.
   URL.revokeObjectURL(url);
 }
 
-/** Atalho: serializa e baixa. */
-export function baixarCsv(linhas: readonly Record<string, unknown>[], base: string): void {
-  baixarArquivo(paraCsv(linhas), nomeComData(base));
+/** Shortcut: serialize and download. */
+export function downloadCsv(rows: readonly Record<string, unknown>[], base: string): void {
+  downloadFile(toCsv(rows), nameWithDate(base));
 }

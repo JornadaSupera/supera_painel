@@ -2,15 +2,15 @@ import type { ListParams } from "@/services/contracts";
 import type { Periodo } from "./enums";
 
 /**
- * Chaves do TanStack Query — centralizadas.
+ * TanStack Query keys — kept in one place.
  *
- * Chave montada à mão dentro de componente é a causa nº 1 de cache fantasma e
- * invalidação que não acontece. Aqui a hierarquia é explícita:
+ * A key assembled by hand inside a component is the number one cause of ghost
+ * cache and invalidation that never happens. Here the hierarchy is explicit:
  *
- *   queryKeys.pacientes.all       → invalida tudo de pacientes
- *   queryKeys.pacientes.lists()   → invalida só as listagens
- *   queryKeys.pacientes.list(p)   → uma listagem específica (filtros inclusos)
- *   queryKeys.pacientes.detail(id)
+ *   queryKeys.patients.all       → invalidates everything about patients
+ *   queryKeys.patients.lists()   → invalidates the listings only
+ *   queryKeys.patients.list(p)   → one specific listing (filters included)
+ *   queryKeys.patients.detail(id)
  */
 
 function entity(name: string) {
@@ -33,64 +33,64 @@ export const queryKeys = {
 
   dashboard: {
     all: ["dashboard"] as const,
-    kpis: (periodo: Periodo, range?: unknown) => ["dashboard", "kpis", periodo, range ?? {}] as const,
-    series: (nome: string, periodo: Periodo, range?: unknown) =>
-      ["dashboard", "series", nome, periodo, range ?? {}] as const,
+    kpis: (period: Periodo, range?: unknown) => ["dashboard", "kpis", period, range ?? {}] as const,
+    series: (name: string, period: Periodo, range?: unknown) =>
+      ["dashboard", "series", name, period, range ?? {}] as const,
   },
 
-  pacientes: entity("pacientes"),
+  patients: entity("patients"),
 
-  usuarios: {
-    ...entity("usuarios"),
-    accessLogs: (id: string) => ["usuarios", "detail", id, "access-logs"] as const,
+  users: {
+    ...entity("users"),
+    accessLogs: (id: string) => ["users", "detail", id, "access-logs"] as const,
   },
 
-  conteudos: {
-    ...entity("conteudos"),
-    versions: (id: string) => ["conteudos", "detail", id, "versions"] as const,
+  contents: {
+    ...entity("contents"),
+    versions: (id: string) => ["contents", "detail", id, "versions"] as const,
   },
 
-  permissoes: {
-    all: ["permissoes"] as const,
-    matrix: () => ["permissoes", "matrix"] as const,
+  permissions: {
+    all: ["permissions"] as const,
+    matrix: () => ["permissions", "matrix"] as const,
   },
 
-  aprovacoes: {
-    all: ["aprovacoes"] as const,
-    queue: (params?: ListParams) => ["aprovacoes", "queue", params ?? {}] as const,
-    diff: (id: string, versao: number) => ["aprovacoes", "diff", id, versao] as const,
+  approvals: {
+    all: ["approvals"] as const,
+    queue: (params?: ListParams) => ["approvals", "queue", params ?? {}] as const,
+    diff: (id: string, version: number) => ["approvals", "diff", id, version] as const,
   },
 
-  relatorios: {
-    all: ["relatorios"] as const,
-    definitions: () => ["relatorios", "definitions"] as const,
-    run: (slug: string, params?: unknown) => ["relatorios", "run", slug, params ?? {}] as const,
-    schedules: () => ["relatorios", "schedules"] as const,
+  reports: {
+    all: ["reports"] as const,
+    definitions: () => ["reports", "definitions"] as const,
+    run: (slug: string, params?: unknown) => ["reports", "run", slug, params ?? {}] as const,
+    schedules: () => ["reports", "schedules"] as const,
   },
 
-  estatisticas: {
-    all: ["estatisticas"] as const,
-    clinicas: (params?: unknown) => ["estatisticas", "clinicas", params ?? {}] as const,
-    operacionais: (params?: unknown) => ["estatisticas", "operacionais", params ?? {}] as const,
+  statistics: {
+    all: ["statistics"] as const,
+    clinical: (params?: unknown) => ["statistics", "clinical", params ?? {}] as const,
+    operational: (params?: unknown) => ["statistics", "operational", params ?? {}] as const,
   },
 
-  auditoria: {
-    ...entity("auditoria"),
-    summary: (range?: unknown) => ["auditoria", "summary", range ?? {}] as const,
+  audit: {
+    ...entity("audit"),
+    summary: (range?: unknown) => ["audit", "summary", range ?? {}] as const,
   },
 
-  configuracoes: {
-    all: ["configuracoes"] as const,
-    get: () => ["configuracoes", "get"] as const,
-    termos: () => ["configuracoes", "termos"] as const,
+  settings: {
+    all: ["settings"] as const,
+    get: () => ["settings", "get"] as const,
+    terms: () => ["settings", "terms"] as const,
   },
 
-  catalogos: {
-    all: ["catalogos"] as const,
-    cids: () => ["catalogos", "cids"] as const,
-    protocolos: () => ["catalogos", "protocolos"] as const,
-    especialidades: () => ["catalogos", "especialidades"] as const,
-    efeitos: () => ["catalogos", "efeitos"] as const,
+  catalogs: {
+    all: ["catalogs"] as const,
+    cids: () => ["catalogs", "cids"] as const,
+    protocols: () => ["catalogs", "protocols"] as const,
+    specialties: () => ["catalogs", "specialties"] as const,
+    effects: () => ["catalogs", "effects"] as const,
   },
 } as const;
 

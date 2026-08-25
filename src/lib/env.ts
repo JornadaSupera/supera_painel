@@ -1,10 +1,10 @@
 /**
- * Acesso centralizado às variáveis de ambiente.
+ * Single entry point for environment variables.
  *
- * Nenhum outro arquivo lê `import.meta.env` diretamente. Isso garante um único
- * lugar para validar configuração, falha explícita no boot em vez de
- * `undefined` silencioso em produção, e inventário claro do que o front-end
- * conhece — útil em auditoria de segurança.
+ * No other file reads `import.meta.env` directly. That gives us one place to
+ * validate configuration, an explicit failure at boot instead of a silent
+ * `undefined` in production, and a clear inventory of what the front-end knows
+ * — useful during a security audit.
  */
 
 const raw = import.meta.env;
@@ -21,33 +21,33 @@ export const API_MODE: ApiMode = raw.VITE_API_MODE === "supabase" ? "supabase" :
 export const IS_MOCK = API_MODE === "mock";
 export const IS_DEV = raw.DEV;
 
-/** Simulação de backend — só tem efeito em modo mock. */
+/** Backend simulation — only has an effect in mock mode. */
 export const MOCK = {
   delayMin: num(raw.VITE_MOCK_DELAY_MIN, 300),
   delayMax: num(raw.VITE_MOCK_DELAY_MAX, 800),
-  /** 0 a 100. Acima de 0, parte das chamadas falha de propósito. */
+  /** 0 to 100. Above 0, a share of the calls fails on purpose. */
   errorRate: num(raw.VITE_MOCK_ERROR_RATE, 0),
 } as const;
 
 /**
- * Supabase (Fase 15).
- * A chave `anon` é pública por design — a proteção real é a RLS no Postgres.
- * A `service_role` NUNCA pode existir no front-end.
+ * Supabase.
+ * The `anon` key is public by design — the real protection is row level
+ * security in Postgres. `service_role` must NEVER exist in the front-end.
  */
 export const SUPABASE = {
   url: raw.VITE_SUPABASE_URL ?? "",
   anonKey: raw.VITE_SUPABASE_ANON_KEY ?? "",
 } as const;
 
-/** Sessão — expiração por inatividade. */
+/** Session — idle timeout. */
 export const SESSION = {
   idleMinutes: num(raw.VITE_SESSION_IDLE_MINUTES, 15),
   warnMinutes: num(raw.VITE_SESSION_WARN_MINUTES, 2),
 } as const;
 
 /**
- * Validação de boot, chamada uma vez em `main.tsx`.
- * Falha alto e cedo, em vez de quebrar no meio de uma tela clínica.
+ * Boot-time validation, called once from `main.tsx`.
+ * Fails loud and early instead of breaking halfway through a clinical screen.
  */
 export function assertEnv(): void {
   if (API_MODE === "supabase" && (!SUPABASE.url || !SUPABASE.anonKey)) {
@@ -56,15 +56,15 @@ export function assertEnv(): void {
     );
   }
 
-  // Barreira contra o erro mais caro possível: vazar a chave de serviço.
-  // Tudo com prefixo VITE_ vai para o bundle público.
-  const proibidas = Object.keys(raw).filter((chave) =>
-    /SERVICE_ROLE|SECRET|PRIVATE_KEY/i.test(chave),
+  // Guard against the most expensive mistake available: leaking the service
+  // key. Anything prefixed with VITE_ ends up in the public bundle.
+  const forbidden = Object.keys(raw).filter((key) =>
+    /SERVICE_ROLE|SECRET|PRIVATE_KEY/i.test(key),
   );
 
-  if (proibidas.length > 0) {
+  if (forbidden.length > 0) {
     throw new Error(
-      `[env] Variável sensível exposta ao browser: ${proibidas.join(", ")}. ` +
+      `[env] Variável sensível exposta ao browser: ${forbidden.join(", ")}. ` +
         "Remova do .env — tudo que começa com VITE_ vai para o bundle público.",
     );
   }

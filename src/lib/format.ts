@@ -1,30 +1,30 @@
 /**
- * Formatação pt-BR.
+ * pt-BR formatting.
  *
- * A camada de dados trabalha em ISO 8601 UTC e números crus. A conversão para
- * o formato brasileiro acontece só na renderização — nunca no mock, nunca no
- * adapter. Isso mantém ordenação, filtro e exportação corretos.
+ * The data layer works in ISO 8601 UTC and raw numbers. Converting to the
+ * Brazilian format happens at render time only — never in the mock, never in
+ * the adapter. That keeps sorting, filtering and exporting correct.
  */
 
 const LOCALE = "pt-BR";
-const FUSO = "America/Sao_Paulo";
-const VAZIO = "—";
+const TIME_ZONE = "America/Sao_Paulo";
+const EMPTY = "—";
 
 type IsoDate = string | null | undefined;
 
-/* ------------------------------------------------------------------- datas */
+/* ------------------------------------------------------------------- dates */
 
 /** "25/08/2026" */
-export function formatarData(iso: IsoDate): string {
-  if (!iso) return VAZIO;
-  return new Date(iso).toLocaleDateString(LOCALE, { timeZone: FUSO });
+export function formatDate(iso: IsoDate): string {
+  if (!iso) return EMPTY;
+  return new Date(iso).toLocaleDateString(LOCALE, { timeZone: TIME_ZONE });
 }
 
 /** "25/08/2026 14:32" */
-export function formatarDataHora(iso: IsoDate): string {
-  if (!iso) return VAZIO;
+export function formatDateTime(iso: IsoDate): string {
+  if (!iso) return EMPTY;
   return new Date(iso).toLocaleString(LOCALE, {
-    timeZone: FUSO,
+    timeZone: TIME_ZONE,
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
@@ -34,10 +34,10 @@ export function formatarDataHora(iso: IsoDate): string {
 }
 
 /** "25 de agosto de 2026" */
-export function formatarDataExtenso(iso: IsoDate): string {
-  if (!iso) return VAZIO;
+export function formatLongDate(iso: IsoDate): string {
+  if (!iso) return EMPTY;
   return new Date(iso).toLocaleDateString(LOCALE, {
-    timeZone: FUSO,
+    timeZone: TIME_ZONE,
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -45,100 +45,100 @@ export function formatarDataExtenso(iso: IsoDate): string {
 }
 
 /**
- * "há 5 min", "há 2 h", "ontem" — como na tela de Auditoria do protótipo.
+ * "há 5 min", "há 2 h", "ontem" — as on the audit reference screen.
  *
- * Acima de 7 dias volta à data absoluta: "há 43 dias" não ajuda ninguém a
- * localizar um evento.
+ * Past seven days it falls back to the absolute date: "há 43 dias" helps
+ * nobody locate an event.
  */
-export function tempoRelativo(iso: IsoDate): string {
-  if (!iso) return VAZIO;
+export function relativeTime(iso: IsoDate): string {
+  if (!iso) return EMPTY;
 
-  const segundos = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
-  const abs = Math.abs(segundos);
+  const seconds = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
+  const abs = Math.abs(seconds);
 
   if (abs < 60) return "agora há pouco";
 
   const rtf = new Intl.RelativeTimeFormat(LOCALE, { numeric: "auto" });
 
-  if (abs < 3600) return rtf.format(Math.round(segundos / 60), "minute");
-  if (abs < 86400) return rtf.format(Math.round(segundos / 3600), "hour");
-  if (abs < 604800) return rtf.format(Math.round(segundos / 86400), "day");
+  if (abs < 3600) return rtf.format(Math.round(seconds / 60), "minute");
+  if (abs < 86400) return rtf.format(Math.round(seconds / 3600), "hour");
+  if (abs < 604800) return rtf.format(Math.round(seconds / 86400), "day");
 
-  return formatarData(iso);
+  return formatDate(iso);
 }
 
-/** Idade em anos a partir da data de nascimento. */
-export function idade(isoNascimento: IsoDate): number | null {
-  if (!isoNascimento) return null;
+/** Age in years from the birth date. */
+export function ageInYears(isoBirthDate: IsoDate): number | null {
+  if (!isoBirthDate) return null;
 
-  const nascimento = new Date(isoNascimento);
-  const hoje = new Date();
+  const birthDate = new Date(isoBirthDate);
+  const today = new Date();
 
-  let anos = hoje.getFullYear() - nascimento.getFullYear();
-  const mes = hoje.getMonth() - nascimento.getMonth();
-  if (mes < 0 || (mes === 0 && hoje.getDate() < nascimento.getDate())) anos -= 1;
+  let years = today.getFullYear() - birthDate.getFullYear();
+  const months = today.getMonth() - birthDate.getMonth();
+  if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) years -= 1;
 
-  return anos;
+  return years;
 }
 
-/* ------------------------------------------------------------------ números */
+/* ----------------------------------------------------------------- numbers */
 
 /** "1.234" */
-export function formatarNumero(
-  valor: number | null | undefined,
-  opcoes?: Intl.NumberFormatOptions,
+export function formatNumber(
+  value: number | null | undefined,
+  options?: Intl.NumberFormatOptions,
 ): string {
-  if (valor === null || valor === undefined || Number.isNaN(valor)) return VAZIO;
-  return valor.toLocaleString(LOCALE, opcoes);
+  if (value === null || value === undefined || Number.isNaN(value)) return EMPTY;
+  return value.toLocaleString(LOCALE, options);
 }
 
 /** "12,4%" */
-export function formatarPercentual(valor: number | null | undefined, casas = 1): string {
-  if (valor === null || valor === undefined || Number.isNaN(valor)) return VAZIO;
-  return `${valor.toLocaleString(LOCALE, {
-    minimumFractionDigits: casas,
-    maximumFractionDigits: casas,
+export function formatPercent(value: number | null | undefined, decimals = 1): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return EMPTY;
+  return `${value.toLocaleString(LOCALE, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   })}%`;
 }
 
 /** "7 min", "1 h 12 min" */
-export function formatarDuracao(minutos: number | null | undefined): string {
-  if (minutos === null || minutos === undefined) return VAZIO;
+export function formatDuration(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined) return EMPTY;
 
-  const total = Math.round(minutos);
+  const total = Math.round(minutes);
   if (total < 60) return `${total} min`;
 
-  const horas = Math.floor(total / 60);
-  const resto = total % 60;
-  return resto === 0 ? `${horas} h` : `${horas} h ${resto} min`;
+  const hours = Math.floor(total / 60);
+  const rest = total % 60;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
 
-/* -------------------------------------------------------------------- texto */
+/* -------------------------------------------------------------------- text */
 
 /**
- * Iniciais a partir do nome — primeiro e último, ignorando preposições.
+ * Initials from a name — first and last, skipping Portuguese particles.
  * "Maria das Graças Silva" → "MS"
  */
-export function iniciais(nome = ""): string {
-  const ignorar = new Set(["de", "da", "do", "das", "dos", "e"]);
-  const partes = nome
+export function initials(name = ""): string {
+  const particles = new Set(["de", "da", "do", "das", "dos", "e"]);
+  const parts = name
     .trim()
     .split(/\s+/)
-    .filter((parte) => parte && !ignorar.has(parte.toLowerCase()));
+    .filter((part) => part && !particles.has(part.toLowerCase()));
 
-  const primeira = partes[0];
-  if (!primeira) return "?";
-  if (partes.length === 1) return primeira.slice(0, 2).toUpperCase();
+  const first = parts[0];
+  if (!first) return "?";
+  if (parts.length === 1) return first.slice(0, 2).toUpperCase();
 
-  const ultima = partes[partes.length - 1] ?? primeira;
-  return `${primeira[0] ?? ""}${ultima[0] ?? ""}`.toUpperCase();
+  const last = parts[parts.length - 1] ?? first;
+  return `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
 }
 
-/** Corta preservando palavra inteira. */
-export function truncar(texto: string | null | undefined, limite = 80): string {
-  const valor = texto ?? "";
-  if (valor.length <= limite) return valor;
+/** Truncates on a whole word. */
+export function truncate(text: string | null | undefined, limit = 80): string {
+  const value = text ?? "";
+  if (value.length <= limit) return value;
 
-  const corte = valor.lastIndexOf(" ", limite);
-  return `${valor.slice(0, corte > 0 ? corte : limite)}…`;
+  const cut = value.lastIndexOf(" ", limit);
+  return `${value.slice(0, cut > 0 ? cut : limit)}…`;
 }
