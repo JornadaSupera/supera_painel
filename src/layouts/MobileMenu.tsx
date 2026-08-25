@@ -12,19 +12,19 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/stores/layout";
-import { NAVEGACAO, type ItemNavegacao } from "./navegacao";
+import { NAV_ITEMS, type NavItem } from "./navigation";
 
 /**
- * Menu de navegação em telas estreitas.
+ * Navigation menu on narrow screens.
  *
- * O painel é desktop-first — mínimo de 1280 px, mas
- * precisa degradar de forma usável em tablet. Aqui a sidebar vira gaveta.
+ * The panel is desktop-first — 1280px minimum — but it has to degrade usably on
+ * a tablet. Here the sidebar becomes a drawer.
  *
- * Reaproveita o `Dialog` do shadcn para herdar foco preso, Esc e `inert` no
- * restante da página, em vez de reimplementar isso num `<div>`.
+ * It reuses the shadcn `Dialog` to inherit focus trapping, Esc and `inert` on
+ * the rest of the page, instead of reimplementing all that in a `<div>`.
  */
 
-function Link({ item, nested = false }: { item: ItemNavegacao; nested?: boolean }) {
+function Link({ item, nested = false }: { item: NavItem; nested?: boolean }) {
   return (
     <NavLink
       to={item.to}
@@ -45,19 +45,19 @@ function Link({ item, nested = false }: { item: ItemNavegacao; nested?: boolean 
   );
 }
 
-export function MenuMobile() {
-  const aberto = useLayoutStore((s) => s.menuMobileAberto);
-  const setAberto = useLayoutStore((s) => s.setMenuMobileAberto);
+export function MobileMenu() {
+  const open = useLayoutStore((s) => s.mobileMenuOpen);
+  const setOpen = useLayoutStore((s) => s.setMobileMenuOpen);
   const location = useLocation();
 
-  // Navegar fecha a gaveta: deixá-la aberta sobre a tela nova obriga a um
-  // segundo gesto para ver o que acabou de ser aberto.
+  // Navigating closes the drawer: leaving it open over the new screen forces a
+  // second gesture just to see what was opened.
   useEffect(() => {
-    setAberto(false);
-  }, [location.pathname, setAberto]);
+    setOpen(false);
+  }, [location.pathname, setOpen]);
 
   return (
-    <Dialog open={aberto} onOpenChange={setAberto}>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="top-0 left-0 h-dvh max-w-72 translate-x-0 translate-y-0 gap-0 rounded-none p-0 sm:max-w-72">
         <DialogHeader className="border-border border-b p-4 text-left">
           <DialogTitle className="flex items-center gap-3 text-base">
@@ -71,17 +71,17 @@ export function MenuMobile() {
 
         <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto p-3">
           <ul className="flex flex-col gap-0.5">
-            {NAVEGACAO.map((item) => (
-              <Can key={item.to} permissao={item.permissao} alguma={item.alguma}>
+            {NAV_ITEMS.map((item) => (
+              <Can key={item.to} permission={item.permission} anyOf={item.anyOf}>
                 <li className="flex flex-col gap-0.5">
-                  {item.filhos ? (
+                  {item.children ? (
                     <>
                       <span className="text-muted-foreground px-3 pt-3 pb-1 text-[11px] font-semibold tracking-wide uppercase">
                         {item.label}
                       </span>
-                      {item.filhos.map((filho) => (
-                        <Can key={filho.to} permissao={filho.permissao} alguma={filho.alguma}>
-                          <Link item={filho} nested />
+                      {item.children.map((child) => (
+                        <Can key={child.to} permission={child.permission} anyOf={child.anyOf}>
+                          <Link item={child} nested />
                         </Can>
                       ))}
                     </>
@@ -98,4 +98,4 @@ export function MenuMobile() {
   );
 }
 
-export default MenuMobile;
+export default MobileMenu;

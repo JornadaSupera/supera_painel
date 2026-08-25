@@ -2,67 +2,68 @@ import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
 import { Breadcrumb } from "@/components/shared";
-import { MenuMobile } from "./MenuMobile";
+import { MobileMenu } from "./MobileMenu";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
-import { itemPorCaminho, trilhaPorCaminho } from "./navegacao";
+import { navItemByPath, navTrailByPath } from "./navigation";
 
 /**
- * Moldura do painel: sidebar + topbar + área de conteúdo.
+ * Panel frame: sidebar + topbar + content area.
  *
- * Fica entre `ProtectedRoute` e as páginas, para que só quem tem sessão veja a
- * navegação — e para que a sidebar não remonte a cada troca de rota.
+ * It sits between `ProtectedRoute` and the pages, so only someone with a
+ * session sees the navigation — and so the sidebar does not remount on every
+ * route change.
  */
 export function AdminLayout() {
   const location = useLocation();
-  const trilha = trilhaPorCaminho(location.pathname);
+  const trail = navTrailByPath(location.pathname);
 
-  /* O título da aba acompanha a tela: com várias abas abertas, "Jornada
-     Supera" repetido não ajuda ninguém a se localizar. */
+  /* The tab title follows the screen: with several tabs open, "Jornada
+     Supera" repeated helps nobody find their way. */
   useEffect(() => {
-    const item = itemPorCaminho(location.pathname);
-    const nome = item?.titulo ?? item?.label;
-    document.title = nome ? `${nome} · Jornada Supera` : "Jornada Supera · Administração";
+    const item = navItemByPath(location.pathname);
+    const name = item?.title ?? item?.label;
+    document.title = name ? `${name} · Jornada Supera` : "Jornada Supera · Administração";
   }, [location.pathname]);
 
-  /* Trocar de página devolve o scroll ao topo. Sem isso, abrir uma tela nova
-     no meio dela é desorientador. */
+  /* Changing pages puts the scroll back at the top. Without it, landing in the
+     middle of a new screen is disorienting. */
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [location.pathname]);
 
   return (
     <div className="bg-background flex min-h-dvh">
-      {/* Primeiro elemento focável da página: pula a navegação inteira. */}
+      {/* First focusable element on the page: skips the whole navigation. */}
       <a href="#conteudo-principal" className="skip-link">
         Pular para o conteúdo
       </a>
 
       <Sidebar />
-      <MenuMobile />
+      <MobileMenu />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
 
         <main
           id="conteudo-principal"
-          // `tabIndex={-1}` permite que o "pular para o conteúdo" mova o foco
-          // de fato para cá, e não apenas role a página.
+          // `tabIndex={-1}` lets "skip to content" actually move the focus
+          // here, instead of only scrolling the page.
           tabIndex={-1}
           className="flex-1 overflow-y-auto focus:outline-none"
         >
-          {/* Largura total, sem `max-w`.
-              O protótipo trava o conteúdo em 1280 px, mas isso é limitação da
-              maquete: num painel de dados, cada pixel horizontal a mais cabe
-              mais coluna de tabela e mais respiro nos gráficos. Faixa branca
-              nas laterais de um monitor de trabalho é desperdício, não
-              respiro. */}
+          {/* Full width, no `max-w`.
+              The reference locks the content at 1280px, but that is a
+              limitation of the mockup: in a data panel, every extra horizontal
+              pixel fits another table column and gives the charts room. A
+              white band down the sides of a work monitor is waste, not
+              breathing room. */}
           <div className="w-full space-y-6 px-4 py-6 sm:px-6 xl:px-8">
-            {/* Só aparece a partir do segundo nível. Migalha de um item só é
-                ruído: repete o que o título e a sidebar já dizem. */}
-            {trilha.length > 1 && (
+            {/* Only appears from the second level down. A one-item crumb is
+                noise: it repeats what the title and the sidebar already say. */}
+            {trail.length > 1 && (
               <Breadcrumb
-                items={trilha.map((item) => ({ label: item.label, to: item.to }))}
+                items={trail.map((item) => ({ label: item.label, to: item.to }))}
                 className="mb-4"
               />
             )}

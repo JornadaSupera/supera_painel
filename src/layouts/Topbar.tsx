@@ -20,26 +20,26 @@ import { useLayoutStore } from "@/stores/layout";
 import { useThemeStore, type Theme } from "@/stores/theme";
 
 /**
- * Barra superior.
+ * Top bar.
  *
- * Busca global, tema, notificações e menu do usuário. A busca ganha
- * implementação real na Fase 5, quando existir o que buscar; aqui já ocupa o
- * lugar certo para não deslocar o layout depois.
+ * Global search, theme, notifications and the user menu. The search gets its
+ * real implementation once there is something to search; it already takes the
+ * right spot here so the layout does not shift later.
  */
 
-const ICONE_TEMA: Record<Theme, typeof Sun> = {
+const THEME_ICON: Record<Theme, typeof Sun> = {
   light: Sun,
   dark: Moon,
   system: Monitor,
 };
 
 export function Topbar() {
-  const { usuario, sair } = useAuth();
+  const { user, signOut } = useAuth();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
-  const setMenuMobileAberto = useLayoutStore((s) => s.setMenuMobileAberto);
+  const setMobileMenuOpen = useLayoutStore((s) => s.setMobileMenuOpen);
 
-  const IconeTema = ICONE_TEMA[theme];
+  const ThemeIcon = THEME_ICON[theme];
 
   return (
     <header className="bg-background/80 border-border sticky top-0 z-30 flex h-15 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-sm sm:px-6">
@@ -48,12 +48,12 @@ export function Topbar() {
         size="icon"
         aria-label="Abrir menu"
         className="lg:hidden"
-        onClick={() => setMenuMobileAberto(true)}
+        onClick={() => setMobileMenuOpen(true)}
       >
         <Menu />
       </Button>
 
-      {/* -------------------------------------------------------- busca */}
+      {/* ------------------------------------------------------- search */}
       <div className="relative hidden max-w-90 flex-1 items-center sm:flex">
         <Search
           size={16}
@@ -64,18 +64,18 @@ export function Topbar() {
           type="search"
           placeholder="Buscar paciente, profissional ou conteúdo…"
           aria-label="Busca global"
-          // A busca global entra na Fase 5, com dados para buscar.
+          // The global search lands once there is data to search.
           disabled
           className="pl-9"
         />
       </div>
 
       <div className="ml-auto flex items-center gap-1">
-        {/* ------------------------------------------------------- tema */}
+        {/* ------------------------------------------------------ theme */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label={`Tema: ${theme}`}>
-              <IconeTema />
+              <ThemeIcon />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -83,7 +83,7 @@ export function Topbar() {
             <DropdownMenuSeparator />
             <DropdownMenuRadioGroup
               value={theme}
-              onValueChange={(valor) => setTheme(valor as Theme)}
+              onValueChange={(value) => setTheme(value as Theme)}
             >
               <DropdownMenuRadioItem value="light">
                 <Sun />
@@ -101,21 +101,21 @@ export function Topbar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* ----------------------------------------------- notificações */}
+        {/* ----------------------------------------------- notifications */}
         <Button variant="ghost" size="icon" aria-label="Notificações" disabled>
           <Bell />
         </Button>
 
-        {/* -------------------------------------------------- usuário */}
-        {usuario && (
+        {/* -------------------------------------------------------- user */}
+        {user && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="ml-1 h-auto gap-2 px-2 py-1.5">
-                <UserAvatar nome={usuario.nome} size="sm" colorido />
+                <UserAvatar name={user.nome} size="sm" colorful />
                 <span className="hidden text-left leading-tight md:flex md:flex-col">
-                  <span className="text-sm font-medium">{usuario.nome.split(" ")[0]}</span>
+                  <span className="text-sm font-medium">{user.nome.split(" ")[0]}</span>
                   <span className="text-muted-foreground text-[11px]">
-                    {PAPEL_LABEL[usuario.papel]}
+                    {PAPEL_LABEL[user.papel]}
                   </span>
                 </span>
               </Button>
@@ -123,13 +123,13 @@ export function Topbar() {
 
             <DropdownMenuContent align="end" className="w-60">
               <DropdownMenuLabel className="flex flex-col gap-0.5">
-                <span className="truncate">{usuario.nome}</span>
+                <span className="truncate">{user.nome}</span>
                 <span className="text-muted-foreground truncate font-mono text-[11px] font-normal">
-                  {usuario.email}
+                  {user.email}
                 </span>
                 <span className="text-muted-foreground text-[11px] font-normal">
-                  {PAPEL_LABEL[usuario.papel]}
-                  {usuario.especialidade && ` · ${ESPECIALIDADE_LABEL[usuario.especialidade]}`}
+                  {PAPEL_LABEL[user.papel]}
+                  {user.especialidade && ` · ${ESPECIALIDADE_LABEL[user.especialidade]}`}
                 </span>
               </DropdownMenuLabel>
 
@@ -144,7 +144,7 @@ export function Topbar() {
                 </DropdownMenuItem>
               )}
 
-              <DropdownMenuItem variant="destructive" onSelect={() => void sair()}>
+              <DropdownMenuItem variant="destructive" onSelect={() => void signOut()}>
                 <LogOut />
                 Sair do painel
               </DropdownMenuItem>

@@ -2,26 +2,26 @@ import { Activity, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
 /**
- * Moldura das telas de autenticação.
+ * Frame for the authentication screens.
  *
- * Duas colunas em telas largas; só o formulário no mobile. A coluna da
- * esquerda carrega a identidade da clínica — o protótipo prevê logo e cor
- * configuráveis em Configurações.
+ * Two columns on wide screens; the form alone on mobile. The left column
+ * carries the clinic identity — the reference allows a logo and colour set in
+ * Settings.
  */
 export function AuthLayout({
-  titulo,
-  descricao,
+  title,
+  description,
   children,
-  rodape,
+  footer,
 }: {
-  titulo: string;
-  descricao?: ReactNode;
+  title: string;
+  description?: ReactNode;
   children: ReactNode;
-  rodape?: ReactNode;
+  footer?: ReactNode;
 }) {
   return (
     <div className="bg-background grid min-h-dvh lg:grid-cols-2">
-      {/* ------------------------------------------------------- identidade */}
+      {/* --------------------------------------------------------- identity */}
       <aside className="bg-sidebar border-sidebar-border hidden flex-col justify-between border-r p-12 lg:flex">
         <div className="flex items-center gap-3">
           <span className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-lg">
@@ -49,10 +49,10 @@ export function AuthLayout({
         </p>
       </aside>
 
-      {/* -------------------------------------------------------- formulário */}
+      {/* ------------------------------------------------------------- form */}
       <main className="flex items-center justify-center p-6 sm:p-12">
         <div className="flex w-full max-w-95 flex-col gap-8">
-          {/* Marca aparece no topo apenas quando a coluna lateral está oculta. */}
+          {/* The brand shows at the top only when the side column is hidden. */}
           <div className="flex items-center gap-3 lg:hidden">
             <span className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-lg">
               <Activity size={20} aria-hidden="true" />
@@ -61,15 +61,15 @@ export function AuthLayout({
           </div>
 
           <div className="flex flex-col gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{titulo}</h1>
-            {descricao && (
-              <p className="text-muted-foreground text-sm leading-relaxed">{descricao}</p>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            {description && (
+              <p className="text-muted-foreground text-sm leading-relaxed">{description}</p>
             )}
           </div>
 
           {children}
 
-          {rodape && <div className="text-muted-foreground text-sm">{rodape}</div>}
+          {footer && <div className="text-muted-foreground text-sm">{footer}</div>}
         </div>
       </main>
     </div>

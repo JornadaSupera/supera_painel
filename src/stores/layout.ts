@@ -2,38 +2,38 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 /**
- * Preferências de layout.
+ * Layout preferences.
  *
- * Zustand, conforme o Anexo I: estado de cliente puro. Persistido porque
- * reabrir o painel com o menu recolhido é o que a pessoa escolheu da última
- * vez — preferência de interface não é dado sensível.
+ * Zustand: pure client state. Persisted because reopening the panel with the
+ * menu collapsed is what the person chose last time — an interface preference
+ * is not sensitive data.
  *
- * O menu mobile fica **fora** da persistência: uma gaveta aberta é estado de
- * momento, e restaurá-la aberta na próxima visita seria confuso.
+ * The mobile menu stays **out** of persistence: an open drawer is momentary
+ * state, and restoring it open on the next visit would be confusing.
  */
 
 interface LayoutState {
-  sidebarColapsada: boolean;
-  alternarSidebar: () => void;
-  setSidebarColapsada: (colapsada: boolean) => void;
+  sidebarCollapsed: boolean;
+  toggleSidebar: () => void;
+  setSidebarCollapsed: (collapsed: boolean) => void;
 
-  menuMobileAberto: boolean;
-  setMenuMobileAberto: (aberto: boolean) => void;
+  mobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
 }
 
 export const useLayoutStore = create<LayoutState>()(
   persist(
     (set) => ({
-      sidebarColapsada: false,
-      alternarSidebar: () => set((s) => ({ sidebarColapsada: !s.sidebarColapsada })),
-      setSidebarColapsada: (sidebarColapsada) => set({ sidebarColapsada }),
+      sidebarCollapsed: false,
+      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
 
-      menuMobileAberto: false,
-      setMenuMobileAberto: (menuMobileAberto) => set({ menuMobileAberto }),
+      mobileMenuOpen: false,
+      setMobileMenuOpen: (mobileMenuOpen) => set({ mobileMenuOpen }),
     }),
     {
       name: "supera:layout",
-      partialize: (state) => ({ sidebarColapsada: state.sidebarColapsada }),
+      partialize: (state) => ({ sidebarCollapsed: state.sidebarCollapsed }),
     },
   ),
 );

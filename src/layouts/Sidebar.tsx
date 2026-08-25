@@ -6,56 +6,57 @@ import { Can } from "@/components/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/stores/layout";
-import { NAVEGACAO, type ItemNavegacao } from "./navegacao";
+import { NAV_ITEMS, type NavItem } from "./navigation";
 
 /**
- * Navegação lateral.
+ * Side navigation.
  *
- * ## Como o recolhimento foi feito liso
+ * ## How the collapse was made smooth
  *
- * O caminho ingênuo — remover o rótulo do DOM quando recolhe — produz um
- * salto: o texto some num quadro e a largura anima no seguinte. Aqui nada é
- * desmontado. O rótulo continua no DOM e anima `grid-template-columns` de
- * `1fr` para `0fr`, o que dá ao navegador uma transição contínua de largura,
- * junto com um fade. O ícone nunca muda de posição, porque o padding do item
- * não muda: só o espaço à direita dele encolhe.
+ * The naive path — dropping the label from the DOM on collapse — produces a
+ * jump: the text disappears in one frame and the width animates in the next.
+ * Nothing is unmounted here. The label stays in the DOM and animates
+ * `grid-template-columns` from `1fr` to `0fr`, which gives the browser a
+ * continuous width transition, together with a fade. The icon never moves,
+ * because the item padding does not change: only the space to its right
+ * shrinks.
  *
- * As três animações — largura da barra, largura do rótulo e opacidade — usam a
- * mesma duração e a mesma curva, então a leitura é de um movimento só.
+ * The three animations — bar width, label width and opacity — share the same
+ * duration and the same curve, so it reads as a single movement.
  */
 
-/* Medidas do protótipo: gap-2.5, px-2.5, py-1.5, ícone size-4. */
+/* Reference measurements: gap-2.5, px-2.5, py-1.5, size-4 icon. */
 const ITEM_BASE =
   "group relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors";
 
-const ITEM_ATIVO = "bg-primary/10 text-primary font-medium";
-const ITEM_INATIVO = "text-muted-foreground hover:bg-muted hover:text-foreground";
+const ITEM_ACTIVE = "bg-primary/10 text-primary font-medium";
+const ITEM_INACTIVE = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
-/** Curva e duração compartilhadas por tudo que se move no recolhimento. */
-const MOVIMENTO = "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]";
+/** Curve and duration shared by everything that moves during the collapse. */
+const MOTION = "duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]";
 
 /**
- * Rótulo que encolhe até sumir, sem sair do DOM.
+ * A label that shrinks away without leaving the DOM.
  *
- * A grade de uma coluna é o truque: `1fr → 0fr` é animável, enquanto
- * `width: auto → 0` não é.
+ * The single-column grid is the trick: `1fr → 0fr` is animatable, whereas
+ * `width: auto → 0` is not.
  */
-function Rotulo({
-  colapsada,
+function Label({
+  collapsed,
   children,
   className,
 }: {
-  colapsada: boolean;
+  collapsed: boolean;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
     <span
-      aria-hidden={colapsada}
+      aria-hidden={collapsed}
       className={cn(
         "grid transition-[grid-template-columns,opacity] motion-reduce:transition-none",
-        MOVIMENTO,
-        colapsada ? "grid-cols-[0fr] opacity-0" : "grid-cols-[1fr] opacity-100",
+        MOTION,
+        collapsed ? "grid-cols-[0fr] opacity-0" : "grid-cols-[1fr] opacity-100",
         className,
       )}
     >
@@ -64,75 +65,76 @@ function Rotulo({
   );
 }
 
-function Marcador({ colapsada }: { colapsada: boolean }) {
+function LevelMarker({ collapsed }: { collapsed: boolean }) {
   return (
-    <Rotulo colapsada={colapsada}>
+    <Label collapsed={collapsed}>
       <span className="bg-supera-uniao/15 text-supera-uniao ml-1 rounded-full px-1.5 py-px text-[10px] font-semibold tracking-wide">
         Médio
       </span>
-    </Rotulo>
+    </Label>
   );
 }
 
 function ItemLink({
   item,
-  colapsada,
-  aninhado = false,
+  collapsed,
+  nested = false,
 }: {
-  item: ItemNavegacao;
-  colapsada: boolean;
-  aninhado?: boolean;
+  item: NavItem;
+  collapsed: boolean;
+  nested?: boolean;
 }) {
-  const conteudo = (
+  const content = (
     <NavLink
       to={item.to}
-      // `end` só no dashboard: os demais precisam marcar-se ativos nas subrotas
-      // (`/pacientes/:id` mantém "Pacientes" destacado).
+      // `end` only on the dashboard: the others need to stay active on their
+      // subroutes (`/pacientes/:id` keeps "Pacientes" highlighted).
       end={item.to === "/dashboard"}
       className={({ isActive }) =>
-        cn(ITEM_BASE, isActive ? ITEM_ATIVO : ITEM_INATIVO, aninhado && "text-[13px]")
+        cn(ITEM_BASE, isActive ? ITEM_ACTIVE : ITEM_INACTIVE, nested && "text-[13px]")
       }
     >
       <item.icon size={16} className="shrink-0" aria-hidden="true" />
-      <Rotulo colapsada={colapsada} className="flex-1 text-left">
+      <Label collapsed={collapsed} className="flex-1 text-left">
         {item.label}
-      </Rotulo>
-      {item.nivelMedio && !aninhado && <Marcador colapsada={colapsada} />}
+      </Label>
+      {item.mediumLevel && !nested && <LevelMarker collapsed={collapsed} />}
     </NavLink>
   );
 
-  // Recolhida, o rótulo visível some — o tooltip passa a ser o nome do item.
-  if (!colapsada) return conteudo;
+  // Collapsed, the visible label is gone — the tooltip becomes the item name.
+  if (!collapsed) return content;
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{conteudo}</TooltipTrigger>
+      <TooltipTrigger asChild>{content}</TooltipTrigger>
       <TooltipContent side="right">{item.label}</TooltipContent>
     </Tooltip>
   );
 }
 
-function Grupo({ item, colapsada }: { item: ItemNavegacao; colapsada: boolean }) {
+function Group({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const location = useLocation();
-  const contemAtiva = location.pathname.startsWith(item.to);
-  const [aberto, setAberto] = useState(contemAtiva);
+  const containsActive = location.pathname.startsWith(item.to);
+  const [open, setOpen] = useState(containsActive);
 
-  // Recolher fecha o submenu; expandir de volta reabre se a rota atual está
-  // dentro dele. Sem isso, a barra reabre com um submenu aberto sobre nada.
+  // Collapsing closes the submenu; expanding back reopens it when the current
+  // route lives inside. Without this, the bar reopens with a submenu hanging
+  // over nothing.
   useEffect(() => {
-    if (colapsada) setAberto(false);
-    else if (contemAtiva) setAberto(true);
-  }, [colapsada, contemAtiva]);
+    if (collapsed) setOpen(false);
+    else if (containsActive) setOpen(true);
+  }, [collapsed, containsActive]);
 
-  const primeiro = item.filhos?.[0];
+  const firstChild = item.children?.[0];
 
-  // Recolhida, o grupo vira atalho para o primeiro filho: não há espaço para
-  // submenu, e um botão que não abre nada confunde. O ícone fica no mesmo
-  // lugar, então a troca não é percebida.
-  if (colapsada && primeiro) {
+  // Collapsed, the group becomes a shortcut to its first child: there is no
+  // room for a submenu, and a button that opens nothing is confusing. The icon
+  // stays in the same place, so the swap goes unnoticed.
+  if (collapsed && firstChild) {
     return (
       <li>
-        <ItemLink item={{ ...primeiro, icon: item.icon, label: item.label }} colapsada />
+        <ItemLink item={{ ...firstChild, icon: item.icon, label: item.label }} collapsed />
       </li>
     );
   }
@@ -141,36 +143,36 @@ function Grupo({ item, colapsada }: { item: ItemNavegacao; colapsada: boolean })
     <li>
       <button
         type="button"
-        onClick={() => setAberto((v) => !v)}
-        aria-expanded={aberto}
-        className={cn(ITEM_BASE, contemAtiva ? "text-foreground font-medium" : ITEM_INATIVO)}
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={cn(ITEM_BASE, containsActive ? "text-foreground font-medium" : ITEM_INACTIVE)}
       >
         <item.icon size={16} className="shrink-0" aria-hidden="true" />
-        <Rotulo colapsada={colapsada} className="flex-1 text-left">
+        <Label collapsed={collapsed} className="flex-1 text-left">
           {item.label}
-        </Rotulo>
-        {item.nivelMedio && <Marcador colapsada={colapsada} />}
+        </Label>
+        {item.mediumLevel && <LevelMarker collapsed={collapsed} />}
         <ChevronDown
           size={14}
           aria-hidden="true"
-          className={cn("shrink-0 transition-transform", MOVIMENTO, aberto && "rotate-180")}
+          className={cn("shrink-0 transition-transform", MOTION, open && "rotate-180")}
         />
       </button>
 
-      {/* O submenu também abre por grade, para não saltar. */}
+      {/* The submenu opens through the grid too, so it does not jump. */}
       <div
         className={cn(
           "grid transition-[grid-template-rows,opacity] motion-reduce:transition-none",
-          MOVIMENTO,
-          aberto ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+          MOTION,
+          open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
         )}
       >
         <div className="overflow-hidden">
           <ul className="border-sidebar-border mt-1 ml-[1.0625rem] flex flex-col gap-0.5 border-l pl-3">
-            {item.filhos?.map((filho) => (
-              <Can key={filho.to} permissao={filho.permissao} alguma={filho.alguma}>
+            {item.children?.map((child) => (
+              <Can key={child.to} permission={child.permission} anyOf={child.anyOf}>
                 <li>
-                  <ItemLink item={filho} colapsada={false} aninhado />
+                  <ItemLink item={child} collapsed={false} nested />
                 </li>
               </Can>
             ))}
@@ -182,44 +184,44 @@ function Grupo({ item, colapsada }: { item: ItemNavegacao; colapsada: boolean })
 }
 
 export function Sidebar() {
-  const colapsada = useLayoutStore((state) => state.sidebarColapsada);
-  const alternar = useLayoutStore((state) => state.alternarSidebar);
+  const collapsed = useLayoutStore((state) => state.sidebarCollapsed);
+  const toggle = useLayoutStore((state) => state.toggleSidebar);
 
   return (
     <aside
       className={cn(
         "bg-sidebar border-sidebar-border sticky top-0 hidden h-dvh shrink-0 flex-col border-r lg:flex",
         "transition-[width] motion-reduce:transition-none",
-        MOVIMENTO,
-        // 60px recolhida: padding do nav (24) + padding do item (20) + ícone
-        // (16). O ícone fica exatamente centrado, sem precisar de `justify-center`
-        // — que causaria salto no meio da animação.
-        colapsada ? "w-15" : "w-64",
+        MOTION,
+        // 60px when collapsed: nav padding (24) + item padding (20) + icon
+        // (16). The icon lands exactly centred without `justify-center`, which
+        // would cause a jump mid-animation.
+        collapsed ? "w-15" : "w-64",
       )}
     >
-      {/* ------------------------------------------------------------- marca */}
+      {/* ------------------------------------------------------------- brand */}
       <div className="border-sidebar-border flex h-15 shrink-0 items-center gap-2.5 border-b px-[0.875rem]">
         <span className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
           <Activity size={18} aria-hidden="true" />
         </span>
-        <Rotulo colapsada={colapsada}>
+        <Label collapsed={collapsed}>
           <span className="flex flex-col leading-tight">
             <span className="text-sm font-semibold tracking-tight">Jornada Supera</span>
             <span className="text-muted-foreground text-[11px]">Administração</span>
           </span>
-        </Rotulo>
+        </Label>
       </div>
 
-      {/* --------------------------------------------------------- navegação */}
+      {/* -------------------------------------------------------- navigation */}
       <nav aria-label="Navegação principal" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-0.5">
-          {NAVEGACAO.map((item) => (
-            <Can key={item.to} permissao={item.permissao} alguma={item.alguma}>
-              {item.filhos ? (
-                <Grupo item={item} colapsada={colapsada} />
+          {NAV_ITEMS.map((item) => (
+            <Can key={item.to} permission={item.permission} anyOf={item.anyOf}>
+              {item.children ? (
+                <Group item={item} collapsed={collapsed} />
               ) : (
                 <li>
-                  <ItemLink item={item} colapsada={colapsada} />
+                  <ItemLink item={item} collapsed={collapsed} />
                 </li>
               )}
             </Can>
@@ -227,24 +229,25 @@ export function Sidebar() {
         </ul>
       </nav>
 
-      {/* ---------------------------------------------------------- colapsar */}
+      {/* ---------------------------------------------------------- collapse */}
       <div className="border-sidebar-border shrink-0 border-t p-3">
         <button
           type="button"
-          onClick={alternar}
-          aria-label={colapsada ? "Expandir menu" : "Recolher menu"}
-          aria-expanded={!colapsada}
-          className={cn(ITEM_BASE, ITEM_INATIVO)}
+          onClick={toggle}
+          aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          aria-expanded={!collapsed}
+          className={cn(ITEM_BASE, ITEM_INACTIVE)}
         >
-          {/* A seta gira em vez de trocar de ícone: trocar o glifo pisca. */}
+          {/* The arrow rotates instead of swapping icons: swapping the glyph
+              flickers. */}
           <ChevronsLeft
             size={16}
             aria-hidden="true"
-            className={cn("shrink-0 transition-transform", MOVIMENTO, colapsada && "rotate-180")}
+            className={cn("shrink-0 transition-transform", MOTION, collapsed && "rotate-180")}
           />
-          <Rotulo colapsada={colapsada} className="flex-1 text-left">
+          <Label collapsed={collapsed} className="flex-1 text-left">
             Recolher menu
-          </Rotulo>
+          </Label>
         </button>
       </div>
     </aside>
