@@ -145,8 +145,18 @@ export interface PerfilAcesso {
  * especialidade são removidas do que veio do papel, antes de somar as da
  * especialidade — é o que impede o administrador de herdar o sigilo.
  */
-export function resolverPermissoes(perfil: PerfilAcesso): Set<Permissao> {
-  const doPapel = PERMISSOES_POR_PAPEL[perfil.papel] ?? [];
+export function resolverPermissoes(
+  perfil: PerfilAcesso,
+  /**
+   * Matriz papel → permissões a considerar.
+   *
+   * O padrão é a definida em código. A tela de Usuários edita uma cópia
+   * persistida dessa matriz, e a camada de dados passa a versão vigente aqui —
+   * assim existe UMA implementação da resolução, e não duas que podem divergir.
+   */
+  matriz: Record<Papel, readonly Permissao[]> = PERMISSOES_POR_PAPEL,
+): Set<Permissao> {
+  const doPapel = matriz[perfil.papel] ?? [];
   const efetivas = new Set(doPapel.filter((p) => !EXCLUSIVAS_DE_ESPECIALIDADE.has(p)));
 
   if (perfil.especialidade) {

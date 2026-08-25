@@ -1,6 +1,10 @@
 import { buildAdapter } from "../_stub";
 import * as auth from "./auth";
+import * as catalogos from "./catalogos";
 import * as dashboard from "./dashboard";
+import * as pacientes from "./pacientes";
+import * as permissoes from "./permissoes";
+import * as usuarios from "./usuarios";
 
 /**
  * ADAPTER MOCK — implementação ativa enquanto o backend não existe.
@@ -17,8 +21,10 @@ import * as dashboard from "./dashboard";
 const implemented = {
   auth, // Fase 2
   dashboard, // Fase 4
-  // Fase 5 -> pacientes
-  // Fase 6 -> usuarios, permissoes
+  pacientes, // Fase 5
+  catalogos, // Fase 5
+  usuarios, // Fase 6
+  permissoes, // Fase 6
   // Fase 7 -> conteudos
 };
 

@@ -2,7 +2,14 @@ import { API_MODE } from "@/lib/env";
 import { mockAdapter } from "./adapters/mock";
 import { supabaseAdapter } from "./adapters/supabase";
 import { throwIfError, type ApiError } from "./contracts";
-import type { AuthOperations, DashboardOperations } from "./contracts/operations";
+import type {
+  AuthOperations,
+  CatalogosOperations,
+  DashboardOperations,
+  PacientesOperations,
+  PermissoesOperations,
+  UsuariosOperations,
+} from "./contracts/operations";
 
 /**
  * apiClient — ÚNICO ponto de entrada de dados do painel.
@@ -52,5 +59,9 @@ export async function call<T extends { error: ApiError | null }>(
 
 export const authApi = api.auth as unknown as AuthOperations;
 export const dashboardApi = api.dashboard as unknown as DashboardOperations;
+export const pacientesApi = api.pacientes as unknown as PacientesOperations;
+export const catalogosApi = api.catalogos as unknown as CatalogosOperations;
+export const usuariosApi = api.usuarios as unknown as UsuariosOperations;
+export const permissoesApi = api.permissoes as unknown as PermissoesOperations;
 
 export default api;

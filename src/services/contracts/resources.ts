@@ -42,7 +42,25 @@ export const RESOURCES = {
   pacientes: {
     table: "pacientes",
     fase: 5,
-    operations: ["list", "getById", "create", "update", "deactivate", "sendInvite", "export"],
+    operations: [
+      "list",
+      "getById",
+      "create",
+      "update",
+      "deactivate",
+      "sendInvite",
+      "export",
+      /**
+       * Devolve CPF, telefone ou e-mail COMPLETOS de um paciente.
+       *
+       * Existe como operação própria, e não como campo da listagem, porque é a
+       * única forma de a revelação ser auditável de fato: enquanto o dado
+       * completo não sai do banco, não há o que vazar no DevTools nem no cache
+       * do navegador. Na Fase 15 vira uma função `security definer` que checa a
+       * permissão e grava o acesso antes de responder.
+       */
+      "revealPii",
+    ],
   },
   usuarios: {
     table: "usuarios",
@@ -56,6 +74,13 @@ export const RESOURCES = {
       "resetPassword",
       "setMfa",
       "listAccessLogs",
+      /**
+       * Contagem por especialidade, que é o que a faixa do topo da tela mostra.
+       * Agregação é do banco (`group by`), não da tela: a tela só tem a página
+       * atual, e somar em cima dela daria número errado assim que a lista
+       * crescer.
+       */
+      "getDistribuicao",
     ],
   },
   permissoes: {
