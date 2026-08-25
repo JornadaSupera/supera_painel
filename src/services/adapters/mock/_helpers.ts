@@ -20,7 +20,14 @@ import {
  * "no papel".
  */
 
-type Row = Record<string, unknown>;
+/**
+ * Linha genérica.
+ *
+ * Os helpers navegam por caminho de string, então não precisam conhecer a
+ * forma do registro — e os tipos de domínio (`PacienteMock`, `UsuarioMock`)
+ * não têm índice de string, logo não caberiam em `Record<string, unknown>`.
+ */
+type Row = object;
 
 /* -------------------------------------------------------------------------
    LATÊNCIA E FALHA SIMULADA
@@ -67,7 +74,7 @@ export function normalizeText(value: unknown): string {
 }
 
 /** Busca textual em vários campos — equivale a `.or(...ilike)`. */
-export function matchSearch(row: Row, search: string, fields: string[]): boolean {
+export function matchSearch(row: unknown, search: string, fields: string[]): boolean {
   if (!search) return true;
 
   const needle = normalizeText(search);
@@ -78,7 +85,7 @@ export function matchSearch(row: Row, search: string, fields: string[]): boolean
  * Filtros por igualdade. Array vira `.in()`, valor único vira `.eq()`.
  * Valores vazios (`""`, `null`, `undefined`, `"todos"`) são ignorados.
  */
-export function matchFilters(row: Row, filters: Record<string, FilterValue> = {}): boolean {
+export function matchFilters(row: unknown, filters: Record<string, FilterValue> = {}): boolean {
   return Object.entries(filters).every(([field, expected]) => {
     if (expected === undefined || expected === null || expected === "" || expected === "todos") {
       return true;
@@ -95,7 +102,7 @@ export function matchFilters(row: Row, filters: Record<string, FilterValue> = {}
 }
 
 /** Recorte temporal — equivale a `.gte(field, from).lte(field, to)`. */
-export function matchRange(row: Row, range: DateRange | null, field = "criado_em"): boolean {
+export function matchRange(row: unknown, range: DateRange | null, field = "criado_em"): boolean {
   if (!range?.from || !range?.to) return true;
 
   const value = new Date(String(getPath(row, field))).getTime();

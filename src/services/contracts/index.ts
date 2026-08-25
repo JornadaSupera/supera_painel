@@ -83,8 +83,20 @@ export interface SingleResult<T> {
   error: ApiError | null;
 }
 
+/**
+ * Resposta de falha, comum a listagem e a registro único.
+ *
+ * `data` é tipado como `never` — e vale `null` em tempo de execução — para que
+ * o mesmo objeto caiba tanto em `ListResult<T>` (`data: T[]`) quanto em
+ * `SingleResult<T>` (`data: T | null`). Sem isso, todo adapter de listagem
+ * precisaria de um `as` no caminho de erro.
+ *
+ * A contrapartida é explícita: **quem recebe um resultado do contrato checa
+ * `error` antes de tocar em `data`.** É o que `throwIfError` — e portanto
+ * `call()` no `apiClient` — faz por todo mundo.
+ */
 export interface FailResult {
-  data: null;
+  data: never;
   count: 0;
   error: ApiError;
 }
@@ -155,7 +167,9 @@ export function okOne<T>(data: T | null): SingleResult<T> {
 
 export function fail(code: ErrorCode, message?: string, details?: unknown): FailResult {
   return {
-    data: null,
+    // Ver `FailResult`: o valor é `null`; o tipo `never` é o que permite a
+    // mesma resposta servir a listagem e a registro único.
+    data: null as never,
     count: 0,
     error: {
       code,
