@@ -1,0 +1,293 @@
+/* =========================================================================
+   DESIGN TOKENS — Jornada Supera / Painel Administrativo
+   Extraídos do CSS compilado do protótipo oficial (que é shadcn/ui), por isso
+   os nomes coincidem com os que o shadcn espera: os primitivos gerados pelo
+   CLI já saem na identidade do projeto.
+
+   REGRA: nenhum componente escreve cor literal. Sempre classe Tailwind ou
+   var(--token).
+   ========================================================================= */
+
+/* Tema escuro por classe `dark` no <html> — convenção do shadcn. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --radius: 0.75rem;
+
+  --background: #f8fdfc;
+  --foreground: #123431;
+
+  --card: #ffffff;
+  --card-foreground: #123431;
+
+  --popover: #ffffff;
+  --popover-foreground: #123431;
+
+  --primary: #00aa92;
+  --primary-foreground: #f8fdfc;
+
+  --secondary: #b7f2ca;
+  --secondary-foreground: #00372c;
+
+  --muted: #e7f6ef;
+  --muted-foreground: #4a6361;
+
+  --accent: #b7f2ca;
+  --accent-foreground: #00372c;
+
+  --destructive: #e01921;
+  --destructive-foreground: #ffffff;
+
+  --border: #d4e6e0;
+  --input: #d4e6e0;
+  --ring: #00aa92;
+
+  /* Sidebar tem paleta própria no protótipo — não é o --card. */
+  --sidebar: #f3fdf9;
+  --sidebar-foreground: #123431;
+  --sidebar-primary: #00aa92;
+  --sidebar-primary-foreground: #f8fdfc;
+  --sidebar-accent: #d5f4e2;
+  --sidebar-accent-foreground: #00372c;
+  --sidebar-border: #d4e6e0;
+  --sidebar-ring: #00aa92;
+
+  /* Séries de gráfico — ordem fixa, nunca reordenar: o leitor associa cor a
+     categoria entre telas. */
+  --chart-1: #00aa92;
+  --chart-2: #7bcc98;
+  --chart-3: #27605b;
+  --chart-4: #e78b30;
+  --chart-5: #886acf;
+
+  /* Status clínico e operacional. Cada um tem trio cor/bg/foreground.
+     Cor nunca é o único portador de significado — badge é cor + texto. */
+  --success: #0f9d58;
+  --success-bg: #e6f6ee;
+  --success-foreground: #05502c;
+
+  --warning: #e78b30;
+  --warning-bg: #fdf1e3;
+  --warning-foreground: #6b3d08;
+
+  --danger: #e01921;
+  --danger-bg: #fdeaea;
+  --danger-foreground: #7a0d11;
+
+  --info: #2f6fed;
+  --info-bg: #eaf1fe;
+  --info-foreground: #12336f;
+
+  --neutral: #4a6361;
+  --neutral-bg: #eef4f2;
+  --neutral-foreground: #123431;
+
+  /* -----------------------------------------------------------------------
+     MARCA — os seis valores do Jornada Supera.
+     Usados como cor de acento por indicador e por categoria, no lugar de
+     repetir a primária em tudo.
+     ----------------------------------------------------------------------- */
+  --supera-uniao: #00aa92;
+  --supera-empatia: #63ba8a;
+  --supera-seguranca: #017272;
+  --supera-respeito: #1c5755;
+  --supera-perfeicao: #1d4542;
+  --supera-amor: #de4e4b;
+
+  /* -----------------------------------------------------------------------
+     ESCALA DE GRAU — 0 a 5.
+     É a escala de sintoma do diário do paciente e o grau CTCAE dos efeitos
+     adversos. Verde no 0, vermelho no 5, com passagem contínua pelo amarelo e
+     laranja: a leitura da gravidade não depende de comparar dois tons de uma
+     cor só. Serve ao mapa de calor das Estatísticas Clínicas (Fase 12).
+     ----------------------------------------------------------------------- */
+  --mood-0: #5bbe62;
+  --mood-1: #9abd53;
+  --mood-2: #dabc43;
+  --mood-3: #f7a224;
+  --mood-4: #f16935;
+  --mood-5: #d73337;
+
+  /* Layout do painel. */
+  --topbar-height: 60px;
+  --content-max-width: 1600px;
+}
+
+.dark {
+  --background: #0a0a0a;
+  --foreground: #f2f2f2;
+
+  --card: #151515;
+  --card-foreground: #f2f2f2;
+
+  --popover: #171717;
+  --popover-foreground: #f2f2f2;
+
+  --primary: #2dc5a6;
+  --primary-foreground: #0a0a0a;
+
+  --secondary: #262626;
+  --secondary-foreground: #caeadb;
+
+  --muted: #1e1e1e;
+  --muted-foreground: #8f8f8f;
+
+  --accent: #262626;
+  --accent-foreground: #caeadb;
+
+  --destructive: #ff6367;
+  --destructive-foreground: #0a0a0a;
+
+  --border: #ffffff14;
+  --input: #ffffff1f;
+  --ring: #2dc5a6;
+
+  --sidebar: #101010;
+  --sidebar-foreground: #f2f2f2;
+  --sidebar-primary: #2dc5a6;
+  --sidebar-primary-foreground: #0a0a0a;
+  --sidebar-accent: #222222;
+  --sidebar-accent-foreground: #caeadb;
+  --sidebar-border: #ffffff14;
+  --sidebar-ring: #2dc5a6;
+
+  --chart-1: #2dc5a6;
+  --chart-2: #88d9a5;
+  --chart-3: #589194;
+  --chart-4: #fc9e47;
+  --chart-5: #9f85e5;
+
+  --success: #4ac98a;
+  --success-bg: #10241a;
+  --success-foreground: #b7f0d0;
+
+  --warning: #fc9e47;
+  --warning-bg: #2a1c0c;
+  --warning-foreground: #ffd9ab;
+
+  --danger: #ff6367;
+  --danger-bg: #2a1112;
+  --danger-foreground: #ffc4c5;
+
+  --info: #6d9bff;
+  --info-bg: #101a2e;
+  --info-foreground: #c3d6ff;
+
+  --neutral: #8f8f8f;
+  --neutral-bg: #1e1e1e;
+  --neutral-foreground: #f2f2f2;
+
+  --supera-uniao: #41d2b3;
+  --supera-empatia: #83daa9;
+  --supera-seguranca: #56b6bb;
+  --supera-respeito: #6ba4a7;
+  --supera-perfeicao: #729b9b;
+  --supera-amor: #ff716b;
+
+  --mood-0: #75d079;
+  --mood-1: #abcc6b;
+  --mood-2: #e7c952;
+  --mood-3: #ffb147;
+  --mood-4: #ff7643;
+  --mood-5: #f4514f;
+}
+
+/* -------------------------------------------------------------------------
+   Exposição para o Tailwind: `bg-card`, `text-muted-foreground`,
+   `border-border`, `fill-chart-1`, `font-mono` etc.
+   ------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-supera-uniao: var(--supera-uniao);
+  --color-supera-empatia: var(--supera-empatia);
+  --color-supera-seguranca: var(--supera-seguranca);
+  --color-supera-respeito: var(--supera-respeito);
+  --color-supera-perfeicao: var(--supera-perfeicao);
+  --color-supera-amor: var(--supera-amor);
+
+  --color-mood-0: var(--mood-0);
+  --color-mood-1: var(--mood-1);
+  --color-mood-2: var(--mood-2);
+  --color-mood-3: var(--mood-3);
+  --color-mood-4: var(--mood-4);
+  --color-mood-5: var(--mood-5);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-success: var(--success);
+  --color-success-bg: var(--success-bg);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-foreground: var(--danger-foreground);
+
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --color-info-foreground: var(--info-foreground);
+
+  --color-neutral: var(--neutral);
+  --color-neutral-bg: var(--neutral-bg);
+  --color-neutral-foreground: var(--neutral-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans:
+    "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* Escala tipográfica do painel — mais densa que o padrão do Tailwind,
+     porque a tela é de leitura de dados, não de marketing. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1.4;
+}
