@@ -10,6 +10,15 @@ CLAUDE.local.md
 PLANO*.md
 PROMPT*.md
 
+# Guia interno do banco: descreve tabelas, RPCs, politicas de RLS e as travas
+# de seguranca. Mapa de ataque para quem nao deveria te-lo.
+README.md
+
+# Cache e logs do firebase-tools (o firebase.json e o .firebaserc VAO para o Git)
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+
 # Vault de documentacao interna (Obsidian): plano, ADRs, pontos de atencao e PDF
 docs/
 AGENTS.md
