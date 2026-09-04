@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/stores/layout";
-import { NAV_ITEMS, type NavItem } from "./navigation";
+import { visibleNavItems, type NavItem } from "./navigation";
 
 /**
  * Navigation menu on narrow screens.
@@ -71,7 +71,7 @@ export function MobileMenu() {
 
         <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto p-3">
           <ul className="flex flex-col gap-0.5">
-            {NAV_ITEMS.map((item) => (
+            {visibleNavItems().map((item) => (
               <Can key={item.to} permission={item.permission} anyOf={item.anyOf}>
                 <li className="flex flex-col gap-0.5">
                   {item.children ? (

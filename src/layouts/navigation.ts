@@ -33,6 +33,16 @@ export interface NavItem {
   anyOf?: readonly Permissao[];
   /** Contract level Médio — flagged in the interface. */
   mediumLevel?: boolean;
+  /**
+   * The screen exists as a route but has not been built yet.
+   *
+   * Kept in this list rather than deleted: `navItemByPath` and
+   * `navTrailByPath` still resolve the title and the breadcrumb, so a
+   * bookmarked URL renders with a proper header instead of a bare placeholder.
+   * What `visibleNavItems` drops is the sidebar entry — a menu that leads to
+   * six empty rooms teaches people to distrust the menu.
+   */
+  pending?: boolean;
   children?: NavItem[];
   /** Page title; falls back to `label` when absent. */
   title?: string;
@@ -67,6 +77,7 @@ export const NAV_ITEMS: NavItem[] = [
     permission: PERMISSAO.CONTEUDO_READ,
     title: "Aprovação de conteúdo",
     subtitle: "Workflow editorial",
+    pending: true,
   },
   {
     label: "Relatórios",
@@ -74,12 +85,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ClipboardList,
     permission: PERMISSAO.RELATORIOS_READ,
     subtitle: "12 relatórios pré-definidos",
+    pending: true,
   },
   {
     label: "Estatísticas",
     to: "/estatisticas",
     icon: TrendingUp,
     mediumLevel: true,
+    pending: true,
     anyOf: [
       PERMISSAO.ESTATISTICAS_CLINICAS_READ,
       PERMISSAO.ESTATISTICAS_READ_ALL,
@@ -92,6 +105,7 @@ export const NAV_ITEMS: NavItem[] = [
         icon: TrendingUp,
         permission: PERMISSAO.ESTATISTICAS_CLINICAS_READ,
         mediumLevel: true,
+        pending: true,
         title: "Estatísticas clínicas",
         subtitle: "Cruzamento Protocolo × Efeito × Grau",
       },
@@ -101,6 +115,7 @@ export const NAV_ITEMS: NavItem[] = [
         icon: TrendingUp,
         anyOf: [PERMISSAO.ESTATISTICAS_READ_ALL, PERMISSAO.ESTATISTICAS_READ_SELF],
         mediumLevel: true,
+        pending: true,
         title: "Estatísticas operacionais",
         subtitle: "Operação da clínica",
       },
@@ -112,6 +127,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ScrollText,
     permission: PERMISSAO.AUDITORIA_READ,
     mediumLevel: true,
+    pending: true,
     title: "Auditoria & logs",
     subtitle: "Rastro de acesso a dados sensíveis · retenção de 5 anos",
   },
@@ -120,8 +136,24 @@ export const NAV_ITEMS: NavItem[] = [
     to: "/configuracoes",
     icon: Settings,
     permission: PERMISSAO.CONFIGURACOES_READ,
+    pending: true,
   },
 ];
+
+/**
+ * What the sidebar shows: everything except the screens still to be built.
+ *
+ * Only the menu is filtered. The routes stay reachable, so a link already
+ * shared keeps working and lands on the placeholder — hiding the entry is
+ * about not promising what is not there, not about breaking addresses.
+ */
+export function visibleNavItems(items: NavItem[] = NAV_ITEMS): NavItem[] {
+  return items
+    .filter((item) => !item.pending)
+    .map((item) =>
+      item.children ? { ...item, children: visibleNavItems(item.children) } : item,
+    );
+}
 
 /** Every item as a flat list, parents and children alike. */
 export function flatNavItems(items: NavItem[] = NAV_ITEMS): NavItem[] {

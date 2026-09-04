@@ -6,7 +6,7 @@ import { Can } from "@/components/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/stores/layout";
-import { NAV_ITEMS, type NavItem } from "./navigation";
+import { visibleNavItems, type NavItem } from "./navigation";
 
 /**
  * Side navigation.
@@ -215,7 +215,7 @@ export function Sidebar() {
       {/* -------------------------------------------------------- navigation */}
       <nav aria-label="Navegação principal" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-0.5">
-          {NAV_ITEMS.map((item) => (
+          {visibleNavItems().map((item) => (
             <Can key={item.to} permission={item.permission} anyOf={item.anyOf}>
               {item.children ? (
                 <Group item={item} collapsed={collapsed} />
