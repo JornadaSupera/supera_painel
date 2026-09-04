@@ -10,7 +10,10 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "typecheck": "tsc -b --noEmit",
-    "verify-bundle": "node scripts/verificar-bundle.mjs"
+    "verify-bundle": "node scripts/verificar-bundle.mjs",
+    "check:env": "node scripts/verificar-ambiente.mjs",
+    "deploy": "node scripts/verificar-ambiente.mjs --producao && npm run build && npx --yes firebase-tools deploy --only hosting",
+    "deploy:homolog": "node scripts/verificar-ambiente.mjs --producao && npm run build && npx --yes firebase-tools hosting:channel:deploy homologacao --expires 30d"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
