@@ -34,6 +34,7 @@ const PacienteNovoPage = lazy(() => import("@/features/pacientes/pages/PacienteN
 const PacienteFichaPage = lazy(() => import("@/features/pacientes/pages/PacienteFichaPage"));
 const UsuariosPage = lazy(() => import("@/features/usuarios/pages/UsuariosPage"));
 const UsuarioFormPage = lazy(() => import("@/features/usuarios/pages/UsuarioFormPage"));
+const UsuarioDetalhePage = lazy(() => import("@/features/usuarios/pages/UsuarioDetalhePage"));
 const ConteudoPage = lazy(() => import("@/features/conteudo/pages/ConteudoPage"));
 const RelatoriosPage = lazy(() => import("@/features/relatorios/pages/RelatoriosPage"));
 const EstatisticasClinicasPage = lazy(
@@ -83,7 +84,11 @@ export function AppRoutes() {
                   requires `usuarios:manage`, not the list read. */}
               <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_MANAGE} />}>
                 <Route path="/usuarios/novo" element={<UsuarioFormPage />} />
-                <Route path="/usuarios/:id" element={<UsuarioFormPage />} />
+                {/* A ficha é leitura; a edição tem rota própria. Abrir um
+                    profissional levava direto ao formulário, e com a edição
+                    indisponível no backend a linha não abria nada. */}
+                <Route path="/usuarios/:id/editar" element={<UsuarioFormPage />} />
+                <Route path="/usuarios/:id" element={<UsuarioDetalhePage />} />
               </Route>
 
               <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_READ} />}>

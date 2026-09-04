@@ -73,14 +73,15 @@ export function HistoricoAcessos({
                   <div className="min-w-0">
                     <p className="truncate text-sm">{log.recurso}</p>
                     <p className="text-muted-foreground text-[11px]">
-                      {ORIGEM_AUDITORIA_LABEL[log.origem]} · {log.user_agent}
+                      {ORIGEM_AUDITORIA_LABEL[log.origem]}
+                      {log.user_agent ? ` · ${log.user_agent}` : ""}
                     </p>
                   </div>
                 </div>
 
                 <div className="shrink-0 text-right">
                   <p className="text-xs tabular-nums">{relativeTime(log.criado_em)}</p>
-                  <p className="text-muted-foreground font-mono text-[11px]">{log.ip}</p>
+                  <p className="text-muted-foreground font-mono text-[11px]">{log.ip || "—"}</p>
                   <p className="sr-only">{formatDateTime(log.criado_em)}</p>
                 </div>
               </li>

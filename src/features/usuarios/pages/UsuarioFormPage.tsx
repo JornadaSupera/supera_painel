@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { ErrorState, PageHeader, SkeletonForm, StatusBadge } from "@/components/shared";
+import { BackendPendente, ErrorState, PageHeader, SkeletonForm, StatusBadge } from "@/components/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,6 +35,7 @@ import {
   type Especialidade,
 } from "@/lib/enums";
 import { PERMISSAO_LABEL } from "@/lib/rbac";
+import { motivoIndisponivel } from "@/services/apiClient";
 import { useAtualizarUsuario, useCriarUsuario, useUsuario } from "../hooks/useUsuarios";
 import { paraEntrada, usuarioSchema, VALORES_INICIAIS, type UsuarioForm as Valores } from "../schemas";
 
@@ -79,7 +80,7 @@ export function UsuarioFormPage() {
       registro: usuario.registro ?? "",
       horario_inicio: usuario.horario_inicio ?? "08:00",
       horario_fim: usuario.horario_fim ?? "18:00",
-      mfa_ativo: usuario.mfa_ativo,
+      mfa_ativo: usuario.mfa_ativo ?? true,
     });
   }, [usuario, form]);
 
@@ -98,6 +99,28 @@ export function UsuarioFormPage() {
 
   if (edicao && (isError || !usuario)) {
     return <ErrorState error={error} onRetry={() => void refetch()} />;
+  }
+
+  // A rota é alcançável pela URL mesmo com o botão desabilitado na listagem.
+  const indisponivel = motivoIndisponivel(edicao ? "usuarios.update" : "usuarios.create");
+
+  if (indisponivel) {
+    return (
+      <div className="flex flex-col gap-5">
+        <PageHeader
+          eyebrow="Gestão"
+          title={edicao ? `Editar ${usuario?.nome}` : "Novo usuário"}
+          breadcrumb={[
+            { label: "Usuários", to: "/usuarios" },
+            { label: edicao ? (usuario?.nome ?? "Editar") : "Novo usuário" },
+          ]}
+        />
+        <BackendPendente
+          titulo={edicao ? "Edição de profissional" : "Cadastro de profissional"}
+          motivo={indisponivel}
+        />
+      </div>
+    );
   }
 
   const enviar = (valores: Valores) => {

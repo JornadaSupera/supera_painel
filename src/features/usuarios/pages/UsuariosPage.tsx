@@ -32,6 +32,7 @@ import {
 } from "@/lib/enums";
 import { formatNumber } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
+import { motivoIndisponivel } from "@/services/apiClient";
 import { temRecorte, useUsuariosStore } from "@/stores/usuarios";
 import type { UsuarioListItem } from "@/types/usuario";
 import { AcoesUsuario } from "../components/AcoesUsuario";
@@ -158,8 +159,11 @@ export function UsuariosPage() {
           </StatusBadge>
 
           {/* Segundo fator desligado é exceção; a lista precisa deixar isso
-              visível sem exigir que se abra cada ficha. */}
-          {!usuario.mfa_ativo && (
+              visível sem exigir que se abra cada ficha. A comparação é com
+              `false`, não com o valor falsy: `null` quer dizer que a origem dos
+              dados não informa o segundo fator de terceiros, e acusar ausência
+              nesse caso marcaria toda a equipe. */}
+          {usuario.mfa_ativo === false && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <span className="bg-warning-bg text-warning-foreground border-warning/30 cursor-default rounded-sm border px-1 text-[10px] font-medium">
@@ -194,7 +198,11 @@ export function UsuariosPage() {
         }
         actions={
           <Can permission={PERMISSAO.USUARIOS_MANAGE}>
-            <Button onClick={() => navigate("/usuarios/novo")}>
+            <Button
+              onClick={() => navigate("/usuarios/novo")}
+              disabled={motivoIndisponivel("usuarios.create") !== null}
+              title={motivoIndisponivel("usuarios.create") ?? undefined}
+            >
               <UserPlus />
               Novo usuário
             </Button>
@@ -281,11 +289,9 @@ export function UsuariosPage() {
               sort={sort}
               onSortChange={setSort}
               filtered={filtrada}
-              onRowClick={
-                can(PERMISSAO.USUARIOS_MANAGE)
-                  ? (usuario) => navigate(`/usuarios/${usuario.id}`)
-                  : undefined
-              }
+              // Ver a ficha é leitura: quem enxerga a lista enxerga a ficha.
+              // A edição é que exige `usuarios:manage`, e ela tem rota própria.
+              onRowClick={(usuario) => navigate(`/usuarios/${usuario.id}`)}
               pagination={{
                 page,
                 pageSize,

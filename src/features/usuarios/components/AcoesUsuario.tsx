@@ -1,4 +1,4 @@
-import { Ellipsis, History, KeyRound, Pause, Play, ShieldCheck, ShieldOff, SquarePen } from "lucide-react";
+import { IdCard, Ellipsis, History, KeyRound, Pause, Play, ShieldCheck, ShieldOff, SquarePen } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { STATUS_USUARIO } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
+import { motivoIndisponivel } from "@/services/apiClient";
 import type { UsuarioListItem } from "@/types/usuario";
 import { useAlterarMfa, useAlterarStatus, useResetarSenha } from "../hooks/useUsuarios";
 
@@ -37,7 +38,14 @@ export function AcoesUsuario({
   const resetarSenha = useResetarSenha();
   const alterarMfa = useAlterarMfa();
 
-  const pausado = usuario.status === STATUS_USUARIO.PAUSADO;
+  // Acesso suspenso é pausado ou inativo: qual dos dois o backend usa depende
+  // de ele ter estado de pausa. Para a tela, os dois significam "não entra".
+  const suspenso =
+    usuario.status === STATUS_USUARIO.PAUSADO || usuario.status === STATUS_USUARIO.INATIVO;
+
+  const semEdicao = motivoIndisponivel("usuarios.update");
+  const semMfa = motivoIndisponivel("usuarios.setMfa");
+  const semPausa = motivoIndisponivel("usuarios.pause") !== null;
 
   return (
     <div onClick={(evento) => evento.stopPropagation()} role="presentation">
@@ -54,13 +62,22 @@ export function AcoesUsuario({
         </DropdownMenuTrigger>
 
         <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuItem onSelect={() => navigate(`/usuarios/${usuario.id}`)}>
+            <IdCard />
+            Ver ficha
+          </DropdownMenuItem>
+
           <DropdownMenuItem onSelect={() => onVerHistorico(usuario)}>
             <History />
             Histórico de acessos
           </DropdownMenuItem>
 
           <Can permission={PERMISSAO.USUARIOS_MANAGE}>
-            <DropdownMenuItem onSelect={() => navigate(`/usuarios/${usuario.id}`)}>
+            <DropdownMenuItem
+              disabled={semEdicao !== null}
+              title={semEdicao ?? undefined}
+              onSelect={() => navigate(`/usuarios/${usuario.id}/editar`)}
+            >
               <SquarePen />
               Editar cadastro
             </DropdownMenuItem>
@@ -76,6 +93,8 @@ export function AcoesUsuario({
             </DropdownMenuItem>
 
             <DropdownMenuItem
+              disabled={semMfa !== null}
+              title={semMfa ?? undefined}
               onSelect={() => {
                 // Ligar é seguro e imediato. Desligar exige justificativa — daí
                 // o diálogo em um caminho e não no outro.
@@ -89,18 +108,29 @@ export function AcoesUsuario({
 
             <DropdownMenuSeparator />
 
+            {/*
+              Suspender acesso tem duas formas, e qual delas existe depende do
+              backend. Onde há pausa, ela mantém o vínculo e suspende o acesso;
+              onde não há, resta desativar — que é a revogação completa, vale
+              para todos os perfis da pessoa de uma vez e por isso é dita com
+              essa palavra, não disfarçada de "pausar".
+            */}
             <DropdownMenuItem
-              variant={pausado ? "default" : "destructive"}
+              variant={suspenso ? "default" : "destructive"}
               disabled={alterarStatus.isPending}
               onSelect={() =>
                 alterarStatus.mutate({
                   id: usuario.id,
-                  status: pausado ? STATUS_USUARIO.ATIVO : STATUS_USUARIO.PAUSADO,
+                  status: suspenso
+                    ? STATUS_USUARIO.ATIVO
+                    : semPausa
+                      ? STATUS_USUARIO.INATIVO
+                      : STATUS_USUARIO.PAUSADO,
                 })
               }
             >
-              {pausado ? <Play /> : <Pause />}
-              {pausado ? "Reativar acesso" : "Pausar acesso"}
+              {suspenso ? <Play /> : <Pause />}
+              {suspenso ? "Reativar acesso" : semPausa ? "Desativar acesso" : "Pausar acesso"}
             </DropdownMenuItem>
           </Can>
         </DropdownMenuContent>
