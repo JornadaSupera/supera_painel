@@ -39,11 +39,38 @@ export const SUPABASE = {
   anonKey: raw.VITE_SUPABASE_ANON_KEY ?? "",
 } as const;
 
-/** Session — idle timeout. */
+/**
+ * Session — idle timeout.
+ *
+ * `idleMinutes: 0` switches the expiry clock off entirely: no idle logout and
+ * no deadline logout. It exists for development, where being signed out in the
+ * middle of building a screen costs more than it protects.
+ *
+ * Production keeps it on. An unattended panel showing patient data is exactly
+ * what the timeout is for, and a reception desk is the place it happens.
+ */
 export const SESSION = {
   idleMinutes: num(raw.VITE_SESSION_IDLE_MINUTES, 15),
   warnMinutes: num(raw.VITE_SESSION_WARN_MINUTES, 2),
 } as const;
+
+/**
+ * Whether the panel demands a second factor to sign in.
+ *
+ * The contract requires it for administrators, so the default is on and stays
+ * on in production. The switch exists because the panel has no screen for
+ * enrolling an authenticator yet: with it forced on and no factor registered,
+ * an account that is otherwise valid cannot get in at all.
+ *
+ * Turning it off is a deliberate, visible choice in configuration — which is
+ * the point. The previous behaviour skipped the factor whenever the build was
+ * a development one, and a security control that switches itself off based on
+ * how the code was compiled is a control nobody can audit.
+ */
+export const MFA_REQUIRED = raw.VITE_MFA_OBRIGATORIO !== "false";
+
+/** Whether the session expires on its own at all. */
+export const SESSION_EXPIRES = SESSION.idleMinutes > 0;
 
 /**
  * Boot-time validation, called once from `main.tsx`.

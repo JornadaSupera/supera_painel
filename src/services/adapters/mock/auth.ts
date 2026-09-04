@@ -1,3 +1,4 @@
+import { MFA_REQUIRED } from "@/lib/env";
 import { STATUS_USUARIO } from "@/lib/enums";
 import { usuarios } from "@/mocks/usuarios";
 import type { UsuarioMock } from "@/mocks/usuarios";
@@ -41,6 +42,16 @@ const desafios = new Map<string, DesafioEmAberto>();
 const tentativasPorEmail = new Map<string, { total: number; ultima: number }>();
 const MAX_TENTATIVAS_LOGIN = 5;
 const JANELA_BLOQUEIO_MS = 15 * 60_000;
+
+function criarSessao(usuario: UsuarioMock): Sessao {
+  usuario.ultimo_acesso_em = now();
+
+  return {
+    usuario: paraUsuarioAutenticado(usuario),
+    token: uuid(),
+    expira_em: new Date(Date.now() + SESSAO_VALIDADE_MS).toISOString(),
+  };
+}
 
 function paraUsuarioAutenticado(usuario: UsuarioMock): UsuarioAutenticado {
   // `senha_mock` e `status` ficam de fora de propósito: o que sai daqui é o
@@ -113,6 +124,12 @@ export async function signIn({
 
     tentativasPorEmail.delete(chave);
 
+    // Segundo fator desligado por configuração: o mock entrega a sessão de uma
+    // vez, para que os dois adapters respondam a mesma coisa à mesma chave.
+    if (!MFA_REQUIRED) {
+      return okOne<ResultadoLogin>({ sessao: criarSessao(usuario) });
+    }
+
     const desafio_id = uuid();
     desafios.set(desafio_id, {
       usuario_id: usuario.id,
@@ -168,15 +185,8 @@ export async function verifyMfa({
 
     // Desafio é de uso único: consumido, deixa de existir.
     desafios.delete(desafio_id);
-    usuario.ultimo_acesso_em = now();
 
-    const sessao: Sessao = {
-      usuario: paraUsuarioAutenticado(usuario),
-      token: uuid(),
-      expira_em: new Date(Date.now() + SESSAO_VALIDADE_MS).toISOString(),
-    };
-
-    return okOne(sessao);
+    return okOne(criarSessao(usuario));
   });
 }
 

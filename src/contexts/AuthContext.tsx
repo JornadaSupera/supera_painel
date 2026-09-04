@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { audit } from "@/lib/audit";
-import { SESSION } from "@/lib/env";
+import { SESSION, SESSION_EXPIRES } from "@/lib/env";
 import { can, canAny, resolverPermissoes, type Permissao } from "@/lib/rbac";
 import { authApi, call } from "@/services/apiClient";
 import type { DesafioMfa, Sessao } from "@/types/auth";
@@ -86,7 +86,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await call(() => authApi.signIn({ email, senha: password }));
     if (!data) throw new Error("Não foi possível iniciar o acesso.");
 
-    // There is never a session at this step: the second factor is mandatory.
+    // Sign-in ends in one of two places: the second factor screen, or the
+    // panel. Which one is the data layer's call, not this component's.
+    if (data.sessao) {
+      setSession(data.sessao);
+      setMfaChallenge(null);
+      lastActivity.current = Date.now();
+      audit.login(data.sessao.usuario.id);
+      return;
+    }
+
     setMfaChallenge(data.mfa);
   }, []);
 
@@ -135,6 +144,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session) return undefined;
+
+    /*
+     * Relógio desligado (`VITE_SESSION_IDLE_MINUTES=0`): nem inatividade nem
+     * prazo do token encerram a sessão.
+     *
+     * Vale notar para quando voltar a ligar: `expira_em` é a validade do token
+     * no instante do login, e o cliente do Supabase renova o token sozinho.
+     * Comparar esse retrato com o relógio derruba uma sessão que continua
+     * válida no servidor — ao reativar, o prazo precisa ser relido, não
+     * tratado como definitivo.
+     */
+    if (!SESSION_EXPIRES) {
+      setSecondsUntilExpiry(null);
+      return undefined;
+    }
 
     const events = ["pointerdown", "keydown", "scroll", "focus"] as const;
     const mark = () => renewActivity();

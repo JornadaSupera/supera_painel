@@ -46,4 +46,14 @@ export interface DesafioMfa {
   expira_em: string;
 }
 
-export type ResultadoLogin = { mfa: DesafioMfa };
+/**
+ * Resultado de `signIn`.
+ *
+ * Duas saídas possíveis, e exatamente uma acontece: ou o acesso pede o segundo
+ * fator, ou já entrega a sessão. Modelar como união — em vez de um campo
+ * opcional — obriga quem consome a tratar os dois casos, e impede que a
+ * ausência do segundo fator passe despercebida como `undefined`.
+ */
+export type ResultadoLogin =
+  | { mfa: DesafioMfa; sessao?: never }
+  | { mfa?: never; sessao: Sessao };
