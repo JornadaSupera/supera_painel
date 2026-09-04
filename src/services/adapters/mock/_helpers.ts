@@ -1,15 +1,5 @@
 import { MOCK } from "@/lib/env";
-import {
-  ERROR_CODE,
-  fail,
-  normalizeListParams,
-  ok,
-  type FilterValue,
-  type DateRange,
-  type ListParams,
-  type ListResult,
-  type Sort,
-} from "@/services/contracts";
+import { ERROR_CODE, fail } from "@/services/contracts";
 
 /**
  * Infra compartilhada dos mocks.
@@ -18,16 +8,22 @@ import {
  * ordenação, busca e falha ocasional — para que os estados de Loading, Vazio e
  * Erro sejam exercitados de verdade durante o desenvolvimento, e não apenas
  * "no papel".
+ *
+ * Busca, filtro, ordenação e paginação moram em `../_list`: o adapter Supabase
+ * precisa exatamente das mesmas regras para resolver o que as funções `read_*`
+ * não resolvem, e duas cópias da mesma regra é como as duas passam a discordar.
  */
 
-/**
- * Linha genérica.
- *
- * Os helpers navegam por caminho de string, então não precisam conhecer a
- * forma do registro — e os tipos de domínio (`PacienteMock`, `UsuarioMock`)
- * não têm índice de string, logo não caberiam em `Record<string, unknown>`.
- */
-type Row = object;
+export {
+  applySort,
+  getPath,
+  matchFilters,
+  matchRange,
+  matchSearch,
+  normalizeText,
+  paginate,
+  type PaginateOptions,
+} from "../_list";
 
 /* -------------------------------------------------------------------------
    LATÊNCIA E FALHA SIMULADA
@@ -56,124 +52,6 @@ export async function simulate<T>(fn: () => T): Promise<T | ReturnType<typeof fa
   }
 
   return fn();
-}
-
-/* -------------------------------------------------------------------------
-   BUSCA, FILTRO E ORDENAÇÃO
-   Espelham a semântica do PostgREST para que o adapter Supabase produza o
-   MESMO resultado sem que a tela perceba a troca.
-   ------------------------------------------------------------------------- */
-
-/** Remove acento e caixa — busca tolerante, como `unaccent` no Postgres. */
-export function normalizeText(value: unknown): string {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-}
-
-/** Busca textual em vários campos — equivale a `.or(...ilike)`. */
-export function matchSearch(row: unknown, search: string, fields: string[]): boolean {
-  if (!search) return true;
-
-  const needle = normalizeText(search);
-  return fields.some((field) => normalizeText(getPath(row, field)).includes(needle));
-}
-
-/**
- * Filtros por igualdade. Array vira `.in()`, valor único vira `.eq()`.
- * Valores vazios (`""`, `null`, `undefined`, `"todos"`) são ignorados.
- */
-export function matchFilters(row: unknown, filters: Record<string, FilterValue> = {}): boolean {
-  return Object.entries(filters).every(([field, expected]) => {
-    if (expected === undefined || expected === null || expected === "" || expected === "todos") {
-      return true;
-    }
-
-    const actual = getPath(row, field);
-
-    if (Array.isArray(expected)) {
-      return expected.length === 0 || expected.includes(String(actual));
-    }
-
-    return String(actual) === String(expected);
-  });
-}
-
-/** Recorte temporal — equivale a `.gte(field, from).lte(field, to)`. */
-export function matchRange(row: unknown, range: DateRange | null, field = "criado_em"): boolean {
-  if (!range?.from || !range?.to) return true;
-
-  const value = new Date(String(getPath(row, field))).getTime();
-  return value >= new Date(range.from).getTime() && value <= new Date(range.to).getTime();
-}
-
-/** Ordenação estável, com `localeCompare` pt-BR e nulos por último. */
-export function applySort<T extends Row>(rows: T[], sort: Sort | null): T[] {
-  if (!sort?.field) return rows;
-
-  const dir = sort.direction === "desc" ? -1 : 1;
-
-  return [...rows].sort((a, b) => {
-    const av = getPath(a, sort.field);
-    const bv = getPath(b, sort.field);
-
-    if (av === bv) return 0;
-    // Nulos por último, como o Postgres faz por padrão.
-    if (av === null || av === undefined) return 1;
-    if (bv === null || bv === undefined) return -1;
-
-    if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
-
-    const ad = Date.parse(String(av));
-    const bd = Date.parse(String(bv));
-    if (!Number.isNaN(ad) && !Number.isNaN(bd)) return (ad - bd) * dir;
-
-    return String(av).localeCompare(String(bv), "pt-BR", { numeric: true }) * dir;
-  });
-}
-
-/** Suporta caminho aninhado: `getPath(row, "paciente.nome")`. */
-export function getPath(obj: unknown, path: string): unknown {
-  return path
-    .split(".")
-    .reduce<unknown>(
-      (acc, key) => (acc == null ? acc : (acc as Record<string, unknown>)[key]),
-      obj,
-    );
-}
-
-/* -------------------------------------------------------------------------
-   PIPELINE DE LISTAGEM
-   ------------------------------------------------------------------------- */
-
-export interface PaginateOptions {
-  searchFields?: string[];
-  rangeField?: string;
-}
-
-/**
- * Aplica busca → filtros → recorte → ordenação → paginação e devolve um
- * `ListResult` do contrato. É o que todo `list()` de mock deve usar.
- */
-export function paginate<T extends Row>(
-  rows: T[],
-  params: ListParams,
-  { searchFields = [], rangeField = "criado_em" }: PaginateOptions = {},
-): ListResult<T> {
-  const { sort, filters, search, range, from, to } = normalizeListParams(params);
-
-  const filtered = rows.filter(
-    (row) =>
-      matchSearch(row, search, searchFields) &&
-      matchFilters(row, filters) &&
-      matchRange(row, range, rangeField),
-  );
-
-  const sorted = applySort(filtered, sort);
-
-  return ok(sorted.slice(from, to + 1), sorted.length);
 }
 
 /* -------------------------------------------------------------------------
