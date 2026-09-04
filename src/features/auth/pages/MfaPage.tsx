@@ -9,7 +9,6 @@ import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from "@/comp
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthLayout } from "@/layouts/AuthLayout";
-import { CODIGO_MFA_DEV } from "../dev-credenciais";
 
 /**
  * Segundo fator — obrigatório.
@@ -26,9 +25,7 @@ export function MfaPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Em desenvolvimento o código já vem preenchido: basta confirmar.
-  // Preenchido sem auto-submeter, para que a etapa continue visível.
-  const [codigo, setCodigo] = useState(import.meta.env.DEV ? CODIGO_MFA_DEV : "");
+  const [codigo, setCodigo] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [segundosRestantes, setSegundosRestantes] = useState<number | null>(null);
@@ -176,13 +173,6 @@ export function MfaPage() {
         <p className="text-muted-foreground text-xs leading-relaxed">
           A verificação em duas etapas é obrigatória para todo acesso ao painel, por se tratar de
           dados de saúde.
-          {import.meta.env.DEV && (
-            <>
-              {" "}
-              Em desenvolvimento, o código <span className="font-mono">{CODIGO_MFA_DEV}</span> já
-              vem preenchido.
-            </>
-          )}
         </p>
       </div>
     </AuthLayout>

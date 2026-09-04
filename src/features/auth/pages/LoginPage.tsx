@@ -18,9 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthLayout } from "@/layouts/AuthLayout";
-import { cn } from "@/lib/utils";
 import { ERROR_CODE } from "@/services/contracts";
-import { CREDENCIAIS_DEV, CREDENCIAL_PADRAO } from "../dev-credenciais";
 import { loginSchema, type LoginForm } from "../schemas";
 
 /**
@@ -36,14 +34,8 @@ export function LoginPage() {
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    // Em desenvolvimento a tela já abre preenchida: basta clicar em Continuar.
-    // O Vite elimina este ramo na build de produção.
-    defaultValues: import.meta.env.DEV
-      ? { email: CREDENCIAL_PADRAO.email, senha: CREDENCIAL_PADRAO.senha }
-      : { email: "", senha: "" },
+    defaultValues: { email: "", senha: "" },
   });
-
-  const emailAtual = form.watch("email");
 
   if (isAuthenticated) {
     const destino = (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? "/dashboard";
@@ -146,40 +138,6 @@ export function LoginPage() {
         </form>
       </Form>
 
-      {import.meta.env.DEV && (
-        <div className="border-border flex flex-col gap-3 rounded-md border border-dashed p-3">
-          <p className="text-muted-foreground text-xs leading-relaxed">
-            <strong className="text-foreground">Acesso de desenvolvimento</strong> — os campos já
-            vêm preenchidos. Trocar de perfil muda o que a sidebar mostra.
-          </p>
-
-          <div className="flex flex-wrap gap-1.5">
-            {CREDENCIAIS_DEV.map((credencial) => {
-              const ativo = emailAtual === credencial.email;
-
-              return (
-                <button
-                  key={credencial.email}
-                  type="button"
-                  title={credencial.descricao}
-                  onClick={() => {
-                    form.setValue("email", credencial.email);
-                    form.setValue("senha", credencial.senha);
-                  }}
-                  className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors",
-                    ativo
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  {credencial.rotulo}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </AuthLayout>
   );
 }
