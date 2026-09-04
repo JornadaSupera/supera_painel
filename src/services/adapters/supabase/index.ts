@@ -1,30 +1,74 @@
 import { buildAdapter } from "../_stub";
+import * as auth from "./auth";
+import * as catalogos from "./catalogos";
+import * as dashboard from "./dashboard";
+import * as pacientes from "./pacientes";
+import * as permissoes from "./permissoes";
+import * as usuarios from "./usuarios";
 
 /**
- * ADAPTER SUPABASE — esqueleto da Fase 15.
+ * ADAPTER SUPABASE.
  *
- * Existe desde a Fase 0 de propósito: é o checklist vivo do que o backend
- * precisa entregar. Toda operação responde NOT_IMPLEMENTED até ser escrita,
- * com a MESMA assinatura do mock.
+ * Mesma superfície do mock, verificada em tempo de compilação por
+ * `RESOURCES`: operação declarada e não escrita vira stub NOT_IMPLEMENTED, não
+ * `undefined is not a function`.
  *
- * Modelo de implementação (a tela não muda uma linha):
+ * Duas regras do banco valem para tudo que se escrever aqui, e nenhuma delas é
+ * negociável no cliente:
  *
- *   // ./pacientes.ts
- *   export async function list(params: ListParams): Promise<ListResult<Paciente>> {
- *     const { from, to, sort, filters, search } = normalizeListParams(params);
- *     let q = getSupabaseClient().from("pacientes").select("*", { count: "exact" });
- *     if (search) q = q.or(`nome.ilike.%${search}%,codigo.ilike.%${search}%`);
- *     for (const [campo, valor] of Object.entries(filters)) {
- *       if (valor) q = Array.isArray(valor) ? q.in(campo, valor) : q.eq(campo, valor);
- *     }
- *     if (sort) q = q.order(sort.field, { ascending: sort.direction === "asc" });
- *     const { data, count, error } = await q.range(from, to);
- *     return error ? fail(mapSupabaseError(error), error.message) : ok(data ?? [], count ?? 0);
- *   }
+ *  1. **Leitura clínica é por `.rpc('read_…')`, nunca por `.from()`.** As
+ *     políticas da equipe só valem dentro dessas funções, que registram o
+ *     acesso em `audit_log`. Com `.from()` o painel recebe zero linhas, sem
+ *     erro nenhum — o sintoma é uma lista vazia inexplicável.
+ *  2. **Quase toda escrita é RPC.** Fora da lista fechada do guia do banco,
+ *     `.insert()` devolve `permission denied`. Não funciona "por acaso".
+ *
+ * Recursos ainda no stub: `conteudos`, `aprovacoes`, `relatorios`,
+ * `estatisticasClinicas`, `estatisticasOperacionais`, `auditoria` e
+ * `configuracoes`.
  */
+const implemented = {
+  auth,
+  dashboard,
+  pacientes,
+  catalogos,
+  usuarios,
+  permissoes,
+};
 
-/** Preenchido na Fase 15, um recurso por vez. */
-const implemented = {};
+/**
+ * O QUE O BACKEND AINDA NÃO EXECUTA — e por quê.
+ * =============================================================================
+ * Operação que existe no contrato e não tem caminho no banco. A interface lê
+ * esta lista para desabilitar a ação **antes** de a pessoa preencher um
+ * formulário inteiro e só então receber `permission denied`.
+ *
+ * O motivo é o texto que a tela exibe. Descreve a regra, não o arquivo: quem
+ * opera o painel precisa saber o que pedir a quem, não onde está escrito.
+ *
+ * Cada linha sai daqui no dia em que o banco ganhar a política ou a função
+ * correspondente — e nenhuma tela muda junto.
+ */
+export const INDISPONIVEIS: Readonly<Record<string, string>> = {
+  "pacientes.list.cid":
+    "A listagem não traz o CID: o diagnóstico só se lê paciente a paciente, e cada leitura registra um acesso ao prontuário. Ele aparece na ficha.",
+  "pacientes.list.protocolo":
+    "A listagem não traz o protocolo: o plano terapêutico só se lê paciente a paciente. Ele aparece na ficha.",
+  "pacientes.create":
+    "O cadastro de paciente ainda não existe no backend: a tabela só permite leitura.",
+  "pacientes.update": "A edição de ficha ainda não existe no backend.",
+  "pacientes.deactivate": "A desativação de paciente ainda não existe no backend.",
+  "pacientes.sendInvite":
+    "O convite de acesso ao app ainda não existe no backend: falta o vínculo entre a ficha e a conta.",
+  "usuarios.create": "O cadastro de profissional ainda não existe no backend.",
+  "usuarios.update": "A edição de profissional ainda não existe no backend.",
+  "usuarios.pause":
+    "Pausar acesso ainda não existe no backend: só há ativo e inativo. Desativar revoga o acesso na hora.",
+  "usuarios.setMfa":
+    "O segundo fator é gerenciado pela própria pessoa, no aplicativo autenticador dela.",
+  "permissoes.updateMatrix":
+    "A matriz de permissões ainda não é dado do backend: o catálogo está vazio.",
+};
 
 export const supabaseAdapter = buildAdapter({ name: "supabase", implemented });
 

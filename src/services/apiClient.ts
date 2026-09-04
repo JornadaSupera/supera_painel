@@ -1,6 +1,6 @@
 import { API_MODE } from "@/lib/env";
-import { mockAdapter } from "./adapters/mock";
-import { supabaseAdapter } from "./adapters/supabase";
+import { INDISPONIVEIS as INDISPONIVEIS_MOCK, mockAdapter } from "./adapters/mock";
+import { INDISPONIVEIS as INDISPONIVEIS_SUPABASE, supabaseAdapter } from "./adapters/supabase";
 import { throwIfError, type ApiError } from "./contracts";
 import type {
   AuthOperations,
@@ -35,6 +35,28 @@ export const apiMode = API_MODE;
  *   api.pacientes.list({ page: 1 })
  */
 export const api = adapter;
+
+/* -------------------------------------------------------------------------
+   O QUE O BACKEND EM USO NÃO EXECUTA
+   -------------------------------------------------------------------------
+   A interface consulta isto para desabilitar uma ação em vez de deixar a
+   pessoa preencher um formulário e receber `permission denied` no fim. É a
+   diferença entre um painel que explica e um que falha.
+
+   A lista é do adapter, não da tela: quando o backend ganhar a operação, a
+   linha some de um lugar só e todos os botões voltam sozinhos.
+   ------------------------------------------------------------------------- */
+
+const indisponiveis = API_MODE === "supabase" ? INDISPONIVEIS_SUPABASE : INDISPONIVEIS_MOCK;
+
+/** `"pacientes.create"` → motivo, ou `null` quando a operação está disponível. */
+export function motivoIndisponivel(operacao: string): string | null {
+  return indisponiveis[operacao] ?? null;
+}
+
+export function operacaoDisponivel(operacao: string): boolean {
+  return !(operacao in indisponiveis);
+}
 
 /**
  * Versão que lança em vez de devolver `{ error }` — é o formato que o TanStack

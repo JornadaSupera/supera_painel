@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCids, useProtocolos } from "@/hooks/useCatalogos";
+import { motivoIndisponivel } from "@/services/apiClient";
 import {
   FASE_TRATAMENTO_LABEL,
   RISCO_LABEL,
@@ -62,6 +63,11 @@ function CampoSelect({ rotulo, valor, onChange, opcoes, larguraClasse }: CampoSe
 }
 
 export function FiltrosPacientes() {
+  // Filtrar por um campo que a listagem não traz devolveria sempre lista vazia,
+  // sem erro nenhum — o pior tipo de controle: o que parece funcionar.
+  const semCid = motivoIndisponivel("pacientes.list.cid") !== null;
+  const semProtocolo = motivoIndisponivel("pacientes.list.protocolo") !== null;
+
   const busca = usePacientesStore((estado) => estado.busca);
   const filtros = usePacientesStore((estado) => estado.filtros);
   const setBusca = usePacientesStore((estado) => estado.setBusca);
@@ -96,21 +102,25 @@ export function FiltrosPacientes() {
         className="min-w-60 flex-1"
       />
 
-      <CampoSelect
-        rotulo="Protocolo"
-        valor={filtros.protocolo_id}
-        onChange={aplicar("protocolo_id")}
-        opcoes={opcoesProtocolo}
-        larguraClasse="w-52"
-      />
+      {!semProtocolo && (
+        <CampoSelect
+          rotulo="Protocolo"
+          valor={filtros.protocolo_id}
+          onChange={aplicar("protocolo_id")}
+          opcoes={opcoesProtocolo}
+          larguraClasse="w-52"
+        />
+      )}
 
-      <CampoSelect
-        rotulo="CID"
-        valor={filtros.cid}
-        onChange={aplicar("cid")}
-        opcoes={opcoesCid}
-        larguraClasse="w-40"
-      />
+      {!semCid && (
+        <CampoSelect
+          rotulo="CID"
+          valor={filtros.cid}
+          onChange={aplicar("cid")}
+          opcoes={opcoesCid}
+          larguraClasse="w-40"
+        />
+      )}
 
       <CampoSelect
         rotulo="Fase"

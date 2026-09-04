@@ -28,6 +28,12 @@ const implemented = {
   // Fase 7 -> conteudos
 };
 
+/**
+ * O mock implementa tudo que declara: nada a bloquear na interface.
+ * Ver `INDISPONIVEIS` no adapter Supabase para o contrato desta lista.
+ */
+export const INDISPONIVEIS: Readonly<Record<string, string>> = {};
+
 export const mockAdapter = buildAdapter({ name: "mock", implemented });
 
 export default mockAdapter;

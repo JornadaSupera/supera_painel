@@ -32,7 +32,11 @@ export interface UsuarioListItem {
   registro: string | null;
   avatar_url: string | null;
   status: StatusUsuario;
-  mfa_ativo: boolean;
+  /**
+   * `null` quando a origem dos dados não expõe o segundo fator de terceiros —
+   * "não sabemos", que é diferente de `false` e não deve virar alerta na tela.
+   */
+  mfa_ativo: boolean | null;
   /** Janela de atendimento no chat. O protótipo mostra "08:00–18:00". */
   horario_inicio: string | null;
   horario_fim: string | null;

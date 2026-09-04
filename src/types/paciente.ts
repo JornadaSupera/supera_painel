@@ -35,15 +35,18 @@ export interface PacienteListItem {
   nome: string;
   cpf_mascarado: string;
   nascimento: string;
-  sexo: Sexo;
+  /** `null` quando a origem dos dados não informa o campo. */
+  sexo: Sexo | null;
   cid: string;
   /** Vem do join com `cids` — evita uma segunda consulta na tela. */
   cid_descricao: string;
   protocolo_id: string;
   protocolo_nome: string;
-  fase: FaseTratamento;
+  /** `null` enquanto nenhuma fase de tratamento estiver atribuída. */
+  fase: FaseTratamento | null;
   status: StatusPaciente;
-  risco: Risco;
+  /** `null` quando não há classificação de risco na origem dos dados. */
+  risco: Risco | null;
   convite_status: StatusConvite;
   criado_em: string;
 }

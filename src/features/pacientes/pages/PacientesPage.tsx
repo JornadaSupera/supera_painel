@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { FASE_TRATAMENTO_LABEL, STATUS_PACIENTE_LABEL } from "@/lib/enums";
 import { formatNumber, ageInYears } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
+import { motivoIndisponivel } from "@/services/apiClient";
 import { temRecorte, usePacientesStore } from "@/stores/pacientes";
 import type { PacienteListItem } from "@/types/paciente";
 import { AcoesPaciente } from "../components/AcoesPaciente";
@@ -53,7 +54,16 @@ export function PacientesPage() {
   const exportar = useExportarPacientes(params);
   const filtrada = temRecorte(busca, filtros);
 
-  const colunas: Column<PacienteListItem>[] = [
+  /*
+   * CID e protocolo dependem de uma leitura por paciente, auditada uma a uma.
+   * Onde a origem dos dados não os entrega na listagem, a coluna sai inteira:
+   * uma coluna sempre vazia se lê como cadastro incompleto, e manda a equipe
+   * procurar um dado que nunca esteve ali.
+   */
+  const semCid = motivoIndisponivel("pacientes.list.cid") !== null;
+  const semProtocolo = motivoIndisponivel("pacientes.list.protocolo") !== null;
+
+  const colunas: (Column<PacienteListItem> | false)[] = [
     {
       key: "nome",
       header: "Paciente",
@@ -81,7 +91,7 @@ export function PacientesPage() {
         </div>
       ),
     },
-    {
+    !semCid && {
       key: "cid",
       header: "CID",
       sortable: true,
@@ -94,7 +104,7 @@ export function PacientesPage() {
         </span>
       ),
     },
-    {
+    !semProtocolo && {
       key: "protocolo_nome",
       header: "Protocolo",
       width: "20%",
@@ -113,7 +123,7 @@ export function PacientesPage() {
       // um alerta. Transformar em badge daria a ela o mesmo peso do status.
       render: (paciente) => (
         <span className="text-muted-foreground text-xs capitalize">
-          {FASE_TRATAMENTO_LABEL[paciente.fase]}
+          {paciente.fase ? FASE_TRATAMENTO_LABEL[paciente.fase] : "—"}
         </span>
       ),
     },
@@ -134,6 +144,10 @@ export function PacientesPage() {
       render: (paciente) => <AcoesPaciente paciente={paciente} />,
     },
   ];
+
+  const colunasVisiveis = colunas.filter((coluna): coluna is Column<PacienteListItem> =>
+    Boolean(coluna),
+  );
 
   return (
     <div className="flex flex-col gap-5">
@@ -160,7 +174,11 @@ export function PacientesPage() {
             </Can>
 
             <Can permission={PERMISSAO.PACIENTES_WRITE}>
-              <Button onClick={() => navigate("/pacientes/novo")}>
+              <Button
+                onClick={() => navigate("/pacientes/novo")}
+                disabled={motivoIndisponivel("pacientes.create") !== null}
+                title={motivoIndisponivel("pacientes.create") ?? undefined}
+              >
                 <UserPlus />
                 Novo paciente
               </Button>
@@ -173,7 +191,7 @@ export function PacientesPage() {
 
       <div className="bg-card overflow-hidden rounded-2xl border">
         <DataTable
-          columns={colunas}
+          columns={colunasVisiveis}
           data={pacientes}
           caption="Pacientes cadastrados, com CID, protocolo, fase do tratamento e status."
           label="pacientes"

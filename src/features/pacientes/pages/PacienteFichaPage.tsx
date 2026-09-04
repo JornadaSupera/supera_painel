@@ -8,11 +8,14 @@ import {
   TriangleAlert,
   User,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
+  BackendPendente,
   Can,
+  DetailField,
+  DetailSection,
   ConfirmDialog,
   ErrorState,
   PageHeader,
@@ -25,7 +28,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import {
   FASE_TRATAMENTO_LABEL,
   RISCO_LABEL,
@@ -36,6 +38,7 @@ import { formatDate, formatDateTime, ageInYears, relativeTime } from "@/lib/form
 import { PERMISSAO } from "@/lib/rbac";
 import { STATUS_CONVITE_LABEL, type PacienteDetalhe } from "@/types/paciente";
 import { CampoSensivel } from "../components/CampoSensivel";
+import { motivoIndisponivel } from "@/services/apiClient";
 import { PacienteForm } from "../components/PacienteForm";
 import {
   useAtualizarPaciente,
@@ -58,40 +61,6 @@ import { paraEntrada, VALORES_INICIAIS, type PacienteForm as Valores } from "../
 
 /* ------------------------------------------------------------- apoio */
 
-function Campo({ rotulo, children }: { rotulo: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <dt className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
-        {rotulo}
-      </dt>
-      <dd className="text-sm">{children ?? "—"}</dd>
-    </div>
-  );
-}
-
-function Secao({
-  titulo,
-  icone,
-  children,
-}: {
-  titulo: string;
-  icone: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <Card>
-      <CardContent className="flex flex-col gap-4 pt-6">
-        <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <span aria-hidden="true" className="text-primary">
-            {icone}
-          </span>
-          {titulo}
-        </h2>
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
 
 /** Converte a ficha no formato do formulário — a ponte entre leitura e edição. */
 function paraFormulario(paciente: PacienteDetalhe): Valores {
@@ -102,11 +71,11 @@ function paraFormulario(paciente: PacienteDetalhe): Valores {
     // mascarado que a camada de dados enviou.
     cpf: paciente.cpf_mascarado,
     nascimento: paciente.nascimento,
-    sexo: paciente.sexo,
+    sexo: paciente.sexo ?? "feminino",
     cid: paciente.cid,
     protocolo_id: paciente.protocolo_id,
-    fase: paciente.fase,
-    risco: paciente.risco,
+    fase: paciente.fase ?? "ativo",
+    risco: paciente.risco ?? "baixo",
     estadiamento: paciente.estadiamento ?? "",
     diagnostico_em: paciente.diagnostico_em?.slice(0, 10) ?? "",
     medico_responsavel_id: paciente.medico_responsavel_id ?? "",
@@ -135,6 +104,10 @@ export function PacienteFichaPage() {
   const convite = useEnviarConvite();
 
   const editando = searchParams.get("editar") === "1";
+
+  const semEdicao = motivoIndisponivel("pacientes.update");
+  const semConvite = motivoIndisponivel("pacientes.sendInvite");
+  const semDesativar = motivoIndisponivel("pacientes.deactivate");
   const sairDaEdicao = () => setSearchParams({}, { replace: true });
 
   if (isLoading) {
@@ -160,6 +133,8 @@ export function PacienteFichaPage() {
         <PageHeader
           eyebrow="Gestão"
           title={`Editar ${paciente.nome}`}
+          backTo={`/pacientes/${paciente.id}`}
+          backLabel="Ficha"
           breadcrumb={[
             { label: "Pacientes", to: "/pacientes" },
             { label: paciente.nome, to: `/pacientes/${paciente.id}` },
@@ -168,6 +143,9 @@ export function PacienteFichaPage() {
           subtitle={`${paciente.codigo} · alterações ficam registradas na trilha de auditoria`}
         />
 
+        {semEdicao ? (
+          <BackendPendente titulo="Edição de ficha" motivo={semEdicao} />
+        ) : (
         <PacienteForm
           modo="edicao"
           valoresIniciais={paraFormulario(paciente)}
@@ -206,6 +184,7 @@ export function PacienteFichaPage() {
             );
           }}
         />
+        )}
       </div>
     );
   }
@@ -217,6 +196,8 @@ export function PacienteFichaPage() {
       <PageHeader
         eyebrow="Gestão"
         title={paciente.nome}
+        backTo="/pacientes"
+        backLabel="Pacientes"
         breadcrumb={[{ label: "Pacientes", to: "/pacientes" }, { label: paciente.nome }]}
         badge={
           <StatusBadge tone={TONE_PATIENT_STATUS[paciente.status]} size="sm" dot>
@@ -243,7 +224,8 @@ export function PacienteFichaPage() {
             <Can permission={PERMISSAO.PACIENTES_WRITE}>
               <Button
                 variant="outline"
-                disabled={inativo || convite.isPending}
+                disabled={inativo || convite.isPending || semConvite !== null}
+                title={semConvite ?? undefined}
                 onClick={() => convite.mutate(paciente.id)}
               >
                 <MessageSquareShare />
@@ -251,7 +233,8 @@ export function PacienteFichaPage() {
               </Button>
 
               <Button
-                disabled={inativo}
+                disabled={inativo || semEdicao !== null}
+                title={semEdicao ?? undefined}
                 onClick={() => setSearchParams({ editar: "1" }, { replace: true })}
               >
                 <SquarePen />
@@ -262,7 +245,8 @@ export function PacienteFichaPage() {
             <Can permission={PERMISSAO.PACIENTES_DEACTIVATE}>
               <Button
                 variant="outline"
-                disabled={inativo}
+                disabled={inativo || semDesativar !== null}
+                title={semDesativar ?? undefined}
                 onClick={() => setConfirmando(true)}
                 className="text-destructive hover:text-destructive"
               >
@@ -286,76 +270,82 @@ export function PacienteFichaPage() {
       )}
 
       <div className="grid max-w-5xl gap-4 lg:grid-cols-2">
-        <Secao titulo="Identificação" icone={<User size={15} />}>
+        <DetailSection titulo="Identificação" icone={<User size={15} />}>
           <div className="flex items-center gap-3">
             <UserAvatar name={paciente.nome} size="lg" />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{paciente.nome}</p>
-              <p className="text-muted-foreground text-xs capitalize">{paciente.sexo}</p>
+              <p className="text-muted-foreground text-xs capitalize">{paciente.sexo ?? "—"}</p>
             </div>
           </div>
 
           <dl className="grid grid-cols-2 gap-4">
-            <Campo rotulo="Nascimento">
+            <DetailField rotulo="Nascimento">
               <span className="tabular-nums">{formatDate(paciente.nascimento)}</span>
-            </Campo>
+            </DetailField>
 
-            <Campo rotulo="CPF">
+            <DetailField rotulo="CPF">
               <CampoSensivel
                 pacienteId={paciente.id}
                 campo="cpf"
                 mascarado={paciente.cpf_mascarado}
                 nomePaciente={paciente.nome}
               />
-            </Campo>
+            </DetailField>
 
-            <Campo rotulo="Telefone">
+            <DetailField rotulo="Telefone">
               <CampoSensivel
                 pacienteId={paciente.id}
                 campo="telefone"
                 mascarado={paciente.telefone_mascarado}
                 nomePaciente={paciente.nome}
               />
-            </Campo>
+            </DetailField>
 
-            <Campo rotulo="E-mail">
+            <DetailField rotulo="E-mail">
               <CampoSensivel
                 pacienteId={paciente.id}
                 campo="email"
                 mascarado={paciente.email_mascarado}
                 nomePaciente={paciente.nome}
               />
-            </Campo>
+            </DetailField>
           </dl>
-        </Secao>
+        </DetailSection>
 
-        <Secao titulo="Diagnóstico e tratamento" icone={<Stethoscope size={15} />}>
+        <DetailSection titulo="Diagnóstico e tratamento" icone={<Stethoscope size={15} />}>
           <dl className="grid grid-cols-2 gap-4">
-            <Campo rotulo="CID-10">
+            <DetailField rotulo="CID-10">
               <span className="tabular-nums">{paciente.cid}</span>
               <p className="text-muted-foreground text-xs">{paciente.cid_descricao}</p>
-            </Campo>
+            </DetailField>
 
-            <Campo rotulo="Estadiamento">{paciente.estadiamento ?? "—"}</Campo>
+            <DetailField rotulo="Estadiamento">{paciente.estadiamento ?? "—"}</DetailField>
 
-            <Campo rotulo="Fase">
-              <span className="capitalize">{FASE_TRATAMENTO_LABEL[paciente.fase]}</span>
-            </Campo>
+            <DetailField rotulo="Fase">
+              <span className="capitalize">
+                {paciente.fase ? FASE_TRATAMENTO_LABEL[paciente.fase] : "—"}
+              </span>
+            </DetailField>
 
-            <Campo rotulo="Risco">
-              <StatusBadge tone={TONE_RISK[paciente.risco]} size="sm">
-                {RISCO_LABEL[paciente.risco]}
-              </StatusBadge>
-            </Campo>
+            <DetailField rotulo="Risco">
+              {paciente.risco ? (
+                <StatusBadge tone={TONE_RISK[paciente.risco]} size="sm">
+                  {RISCO_LABEL[paciente.risco]}
+                </StatusBadge>
+              ) : (
+                "—"
+              )}
+            </DetailField>
 
-            <Campo rotulo="Diagnóstico em">
+            <DetailField rotulo="Diagnóstico em">
               <span className="tabular-nums">{formatDate(paciente.diagnostico_em)}</span>
-            </Campo>
+            </DetailField>
 
-            <Campo rotulo="Médico responsável">{paciente.medico_responsavel_nome ?? "—"}</Campo>
+            <DetailField rotulo="Médico responsável">{paciente.medico_responsavel_nome ?? "—"}</DetailField>
 
             <div className="col-span-2">
-              <Campo rotulo="Protocolo">
+              <DetailField rotulo="Protocolo">
                 {paciente.protocolo ? (
                   <div className="flex flex-col gap-1.5">
                     <span className="font-medium">{paciente.protocolo.nome}</span>
@@ -370,14 +360,14 @@ export function PacienteFichaPage() {
                 ) : (
                   "—"
                 )}
-              </Campo>
+              </DetailField>
             </div>
           </dl>
-        </Secao>
+        </DetailSection>
 
-        <Secao titulo="Alergias e reações prévias" icone={<CalendarDays size={15} />}>
+        <DetailSection titulo="Alergias e reações prévias" icone={<CalendarDays size={15} />}>
           <dl className="flex flex-col gap-4">
-            <Campo rotulo="Alergias">
+            <DetailField rotulo="Alergias">
               {paciente.alergias.length > 0 ? (
                 <ul className="flex flex-wrap gap-1.5">
                   {paciente.alergias.map((alergia) => (
@@ -391,9 +381,9 @@ export function PacienteFichaPage() {
               ) : (
                 <span className="text-muted-foreground text-sm">Nenhuma registrada</span>
               )}
-            </Campo>
+            </DetailField>
 
-            <Campo rotulo="Reações prévias">
+            <DetailField rotulo="Reações prévias">
               {paciente.reacoes_previas.length > 0 ? (
                 <ul className="flex flex-wrap gap-1.5">
                   {paciente.reacoes_previas.map((reacao) => (
@@ -407,33 +397,33 @@ export function PacienteFichaPage() {
               ) : (
                 <span className="text-muted-foreground text-sm">Nenhuma registrada</span>
               )}
-            </Campo>
+            </DetailField>
 
             {paciente.observacoes && (
-              <Campo rotulo="Observações">
+              <DetailField rotulo="Observações">
                 <p className="text-sm leading-relaxed">{paciente.observacoes}</p>
-              </Campo>
+              </DetailField>
             )}
           </dl>
-        </Secao>
+        </DetailSection>
 
-        <Secao titulo="Acesso ao aplicativo" icone={<Smartphone size={15} />}>
+        <DetailSection titulo="Acesso ao aplicativo" icone={<Smartphone size={15} />}>
           <dl className="grid grid-cols-2 gap-4">
-            <Campo rotulo="Convite">{STATUS_CONVITE_LABEL[paciente.convite_status]}</Campo>
+            <DetailField rotulo="Convite">{STATUS_CONVITE_LABEL[paciente.convite_status]}</DetailField>
 
-            <Campo rotulo="Enviado em">
+            <DetailField rotulo="Enviado em">
               <span className="tabular-nums">{formatDateTime(paciente.convite_enviado_em)}</span>
-            </Campo>
+            </DetailField>
 
-            <Campo rotulo="Último acesso">
+            <DetailField rotulo="Último acesso">
               {paciente.ultimo_acesso_app_em ? relativeTime(paciente.ultimo_acesso_app_em) : "Nunca acessou"}
-            </Campo>
+            </DetailField>
 
-            <Campo rotulo="Cadastrado em">
+            <DetailField rotulo="Cadastrado em">
               <span className="tabular-nums">{formatDate(paciente.criado_em)}</span>
-            </Campo>
+            </DetailField>
           </dl>
-        </Secao>
+        </DetailSection>
       </div>
 
       <ConfirmDialog
