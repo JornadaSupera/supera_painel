@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { STATUS_PACIENTE } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
+import { motivoIndisponivel } from "@/services/apiClient";
 import type { PacienteListItem } from "@/types/paciente";
 import { useDesativarPaciente, useEnviarConvite } from "../hooks/usePacientes";
 
@@ -31,6 +32,12 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
   const convite = useEnviarConvite();
 
   const inativo = paciente.status === STATUS_PACIENTE.INATIVO;
+
+  // O backend em uso pode não executar a operação. Desabilitar aqui é o que
+  // evita a pessoa abrir um formulário para receber `permission denied` no fim.
+  const semEdicao = motivoIndisponivel("pacientes.update");
+  const semConvite = motivoIndisponivel("pacientes.sendInvite");
+  const semDesativar = motivoIndisponivel("pacientes.deactivate");
 
   return (
     // O clique no menu não deve abrir a ficha — a linha inteira é clicável.
@@ -55,7 +62,8 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
 
           <Can permission={PERMISSAO.PACIENTES_WRITE}>
             <DropdownMenuItem
-              disabled={inativo}
+              disabled={inativo || semEdicao !== null}
+              title={semEdicao ?? undefined}
               onSelect={() => navigate(`/pacientes/${paciente.id}?editar=1`)}
             >
               <SquarePen />
@@ -63,7 +71,8 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              disabled={inativo || convite.isPending}
+              disabled={inativo || convite.isPending || semConvite !== null}
+              title={semConvite ?? undefined}
               onSelect={() => convite.mutate(paciente.id)}
             >
               <MessageSquareShare />
@@ -75,7 +84,8 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
-              disabled={inativo}
+              disabled={inativo || semDesativar !== null}
+              title={semDesativar ?? undefined}
               onSelect={() => setConfirmando(true)}
             >
               <Ban />
