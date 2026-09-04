@@ -7,7 +7,12 @@
  * Nothing here knows about the domain — no mention of "patient" or "protocol".
  */
 
+export { BackendPendente } from "./BackendPendente";
+export type { BackendPendenteProps } from "./BackendPendente";
+
 export { Can } from "./Can";
+
+export { DetailField, DetailSection } from "./DetailBlocks";
 export type { CanProps } from "./Can";
 
 export { BarChart, CHART_COLORS, DonutChart, LineChart } from "./Charts";

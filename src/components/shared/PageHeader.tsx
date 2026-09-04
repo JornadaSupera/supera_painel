@@ -1,7 +1,8 @@
-import { ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -87,6 +88,17 @@ export interface PageHeaderProps {
   subtitle?: ReactNode;
   actions?: ReactNode;
   breadcrumb?: BreadcrumbItem[];
+  /**
+   * Destino do botão de voltar. Sem ele, o botão não aparece.
+   *
+   * Uma rota de detalhe pode ser alcançada por link direto, por atualização da
+   * página ou por uma aba nova — situações em que o histórico do navegador não
+   * tem para onde voltar. Por isso o botão navega para um destino declarado, e
+   * não chama `history.back()`.
+   */
+  backTo?: string;
+  /** Texto acessível do botão de voltar. */
+  backLabel?: string;
   level?: "MVP" | "Médio";
   /** Replaces the level pill with a badge of your own. */
   badge?: ReactNode;
@@ -101,11 +113,27 @@ export function PageHeader({
   breadcrumb,
   level,
   badge,
+  backTo,
+  backLabel = "Voltar",
   className,
 }: PageHeaderProps) {
   return (
     <header className={cn("flex flex-wrap items-start justify-between gap-4", className)}>
       <div className="flex min-w-0 flex-col">
+        {backTo && (
+          <Button
+            variant="ghost"
+            size="sm"
+            asChild
+            className="text-muted-foreground hover:text-foreground -ml-2 mb-1 h-7 w-fit gap-1 px-2"
+          >
+            <Link to={backTo}>
+              <ArrowLeft size={14} aria-hidden="true" />
+              {backLabel}
+            </Link>
+          </Button>
+        )}
+
         {breadcrumb && <Breadcrumb items={breadcrumb} className="mb-1.5" />}
 
         {eyebrow && (
