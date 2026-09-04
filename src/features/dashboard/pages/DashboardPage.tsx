@@ -1,8 +1,9 @@
 import { Activity, ShieldAlert, Star, TrendingUp, UserPlus, Users } from "lucide-react";
-import { useRef, useState, type ComponentType } from "react";
+import { useRef, useState, type ComponentType, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
+  BackendPendente,
   BarChart,
   ChartCard,
   DonutChart,
@@ -52,7 +53,50 @@ const SERIES_EFEITOS = [
   { key: "diarreia", label: "Diarreia" },
 ];
 
+/** Indicadores que o protótipo mostra. */
+const TOTAL_INDICADORES = 6;
+
 const ALTURA_GRAFICO = 220;
+
+/**
+ * Por que cada gráfico pode não ter série.
+ *
+ * O texto é o motivo concreto, não "sem dados": um gráfico vazio porque a
+ * clínica não teve movimento e um gráfico vazio porque o backend não agrega
+ * são situações opostas, e a tela precisa distinguir as duas.
+ */
+const SEM_FONTE: Record<string, string> = {
+  sessoes:
+    "A agenda só se lê paciente a paciente. Enquanto o backend não expuser a agenda agregada, não há série de sessões a mostrar.",
+  cid: "A distribuição por CID exigiria ler o diagnóstico de cada paciente individualmente — o que registraria um acesso a prontuário por linha do gráfico.",
+  efeitos:
+    "O cruzamento entre protocolo e efeito adverso ainda não existe como agregação no backend.",
+  engajamento:
+    "O engajamento vem do diário do paciente, que só se lê individualmente. Falta a agregação no backend.",
+};
+
+/**
+ * Um gráfico só se desenha quando tem série.
+ *
+ * Recharts com um array vazio desenha eixos sem nada dentro, o que se lê como
+ * "a clínica não teve movimento" — afirmação que este painel não pode fazer.
+ * Na ausência de série, o cartão diz o motivo.
+ */
+function ComSerie({
+  titulo,
+  motivo,
+  vazio,
+  children,
+}: {
+  titulo: string;
+  motivo: string;
+  vazio: boolean;
+  children: ReactNode;
+}) {
+  if (!vazio) return children;
+
+  return <BackendPendente titulo={titulo} motivo={motivo} altura={ALTURA_GRAFICO} />;
+}
 
 export function DashboardPage() {
   const [periodo, setPeriodo] = useState<Periodo>("mensal");
@@ -63,6 +107,11 @@ export function DashboardPage() {
   const series = useSeries(periodo);
 
   const erroSeries = series.isError ? series.error : null;
+
+  // "Sem série" só é uma afirmação depois que a resposta chegou e não falhou.
+  const semSerie = (linhas: unknown[] | undefined) =>
+    !series.isLoading && !erroSeries && (linhas?.length ?? 0) === 0;
+
   const recarregarSeries = () => void series.refetch();
 
   return (
@@ -124,6 +173,20 @@ export function DashboardPage() {
                       />
                     );
                   })}
+
+              {/*
+                O protótipo tem seis indicadores. Quando o backend em uso não
+                alimenta todos, os que faltam são OMITIDOS pela camada de dados,
+                não zerados — um cartão marcando zero afirmaria que a clínica não
+                teve nenhuma sessão de quimioterapia no mês. O espaço que sobra
+                diz o que falta.
+              */}
+              {!kpis.isLoading && (kpis.data?.kpis.length ?? 0) < TOTAL_INDICADORES && (
+                <BackendPendente
+                  className="sm:col-span-2 lg:col-span-3 xl:col-span-4"
+                  motivo="Sessões de quimioterapia, engajamento no app, NPS e alertas de sintoma crítico ainda não têm agregação no backend. Os indicadores aparecem assim que ela existir."
+                />
+              )}
             </div>
           )}
         </section>
@@ -146,29 +209,33 @@ export function DashboardPage() {
               )
             }
           >
-            <BarChart
-              data={series.data?.sessoes ?? []}
-              xKey="periodo"
-              series={[{ key: "sessoes", label: "Sessões" }]}
-              loading={series.isLoading}
-              error={erroSeries}
-              onRetry={recarregarSeries}
-              height={ALTURA_GRAFICO}
-            />
+            <ComSerie titulo="Sessões de quimioterapia" motivo={SEM_FONTE.sessoes!} vazio={semSerie(series.data?.sessoes)}>
+              <BarChart
+                data={series.data?.sessoes ?? []}
+                xKey="periodo"
+                series={[{ key: "sessoes", label: "Sessões" }]}
+                loading={series.isLoading}
+                error={erroSeries}
+                onRetry={recarregarSeries}
+                height={ALTURA_GRAFICO}
+              />
+            </ComSerie>
           </ChartCard>
 
           <ChartCard title="Pacientes por CID" description="Distribuição atual">
-            <DonutChart
-              data={(series.data?.pacientes_por_cid ?? []).map((fatia) => ({
-                name: fatia.nome,
-                value: fatia.valor,
-              }))}
-              totalLabel="pacientes"
-              loading={series.isLoading}
-              error={erroSeries}
-              onRetry={recarregarSeries}
-              height={ALTURA_GRAFICO}
-            />
+            <ComSerie titulo="Pacientes por CID" motivo={SEM_FONTE.cid!} vazio={semSerie(series.data?.pacientes_por_cid)}>
+              <DonutChart
+                data={(series.data?.pacientes_por_cid ?? []).map((fatia) => ({
+                  name: fatia.nome,
+                  value: fatia.valor,
+                }))}
+                totalLabel="pacientes"
+                loading={series.isLoading}
+                error={erroSeries}
+                onRetry={recarregarSeries}
+                height={ALTURA_GRAFICO}
+              />
+            </ComSerie>
           </ChartCard>
 
           <ChartCard
@@ -176,33 +243,37 @@ export function DashboardPage() {
             title="Efeitos adversos por protocolo"
             description="% de pacientes com grau 2+ · pergunta levantada na reunião com a Dra."
           >
-            <BarChart
-              data={series.data?.efeitos_por_protocolo ?? []}
-              xKey="protocolo"
-              series={SERIES_EFEITOS}
-              suffix="%"
-              legend
-              loading={series.isLoading}
-              error={erroSeries}
-              onRetry={recarregarSeries}
-              height={ALTURA_GRAFICO}
-            />
+            <ComSerie titulo="Efeitos adversos por protocolo" motivo={SEM_FONTE.efeitos!} vazio={semSerie(series.data?.efeitos_por_protocolo)}>
+              <BarChart
+                data={series.data?.efeitos_por_protocolo ?? []}
+                xKey="protocolo"
+                series={SERIES_EFEITOS}
+                suffix="%"
+                legend
+                loading={series.isLoading}
+                error={erroSeries}
+                onRetry={recarregarSeries}
+                height={ALTURA_GRAFICO}
+              />
+            </ComSerie>
           </ChartCard>
 
           <ChartCard
             title="Engajamento ao longo das semanas"
             description="% de pacientes ativos no app"
           >
-            <LineChart
-              data={series.data?.engajamento ?? []}
-              xKey="periodo"
-              series={[{ key: "engajamento", label: "Ativos no app" }]}
-              suffix="%"
-              loading={series.isLoading}
-              error={erroSeries}
-              onRetry={recarregarSeries}
-              height={ALTURA_GRAFICO}
-            />
+            <ComSerie titulo="Engajamento no app" motivo={SEM_FONTE.engajamento!} vazio={semSerie(series.data?.engajamento)}>
+              <LineChart
+                data={series.data?.engajamento ?? []}
+                xKey="periodo"
+                series={[{ key: "engajamento", label: "Ativos no app" }]}
+                suffix="%"
+                loading={series.isLoading}
+                error={erroSeries}
+                onRetry={recarregarSeries}
+                height={ALTURA_GRAFICO}
+              />
+            </ComSerie>
           </ChartCard>
         </div>
 
