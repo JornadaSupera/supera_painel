@@ -238,8 +238,30 @@ export function DataTable<T>({
                 <TableRow
                   key={id}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  // A clickable row has to be reachable without a mouse.
+                  // `role="button"` is not an option on a `<tr>`: it would
+                  // replace the row semantics a screen reader uses to announce
+                  // "row 3 of 20". tabIndex plus Enter/Space keeps the table a
+                  // table and still makes the row operable from the keyboard.
+                  tabIndex={onRowClick ? 0 : undefined}
+                  onKeyDown={
+                    onRowClick
+                      ? (event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          // Only when the row itself has focus. Without this,
+                          // hitting Enter on a button inside the row would fire
+                          // the button AND open the row.
+                          if (event.target !== event.currentTarget) return;
+                          // Space scrolls the page by default, which would jump
+                          // the view instead of opening the record.
+                          event.preventDefault();
+                          onRowClick(row);
+                        }
+                      : undefined
+                  }
                   className={cn(
-                    onRowClick && "cursor-pointer",
+                    onRowClick &&
+                      "cursor-pointer focus-visible:outline-primary focus-visible:-outline-offset-2 focus-visible:outline-2",
                     // A selected row has a background AND a checked box —
                     // colour is not the only signal.
                     isSelected && "bg-primary/8 hover:bg-primary/12",
