@@ -65,7 +65,13 @@ export function EstatisticasClinicasPage() {
   const comparacao = useComparacaoProtocolos(filtro);
 
   const dados = cruzamento.data;
-  const vazio = !cruzamento.isLoading && (dados?.protocolos.length ?? 0) === 0;
+
+  // "Vazio" só vale quando a consulta REALIZOU e não achou nada. Sem o
+  // `!isError`, uma leitura que falhou cai no mesmo ramo e a tela explica a
+  // ausência com uma causa falsa — "amplie o período" quando o período nunca
+  // foi o problema. O motivo verdadeiro vem no erro, e é ele que deve aparecer.
+  const vazio =
+    !cruzamento.isLoading && !cruzamento.isError && (dados?.protocolos.length ?? 0) === 0;
 
   return (
     <div className="flex flex-col gap-5">
@@ -167,6 +173,11 @@ export function EstatisticasClinicasPage() {
       >
         {comparacao.isLoading ? (
           <SkeletonChart />
+        ) : comparacao.isError ? (
+          // Mesma razão do mapa: sem este ramo, a falta de origem viraria
+          // "Sem protocolos no recorte" — que afirma sobre a base algo que a
+          // consulta não chegou a verificar.
+          <ErrorState compact error={comparacao.error} />
         ) : (comparacao.data?.length ?? 0) === 0 ? (
           <EmptyState compact title="Sem protocolos no recorte" />
         ) : (

@@ -134,6 +134,11 @@ export function EstatisticasOperacionaisPage() {
       <ChartCard title="Volume de sessões" description="Compromissos por mês nos últimos 7 meses">
         {isLoading ? (
           <SkeletonChart />
+        ) : isError ? (
+          // Sem este ramo o gráfico desenharia um eixo com barras zeradas, que
+          // se lê como "a clínica não teve compromisso nenhum" — afirmação que
+          // a consulta não chegou a apurar.
+          <ErrorState compact error={error} />
         ) : (
           <BarChart
             data={data?.volume_mensal ?? []}
