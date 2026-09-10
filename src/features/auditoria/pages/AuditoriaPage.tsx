@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { Download, FileJson, FilterX, ShieldCheck } from "lucide-react";
 
 import {
@@ -26,7 +28,14 @@ import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { JANELAS, temRecorte, useAuditoriaStore } from "@/stores/auditoria";
 import type { AuditoriaListItem } from "@/types/auditoria";
-import { useExportarTrilha, useResumoAuditoria, useTrilha } from "../hooks/useAuditoria";
+import {
+  useExportarTrilha,
+  useFacetasAuditoria,
+  useRegistroAuditoria,
+  useResumoAuditoria,
+  useTrilha,
+} from "../hooks/useAuditoria";
+import { DetalheAcesso } from "../components/DetalheAcesso";
 
 /**
  * Auditoria & logs — o rastro de acesso a dado sensível.
@@ -66,6 +75,14 @@ export function AuditoriaPage() {
   const setSort = useAuditoriaStore((estado) => estado.setSort);
   const setPage = useAuditoriaStore((estado) => estado.setPage);
   const setPageSize = useAuditoriaStore((estado) => estado.setPageSize);
+
+  const facetas = useFacetasAuditoria();
+  const atores = facetas.data?.atores ?? [];
+  const pacientesNaTrilha = facetas.data?.pacientes ?? [];
+
+  // O registro aberto no painel de detalhe. `null` = nenhum.
+  const [registroAberto, setRegistroAberto] = useState<string | null>(null);
+  const detalhe = useRegistroAuditoria(registroAberto);
 
   const filtrada = temRecorte(busca, filtros);
   const semIp = motivoIndisponivel("auditoria.list.ip");
@@ -248,6 +265,42 @@ export function AuditoriaPage() {
           </SelectContent>
         </Select>
 
+        {/* Usuário e paciente fecham os quatro recortes que o escopo pede.
+            As opções saem da própria trilha — ver `useFacetasAuditoria`. */}
+        <Select
+          value={filtros.usuario_id || TODOS}
+          onValueChange={(valor) => setFiltro("usuario_id", valor === TODOS ? "" : valor)}
+        >
+          <SelectTrigger size="sm" aria-label="Usuário" className="w-52">
+            <SelectValue placeholder="Usuário" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Usuário: todos</SelectItem>
+            {atores.map((opcao) => (
+              <SelectItem key={opcao.id} value={opcao.id}>
+                {opcao.nome} · {opcao.total}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={filtros.paciente_id || TODOS}
+          onValueChange={(valor) => setFiltro("paciente_id", valor === TODOS ? "" : valor)}
+        >
+          <SelectTrigger size="sm" aria-label="Paciente" className="w-52">
+            <SelectValue placeholder="Paciente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Paciente: todos</SelectItem>
+            {pacientesNaTrilha.map((opcao) => (
+              <SelectItem key={opcao.id} value={opcao.id}>
+                {opcao.nome} · {opcao.total}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         {filtrada && (
           <Button variant="ghost" size="sm" onClick={limparFiltros}>
             <FilterX />
@@ -255,6 +308,15 @@ export function AuditoriaPage() {
           </Button>
         )}
       </div>
+
+      {/* Um seletor incompleto que se apresenta como completo faz quem apura
+          concluir que não há rastro de alguém. */}
+      {facetas.data?.truncado && (
+        <p className="text-muted-foreground text-[11px]">
+          A janela tem mais registros do que o backend devolve de uma vez: os seletores de usuário
+          e de paciente podem não listar todo mundo. Estreite o período para fechar a lista.
+        </p>
+      )}
 
       {/* ----------------------------------------------------------- trilha */}
       <div className="bg-card overflow-hidden rounded-2xl border">
@@ -269,6 +331,7 @@ export function AuditoriaPage() {
           sort={sort}
           onSortChange={setSort}
           filtered={filtrada}
+          onRowClick={(registro) => setRegistroAberto(registro.id)}
           pagination={{
             page,
             pageSize,
@@ -302,6 +365,14 @@ export function AuditoriaPage() {
           registrada na trilha.
         </p>
       </div>
+
+      <DetalheAcesso
+        registro={detalhe.data ?? null}
+        carregando={detalhe.isLoading}
+        aberto={registroAberto !== null}
+        onFechar={() => setRegistroAberto(null)}
+        semIp={semIp}
+      />
     </div>
   );
 }

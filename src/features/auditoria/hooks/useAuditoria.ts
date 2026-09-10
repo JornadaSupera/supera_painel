@@ -61,6 +61,40 @@ export function useTrilha() {
   };
 }
 
+/**
+ * Opções dos seletores de usuário e de paciente.
+ *
+ * Depende só da janela, de propósito: se as opções seguissem os filtros
+ * aplicados, escolher um usuário faria os outros sumirem da lista e não haveria
+ * como trocar de escolha sem limpar tudo.
+ */
+export function useFacetasAuditoria() {
+  const janelaDias = useAuditoriaStore((estado) => estado.janelaDias);
+  const range = janelaComoRange(janelaDias);
+
+  return useQuery({
+    queryKey: queryKeys.audit.facets(range),
+    queryFn: async () => (await call(() => auditoriaApi.getFacets({ range }))).data,
+    // A janela muda pouco e a leitura é a mesma que a lista já faz. Manter o
+    // resultado quente evita refazê-la a cada troca de filtro ou de página.
+    staleTime: 60_000,
+  });
+}
+
+/** Um registro da trilha, aberto. Só busca quando há um id selecionado. */
+export function useRegistroAuditoria(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.audit.detail(id ?? ""),
+    queryFn: async () => {
+      // `enabled` já impede a chamada sem id; a guarda existe para o tipo, e
+      // dispensa a asserção que só serviria para calar o compilador.
+      if (!id) return null;
+      return (await call(() => auditoriaApi.getById({ id }))).data;
+    },
+    enabled: Boolean(id),
+  });
+}
+
 /** Os contadores do topo. A janela é a mesma que a lista está usando. */
 export function useResumoAuditoria() {
   const janelaDias = useAuditoriaStore((estado) => estado.janelaDias);
