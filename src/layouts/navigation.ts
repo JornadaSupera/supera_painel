@@ -77,7 +77,6 @@ export const NAV_ITEMS: NavItem[] = [
     permission: PERMISSAO.CONTEUDO_READ,
     title: "Aprovação de conteúdo",
     subtitle: "Workflow editorial",
-    pending: true,
   },
   {
     label: "Relatórios",
@@ -85,14 +84,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ClipboardList,
     permission: PERMISSAO.RELATORIOS_READ,
     subtitle: "12 relatórios pré-definidos",
-    pending: true,
   },
   {
     label: "Estatísticas",
     to: "/estatisticas",
     icon: TrendingUp,
     mediumLevel: true,
-    pending: true,
     anyOf: [
       PERMISSAO.ESTATISTICAS_CLINICAS_READ,
       PERMISSAO.ESTATISTICAS_READ_ALL,
@@ -105,7 +102,6 @@ export const NAV_ITEMS: NavItem[] = [
         icon: TrendingUp,
         permission: PERMISSAO.ESTATISTICAS_CLINICAS_READ,
         mediumLevel: true,
-        pending: true,
         title: "Estatísticas clínicas",
         subtitle: "Cruzamento Protocolo × Efeito × Grau",
       },
@@ -115,7 +111,6 @@ export const NAV_ITEMS: NavItem[] = [
         icon: TrendingUp,
         anyOf: [PERMISSAO.ESTATISTICAS_READ_ALL, PERMISSAO.ESTATISTICAS_READ_SELF],
         mediumLevel: true,
-        pending: true,
         title: "Estatísticas operacionais",
         subtitle: "Operação da clínica",
       },
@@ -127,7 +122,6 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ScrollText,
     permission: PERMISSAO.AUDITORIA_READ,
     mediumLevel: true,
-    pending: true,
     title: "Auditoria & logs",
     subtitle: "Rastro de acesso a dados sensíveis · retenção de 5 anos",
   },
@@ -136,7 +130,6 @@ export const NAV_ITEMS: NavItem[] = [
     to: "/configuracoes",
     icon: Settings,
     permission: PERMISSAO.CONFIGURACOES_READ,
-    pending: true,
   },
 ];
 
