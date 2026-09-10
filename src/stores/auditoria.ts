@@ -74,13 +74,34 @@ export function temRecorte(busca: string, filtros: FiltrosAuditoria): boolean {
   return Boolean(busca.trim()) || Object.values(filtros).some(Boolean);
 }
 
-/** A janela escolhida como intervalo ISO, ou `null` para "todo o período". */
+const UM_MINUTO = 60_000;
+const UM_DIA = 86_400_000;
+
+/**
+ * A janela escolhida como intervalo ISO, ou `null` para "todo o período".
+ *
+ * > [!] O instante é arredondado para o minuto, e isso NÃO é cosmético.
+ * Este intervalo entra na CHAVE de cache das consultas da trilha. Com precisão
+ * de milissegundo, `to` mudava a cada chamada — e como a função é chamada no
+ * corpo do componente, cada render produzia uma chave nova. O ciclo se
+ * fechava sozinho: a resposta provocava um render, o render provocava uma
+ * chave nova, a chave nova provocava outra consulta. A tela relia a trilha
+ * indefinidamente, e o sintoma era invisível porque `placeholderData` mantinha
+ * os dados anteriores na tela enquanto isso acontecia.
+ *
+ * Arredondar estabiliza a chave por até um minuto. Para uma trilha com
+ * retenção de cinco anos, um minuto de defasagem no limite superior não muda
+ * resposta nenhuma — e `to` fica no fim do minuto corrente, para que o registro
+ * de agora há pouco continue dentro da janela.
+ */
 export function janelaComoRange(janelaDias: string): DateRange | null {
   const dias = Number(janelaDias);
   if (!dias || Number.isNaN(dias)) return null;
 
+  const agora = Math.floor(Date.now() / UM_MINUTO) * UM_MINUTO;
+
   return {
-    from: new Date(Date.now() - dias * 86_400_000).toISOString(),
-    to: new Date().toISOString(),
+    from: new Date(agora - dias * UM_DIA).toISOString(),
+    to: new Date(agora + UM_MINUTO).toISOString(),
   };
 }
