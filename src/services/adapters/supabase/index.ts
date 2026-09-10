@@ -95,6 +95,34 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
     "Exportação não gera linha na trilha: baixar um CSV do que já está na tela acontece no navegador, sem passar pelo banco.",
   "conteudos.list.visualizacoes":
     "Não há contagem de acessos: favorito e leitura vivem na biblioteca do paciente, e nem a equipe nem a administração têm política de leitura ali.",
+
+  /* -------------------------------------------------------------------------
+     LEITURA CLÍNICA EM CONJUNTO — a ausência que atinge três telas
+     -------------------------------------------------------------------------
+     As políticas de leitura da equipe são `TO clinical_reader`, e o papel de
+     quem faz login (`authenticated`) não é membro dele: quem alcança aquelas
+     linhas são as funções `read_*`, que têm `clinical_reader` como dono. Um
+     `.from()` nessas tabelas devolve zero linhas SEM erro — e uma tela que soma
+     zero linhas publica `0` com cara de medição.
+
+     As `read_*` existem, mas são por paciente ou por conversa. Montar
+     estatística com elas exigiria varrer a base a cada abertura de tela, e cada
+     chamada grava acesso a prontuário em `audit_log`: o gráfico produziria
+     centenas de "administrador leu o prontuário de fulano". Trocaríamos número
+     errado por rastro sujo.
+
+     O que libera é agregação no banco — função de resumo que devolva contagem,
+     nunca linha. Ela é MELHOR em privacidade do que o que havia antes, porque
+     nenhum registro de sintoma precisa chegar ao navegador.
+     ------------------------------------------------------------------------- */
+  "estatisticasClinicas.crossTab":
+    "O cruzamento depende de ler diário e plano de toda a base ao mesmo tempo, e o backend só oferece essa leitura paciente a paciente. Falta uma leitura agregada, que devolva a contagem já somada sem expor registro de ninguém.",
+  "estatisticasOperacionais.getIndicadores":
+    "Os indicadores saem da agenda e do chat da clínica inteira, e o backend não oferece essa leitura em conjunto: a agenda só se lê por paciente e a conversa uma a uma.",
+  "estatisticasOperacionais.getFilaAlertas":
+    "Não existe fila de alertas no backend: não há tabela de alerta, regra de criticidade nem registro de conduta. Quem define o que é grave é a equipe assistencial, não o painel.",
+  "relatorios.agregados":
+    "Dez dos doze relatórios dependem de leitura clínica em conjunto — agenda, diário, plano e diagnóstico de toda a base — que o backend ainda não oferece. Cada um diz o seu motivo no próprio cartão.",
 };
 
 export const supabaseAdapter = buildAdapter({ name: "supabase", implemented });
