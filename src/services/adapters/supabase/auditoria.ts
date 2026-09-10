@@ -22,7 +22,7 @@ import type {
   ResumoAuditoria,
 } from "@/types/auditoria";
 import { paginate } from "../_list";
-import { executar, falhaDe, paraIso, umDe } from "./_helpers";
+import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { paraAcaoAuditoria } from "./mapping";
 
@@ -58,9 +58,55 @@ const SELECT_LOG = `
   row_count,
   actor_account_id,
   patient_id,
-  accounts:actor_account_id ( full_name, email ),
-  patients:patient_id ( full_name )
+  accounts:actor_account_id ( full_name, email )
 `;
+
+/**
+ * NOME DE PACIENTE NÃO SAI DO JOIN — e a tentativa era silenciosamente vazia.
+ * =============================================================================
+ * `audit_log` é legível pelo administrador, mas `patients` não é: a política
+ * dela vale só dentro das funções `read_*`. Um vínculo embutido
+ * (`patients:patient_id ( full_name )`) atravessa a mesma RLS e volta **nulo**,
+ * sem erro — medido na base: das 76 linhas da trilha, 47 têm paciente e
+ * **zero** nomes resolviam. A coluna de paciente da tela e da exportação
+ * ficava em branco, e ninguém era avisado disso.
+ *
+ * O nome vem de `read_patients`, que é a porta que alcança a tabela. São 200
+ * pacientes por chamada e **uma** chamada por leitura da trilha — nunca uma por
+ * linha, que encheria a própria trilha de acessos gerados por quem a consulta.
+ *
+ * Que essa chamada registre "administrador leu a lista de pacientes" é
+ * correto, não efeito colateral: a tela de fato exibe nome de paciente, e a
+ * trilha deve dizer isso.
+ */
+async function nomesDePacientes(): Promise<Map<string, string>> {
+  const { data, error } = await getSupabaseClient().rpc("read_patients", {
+    p_limit: TETO_READ,
+    p_offset: 0,
+  });
+
+  // Falha aqui não derruba a trilha: sem o mapa, a linha continua listada e o
+  // paciente aparece como não identificado. Perder o nome é degradação; perder
+  // a trilha inteira seria outra coisa.
+  if (error || !data) return new Map();
+
+  return new Map(
+    (data as { id: string; full_name: string }[]).map((linha) => [linha.id, linha.full_name]),
+  );
+}
+
+/**
+ * O rótulo de um paciente na trilha.
+ *
+ * `null` quando a linha não é sobre paciente nenhum — que é diferente de ser
+ * sobre um paciente cujo nome não alcançamos. O segundo caso é dito com todas
+ * as letras, porque "sem paciente" e "paciente não identificado" levam a
+ * conclusões opostas em uma apuração.
+ */
+function rotuloDePaciente(id: string | null, nomes: Map<string, string>): string | null {
+  if (!id) return null;
+  return nomes.get(id) ?? "Paciente não identificado";
+}
 
 /**
  * Teto de linhas trazidas para o recorte em memória.
@@ -82,12 +128,10 @@ interface LinhaLog {
   actor_account_id: string | null;
   patient_id: string | null;
   accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
-  patients: { full_name: string } | { full_name: string }[] | null;
 }
 
-function projetar(linha: LinhaLog): AuditoriaListItem {
+function projetar(linha: LinhaLog, nomes: Map<string, string>): AuditoriaListItem {
   const ator = umDe(linha.accounts);
-  const paciente = umDe(linha.patients);
 
   return {
     id: String(linha.id),
@@ -101,7 +145,7 @@ function projetar(linha: LinhaLog): AuditoriaListItem {
     recurso_label: RECURSO_AUDITORIA_LABEL[linha.resource_table] ?? linha.resource_table,
     recurso_id: linha.resource_id,
     paciente_id: linha.patient_id,
-    paciente_nome: paciente?.full_name ?? null,
+    paciente_nome: rotuloDePaciente(linha.patient_id, nomes),
     linhas: linha.row_count === null ? null : Number(linha.row_count),
     // Toda linha de `audit_log` nasce dentro do banco, a partir de uma chamada
     // do painel ou dos aplicativos. A tabela não distingue a procedência, e
@@ -140,7 +184,15 @@ export async function list(params: ListParams = {}): Promise<ListResult<Auditori
     const { data, error } = await consulta;
     if (error) return falhaDe(error);
 
-    const linhas = (data as unknown as LinhaLog[]).map(projetar);
+    const brutas = data as unknown as LinhaLog[];
+
+    // Só lê a lista de pacientes quando há paciente na janela. Uma trilha sem
+    // acesso a prontuário não justifica gerar um.
+    const nomes = brutas.some((linha) => linha.patient_id)
+      ? await nomesDePacientes()
+      : new Map<string, string>();
+
+    const linhas = brutas.map((linha) => projetar(linha, nomes));
 
     return paginate(
       linhas,
@@ -167,7 +219,13 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Audi
     if (error) return falhaDe(error);
     if (!data) return fail(ERROR_CODE.NOT_FOUND, "Registro de auditoria não encontrado.");
 
-    return okOne(projetar(data as unknown as LinhaLog));
+    const linha = data as unknown as LinhaLog;
+
+    // Só resolve o nome quando a linha é sobre um paciente: abrir um registro
+    // que não é de paciente nenhum não justifica ler a lista de pacientes.
+    const nomes = linha.patient_id ? await nomesDePacientes() : new Map<string, string>();
+
+    return okOne(projetar(linha, nomes));
   });
 }
 
@@ -253,9 +311,7 @@ export async function getFacets(
   return executar(async () => {
     let consulta = getSupabaseClient()
       .from("audit_log")
-      .select(
-        "actor_account_id, patient_id, accounts:actor_account_id ( full_name, email ), patients:patient_id ( full_name )",
-      )
+      .select("actor_account_id, patient_id, accounts:actor_account_id ( full_name, email )")
       .order("occurred_at", { ascending: false })
       .limit(TETO_TRILHA);
 
@@ -267,8 +323,13 @@ export async function getFacets(
 
     const linhas = data as unknown as Pick<
       LinhaLog,
-      "actor_account_id" | "patient_id" | "accounts" | "patients"
+      "actor_account_id" | "patient_id" | "accounts"
     >[];
+
+    // Uma chamada só, e apenas quando há paciente na janela.
+    const nomes = linhas.some((linha) => linha.patient_id)
+      ? await nomesDePacientes()
+      : new Map<string, string>();
 
     const atores = new Map<string, OpcaoFiltroAuditoria>();
     const pacientes = new Map<string, OpcaoFiltroAuditoria>();
@@ -293,8 +354,8 @@ export async function getFacets(
       }
 
       if (linha.patient_id) {
-        const paciente = umDe(linha.patients);
-        contar(pacientes, linha.patient_id, paciente?.full_name ?? "Paciente removido");
+        // `rotuloDePaciente` só devolve `null` sem id, e aqui há id.
+        contar(pacientes, linha.patient_id, rotuloDePaciente(linha.patient_id, nomes) ?? "");
       }
     }
 

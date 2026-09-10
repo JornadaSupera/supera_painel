@@ -126,11 +126,16 @@ export function DetalheAcesso({
                 }
               />
 
+              {/* A ausência olha o ID, não o nome. Um acesso COM paciente cujo
+                  nome não resolvemos não é um acesso sem paciente — dizer que é
+                  inverteria a conclusão de quem apura. */}
               <Campo
                 rotulo="Paciente"
                 valor={registro.paciente_nome}
                 ajuda={
-                  registro.paciente_nome ? undefined : "O acesso não é sobre um paciente específico."
+                  registro.paciente_id
+                    ? undefined
+                    : "O acesso não é sobre um paciente específico."
                 }
               />
 
