@@ -221,6 +221,41 @@ export const ACAO_AUDITORIA_LABEL: Record<AcaoAuditoria, string> = {
   logout: "Logout",
 };
 
+/**
+ * O que foi acessado, em português.
+ *
+ * A trilha guarda o nome técnico do recurso; a tela precisa dizer "Ficha de
+ * paciente", não `patients`. O mapa cobre os recursos que a trilha registra
+ * hoje e serve de fallback para o próprio nome quando aparecer um novo — um
+ * recurso não mapeado ainda aparece na lista, só que com o nome cru, o que é
+ * muito melhor do que sumir da auditoria.
+ */
+export const RECURSO_AUDITORIA_LABEL: Record<string, string> = {
+  patients: "Ficha de paciente",
+  pacientes: "Ficha de paciente",
+  patient_diagnoses: "Diagnóstico (CID)",
+  patient_clinical_history: "Histórico clínico",
+  treatment_plans: "Plano terapêutico",
+  diary_entries: "Diário de sintomas",
+  diary_symptom_reports: "Sintoma registrado no diário",
+  appointments: "Agenda",
+  conversations: "Conversa no chat",
+  messages: "Mensagem do chat",
+  specialty_notes: "Anotação de atendimento",
+  content_items: "Orientação",
+  content_versions: "Versão de orientação",
+  conteudos: "Orientação",
+  accounts: "Conta de usuário",
+  usuarios: "Conta de usuário",
+  "usuarios/acessos": "Histórico de acessos",
+  "conteudos/comparacao": "Comparação de versões",
+  permissoes: "Matriz de permissões",
+  consent_records: "Aceite de termos",
+  data_subject_requests: "Pedido do titular (LGPD)",
+  caregiver_invitations: "Convite de acompanhante",
+  patient_caregivers: "Vínculo de acompanhante",
+};
+
 /** Origem do registro — inclui a integração Gemed (nível Médio). */
 export const ORIGEM_AUDITORIA = {
   PAINEL: "painel",
@@ -261,6 +296,46 @@ export const PERIODO_LABEL: Record<Periodo, string> = {
 /** Grau de efeito adverso (CTCAE) — 1 a 5. */
 export const GRAU_EFEITO = [1, 2, 3, 4, 5] as const;
 export type GrauEfeito = (typeof GRAU_EFEITO)[number];
+
+/* ------------------------------------------------------------------------
+   REVISÃO EDITORIAL — o que um administrador decide sobre uma versão
+   ------------------------------------------------------------------------ */
+
+/**
+ * As quatro decisões do workflow de conteúdo.
+ *
+ * São AÇÕES, e por isso não se confundem com `STATUS_CONTEUDO`, que é o
+ * ESTADO resultante: devolver leva a "devolvido", aprovar leva a "publicado".
+ * Manter os dois vocabulários separados evita a confusão clássica de tratar
+ * "aprovar" como se fosse um status que a versão poderia ficar tendo.
+ */
+export const ACAO_REVISAO = {
+  APROVAR: "aprovar",
+  DEVOLVER: "devolver",
+  REJEITAR: "rejeitar",
+  DESPUBLICAR: "despublicar",
+} as const;
+
+export type AcaoRevisao = (typeof ACAO_REVISAO)[keyof typeof ACAO_REVISAO];
+
+export const ACAO_REVISAO_LABEL: Record<AcaoRevisao, string> = {
+  aprovar: "Aprovar",
+  devolver: "Revisar texto",
+  rejeitar: "Rejeitar",
+  despublicar: "Despublicar",
+};
+
+/**
+ * Ações que exigem comentário — o banco recusa sem ele.
+ *
+ * Devolver e rejeitar interrompem o trabalho de outra pessoa; sem o motivo
+ * escrito, quem escreveu o conteúdo não sabe o que corrigir. A tela cobra
+ * antes de enviar, para que a recusa não chegue como erro do servidor.
+ */
+export const REVISAO_EXIGE_COMENTARIO: readonly AcaoRevisao[] = [
+  ACAO_REVISAO.DEVOLVER,
+  ACAO_REVISAO.REJEITAR,
+];
 
 /* ------------------------------------------------------------------------
    Helpers
