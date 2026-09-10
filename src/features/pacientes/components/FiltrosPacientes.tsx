@@ -67,6 +67,7 @@ export function FiltrosPacientes() {
   // sem erro nenhum — o pior tipo de controle: o que parece funcionar.
   const semCid = motivoIndisponivel("pacientes.list.cid") !== null;
   const semProtocolo = motivoIndisponivel("pacientes.list.protocolo") !== null;
+  const semRisco = motivoIndisponivel("pacientes.list.risco") !== null;
 
   const busca = usePacientesStore((estado) => estado.busca);
   const filtros = usePacientesStore((estado) => estado.filtros);
@@ -130,13 +131,15 @@ export function FiltrosPacientes() {
         larguraClasse="w-36"
       />
 
-      <CampoSelect
-        rotulo="Risco"
-        valor={filtros.risco}
-        onChange={aplicar("risco")}
-        opcoes={toOptions(RISCO_LABEL)}
-        larguraClasse="w-32"
-      />
+      {!semRisco && (
+        <CampoSelect
+          rotulo="Risco"
+          valor={filtros.risco}
+          onChange={aplicar("risco")}
+          opcoes={toOptions(RISCO_LABEL)}
+          larguraClasse="w-32"
+        />
+      )}
 
       <CampoSelect
         rotulo="Status"
