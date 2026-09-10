@@ -1,9 +1,16 @@
 import { buildAdapter } from "../_stub";
+import * as aprovacoes from "./aprovacoes";
+import * as auditoria from "./auditoria";
 import * as auth from "./auth";
 import * as catalogos from "./catalogos";
+import * as conteudos from "./conteudos";
+import * as configuracoes from "./configuracoes";
 import * as dashboard from "./dashboard";
+import * as estatisticasClinicas from "./estatisticasClinicas";
+import * as estatisticasOperacionais from "./estatisticasOperacionais";
 import * as pacientes from "./pacientes";
 import * as permissoes from "./permissoes";
+import * as relatorios from "./relatorios";
 import * as usuarios from "./usuarios";
 
 /**
@@ -22,10 +29,7 @@ import * as usuarios from "./usuarios";
  *     erro nenhum — o sintoma é uma lista vazia inexplicável.
  *  2. **Quase toda escrita é RPC.** Fora da lista fechada do guia do banco,
  *     `.insert()` devolve `permission denied`. Não funciona "por acaso".
- *
- * Recursos ainda no stub: `conteudos`, `aprovacoes`, `relatorios`,
- * `estatisticasClinicas`, `estatisticasOperacionais`, `auditoria` e
- * `configuracoes`.
+
  */
 const implemented = {
   auth,
@@ -34,6 +38,13 @@ const implemented = {
   catalogos,
   usuarios,
   permissoes,
+  conteudos,
+  aprovacoes,
+  auditoria,
+  estatisticasClinicas,
+  estatisticasOperacionais,
+  configuracoes,
+  relatorios,
 };
 
 /**
@@ -52,6 +63,8 @@ const implemented = {
 export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "pacientes.list.cid":
     "A listagem não traz o CID: o diagnóstico só se lê paciente a paciente, e cada leitura registra um acesso ao prontuário. Ele aparece na ficha.",
+  "pacientes.list.risco":
+    "Não há classificação de risco no backend: nenhuma tabela de alerta e nenhuma regra de criticidade. Calcular no painel seria inferência clínica no front-end.",
   "pacientes.list.protocolo":
     "A listagem não traz o protocolo: o plano terapêutico só se lê paciente a paciente. Ele aparece na ficha.",
   "pacientes.create":
@@ -68,6 +81,20 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
     "O segundo fator é gerenciado pela própria pessoa, no aplicativo autenticador dela.",
   "permissoes.updateMatrix":
     "A matriz de permissões ainda não é dado do backend: o catálogo está vazio.",
+  "conteudos.create":
+    "Redigir orientação é do profissional da área, no espaço de trabalho dele — o banco exige que o autor seja quem escreve. O painel administrativo revisa, aprova e despublica.",
+  "conteudos.update":
+    "A edição do texto é do autor, e só enquanto a versão está em rascunho ou devolvida. Para pedir mudança, devolva a versão com um comentário.",
+  "conteudos.submitForReview":
+    "Enviar para revisão é o ato de quem escreveu — é assim que o texto entra nesta fila.",
+  "auditoria.list.ip":
+    "A trilha não registra endereço de IP: ela é escrita dentro do banco, por gatilho, e o Postgres não enxerga o endereço do navegador que originou a chamada.",
+  "auditoria.summary.sigiloso":
+    "A trilha não separa acesso sigiloso: ela guarda qual tabela foi lida, não qual linha nem sob que visibilidade. Contar exigiria copiar o recorte de sigilo para dentro do log.",
+  "auditoria.summary.exportacao":
+    "Exportação não gera linha na trilha: baixar um CSV do que já está na tela acontece no navegador, sem passar pelo banco.",
+  "conteudos.list.visualizacoes":
+    "Não há contagem de acessos: favorito e leitura vivem na biblioteca do paciente, e nem a equipe nem a administração têm política de leitura ali.",
 };
 
 export const supabaseAdapter = buildAdapter({ name: "supabase", implemented });

@@ -1,9 +1,16 @@
 import { buildAdapter } from "../_stub";
+import * as aprovacoes from "./aprovacoes";
+import * as auditoria from "./auditoria";
 import * as auth from "./auth";
 import * as catalogos from "./catalogos";
+import * as conteudos from "./conteudos";
+import * as configuracoes from "./configuracoes";
 import * as dashboard from "./dashboard";
+import * as estatisticasClinicas from "./estatisticasClinicas";
+import * as estatisticasOperacionais from "./estatisticasOperacionais";
 import * as pacientes from "./pacientes";
 import * as permissoes from "./permissoes";
+import * as relatorios from "./relatorios";
 import * as usuarios from "./usuarios";
 
 /**
@@ -25,7 +32,13 @@ const implemented = {
   catalogos, // Fase 5
   usuarios, // Fase 6
   permissoes, // Fase 6
-  // Fase 7 -> conteudos
+  conteudos, // Fase 7
+  aprovacoes, // Fase 7 — a fila vive na mesma tela
+  auditoria, // Fase 10
+  estatisticasClinicas, // Fase 12
+  estatisticasOperacionais, // Fase 13
+  configuracoes, // Fase 9
+  relatorios, // Fase 8
 };
 
 /**
