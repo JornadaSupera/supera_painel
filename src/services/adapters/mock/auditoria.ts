@@ -13,11 +13,17 @@ import {
   fail,
   ok,
   okOne,
+  type DateRange,
   type ListParams,
   type ListResult,
   type SingleResult,
 } from "@/services/contracts";
-import type { AuditoriaListItem, ResumoAuditoria } from "@/types/auditoria";
+import type {
+  AuditoriaListItem,
+  FacetasAuditoria,
+  OpcaoFiltroAuditoria,
+  ResumoAuditoria,
+} from "@/types/auditoria";
 import { paginate, simulate } from "./_helpers";
 
 /**
@@ -86,6 +92,53 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Audi
     if (!registro) return fail(ERROR_CODE.NOT_FOUND, "Registro de auditoria não encontrado.");
 
     return okOne(registro);
+  });
+}
+
+/**
+ * Quem aparece na janela — as opções dos seletores de usuário e de paciente.
+ *
+ * Sai da própria trilha, e não dos mocks de usuário e paciente, pelo mesmo
+ * motivo do adapter real: a opção precisa corresponder a quem TEM linha ali,
+ * incluindo quem já foi desativado. Ver `FacetasAuditoria`.
+ */
+export async function getFacets(
+  params: { range?: DateRange | null } = {},
+): Promise<SingleResult<FacetasAuditoria>> {
+  return simulate(() => {
+    const desde = params.range?.from;
+    const ate = params.range?.to;
+
+    const naJanela = registros.filter((linha) => {
+      if (desde && linha.criado_em < desde) return false;
+      if (ate && linha.criado_em > ate) return false;
+      return true;
+    });
+
+    const atores = new Map<string, OpcaoFiltroAuditoria>();
+    const pacientes = new Map<string, OpcaoFiltroAuditoria>();
+
+    function contar(mapa: Map<string, OpcaoFiltroAuditoria>, id: string, nome: string) {
+      const atual = mapa.get(id);
+      if (atual) atual.total += 1;
+      else mapa.set(id, { id, nome, total: 1 });
+    }
+
+    for (const linha of naJanela) {
+      if (linha.usuario_id) contar(atores, linha.usuario_id, linha.usuario_nome);
+      if (linha.paciente_id && linha.paciente_nome) {
+        contar(pacientes, linha.paciente_id, linha.paciente_nome);
+      }
+    }
+
+    const ordenar = (opcoes: OpcaoFiltroAuditoria[]) =>
+      opcoes.sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"));
+
+    return okOne({
+      atores: ordenar([...atores.values()]),
+      pacientes: ordenar([...pacientes.values()]),
+      truncado: false,
+    });
   });
 }
 

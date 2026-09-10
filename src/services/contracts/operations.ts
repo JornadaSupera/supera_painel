@@ -2,7 +2,7 @@ import type { Papel, Periodo, StatusUsuario } from "@/lib/enums";
 import type { Permissao } from "@/lib/rbac";
 import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
 import type { DesafioMfa, ResultadoLogin, Sessao } from "@/types/auth";
-import type { AuditoriaListItem, ResumoAuditoria } from "@/types/auditoria";
+import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type { Configuracoes, VersaoLegal } from "@/types/configuracao";
 import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
@@ -36,7 +36,7 @@ import type {
   UsuarioEntrada,
   UsuarioListItem,
 } from "@/types/usuario";
-import type { ListParams, ListResult, SingleResult } from "./index";
+import type { DateRange, ListParams, ListResult, SingleResult } from "./index";
 
 /**
  * ASSINATURAS TIPADAS DAS OPERAÇÕES
@@ -213,6 +213,15 @@ export interface AuditoriaOperations {
 
   /** Contadores da janela — os cartões do topo. Padrão: 24 horas. */
   getSummary(params?: { janelaHoras?: number }): Promise<SingleResult<ResumoAuditoria>>;
+
+  /**
+   * Quem aparece na janela, para preencher os seletores de usuário e paciente.
+   *
+   * Recebe só o `range` porque as opções descrevem a JANELA, não o recorte: se
+   * dependessem dos filtros aplicados, escolher um usuário apagaria os outros
+   * da lista e não haveria como trocar de escolha.
+   */
+  getFacets(params?: { range?: DateRange | null }): Promise<SingleResult<FacetasAuditoria>>;
 
   /** Linhas achatadas do RECORTE inteiro, não da página aberta. */
   export(params?: ListParams): Promise<ListResult<Record<string, string>>>;

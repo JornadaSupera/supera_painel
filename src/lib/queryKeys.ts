@@ -77,6 +77,12 @@ export const queryKeys = {
   audit: {
     ...entity("audit"),
     summary: (range?: unknown) => ["audit", "summary", range ?? {}] as const,
+    /**
+     * Opções dos seletores. A chave leva só a JANELA, e não os filtros: as
+     * opções descrevem o período inteiro, então trocar de filtro não deve
+     * invalidá-las nem disparar leitura nova.
+     */
+    facets: (range?: unknown) => ["audit", "facets", range ?? {}] as const,
   },
 
   settings: {

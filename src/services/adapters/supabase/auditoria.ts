@@ -10,11 +10,17 @@ import {
   fail,
   ok,
   okOne,
+  type DateRange,
   type ListParams,
   type ListResult,
   type SingleResult,
 } from "@/services/contracts";
-import type { AuditoriaListItem, ResumoAuditoria } from "@/types/auditoria";
+import type {
+  AuditoriaListItem,
+  FacetasAuditoria,
+  OpcaoFiltroAuditoria,
+  ResumoAuditoria,
+} from "@/types/auditoria";
 import { paginate } from "../_list";
 import { executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
@@ -219,6 +225,88 @@ export async function getSummary(params: {
         total: total.get(acao) ?? 0,
       })),
       sem_origem: SEM_ORIGEM,
+    });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   QUEM APARECE NA JANELA
+   ------------------------------------------------------------------------- */
+
+/**
+ * Opções dos seletores de usuário e de paciente.
+ *
+ * Sai da própria trilha, e não dos cadastros. Consultar `usuarios` e
+ * `pacientes` para desenhar dois seletores custaria uma leitura de prontuário
+ * a cada abertura desta tela — na tela cuja função é apontar leituras de
+ * prontuário. Além disso o cadastro lista quem está ativo, e a trilha guarda
+ * quem agiu: filtrar por cadastro faria desaparecer justamente o rastro de
+ * quem foi desativado depois, que é o mais interessante numa apuração.
+ *
+ * Recebe só o `range`. As opções descrevem a JANELA, não o recorte — se
+ * dependessem dos filtros aplicados, escolher um usuário apagaria os demais da
+ * lista e não haveria como trocar de escolha.
+ */
+export async function getFacets(
+  params: { range?: DateRange | null } = {},
+): Promise<SingleResult<FacetasAuditoria>> {
+  return executar(async () => {
+    let consulta = getSupabaseClient()
+      .from("audit_log")
+      .select(
+        "actor_account_id, patient_id, accounts:actor_account_id ( full_name, email ), patients:patient_id ( full_name )",
+      )
+      .order("occurred_at", { ascending: false })
+      .limit(TETO_TRILHA);
+
+    if (params.range?.from) consulta = consulta.gte("occurred_at", params.range.from);
+    if (params.range?.to) consulta = consulta.lte("occurred_at", params.range.to);
+
+    const { data, error } = await consulta;
+    if (error) return falhaDe(error);
+
+    const linhas = data as unknown as Pick<
+      LinhaLog,
+      "actor_account_id" | "patient_id" | "accounts" | "patients"
+    >[];
+
+    const atores = new Map<string, OpcaoFiltroAuditoria>();
+    const pacientes = new Map<string, OpcaoFiltroAuditoria>();
+
+    function contar(mapa: Map<string, OpcaoFiltroAuditoria>, id: string, nome: string) {
+      const atual = mapa.get(id);
+      if (atual) atual.total += 1;
+      else mapa.set(id, { id, nome, total: 1 });
+    }
+
+    for (const linha of linhas) {
+      // Ação sem ator é ação do próprio sistema — gatilho, rotina, integração.
+      // Ela existe na trilha e não é filtrável por pessoa, então fica de fora
+      // do seletor em vez de virar uma opção que não corresponde a ninguém.
+      if (linha.actor_account_id) {
+        const ator = umDe(linha.accounts);
+        contar(
+          atores,
+          linha.actor_account_id,
+          ator?.full_name?.trim() || ator?.email || "Sem identificação",
+        );
+      }
+
+      if (linha.patient_id) {
+        const paciente = umDe(linha.patients);
+        contar(pacientes, linha.patient_id, paciente?.full_name ?? "Paciente removido");
+      }
+    }
+
+    // Mais volume primeiro: quem tem mais linhas na janela é quem alguém veio
+    // procurar. Empate resolve por nome, para a ordem não dançar entre cargas.
+    const ordenar = (opcoes: OpcaoFiltroAuditoria[]) =>
+      opcoes.sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"));
+
+    return okOne({
+      atores: ordenar([...atores.values()]),
+      pacientes: ordenar([...pacientes.values()]),
+      truncado: linhas.length >= TETO_TRILHA,
     });
   });
 }

@@ -42,6 +42,40 @@ export interface AuditoriaListItem {
   ip: string | null;
 }
 
+/**
+ * Uma opção de filtro, derivada da própria trilha.
+ *
+ * As opções NÃO vêm do cadastro de usuários nem do de pacientes, e a diferença
+ * é deliberada:
+ *
+ *  - **Não gera acesso novo.** Puxar a lista de pacientes para preencher um
+ *    seletor registraria mais uma leitura de prontuário — na tela cuja função é
+ *    justamente denunciar leituras de prontuário.
+ *  - **Não esconde histórico.** O cadastro filtra por quem está ativo; a trilha
+ *    guarda quem agiu, inclusive quem foi desativado depois. Filtrar por
+ *    cadastro faria sumir exatamente o rastro que se quer investigar.
+ *  - **Não oferece filtro vazio.** Só aparece quem tem linha na janela, então
+ *    nenhuma escolha leva a "nenhum resultado".
+ */
+export interface OpcaoFiltroAuditoria {
+  id: string;
+  nome: string;
+  /** Quantas linhas da janela são desta pessoa. Ordena e dá noção de volume. */
+  total: number;
+}
+
+/** Quem aparece na janela — alimenta os seletores de usuário e de paciente. */
+export interface FacetasAuditoria {
+  atores: OpcaoFiltroAuditoria[];
+  pacientes: OpcaoFiltroAuditoria[];
+  /**
+   * `true` quando a leitura bateu no teto e as opções podem não cobrir a janela
+   * inteira. A tela avisa: um seletor incompleto que se apresenta como completo
+   * faz quem investiga concluir que não há rastro de alguém.
+   */
+  truncado: boolean;
+}
+
 /** Um cartão da faixa de contadores do topo da tela. */
 export interface ContagemAuditoria {
   acao: AcaoAuditoria;

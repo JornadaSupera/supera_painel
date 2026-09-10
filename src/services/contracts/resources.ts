@@ -131,7 +131,12 @@ export const RESOURCES = {
   auditoria: {
     table: "auditoria_logs",
     fase: 10, // MÉDIO
-    operations: ["list", "getSummary", "getById", "export"],
+    /**
+     * `getFacets` devolve quem aparece na janela — é o que preenche os
+     * seletores de usuário e de paciente sem consultar os cadastros, e portanto
+     * sem gerar um acesso a prontuário só para desenhar um filtro.
+     */
+    operations: ["list", "getSummary", "getFacets", "getById", "export"],
   },
   configuracoes: {
     table: "configuracoes",
