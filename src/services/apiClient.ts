@@ -3,10 +3,17 @@ import { INDISPONIVEIS as INDISPONIVEIS_MOCK, mockAdapter } from "./adapters/moc
 import { INDISPONIVEIS as INDISPONIVEIS_SUPABASE, supabaseAdapter } from "./adapters/supabase";
 import { throwIfError, type ApiError } from "./contracts";
 import type {
+  AprovacoesOperations,
+  AuditoriaOperations,
   AuthOperations,
   CatalogosOperations,
+  ConfiguracoesOperations,
+  ConteudosOperations,
   DashboardOperations,
+  EstatisticasClinicasOperations,
+  EstatisticasOperacionaisOperations,
   PacientesOperations,
+  RelatoriosOperations,
   PermissoesOperations,
   UsuariosOperations,
 } from "./contracts/operations";
@@ -85,5 +92,12 @@ export const pacientesApi = api.pacientes as unknown as PacientesOperations;
 export const catalogosApi = api.catalogos as unknown as CatalogosOperations;
 export const usuariosApi = api.usuarios as unknown as UsuariosOperations;
 export const permissoesApi = api.permissoes as unknown as PermissoesOperations;
+export const conteudosApi = api.conteudos as unknown as ConteudosOperations;
+export const aprovacoesApi = api.aprovacoes as unknown as AprovacoesOperations;
+export const auditoriaApi = api.auditoria as unknown as AuditoriaOperations;
+export const estatisticasClinicasApi = api.estatisticasClinicas as unknown as EstatisticasClinicasOperations;
+export const estatisticasOperacionaisApi = api.estatisticasOperacionais as unknown as EstatisticasOperacionaisOperations;
+export const configuracoesApi = api.configuracoes as unknown as ConfiguracoesOperations;
+export const relatoriosApi = api.relatorios as unknown as RelatoriosOperations;
 
 export default api;
