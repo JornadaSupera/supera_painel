@@ -27,6 +27,12 @@ export type { ConfirmDialogProps } from "./ConfirmDialog";
 export { DataTable } from "./DataTable";
 export type { Column, DataTableProps } from "./DataTable";
 
+export { ClearFiltersButton, FilterSelect } from "./FilterBar";
+export type { FilterSelectProps } from "./FilterBar";
+
+export { FormSelect } from "./FormSelect";
+export type { FormSelectProps } from "./FormSelect";
+
 export { UnderConstruction } from "./UnderConstruction";
 export type { UnderConstructionProps } from "./UnderConstruction";
 
