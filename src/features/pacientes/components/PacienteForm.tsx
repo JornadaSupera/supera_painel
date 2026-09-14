@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, ArrowRight, Check, LoaderCircle } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFormContext } from "react-hook-form";
 
+import { FormSelect } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -15,13 +16,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCids, useEfeitosAdversos, useProtocolos } from "@/hooks/useCatalogos";
@@ -55,6 +49,32 @@ import { ListaDeChips, SelecaoDeCatalogo } from "./ListaDeChips";
  * persistida no navegador. Trocar de etapa preserva o preenchimento; fechar a
  * aba, não — e é assim que deve ser.
  */
+
+const OPCOES_SEXO = [
+  { value: "feminino", label: "Feminino" },
+  { value: "masculino", label: "Masculino" },
+];
+
+/** Date input bound to the surrounding form — the two dates of the record. */
+function CampoData({ name, rotulo }: { name: "nascimento" | "diagnostico_em"; rotulo: string }) {
+  const { control } = useFormContext<Valores>();
+
+  return (
+    <FormField
+      control={control}
+      name={name}
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>{rotulo}</FormLabel>
+          <FormControl>
+            <Input {...field} type="date" />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  );
+}
 
 export interface PacienteFormProps {
   valoresIniciais: Valores;
@@ -189,19 +209,7 @@ export function PacienteForm({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="nascimento"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data de nascimento</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="date" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <CampoData name="nascimento" rotulo="Data de nascimento" />
 
                 <FormField
                   control={form.control}
@@ -209,17 +217,11 @@ export function PacienteForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Sexo</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="feminino">Feminino</SelectItem>
-                          <SelectItem value="masculino">Masculino</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormSelect
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        options={OPCOES_SEXO}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -236,20 +238,15 @@ export function PacienteForm({
                   render={({ field }) => (
                     <FormItem className="sm:col-span-2">
                       <FormLabel>CID-10</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Selecione o diagnóstico" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {(cids.data ?? []).map((cid) => (
-                            <SelectItem key={cid.codigo} value={cid.codigo}>
-                              {cid.codigo} · {cid.descricao}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormSelect
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Selecione o diagnóstico"
+                        options={(cids.data ?? []).map((cid) => ({
+                          value: cid.codigo,
+                          label: `${cid.codigo} · ${cid.descricao}`,
+                        }))}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -261,20 +258,15 @@ export function PacienteForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Protocolo terapêutico</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Selecione o protocolo" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {(protocolos.data ?? []).map((protocolo) => (
-                            <SelectItem key={protocolo.id} value={protocolo.id}>
-                              {protocolo.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormSelect
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Selecione o protocolo"
+                        options={(protocolos.data ?? []).map((protocolo) => ({
+                          value: protocolo.id,
+                          label: protocolo.nome,
+                        }))}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -286,20 +278,15 @@ export function PacienteForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Médico responsável</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {profissionais.map((profissional) => (
-                            <SelectItem key={profissional.id} value={profissional.id}>
-                              {profissional.nome}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormSelect
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        placeholder="Selecione"
+                        options={profissionais.map((profissional) => ({
+                          value: profissional.id,
+                          label: profissional.nome,
+                        }))}
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -311,20 +298,12 @@ export function PacienteForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Fase do tratamento</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full capitalize">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {toOptions(FASE_TRATAMENTO_LABEL).map((opcao) => (
-                            <SelectItem key={opcao.value} value={opcao.value} className="capitalize">
-                              {opcao.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormSelect
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        options={toOptions(FASE_TRATAMENTO_LABEL)}
+                        className="capitalize"
+                      />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -336,20 +315,11 @@ export function PacienteForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Classificação de risco</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {toOptions(RISCO_LABEL).map((opcao) => (
-                            <SelectItem key={opcao.value} value={opcao.value}>
-                              {opcao.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormSelect
+                        value={field.value}
+                        onValueChange={field.onChange}
+                        options={toOptions(RISCO_LABEL)}
+                      />
                       <FormDescription>Definida pela equipe assistencial.</FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -370,19 +340,7 @@ export function PacienteForm({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="diagnostico_em"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Data do diagnóstico</FormLabel>
-                      <FormControl>
-                        <Input {...field} type="date" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <CampoData name="diagnostico_em" rotulo="Data do diagnóstico" />
 
                 <FormField
                   control={form.control}
