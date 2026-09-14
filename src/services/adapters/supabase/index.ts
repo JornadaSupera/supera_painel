@@ -1,3 +1,6 @@
+// Both adapters register the same resources on purpose — `RESOURCES` checks
+// the surface at compile time — so this block mirrors the other adapter.
+// jscpd:ignore-start
 import { buildAdapter } from "../_stub";
 import * as aprovacoes from "./aprovacoes";
 import * as auditoria from "./auditoria";
@@ -46,6 +49,7 @@ const implemented = {
   configuracoes,
   relatorios,
 };
+// jscpd:ignore-end
 
 /**
  * O QUE O BACKEND AINDA NÃO EXECUTA — e por quê.
