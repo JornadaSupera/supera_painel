@@ -1,6 +1,5 @@
 import {
   ACAO_AUDITORIA,
-  ACAO_AUDITORIA_LABEL,
   ORIGEM_AUDITORIA,
   RECURSO_AUDITORIA_LABEL,
   type AcaoAuditoria,
@@ -11,19 +10,14 @@ import { usuarios } from "@/mocks/usuarios";
 import {
   ERROR_CODE,
   fail,
-  ok,
   okOne,
   type DateRange,
   type ListParams,
   type ListResult,
   type SingleResult,
 } from "@/services/contracts";
-import type {
-  AuditoriaListItem,
-  FacetasAuditoria,
-  OpcaoFiltroAuditoria,
-  ResumoAuditoria,
-} from "@/types/auditoria";
+import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
+import { AUDIT_DEFAULT_SORT, buildFacetOptions, summarizeAudit, toAuditExport } from "../_audit";
 import { paginate, simulate } from "./_helpers";
 
 /**
@@ -80,7 +74,7 @@ export async function list(params: ListParams = {}): Promise<ListResult<Auditori
   return simulate(() =>
     paginate(
       registros,
-      { ...params, sort: params.sort ?? { field: "criado_em", direction: "desc" } },
+      { ...params, sort: params.sort ?? AUDIT_DEFAULT_SORT },
       { searchFields: CAMPOS_BUSCA, rangeField: "criado_em" },
     ),
   );
@@ -115,28 +109,19 @@ export async function getFacets(
       return true;
     });
 
-    const atores = new Map<string, OpcaoFiltroAuditoria>();
-    const pacientes = new Map<string, OpcaoFiltroAuditoria>();
-
-    function contar(mapa: Map<string, OpcaoFiltroAuditoria>, id: string, nome: string) {
-      const atual = mapa.get(id);
-      if (atual) atual.total += 1;
-      else mapa.set(id, { id, nome, total: 1 });
-    }
-
-    for (const linha of naJanela) {
-      if (linha.usuario_id) contar(atores, linha.usuario_id, linha.usuario_nome);
-      if (linha.paciente_id && linha.paciente_nome) {
-        contar(pacientes, linha.paciente_id, linha.paciente_nome);
-      }
-    }
-
-    const ordenar = (opcoes: OpcaoFiltroAuditoria[]) =>
-      opcoes.sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"));
-
     return okOne({
-      atores: ordenar([...atores.values()]),
-      pacientes: ordenar([...pacientes.values()]),
+      atores: buildFacetOptions(
+        naJanela.map((linha) =>
+          linha.usuario_id ? { id: linha.usuario_id, nome: linha.usuario_nome } : null,
+        ),
+      ),
+      pacientes: buildFacetOptions(
+        naJanela.map((linha) =>
+          linha.paciente_id && linha.paciente_nome
+            ? { id: linha.paciente_id, nome: linha.paciente_nome }
+            : null,
+        ),
+      ),
       truncado: false,
     });
   });
@@ -158,46 +143,23 @@ export async function getSummary(
     const janela_horas = params.janelaHoras ?? 24;
     const desde = Date.now() - janela_horas * 3_600_000;
 
-    const total = new Map<AcaoAuditoria, number>();
-
-    for (const registro of registros) {
-      if (Date.parse(registro.criado_em) < desde) continue;
-      total.set(registro.acao, (total.get(registro.acao) ?? 0) + 1);
-    }
-
-    return okOne({
-      janela_horas,
-      contagens: CONTAVEIS.map((acao) => ({
-        acao,
-        label: ACAO_AUDITORIA_LABEL[acao],
-        total: total.get(acao) ?? 0,
-      })),
-      sem_origem: [],
-    });
+    return okOne(
+      summarizeAudit({
+        actions: registros
+          .filter((registro) => Date.parse(registro.criado_em) >= desde)
+          .map((registro) => registro.acao),
+        countable: CONTAVEIS,
+        windowHours: janela_horas,
+        withoutSource: [],
+      }),
+    );
   });
 }
 
 export async function exportar(
   params: ListParams = {},
 ): Promise<ListResult<Record<string, string>>> {
-  const resultado = await list({ ...params, page: 1, pageSize: registros.length || 1 });
-
-  if (resultado.error) {
-    return fail(resultado.error.code, resultado.error.message, resultado.error.details);
-  }
-
-  return ok(
-    resultado.data.map((registro) => ({
-      data_hora: registro.criado_em,
-      acao: ACAO_AUDITORIA_LABEL[registro.acao],
-      usuario: registro.usuario_nome,
-      recurso: registro.recurso_label,
-      registro_id: registro.recurso_id ?? "",
-      paciente: registro.paciente_nome ?? "",
-      linhas_alcancadas: registro.linhas === null ? "" : String(registro.linhas),
-    })),
-    resultado.count,
-  );
+  return toAuditExport(await list({ ...params, page: 1, pageSize: registros.length || 1 }));
 }
 
 export { exportar as export };

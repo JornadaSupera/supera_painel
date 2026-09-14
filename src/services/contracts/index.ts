@@ -179,6 +179,15 @@ export function fail(code: ErrorCode, message?: string, details?: unknown): Fail
   };
 }
 
+/**
+ * Relays the failure of another contract operation, keeping its original code:
+ * the caller needs to know whether it was `FORBIDDEN` or `NOT_FOUND`, because
+ * the two lead to different screens.
+ */
+export function failWith(error: ApiError): FailResult {
+  return fail(error.code, error.message, error.details);
+}
+
 /** Erro do contrato como `Error`, para o TanStack Query tratar. */
 export class ApiException extends Error {
   readonly code: ErrorCode;

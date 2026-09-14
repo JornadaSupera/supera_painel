@@ -1,6 +1,5 @@
 import {
   ACAO_AUDITORIA,
-  ACAO_AUDITORIA_LABEL,
   ORIGEM_AUDITORIA,
   RECURSO_AUDITORIA_LABEL,
   type AcaoAuditoria,
@@ -8,19 +7,14 @@ import {
 import {
   ERROR_CODE,
   fail,
-  ok,
   okOne,
   type DateRange,
   type ListParams,
   type ListResult,
   type SingleResult,
 } from "@/services/contracts";
-import type {
-  AuditoriaListItem,
-  FacetasAuditoria,
-  OpcaoFiltroAuditoria,
-  ResumoAuditoria,
-} from "@/types/auditoria";
+import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
+import { AUDIT_DEFAULT_SORT, buildFacetOptions, summarizeAudit, toAuditExport } from "../_audit";
 import { paginate } from "../_list";
 import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
@@ -96,6 +90,16 @@ async function nomesDePacientes(): Promise<Map<string, string>> {
 }
 
 /**
+ * Resolves patient names only when some row is about a patient. A trail with no
+ * record access does not justify generating one.
+ */
+async function nomesSeHouverPaciente(
+  linhas: { patient_id: string | null }[],
+): Promise<Map<string, string>> {
+  return linhas.some((linha) => linha.patient_id) ? nomesDePacientes() : new Map();
+}
+
+/**
  * O rótulo de um paciente na trilha.
  *
  * `null` quando a linha não é sobre paciente nenhum — que é diferente de ser
@@ -128,6 +132,24 @@ interface LinhaLog {
   actor_account_id: string | null;
   patient_id: string | null;
   accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
+}
+
+/**
+ * The trail inside the window, newest first and capped. The period is the one
+ * filter applied on the server — it is the only one that cuts volume before
+ * the row travels.
+ */
+function consultarJanela(colunas: string, range: DateRange | null | undefined) {
+  let consulta = getSupabaseClient()
+    .from("audit_log")
+    .select(colunas)
+    .order("occurred_at", { ascending: false })
+    .limit(TETO_TRILHA);
+
+  if (range?.from) consulta = consulta.gte("occurred_at", range.from);
+  if (range?.to) consulta = consulta.lte("occurred_at", range.to);
+
+  return consulta;
 }
 
 function projetar(linha: LinhaLog, nomes: Map<string, string>): AuditoriaListItem {
@@ -172,26 +194,11 @@ const CAMPOS_BUSCA = ["usuario_nome", "recurso_label", "paciente_nome", "recurso
  */
 export async function list(params: ListParams = {}): Promise<ListResult<AuditoriaListItem>> {
   return executar(async () => {
-    let consulta = getSupabaseClient()
-      .from("audit_log")
-      .select(SELECT_LOG)
-      .order("occurred_at", { ascending: false })
-      .limit(TETO_TRILHA);
-
-    if (params.range?.from) consulta = consulta.gte("occurred_at", params.range.from);
-    if (params.range?.to) consulta = consulta.lte("occurred_at", params.range.to);
-
-    const { data, error } = await consulta;
+    const { data, error } = await consultarJanela(SELECT_LOG, params.range);
     if (error) return falhaDe(error);
 
     const brutas = data as unknown as LinhaLog[];
-
-    // Só lê a lista de pacientes quando há paciente na janela. Uma trilha sem
-    // acesso a prontuário não justifica gerar um.
-    const nomes = brutas.some((linha) => linha.patient_id)
-      ? await nomesDePacientes()
-      : new Map<string, string>();
-
+    const nomes = await nomesSeHouverPaciente(brutas);
     const linhas = brutas.map((linha) => projetar(linha, nomes));
 
     return paginate(
@@ -201,7 +208,7 @@ export async function list(params: ListParams = {}): Promise<ListResult<Auditori
         // O período já foi aplicado no servidor; repeti-lo em memória não muda
         // o resultado e só dá chance de os dois critérios divergirem.
         range: null,
-        sort: params.sort ?? { field: "criado_em", direction: "desc" },
+        sort: params.sort ?? AUDIT_DEFAULT_SORT,
       },
       { searchFields: CAMPOS_BUSCA, rangeField: "criado_em" },
     );
@@ -221,11 +228,7 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Audi
 
     const linha = data as unknown as LinhaLog;
 
-    // Só resolve o nome quando a linha é sobre um paciente: abrir um registro
-    // que não é de paciente nenhum não justifica ler a lista de pacientes.
-    const nomes = linha.patient_id ? await nomesDePacientes() : new Map<string, string>();
-
-    return okOne(projetar(linha, nomes));
+    return okOne(projetar(linha, await nomesSeHouverPaciente([linha])));
   });
 }
 
@@ -268,22 +271,16 @@ export async function getSummary(params: {
 
     if (error) return falhaDe(error);
 
-    const total = new Map<AcaoAuditoria, number>();
-
-    for (const linha of data as unknown as { action: string }[]) {
-      const acao = paraAcaoAuditoria(linha.action);
-      total.set(acao, (total.get(acao) ?? 0) + 1);
-    }
-
-    return okOne({
-      janela_horas,
-      contagens: CONTAVEIS.map((acao) => ({
-        acao,
-        label: ACAO_AUDITORIA_LABEL[acao],
-        total: total.get(acao) ?? 0,
-      })),
-      sem_origem: SEM_ORIGEM,
-    });
+    return okOne(
+      summarizeAudit({
+        actions: (data as unknown as { action: string }[]).map((linha) =>
+          paraAcaoAuditoria(linha.action),
+        ),
+        countable: CONTAVEIS,
+        windowHours: janela_horas,
+        withoutSource: SEM_ORIGEM,
+      }),
+    );
   });
 }
 
@@ -309,16 +306,10 @@ export async function getFacets(
   params: { range?: DateRange | null } = {},
 ): Promise<SingleResult<FacetasAuditoria>> {
   return executar(async () => {
-    let consulta = getSupabaseClient()
-      .from("audit_log")
-      .select("actor_account_id, patient_id, accounts:actor_account_id ( full_name, email )")
-      .order("occurred_at", { ascending: false })
-      .limit(TETO_TRILHA);
-
-    if (params.range?.from) consulta = consulta.gte("occurred_at", params.range.from);
-    if (params.range?.to) consulta = consulta.lte("occurred_at", params.range.to);
-
-    const { data, error } = await consulta;
+    const { data, error } = await consultarJanela(
+      "actor_account_id, patient_id, accounts:actor_account_id ( full_name, email )",
+      params.range,
+    );
     if (error) return falhaDe(error);
 
     const linhas = data as unknown as Pick<
@@ -327,46 +318,31 @@ export async function getFacets(
     >[];
 
     // Uma chamada só, e apenas quando há paciente na janela.
-    const nomes = linhas.some((linha) => linha.patient_id)
-      ? await nomesDePacientes()
-      : new Map<string, string>();
+    const nomes = await nomesSeHouverPaciente(linhas);
 
-    const atores = new Map<string, OpcaoFiltroAuditoria>();
-    const pacientes = new Map<string, OpcaoFiltroAuditoria>();
-
-    function contar(mapa: Map<string, OpcaoFiltroAuditoria>, id: string, nome: string) {
-      const atual = mapa.get(id);
-      if (atual) atual.total += 1;
-      else mapa.set(id, { id, nome, total: 1 });
-    }
-
-    for (const linha of linhas) {
+    return okOne({
       // Ação sem ator é ação do próprio sistema — gatilho, rotina, integração.
       // Ela existe na trilha e não é filtrável por pessoa, então fica de fora
       // do seletor em vez de virar uma opção que não corresponde a ninguém.
-      if (linha.actor_account_id) {
-        const ator = umDe(linha.accounts);
-        contar(
-          atores,
-          linha.actor_account_id,
-          ator?.full_name?.trim() || ator?.email || "Sem identificação",
-        );
-      }
+      atores: buildFacetOptions(
+        linhas.map((linha) => {
+          if (!linha.actor_account_id) return null;
 
-      if (linha.patient_id) {
-        // `rotuloDePaciente` só devolve `null` sem id, e aqui há id.
-        contar(pacientes, linha.patient_id, rotuloDePaciente(linha.patient_id, nomes) ?? "");
-      }
-    }
-
-    // Mais volume primeiro: quem tem mais linhas na janela é quem alguém veio
-    // procurar. Empate resolve por nome, para a ordem não dançar entre cargas.
-    const ordenar = (opcoes: OpcaoFiltroAuditoria[]) =>
-      opcoes.sort((a, b) => b.total - a.total || a.nome.localeCompare(b.nome, "pt-BR"));
-
-    return okOne({
-      atores: ordenar([...atores.values()]),
-      pacientes: ordenar([...pacientes.values()]),
+          const ator = umDe(linha.accounts);
+          return {
+            id: linha.actor_account_id,
+            nome: ator?.full_name?.trim() || ator?.email || "Sem identificação",
+          };
+        }),
+      ),
+      pacientes: buildFacetOptions(
+        linhas.map((linha) =>
+          // `rotuloDePaciente` só devolve `null` sem id, e aqui há id.
+          linha.patient_id
+            ? { id: linha.patient_id, nome: rotuloDePaciente(linha.patient_id, nomes) ?? "" }
+            : null,
+        ),
+      ),
       truncado: linhas.length >= TETO_TRILHA,
     });
   });
@@ -376,36 +352,12 @@ export async function getFacets(
    EXPORTAÇÃO
    ------------------------------------------------------------------------- */
 
-/**
- * Linhas achatadas para CSV ou JSON — o relatório que o DPO pede.
- *
- * As colunas são decididas aqui, e não na tela, para que a exportação não
- * dependa de quem clicou nem de quais colunas estavam visíveis. A serialização
- * é da interface (`lib/csv.ts`).
- */
+/** Linhas achatadas para CSV ou JSON. A serialização é da interface (`lib/csv.ts`). */
 export async function exportar(params: ListParams = {}): Promise<ListResult<Record<string, string>>> {
-  return executar(async () => {
-    // Sem paginação: a exportação é do RECORTE inteiro, não da página aberta.
-    const resultado = await list({ ...params, page: 1, pageSize: TETO_TRILHA });
-
-    // O erro é repassado com o código original: quem exporta precisa saber se
-    // faltou permissão ou se a consulta caiu.
-    if (resultado.error) {
-      return fail(resultado.error.code, resultado.error.message, resultado.error.details);
-    }
-
-    const linhas = resultado.data.map((registro) => ({
-      data_hora: registro.criado_em,
-      acao: ACAO_AUDITORIA_LABEL[registro.acao],
-      usuario: registro.usuario_nome,
-      recurso: registro.recurso_label,
-      registro_id: registro.recurso_id ?? "",
-      paciente: registro.paciente_nome ?? "",
-      linhas_alcancadas: registro.linhas === null ? "" : String(registro.linhas),
-    }));
-
-    return ok(linhas, resultado.count);
-  });
+  // Sem paginação: a exportação é do RECORTE inteiro, não da página aberta.
+  return executar(async () =>
+    toAuditExport(await list({ ...params, page: 1, pageSize: TETO_TRILHA })),
+  );
 }
 
 export { exportar as export };
