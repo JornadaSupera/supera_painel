@@ -9,6 +9,7 @@ import {
 import {
   ERROR_CODE,
   fail,
+  failWith,
   okOne,
   type ListParams,
   type ListResult,
@@ -20,6 +21,12 @@ import type {
   ConteudoListItem,
   RevisaoConteudo,
 } from "@/types/conteudo";
+import {
+  AUTHOR_ONLY_OPERATIONS,
+  createPublishingOperations,
+  missingReviewComment,
+  summarizeBody,
+} from "../_content";
 import { paginate } from "../_list";
 import { executar, falhaDe, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
@@ -152,15 +159,6 @@ interface LinhaVersao {
   } | null;
 }
 
-/** Primeiras linhas do corpo — o cartão da fila mostra do que o texto trata. */
-function resumir(corpo: string, limite = 160): string {
-  const limpo = corpo.replace(/\s+/g, " ").trim();
-  if (limpo.length <= limite) return limpo;
-
-  // Corta na palavra, não no meio dela.
-  return `${limpo.slice(0, limite).replace(/\s+\S*$/, "")}…`;
-}
-
 function nomeDe(conta: LinhaConta | null, ausente: string): string {
   return conta?.full_name?.trim() || conta?.email || ausente;
 }
@@ -174,7 +172,7 @@ function projetar(linha: LinhaVersao): ConteudoListItem {
     id: linha.id,
     orientacao_id: linha.content_item_id,
     titulo: linha.title,
-    resumo: resumir(linha.body),
+    resumo: summarizeBody(linha.body),
     versao: Number(linha.version_no),
     status: STATUS_POR_CODIGO[linha.status] ?? STATUS_CONTEUDO.RASCUNHO,
     tipo: TIPO_POR_CODIGO[linha.media_kind] ?? TIPO_CONTEUDO.ARTIGO,
@@ -334,12 +332,8 @@ export async function revisar({
   return executar(async () => {
     const texto = comentario?.trim() ?? "";
 
-    if ((acao === ACAO_REVISAO.DEVOLVER || acao === ACAO_REVISAO.REJEITAR) && texto === "") {
-      return fail(
-        ERROR_CODE.VALIDATION,
-        "Devolver e rejeitar exigem um comentário explicando o que precisa mudar.",
-      );
-    }
+    const semComentario = missingReviewComment(acao, texto);
+    if (semComentario) return semComentario;
 
     const { error } = await getSupabaseClient().rpc("review_content_version", {
       p_content_version_id: id,
@@ -353,19 +347,7 @@ export async function revisar({
   });
 }
 
-export async function publish({ id }: { id: string }): Promise<SingleResult<ConteudoDetalhe>> {
-  return revisar({ id, acao: ACAO_REVISAO.APROVAR });
-}
-
-export async function unpublish({
-  id,
-  motivo,
-}: {
-  id: string;
-  motivo?: string;
-}): Promise<SingleResult<ConteudoDetalhe>> {
-  return revisar({ id, acao: ACAO_REVISAO.DESPUBLICAR, comentario: motivo });
-}
+export const { publish, unpublish } = createPublishingOperations(revisar);
 
 /* -------------------------------------------------------------------------
    COMPARAÇÃO ENTRE VERSÕES
@@ -385,7 +367,7 @@ export async function getDiff({ id }: { id: string }): Promise<SingleResult<Comp
 
     // O erro é repassado, não embrulhado: quem chamou precisa do código
     // original — `FORBIDDEN` e `NOT_FOUND` levam a telas diferentes.
-    if (atual.error) return fail(atual.error.code, atual.error.message, atual.error.details);
+    if (atual.error) return failWith(atual.error);
     if (!atual.data) return fail(ERROR_CODE.NOT_FOUND, "Versão de conteúdo não encontrada.");
 
     const { data, error } = await getSupabaseClient()
@@ -416,20 +398,4 @@ export async function getDiff({ id }: { id: string }): Promise<SingleResult<Comp
    razão de o workflow existir.
    ------------------------------------------------------------------------- */
 
-const SO_O_AUTOR =
-  "Quem redige a orientação é o profissional da área, no espaço de trabalho dele. O painel administrativo revisa, aprova e despublica.";
-
-export async function create(): Promise<SingleResult<ConteudoDetalhe>> {
-  return fail(ERROR_CODE.FORBIDDEN, SO_O_AUTOR);
-}
-
-export async function update(): Promise<SingleResult<ConteudoDetalhe>> {
-  return fail(ERROR_CODE.FORBIDDEN, SO_O_AUTOR);
-}
-
-export async function submitForReview(): Promise<SingleResult<ConteudoDetalhe>> {
-  return fail(
-    ERROR_CODE.FORBIDDEN,
-    "Enviar para revisão é o ato de quem escreveu — é assim que o texto entra nesta fila.",
-  );
-}
+export const { create, update, submitForReview } = AUTHOR_ONLY_OPERATIONS;

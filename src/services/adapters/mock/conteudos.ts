@@ -19,6 +19,12 @@ import type {
   ConteudoListItem,
   RevisaoConteudo,
 } from "@/types/conteudo";
+import {
+  AUTHOR_ONLY_OPERATIONS,
+  createPublishingOperations,
+  missingReviewComment,
+  summarizeBody,
+} from "../_content";
 import { now, paginate, simulate, uuid } from "./_helpers";
 
 /**
@@ -39,18 +45,12 @@ const ORDENACAO_PADRAO = { field: "atualizado_em", direction: "desc" } as const;
 const versoes: ConteudoRaw[] = conteudos.map((linha) => ({ ...linha }));
 const historico = revisoes.map((linha) => ({ ...linha }));
 
-function resumir(corpo: string, limite = 160): string {
-  const limpo = corpo.replace(/\s+/g, " ").trim();
-  if (limpo.length <= limite) return limpo;
-  return `${limpo.slice(0, limite).replace(/\s+\S*$/, "")}…`;
-}
-
 function projetar(linha: ConteudoRaw): ConteudoListItem {
   return {
     id: linha.id,
     orientacao_id: linha.content_item_id,
     titulo: linha.title,
-    resumo: resumir(linha.body),
+    resumo: summarizeBody(linha.body),
     versao: linha.version_no,
     status: linha.status,
     tipo: linha.media_kind,
@@ -178,12 +178,8 @@ export async function revisar({
 
     const texto = comentario?.trim() ?? "";
 
-    if ((acao === ACAO_REVISAO.DEVOLVER || acao === ACAO_REVISAO.REJEITAR) && texto === "") {
-      return fail(
-        ERROR_CODE.VALIDATION,
-        "Devolver e rejeitar exigem um comentário explicando o que precisa mudar.",
-      );
-    }
+    const semComentario = missingReviewComment(acao, texto);
+    if (semComentario) return semComentario;
 
     // Aprovar tira do ar a versão que estava publicada. É o que a função do
     // banco faz antes de publicar a nova, e por um motivo que vale nos dois
@@ -216,43 +212,13 @@ export async function revisar({
   });
 }
 
-export async function publish({ id }: { id: string }): Promise<SingleResult<ConteudoDetalhe>> {
-  return revisar({ id, acao: ACAO_REVISAO.APROVAR });
-}
-
-export async function unpublish({
-  id,
-  motivo,
-}: {
-  id: string;
-  motivo?: string;
-}): Promise<SingleResult<ConteudoDetalhe>> {
-  return revisar({ id, acao: ACAO_REVISAO.DESPUBLICAR, comentario: motivo });
-}
+export const { publish, unpublish } = createPublishingOperations(revisar);
 
 /* -------------------------------------------------------------------------
    ESCRITA DO AUTOR
    -------------------------------------------------------------------------
-   O mock RECUSA criar e editar, igual ao Supabase — e pela mesma razão de
-   produto, não por falta de implementação: quem redige é o profissional da
-   área, e o painel administrativo revisa. Um mock que aceitasse aqui faria a
-   tela prometer um botão que o backend real nega.
+   The mock REFUSES create and edit, just like Supabase — for the same product
+   reason, not for lack of implementation.
    ------------------------------------------------------------------------- */
 
-const SO_O_AUTOR =
-  "Quem redige a orientação é o profissional da área, no espaço de trabalho dele. O painel administrativo revisa, aprova e despublica.";
-
-export async function create(): Promise<SingleResult<ConteudoDetalhe>> {
-  return fail(ERROR_CODE.FORBIDDEN, SO_O_AUTOR);
-}
-
-export async function update(): Promise<SingleResult<ConteudoDetalhe>> {
-  return fail(ERROR_CODE.FORBIDDEN, SO_O_AUTOR);
-}
-
-export async function submitForReview(): Promise<SingleResult<ConteudoDetalhe>> {
-  return fail(
-    ERROR_CODE.FORBIDDEN,
-    "Enviar para revisão é o ato de quem escreveu — é assim que o texto entra nesta fila.",
-  );
-}
+export const { create, update, submitForReview } = AUTHOR_ONLY_OPERATIONS;
