@@ -23,6 +23,7 @@ import type {
   PiiRevelada,
   ResultadoConvite,
 } from "@/types/paciente";
+import { PATIENT_DEFAULT_SORT, normalizePatientSearch } from "../_people";
 import { now, paginate, simulate, uuid } from "./_helpers";
 
 /**
@@ -102,30 +103,29 @@ function toDetalhe(row: PacienteMock): PacienteDetalhe {
   };
 }
 
+/** Simula a chamada sobre o paciente pedido, ou responde NOT_FOUND. */
+function comPaciente<R>(id: string, operacao: (row: PacienteMock) => R) {
+  return simulate(() => {
+    const row = pacientes.find((paciente) => paciente.id === id);
+    return row ? operacao(row) : fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
+  });
+}
+
 /* -------------------------------------------------------------------------
    LEITURA
    ------------------------------------------------------------------------- */
 
 const CAMPOS_BUSCA = ["nome", "codigo", "cpf"];
 
-/**
- * Busca por CPF tem que funcionar com o que a pessoa digita — "123.456" ou
- * "123456". Como a coluna guarda só dígitos, o termo é reduzido a dígitos
- * quando é claramente um documento. Na Fase 15 isso vira `regexp_replace` no
- * lado do Postgres, pelo mesmo motivo.
- */
-function normalizarBusca(search?: string): string {
-  const termo = (search ?? "").trim();
-  return /^[\d.\-\s/]+$/.test(termo) && termo.length > 0 ? digitsOnly(termo) : termo;
-}
-
-const ORDENACAO_PADRAO = { field: "criado_em", direction: "desc" } as const;
-
 export async function list(params: ListParams = {}): Promise<ListResult<PacienteListItem>> {
   return simulate(() => {
     const resultado = paginate(
       pacientes,
-      { ...params, search: normalizarBusca(params.search), sort: params.sort ?? ORDENACAO_PADRAO },
+      {
+        ...params,
+        search: normalizePatientSearch(params.search),
+        sort: params.sort ?? PATIENT_DEFAULT_SORT,
+      },
       { searchFields: CAMPOS_BUSCA },
     );
 
@@ -134,12 +134,7 @@ export async function list(params: ListParams = {}): Promise<ListResult<Paciente
 }
 
 export async function getById({ id }: { id: string }): Promise<SingleResult<PacienteDetalhe>> {
-  return simulate(() => {
-    const row = pacientes.find((paciente) => paciente.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
-
-    return okOne(toDetalhe(row));
-  });
+  return comPaciente(id, (row) => okOne(toDetalhe(row)));
 }
 
 /* -------------------------------------------------------------------------
@@ -160,10 +155,7 @@ export async function revealPii({
   id: string;
   campos: CampoPii[];
 }): Promise<SingleResult<PiiRevelada>> {
-  return simulate(() => {
-    const row = pacientes.find((paciente) => paciente.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
-
+  return comPaciente(id, (row) => {
     const revelado: PiiRevelada = {};
     if (campos.includes("cpf")) revelado.cpf = row.cpf;
     if (campos.includes("telefone")) revelado.telefone = row.telefone;
@@ -240,10 +232,7 @@ export async function update({
   id: string;
   dados: Partial<PacienteEntrada>;
 }): Promise<SingleResult<PacienteDetalhe>> {
-  return simulate(() => {
-    const row = pacientes.find((paciente) => paciente.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
-
+  return comPaciente(id, (row) => {
     // CPF não entra na edição de propósito: é a chave natural do registro, e
     // trocá-la é uma correção de cadastro, não uma edição de rotina.
     Object.assign(row, {
@@ -283,10 +272,7 @@ export async function deactivate({
   id: string;
   motivo: string;
 }): Promise<SingleResult<PacienteDetalhe>> {
-  return simulate(() => {
-    const row = pacientes.find((paciente) => paciente.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
-
+  return comPaciente(id, (row) => {
     if (!motivo.trim()) {
       return fail(ERROR_CODE.VALIDATION, "Informe o motivo da desativação.");
     }
@@ -306,10 +292,7 @@ export async function deactivate({
 
 /** Reenvio do convite de acesso ao app. Fase 15: Edge Function + gateway SMS. */
 export async function sendInvite({ id }: { id: string }): Promise<SingleResult<ResultadoConvite>> {
-  return simulate(() => {
-    const row = pacientes.find((paciente) => paciente.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
-
+  return comPaciente(id, (row) => {
     if (row.status === STATUS_PACIENTE.INATIVO) {
       return fail(ERROR_CODE.CONFLICT, "Não é possível convidar um paciente inativo.");
     }
@@ -344,8 +327,8 @@ export async function exportar(params: ListParams = {}): Promise<ListResult<Reco
       pacientes,
       {
         ...params,
-        search: normalizarBusca(params.search),
-        sort: params.sort ?? ORDENACAO_PADRAO,
+        search: normalizePatientSearch(params.search),
+        sort: params.sort ?? PATIENT_DEFAULT_SORT,
         page: 1,
         pageSize: pacientes.length || 1,
       },

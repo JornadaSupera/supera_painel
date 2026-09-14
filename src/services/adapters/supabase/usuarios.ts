@@ -26,6 +26,7 @@ import type {
   UsuarioListItem,
 } from "@/types/usuario";
 import { paginate } from "../_list";
+import { USER_DEFAULT_SORT, USER_SEARCH_FIELDS } from "../_people";
 import { executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { paraAcaoAuditoria, paraEspecialidade } from "./mapping";
@@ -160,9 +161,6 @@ function detalhar(item: UsuarioListItem): UsuarioDetalhe {
    LEITURA
    ------------------------------------------------------------------------- */
 
-const CAMPOS_BUSCA = ["nome", "email", "registro"];
-const ORDENACAO_PADRAO = { field: "nome", direction: "asc" } as const;
-
 export async function list(params: ListParams = {}): Promise<ListResult<UsuarioListItem>> {
   return executar(async () => {
     const { data, error } = await getSupabaseClient()
@@ -178,8 +176,8 @@ export async function list(params: ListParams = {}): Promise<ListResult<UsuarioL
 
     return paginate(
       usuarios,
-      { ...params, sort: params.sort ?? ORDENACAO_PADRAO },
-      { searchFields: CAMPOS_BUSCA },
+      { ...params, sort: params.sort ?? USER_DEFAULT_SORT },
+      { searchFields: USER_SEARCH_FIELDS },
     );
   });
 }

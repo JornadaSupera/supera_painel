@@ -1,6 +1,6 @@
 import { FASE_TRATAMENTO_LABEL, RISCO_LABEL, STATUS_PACIENTE, STATUS_PACIENTE_LABEL } from "@/lib/enums";
 import { ageInYears, formatDate } from "@/lib/format";
-import { digitsOnly, maskCpf, maskEmail, maskPhone } from "@/lib/mask";
+import { maskCpf, maskEmail, maskPhone } from "@/lib/mask";
 import {
   ERROR_CODE,
   fail,
@@ -19,6 +19,7 @@ import type {
   StatusConvite,
 } from "@/types/paciente";
 import { paginate } from "../_list";
+import { PATIENT_DEFAULT_SORT, normalizePatientSearch } from "../_people";
 import { TETO_READ, executar, falhaDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { codigoExibidoDoPaciente, paraFase } from "./mapping";
@@ -216,23 +217,13 @@ function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDet
    LEITURA
    ------------------------------------------------------------------------- */
 
+// O CPF chega mascarado na projeção: um termo numérico casa apenas com os
+// dígitos visíveis — é o que a listagem oferece sem trazer o documento inteiro
+// de todo mundo para o navegador.
 const CAMPOS_BUSCA = ["nome", "codigo", "cpf_mascarado"];
-const ORDENACAO_PADRAO = { field: "criado_em", direction: "desc" } as const;
 
-/**
- * Busca por documento tem que funcionar com o que a pessoa digita. Como o CPF
- * chega mascarado na projeção, um termo puramente numérico casa apenas com os
- * dígitos visíveis — e é só isso que a listagem consegue oferecer sem trazer o
- * documento inteiro de todo mundo para o navegador.
- */
-function normalizarBusca(search?: string): string {
-  const termo = (search ?? "").trim();
-  return /^[\d.\-\s/]+$/.test(termo) && termo.length > 0 ? digitsOnly(termo) : termo;
-}
-
-async function carregarPagina(): Promise<
-  { linhas: LinhaPaciente[]; catalogos: Catalogos } | ReturnType<typeof falhaDe>
-> {
+/** A janela inteira que `read_patients` devolve, já projetada para a listagem. */
+async function carregarItens(): Promise<PacienteListItem[] | ReturnType<typeof falhaDe>> {
   const catalogos = await carregarCatalogos();
   if (!("cidPorId" in catalogos)) return catalogos;
 
@@ -243,7 +234,20 @@ async function carregarPagina(): Promise<
 
   if (error) return falhaDe(error);
 
-  return { linhas: (data ?? []) as LinhaPaciente[], catalogos };
+  return ((data ?? []) as LinhaPaciente[]).map((linha) => projetar(linha, { catalogos }));
+}
+
+/** Busca, filtro, ordenação e página sobre a janela — os mesmos da tela. */
+function recortar(itens: PacienteListItem[], params: ListParams): ListResult<PacienteListItem> {
+  return paginate(
+    itens,
+    {
+      ...params,
+      search: normalizePatientSearch(params.search),
+      sort: params.sort ?? PATIENT_DEFAULT_SORT,
+    },
+    { searchFields: CAMPOS_BUSCA },
+  );
 }
 
 /**
@@ -260,16 +264,10 @@ async function carregarPagina(): Promise<
  */
 export async function list(params: ListParams = {}): Promise<ListResult<PacienteListItem>> {
   return executar(async () => {
-    const pagina = await carregarPagina();
-    if (!("linhas" in pagina)) return pagina;
+    const itens = await carregarItens();
+    if (!Array.isArray(itens)) return itens;
 
-    const itens = pagina.linhas.map((linha) => projetar(linha, { catalogos: pagina.catalogos }));
-
-    return paginate(
-      itens,
-      { ...params, search: normalizarBusca(params.search), sort: params.sort ?? ORDENACAO_PADRAO },
-      { searchFields: CAMPOS_BUSCA },
-    );
+    return recortar(itens, params);
   });
 }
 
@@ -359,22 +357,10 @@ export async function exportar(
   params: ListParams = {},
 ): Promise<ListResult<Record<string, string>>> {
   return executar(async () => {
-    const pagina = await carregarPagina();
-    if (!("linhas" in pagina)) return pagina;
+    const itens = await carregarItens();
+    if (!Array.isArray(itens)) return itens;
 
-    const itens = pagina.linhas.map((linha) => projetar(linha, { catalogos: pagina.catalogos }));
-
-    const filtrados = paginate(
-      itens,
-      {
-        ...params,
-        search: normalizarBusca(params.search),
-        sort: params.sort ?? ORDENACAO_PADRAO,
-        page: 1,
-        pageSize: Math.max(1, itens.length),
-      },
-      { searchFields: CAMPOS_BUSCA },
-    );
+    const filtrados = recortar(itens, { ...params, page: 1, pageSize: Math.max(1, itens.length) });
 
     const linhas = filtrados.data.map((item) => ({
       Código: item.codigo,

@@ -25,6 +25,7 @@ import type {
   UsuarioEntrada,
   UsuarioListItem,
 } from "@/types/usuario";
+import { USER_DEFAULT_SORT, USER_SEARCH_FIELDS } from "../_people";
 import { now, paginate, simulate, uuid } from "./_helpers";
 
 /**
@@ -82,19 +83,24 @@ function toDetalhe(row: UsuarioMock): UsuarioDetalhe {
   };
 }
 
+/** Simula a chamada sobre o profissional pedido, ou responde NOT_FOUND. */
+function comUsuario<R>(id: string, operacao: (row: UsuarioMock) => R) {
+  return simulate(() => {
+    const row = usuarios.find((usuario) => usuario.id === id);
+    return row ? operacao(row) : fail(ERROR_CODE.NOT_FOUND, "Profissional não encontrado.");
+  });
+}
+
 /* -------------------------------------------------------------------------
    LEITURA
    ------------------------------------------------------------------------- */
-
-const CAMPOS_BUSCA = ["nome", "email", "registro"];
-const ORDENACAO_PADRAO = { field: "nome", direction: "asc" } as const;
 
 export async function list(params: ListParams = {}): Promise<ListResult<UsuarioListItem>> {
   return simulate(() => {
     const resultado = paginate(
       usuarios,
-      { ...params, sort: params.sort ?? ORDENACAO_PADRAO },
-      { searchFields: CAMPOS_BUSCA },
+      { ...params, sort: params.sort ?? USER_DEFAULT_SORT },
+      { searchFields: USER_SEARCH_FIELDS },
     );
 
     return ok(resultado.data.map(toListItem), resultado.count);
@@ -102,12 +108,7 @@ export async function list(params: ListParams = {}): Promise<ListResult<UsuarioL
 }
 
 export async function getById({ id }: { id: string }): Promise<SingleResult<UsuarioDetalhe>> {
-  return simulate(() => {
-    const row = usuarios.find((usuario) => usuario.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Profissional não encontrado.");
-
-    return okOne(toDetalhe(row));
-  });
+  return comUsuario(id, (row) => okOne(toDetalhe(row)));
 }
 
 /**
@@ -192,10 +193,7 @@ export async function update({
   id: string;
   dados: Partial<UsuarioEntrada>;
 }): Promise<SingleResult<UsuarioDetalhe>> {
-  return simulate(() => {
-    const row = usuarios.find((usuario) => usuario.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Profissional não encontrado.");
-
+  return comUsuario(id, (row) => {
     if (dados.email) {
       const email = dados.email.trim().toLowerCase();
       if (usuarios.some((usuario) => usuario.email === email && usuario.id !== id)) {
@@ -224,10 +222,7 @@ export async function setStatus({
   id: string;
   status: StatusUsuario;
 }): Promise<SingleResult<UsuarioDetalhe>> {
-  return simulate(() => {
-    const row = usuarios.find((usuario) => usuario.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Profissional não encontrado.");
-
+  return comUsuario(id, (row) => {
     // Sem administrador ativo ninguém consegue reverter nada — nem restaurar o
     // próprio acesso. A trava vale igual no Postgres, como constraint.
     const admins = usuarios.filter(
@@ -256,10 +251,7 @@ export async function resetPassword({
 }: {
   id: string;
 }): Promise<SingleResult<{ enviado: true; destino: string }>> {
-  return simulate(() => {
-    const row = usuarios.find((usuario) => usuario.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Profissional não encontrado.");
-
+  return comUsuario(id, (row) => {
     // O painel dispara o link; quem escolhe a senha é a própria pessoa. Um
     // administrador que define senha de terceiro quebra o não-repúdio da
     // trilha de auditoria.
@@ -276,10 +268,7 @@ export async function setMfa({
   ativo: boolean;
   motivo?: string;
 }): Promise<SingleResult<UsuarioDetalhe>> {
-  return simulate(() => {
-    const row = usuarios.find((usuario) => usuario.id === id);
-    if (!row) return fail(ERROR_CODE.NOT_FOUND, "Profissional não encontrado.");
-
+  return comUsuario(id, (row) => {
     // Desligar o segundo fator de quem acessa prontuário é exceção, e exceção
     // sem justificativa não fica registrada em lugar nenhum.
     if (!ativo && !motivo?.trim()) {
