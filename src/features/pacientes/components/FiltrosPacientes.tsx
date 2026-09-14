@@ -1,14 +1,4 @@
-import { FilterX } from "lucide-react";
-
-import { SearchInput } from "@/components/shared";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ClearFiltersButton, FilterSelect, SearchInput } from "@/components/shared";
 import { useCids, useProtocolos } from "@/hooks/useCatalogos";
 import { motivoIndisponivel } from "@/services/apiClient";
 import {
@@ -17,7 +7,8 @@ import {
   STATUS_PACIENTE_LABEL,
   toOptions,
 } from "@/lib/enums";
-import { usePacientesStore, temRecorte, type FiltrosPacientes as Filtros } from "@/stores/pacientes";
+import { hasActiveFilters } from "@/stores/listStore";
+import { usePacientesStore, type FiltrosPacientes as Filtros } from "@/stores/pacientes";
 
 /**
  * Busca e filtros da listagem.
@@ -27,41 +18,6 @@ import { usePacientesStore, temRecorte, type FiltrosPacientes as Filtros } from 
  * fase e risco. A barra segue a linguagem visual da busca da tela de Usuários,
  * que é onde o protótipo mostra como esse controle se parece aqui.
  */
-
-/**
- * O <Select> do Radix não aceita item com valor vazio — vazio é como ele marca
- * "nada selecionado". "todos" é o sentinela na interface; o store e a camada de
- * dados continuam falando em string vazia.
- */
-const TODOS = "todos";
-
-interface CampoSelectProps {
-  rotulo: string;
-  valor: string;
-  onChange: (valor: string) => void;
-  opcoes: { value: string; label: string }[];
-  larguraClasse?: string;
-}
-
-function CampoSelect({ rotulo, valor, onChange, opcoes, larguraClasse }: CampoSelectProps) {
-  return (
-    <Select value={valor || TODOS} onValueChange={(v) => onChange(v === TODOS ? "" : v)}>
-      <SelectTrigger size="sm" aria-label={rotulo} className={larguraClasse}>
-        <SelectValue placeholder={rotulo} />
-      </SelectTrigger>
-
-      <SelectContent>
-        <SelectItem value={TODOS}>{rotulo}: todos</SelectItem>
-        {opcoes.map((opcao) => (
-          <SelectItem key={opcao.value} value={opcao.value}>
-            {opcao.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
-
 export function FiltrosPacientes() {
   // Filtrar por um campo que a listagem não traz devolveria sempre lista vazia,
   // sem erro nenhum — o pior tipo de controle: o que parece funcionar.
@@ -91,7 +47,6 @@ export function FiltrosPacientes() {
   }));
 
   const aplicar = (campo: keyof Filtros) => (valor: string) => setFiltro(campo, valor);
-  const comRecorte = temRecorte(busca, filtros);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -104,57 +59,52 @@ export function FiltrosPacientes() {
       />
 
       {!semProtocolo && (
-        <CampoSelect
-          rotulo="Protocolo"
-          valor={filtros.protocolo_id}
+        <FilterSelect
+          label="Protocolo"
+          value={filtros.protocolo_id}
           onChange={aplicar("protocolo_id")}
-          opcoes={opcoesProtocolo}
-          larguraClasse="w-52"
+          options={opcoesProtocolo}
+          className="w-52"
         />
       )}
 
       {!semCid && (
-        <CampoSelect
-          rotulo="CID"
-          valor={filtros.cid}
+        <FilterSelect
+          label="CID"
+          value={filtros.cid}
           onChange={aplicar("cid")}
-          opcoes={opcoesCid}
-          larguraClasse="w-40"
+          options={opcoesCid}
+          className="w-40"
         />
       )}
 
-      <CampoSelect
-        rotulo="Fase"
-        valor={filtros.fase}
+      <FilterSelect
+        label="Fase"
+        value={filtros.fase}
         onChange={aplicar("fase")}
-        opcoes={toOptions(FASE_TRATAMENTO_LABEL)}
-        larguraClasse="w-36"
+        options={toOptions(FASE_TRATAMENTO_LABEL)}
+        className="w-36"
       />
 
       {!semRisco && (
-        <CampoSelect
-          rotulo="Risco"
-          valor={filtros.risco}
+        <FilterSelect
+          label="Risco"
+          value={filtros.risco}
           onChange={aplicar("risco")}
-          opcoes={toOptions(RISCO_LABEL)}
-          larguraClasse="w-32"
+          options={toOptions(RISCO_LABEL)}
+          className="w-32"
         />
       )}
 
-      <CampoSelect
-        rotulo="Status"
-        valor={filtros.status}
+      <FilterSelect
+        label="Status"
+        value={filtros.status}
         onChange={aplicar("status")}
-        opcoes={toOptions(STATUS_PACIENTE_LABEL)}
-        larguraClasse="w-32"
+        options={toOptions(STATUS_PACIENTE_LABEL)}
+        className="w-32"
       />
 
-      {comRecorte && (
-        <Button variant="ghost" size="sm" onClick={limparFiltros}>
-          <FilterX />
-          Limpar
-        </Button>
-      )}
+      <ClearFiltersButton visible={hasActiveFilters(busca, filtros)} onClick={limparFiltros} />
     </div>
   );
 }

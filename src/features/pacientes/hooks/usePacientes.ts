@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { downloadCsv } from "@/lib/csv";
 import { queryKeys } from "@/lib/queryKeys";
@@ -28,28 +28,9 @@ const RECURSO = "pacientes";
    LEITURA
    ------------------------------------------------------------------------- */
 
-/**
- * Listagem já ligada ao store de filtros.
- *
- * A busca é atrasada em 350 ms; os filtros não — clicar num <Select> é uma
- * decisão, e esperar depois dela parece travamento.
- */
+/** Listagem já ligada ao store de filtros. Ver `useListParams`. */
 export function usePacientes() {
-  const busca = usePacientesStore((estado) => estado.busca);
-  const filtros = usePacientesStore((estado) => estado.filtros);
-  const sort = usePacientesStore((estado) => estado.sort);
-  const page = usePacientesStore((estado) => estado.page);
-  const pageSize = usePacientesStore((estado) => estado.pageSize);
-
-  const buscaAtrasada = useDebouncedValue(busca);
-
-  const params: ListParams = {
-    page,
-    pageSize,
-    sort,
-    search: buscaAtrasada,
-    filters: filtros,
-  };
+  const params = useListParams(usePacientesStore);
 
   const query = useQuery({
     queryKey: queryKeys.patients.list(params),

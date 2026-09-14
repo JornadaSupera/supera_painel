@@ -17,7 +17,8 @@ import { FASE_TRATAMENTO_LABEL, STATUS_PACIENTE_LABEL } from "@/lib/enums";
 import { formatNumber, ageInYears } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
-import { temRecorte, usePacientesStore } from "@/stores/pacientes";
+import { hasActiveFilters } from "@/stores/listStore";
+import { usePacientesStore } from "@/stores/pacientes";
 import type { PacienteListItem } from "@/types/paciente";
 import { AcoesPaciente } from "../components/AcoesPaciente";
 import { CampoSensivel } from "../components/CampoSensivel";
@@ -52,7 +53,7 @@ export function PacientesPage() {
   const setPageSize = usePacientesStore((estado) => estado.setPageSize);
 
   const exportar = useExportarPacientes(params);
-  const filtrada = temRecorte(busca, filtros);
+  const filtrada = hasActiveFilters(busca, filtros);
 
   /*
    * CID e protocolo dependem de uma leitura por paciente, auditada uma a uma.
