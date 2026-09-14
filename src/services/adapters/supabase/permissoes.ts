@@ -1,8 +1,6 @@
-import { PAPEL } from "@/lib/enums";
-import { PERMISSAO, type Permissao } from "@/lib/rbac";
-import { catalogoPermissoes, concedidas, PAPEIS } from "@/mocks/permissoes";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
 import type { MatrizPermissoes } from "@/types/usuario";
+import { buildPermissionMatrix } from "../_permissions";
 
 /**
  * Matriz papel × permissão.
@@ -23,19 +21,8 @@ import type { MatrizPermissoes } from "@/types/usuario";
  * ganha a RPC correspondente. Nenhuma tela muda junto.
  */
 
-const EXCLUSIVAS_DE_ESPECIALIDADE: Permissao[] = [PERMISSAO.SIGILO_PSICOLOGIA];
-
 export async function getMatrix(): Promise<SingleResult<MatrizPermissoes>> {
-  return okOne<MatrizPermissoes>({
-    papeis: PAPEIS,
-    permissoes: catalogoPermissoes,
-    concedidas: {
-      [PAPEL.ADMIN]: [...concedidas[PAPEL.ADMIN]],
-      [PAPEL.GESTOR]: [...concedidas[PAPEL.GESTOR]],
-      [PAPEL.PROFISSIONAL]: [...concedidas[PAPEL.PROFISSIONAL]],
-    },
-    exclusivas_de_especialidade: EXCLUSIVAS_DE_ESPECIALIDADE,
-  });
+  return okOne(buildPermissionMatrix());
 }
 
 export async function updateMatrix(): Promise<SingleResult<MatrizPermissoes>> {

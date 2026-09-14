@@ -1,8 +1,9 @@
 import { PAPEL, type Papel } from "@/lib/enums";
 import { PERMISSAO, type Permissao } from "@/lib/rbac";
-import { catalogoPermissoes, concedidas, PAPEIS } from "@/mocks/permissoes";
+import { concedidas, PAPEIS } from "@/mocks/permissoes";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
 import type { MatrizPermissoes } from "@/types/usuario";
+import { SPECIALTY_EXCLUSIVE_PERMISSIONS, buildPermissionMatrix } from "../_permissions";
 import { simulate } from "./_helpers";
 
 /**
@@ -12,12 +13,9 @@ import { simulate } from "./_helpers";
  * 1. O administrador não perde `usuarios:manage` nem `permissoes:manage` — sem
  *    elas, ninguém consegue reverter a própria alteração e o painel fica sem
  *    quem administre.
- * 2. Permissão exclusiva de especialidade não entra em papel nenhum. O sigilo
- *    de Psicologia é da especialidade; concedê-lo por papel daria ao
- *    administrador acesso a conteúdo de sessão.
+ * 2. Permissão exclusiva de especialidade não entra em papel nenhum. Ver
+ *    `SPECIALTY_EXCLUSIVE_PERMISSIONS`.
  */
-
-const EXCLUSIVAS_DE_ESPECIALIDADE: Permissao[] = [PERMISSAO.SIGILO_PSICOLOGIA];
 
 /** Sem estas, o administrador não consegue desfazer o que acabou de fazer. */
 const INDISPENSAVEIS_DO_ADMIN: Permissao[] = [
@@ -25,21 +23,8 @@ const INDISPENSAVEIS_DO_ADMIN: Permissao[] = [
   PERMISSAO.PERMISSOES_MANAGE,
 ];
 
-function montar(): MatrizPermissoes {
-  return {
-    papeis: PAPEIS,
-    permissoes: catalogoPermissoes,
-    concedidas: {
-      [PAPEL.ADMIN]: [...concedidas[PAPEL.ADMIN]],
-      [PAPEL.GESTOR]: [...concedidas[PAPEL.GESTOR]],
-      [PAPEL.PROFISSIONAL]: [...concedidas[PAPEL.PROFISSIONAL]],
-    },
-    exclusivas_de_especialidade: EXCLUSIVAS_DE_ESPECIALIDADE,
-  };
-}
-
 export async function getMatrix(): Promise<SingleResult<MatrizPermissoes>> {
-  return simulate(() => okOne(montar()));
+  return simulate(() => okOne(buildPermissionMatrix()));
 }
 
 export async function updateMatrix({
@@ -60,7 +45,7 @@ export async function updateMatrix({
 
     for (const papel of PAPEIS) {
       const limpa = (novas[papel] ?? []).filter(
-        (permissao) => !EXCLUSIVAS_DE_ESPECIALIDADE.includes(permissao),
+        (permissao) => !SPECIALTY_EXCLUSIVE_PERMISSIONS.includes(permissao),
       );
 
       // Mantém a referência do objeto do mock: outros módulos já a importaram.
@@ -68,6 +53,6 @@ export async function updateMatrix({
       concedidas[papel].push(...limpa);
     }
 
-    return okOne(montar());
+    return okOne(buildPermissionMatrix());
   });
 }
