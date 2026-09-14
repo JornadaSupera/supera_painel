@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { downloadFile, nameWithDate, toCsv } from "@/lib/csv";
 import { queryKeys } from "@/lib/queryKeys";
@@ -25,23 +25,10 @@ import { janelaComoRange, useAuditoriaStore } from "@/stores/auditoria";
 const RECURSO = "auditoria";
 
 function useParametros(): ListParams {
-  const busca = useAuditoriaStore((estado) => estado.busca);
-  const filtros = useAuditoriaStore((estado) => estado.filtros);
+  const recorte = useListParams(useAuditoriaStore);
   const janelaDias = useAuditoriaStore((estado) => estado.janelaDias);
-  const sort = useAuditoriaStore((estado) => estado.sort);
-  const page = useAuditoriaStore((estado) => estado.page);
-  const pageSize = useAuditoriaStore((estado) => estado.pageSize);
 
-  const buscaAtrasada = useDebouncedValue(busca);
-
-  return {
-    page,
-    pageSize,
-    sort,
-    search: buscaAtrasada,
-    filters: filtros,
-    range: janelaComoRange(janelaDias),
-  };
+  return { ...recorte, range: janelaComoRange(janelaDias) };
 }
 
 export function useTrilha() {

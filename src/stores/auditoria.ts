@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-import { DEFAULT_PAGE_SIZE, type DateRange, type Sort } from "@/services/contracts";
+import type { DateRange } from "@/services/contracts";
+import { createListSlice, type ListState } from "./listStore";
 
 /**
  * Estado de cliente da trilha de auditoria.
@@ -32,47 +33,28 @@ export const JANELAS = [
   { value: "", label: "Todo o período" },
 ] as const;
 
-interface AuditoriaState {
-  busca: string;
-  filtros: FiltrosAuditoria;
+interface AuditoriaState extends ListState<FiltrosAuditoria> {
   /** Dias para trás; string vazia = sem recorte. */
   janelaDias: string;
-  sort: Sort | null;
-  page: number;
-  pageSize: number;
-
-  setBusca: (busca: string) => void;
-  setFiltro: (campo: keyof FiltrosAuditoria, valor: string) => void;
   setJanela: (dias: string) => void;
-  limparFiltros: () => void;
-  setSort: (sort: Sort) => void;
-  setPage: (page: number) => void;
-  setPageSize: (pageSize: number) => void;
 }
+
+// Trinta dias é o recorte que mostra atividade real sem puxar a tabela
+// inteira. O protótipo abre em "atividade recente", que é a mesma ideia.
+const JANELA_PADRAO = "30";
 
 export const useAuditoriaStore = create<AuditoriaState>()((set) => ({
-  busca: "",
-  filtros: FILTROS_VAZIOS,
-  // Trinta dias é o recorte que mostra atividade real sem puxar a tabela
-  // inteira. O protótipo abre em "atividade recente", que é a mesma ideia.
-  janelaDias: "30",
-  sort: { field: "criado_em", direction: "desc" },
-  page: 1,
-  pageSize: DEFAULT_PAGE_SIZE,
+  ...createListSlice(set, {
+    emptyFilters: FILTROS_VAZIOS,
+    sort: { field: "criado_em", direction: "desc" },
+  }),
 
-  setBusca: (busca) => set({ busca, page: 1 }),
-  setFiltro: (campo, valor) =>
-    set((estado) => ({ filtros: { ...estado.filtros, [campo]: valor }, page: 1 })),
+  janelaDias: JANELA_PADRAO,
   setJanela: (janelaDias) => set({ janelaDias, page: 1 }),
-  limparFiltros: () => set({ filtros: FILTROS_VAZIOS, busca: "", janelaDias: "30", page: 1 }),
-  setSort: (sort) => set({ sort, page: 1 }),
-  setPage: (page) => set({ page }),
-  setPageSize: (pageSize) => set({ pageSize, page: 1 }),
+  // Limpar também devolve a janela ao padrão, não só a busca e os filtros.
+  limparFiltros: () =>
+    set({ filtros: FILTROS_VAZIOS, busca: "", janelaDias: JANELA_PADRAO, page: 1 }),
 }));
-
-export function temRecorte(busca: string, filtros: FiltrosAuditoria): boolean {
-  return Boolean(busca.trim()) || Object.values(filtros).some(Boolean);
-}
 
 const UM_MINUTO = 60_000;
 const UM_DIA = 86_400_000;

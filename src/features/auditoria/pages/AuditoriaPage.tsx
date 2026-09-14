@@ -1,11 +1,13 @@
 import { useState } from "react";
 
-import { Download, FileJson, FilterX, ShieldCheck } from "lucide-react";
+import { Download, FileJson, ShieldCheck } from "lucide-react";
 
 import {
   BackendPendente,
+  ClearFiltersButton,
   DataTable,
   EmptyState,
+  FilterSelect,
   PageHeader,
   SearchInput,
   SkeletonCards,
@@ -23,11 +25,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ACAO_AUDITORIA_LABEL, toOptions } from "@/lib/enums";
+import { ACAO_AUDITORIA_LABEL, toOptions, type Option } from "@/lib/enums";
 import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { motivoIndisponivel } from "@/services/apiClient";
-import { JANELAS, temRecorte, useAuditoriaStore } from "@/stores/auditoria";
-import type { AuditoriaListItem } from "@/types/auditoria";
+import { JANELAS, useAuditoriaStore } from "@/stores/auditoria";
+import { hasActiveFilters } from "@/stores/listStore";
+import type { AuditoriaListItem, OpcaoFiltroAuditoria } from "@/types/auditoria";
 import {
   useExportarTrilha,
   useFacetasAuditoria,
@@ -55,7 +58,10 @@ import { DetalheAcesso } from "../components/DetalheAcesso";
  *    desta pessoa nos últimos 90 dias" — a segunda é a pergunta de uma apuração.
  */
 
-const TODOS = "todos";
+/** Quem aparece na trilha, com o volume ao lado: "Ana Souza · 12". */
+function comoOpcoes(opcoes: OpcaoFiltroAuditoria[]): Option[] {
+  return opcoes.map((opcao) => ({ value: opcao.id, label: `${opcao.nome} · ${opcao.total}` }));
+}
 
 export function AuditoriaPage() {
   const { registros, total, isLoading, isError, error, refetch } = useTrilha();
@@ -84,7 +90,7 @@ export function AuditoriaPage() {
   const [registroAberto, setRegistroAberto] = useState<string | null>(null);
   const detalhe = useRegistroAuditoria(registroAberto);
 
-  const filtrada = temRecorte(busca, filtros);
+  const filtrada = hasActiveFilters(busca, filtros);
   const semIp = motivoIndisponivel("auditoria.list.ip");
 
   const semOrigem = resumo.data?.sem_origem ?? [];
@@ -248,65 +254,34 @@ export function AuditoriaPage() {
           </SelectContent>
         </Select>
 
-        <Select
-          value={filtros.acao || TODOS}
-          onValueChange={(valor) => setFiltro("acao", valor === TODOS ? "" : valor)}
-        >
-          <SelectTrigger size="sm" aria-label="Tipo de ação" className="w-40">
-            <SelectValue placeholder="Ação" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TODOS}>Ação: todas</SelectItem>
-            {toOptions(ACAO_AUDITORIA_LABEL).map((opcao) => (
-              <SelectItem key={opcao.value} value={opcao.value}>
-                {opcao.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FilterSelect
+          label="Tipo de ação"
+          allLabel="Ação: todas"
+          value={filtros.acao}
+          onChange={(valor) => setFiltro("acao", valor)}
+          options={toOptions(ACAO_AUDITORIA_LABEL)}
+          className="w-40"
+        />
 
         {/* Usuário e paciente fecham os quatro recortes que o escopo pede.
             As opções saem da própria trilha — ver `useFacetasAuditoria`. */}
-        <Select
-          value={filtros.usuario_id || TODOS}
-          onValueChange={(valor) => setFiltro("usuario_id", valor === TODOS ? "" : valor)}
-        >
-          <SelectTrigger size="sm" aria-label="Usuário" className="w-52">
-            <SelectValue placeholder="Usuário" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TODOS}>Usuário: todos</SelectItem>
-            {atores.map((opcao) => (
-              <SelectItem key={opcao.id} value={opcao.id}>
-                {opcao.nome} · {opcao.total}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FilterSelect
+          label="Usuário"
+          value={filtros.usuario_id}
+          onChange={(valor) => setFiltro("usuario_id", valor)}
+          options={comoOpcoes(atores)}
+          className="w-52"
+        />
 
-        <Select
-          value={filtros.paciente_id || TODOS}
-          onValueChange={(valor) => setFiltro("paciente_id", valor === TODOS ? "" : valor)}
-        >
-          <SelectTrigger size="sm" aria-label="Paciente" className="w-52">
-            <SelectValue placeholder="Paciente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TODOS}>Paciente: todos</SelectItem>
-            {pacientesNaTrilha.map((opcao) => (
-              <SelectItem key={opcao.id} value={opcao.id}>
-                {opcao.nome} · {opcao.total}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <FilterSelect
+          label="Paciente"
+          value={filtros.paciente_id}
+          onChange={(valor) => setFiltro("paciente_id", valor)}
+          options={comoOpcoes(pacientesNaTrilha)}
+          className="w-52"
+        />
 
-        {filtrada && (
-          <Button variant="ghost" size="sm" onClick={limparFiltros}>
-            <FilterX />
-            Limpar
-          </Button>
-        )}
+        <ClearFiltersButton visible={filtrada} onClick={limparFiltros} />
       </div>
 
       {/* Um seletor incompleto que se apresenta como completo faz quem apura
