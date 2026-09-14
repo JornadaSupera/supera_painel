@@ -3,7 +3,9 @@ import { STATUS_USUARIO } from "@/lib/enums";
 import { usuarios } from "@/mocks/usuarios";
 import type { UsuarioMock } from "@/mocks/usuarios";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
+import type { PasswordResetInput, PasswordResetRequest } from "@/services/contracts/operations";
 import type { DesafioMfa, ResultadoLogin, Sessao, UsuarioAutenticado } from "@/types/auth";
+import { maskDestination } from "../_people";
 import { now, simulate, uuid } from "./_helpers";
 
 /**
@@ -71,13 +73,6 @@ function paraUsuarioAutenticado(usuario: UsuarioMock): UsuarioAutenticado {
   };
 }
 
-/** "juliana.fontana@cosc.com.br" → "ju•••••••@cosc.com.br" */
-function mascararDestino(email: string): string {
-  const [usuario, dominio] = email.split("@");
-  if (!usuario || !dominio) return "seu contato cadastrado";
-  return `${usuario.slice(0, 2)}${"•".repeat(Math.max(3, usuario.length - 2))}@${dominio}`;
-}
-
 /* -------------------------------------------------------------------------
    LOGIN
    ------------------------------------------------------------------------- */
@@ -139,7 +134,7 @@ export async function signIn({
 
     const mfa: DesafioMfa = {
       desafio_id,
-      destino: usuario.mfa_ativo ? "seu aplicativo autenticador" : mascararDestino(usuario.email),
+      destino: usuario.mfa_ativo ? "seu aplicativo autenticador" : maskDestination(usuario.email),
       metodo: usuario.mfa_ativo ? "totp" : "sms",
       expira_em: new Date(Date.now() + MFA_VALIDADE_MS).toISOString(),
     };
@@ -219,9 +214,7 @@ export async function getSession(): Promise<SingleResult<Sessao>> {
  */
 export async function requestPasswordReset({
   email,
-}: {
-  email: string;
-}): Promise<SingleResult<{ enviado: true }>> {
+}: PasswordResetRequest): Promise<SingleResult<{ enviado: true }>> {
   return simulate(() => {
     void email;
     return okOne({ enviado: true as const });
@@ -231,10 +224,7 @@ export async function requestPasswordReset({
 export async function resetPassword({
   token,
   senha,
-}: {
-  token: string;
-  senha: string;
-}): Promise<SingleResult<{ alterada: true }>> {
+}: PasswordResetInput): Promise<SingleResult<{ alterada: true }>> {
   return simulate(() => {
     if (!token) return fail(ERROR_CODE.VALIDATION, "Link inválido ou expirado.");
     if (senha.length < 10) return fail(ERROR_CODE.VALIDATION, "A senha não atende aos requisitos.");

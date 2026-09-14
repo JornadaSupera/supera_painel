@@ -3,7 +3,9 @@ import type { User } from "@supabase/supabase-js";
 import { MFA_REQUIRED } from "@/lib/env";
 import { PAPEL, type Papel } from "@/lib/enums";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
+import type { PasswordResetInput, PasswordResetRequest } from "@/services/contracts/operations";
 import type { DesafioMfa, ResultadoLogin, Sessao, UsuarioAutenticado } from "@/types/auth";
+import { maskDestination } from "../_people";
 import { executar, falhaDe, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
@@ -159,13 +161,6 @@ function montarSessao(sessao: SessaoDoGoTrue, usuario: UsuarioAutenticado): Sess
   };
 }
 
-/** "juliana.fontana@cosc.com.br" → "ju•••••••@cosc.com.br" */
-function mascararDestino(email: string): string {
-  const [usuario, dominio] = email.split("@");
-  if (!usuario || !dominio) return "seu contato cadastrado";
-  return `${usuario.slice(0, 2)}${"•".repeat(Math.max(3, usuario.length - 2))}@${dominio}`;
-}
-
 /* -------------------------------------------------------------------------
    SEGUNDO FATOR
    -------------------------------------------------------------------------
@@ -256,7 +251,7 @@ export async function signIn({
 
     return fail(
       ERROR_CODE.FORBIDDEN,
-      `Este acesso exige um aplicativo autenticador, e ${mascararDestino(perfil.email)} ainda não tem um cadastrado. Procure um administrador da clínica.`,
+      `Este acesso exige um aplicativo autenticador, e ${maskDestination(perfil.email)} ainda não tem um cadastrado. Procure um administrador da clínica.`,
     );
   });
 }
@@ -337,9 +332,7 @@ export async function getSession(): Promise<SingleResult<Sessao>> {
  */
 export async function requestPasswordReset({
   email,
-}: {
-  email: string;
-}): Promise<SingleResult<{ enviado: true }>> {
+}: PasswordResetRequest): Promise<SingleResult<{ enviado: true }>> {
   return executar(async () => {
     await getSupabaseClient().auth.resetPasswordForEmail(email.trim().toLowerCase(), {
       redirectTo: `${window.location.origin}/nova-senha`,
@@ -357,10 +350,7 @@ export async function requestPasswordReset({
 export async function resetPassword({
   token,
   senha,
-}: {
-  token: string;
-  senha: string;
-}): Promise<SingleResult<{ alterada: true }>> {
+}: PasswordResetInput): Promise<SingleResult<{ alterada: true }>> {
   return executar(async () => {
     if (!token) return fail(ERROR_CODE.VALIDATION, "Link inválido ou expirado.");
 

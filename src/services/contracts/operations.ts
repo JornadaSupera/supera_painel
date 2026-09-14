@@ -53,6 +53,15 @@ import type { DateRange, ListParams, ListResult, SingleResult } from "./index";
 
 /* ---------------------------------------------------------------- Fase 2 */
 
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetInput {
+  token: string;
+  senha: string;
+}
+
 export interface AuthOperations {
   /** Nunca devolve sessão direto: o segundo fator é obrigatório. */
   signIn(params: { email: string; senha: string }): Promise<SingleResult<ResultadoLogin>>;
@@ -65,9 +74,9 @@ export interface AuthOperations {
   getSession(): Promise<SingleResult<Sessao>>;
 
   /** Responde sucesso mesmo para e-mail inexistente, por design. */
-  requestPasswordReset(params: { email: string }): Promise<SingleResult<{ enviado: true }>>;
+  requestPasswordReset(params: PasswordResetRequest): Promise<SingleResult<{ enviado: true }>>;
 
-  resetPassword(params: { token: string; senha: string }): Promise<SingleResult<{ alterada: true }>>;
+  resetPassword(params: PasswordResetInput): Promise<SingleResult<{ alterada: true }>>;
 }
 
 /* ---------------------------------------------------------------- Fase 4 */
