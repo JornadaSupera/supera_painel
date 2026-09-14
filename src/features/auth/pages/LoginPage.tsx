@@ -1,11 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CircleAlert, LoaderCircle } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import type { Location as RouterLocation } from "react-router-dom";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -19,6 +18,8 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { ERROR_CODE } from "@/services/contracts";
+import { AuthErrorAlert } from "../components/AuthErrorAlert";
+import { CorporateEmailField } from "../components/CorporateEmailField";
 import { loginSchema, type LoginForm } from "../schemas";
 
 /**
@@ -80,32 +81,9 @@ export function LoginPage() {
     >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(enviar)} className="flex flex-col gap-5" noValidate>
-          {erro && (
-            <Alert variant="destructive" role="alert">
-              <CircleAlert />
-              <AlertDescription>{erro}</AlertDescription>
-            </Alert>
-          )}
+          <AuthErrorAlert message={erro} />
 
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>E-mail corporativo</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    type="email"
-                    autoComplete="username"
-                    autoFocus
-                    placeholder="nome.sobrenome@cosc.com.br"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <CorporateEmailField />
 
           <FormField
             control={form.control}

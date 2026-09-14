@@ -5,17 +5,10 @@ import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Form } from "@/components/ui/form";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { authApi, call } from "@/services/apiClient";
+import { CorporateEmailField } from "../components/CorporateEmailField";
 import { recuperarSenhaSchema, type RecuperarSenhaForm } from "../schemas";
 
 /**
@@ -93,25 +86,7 @@ export function RecuperarSenhaPage() {
     >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(enviar)} className="flex flex-col gap-5" noValidate>
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>E-mail corporativo</FormLabel>
-                <FormControl>
-                  <Input
-                    {...field}
-                    type="email"
-                    autoComplete="username"
-                    autoFocus
-                    placeholder="nome.sobrenome@cosc.com.br"
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <CorporateEmailField />
 
           <Button type="submit" disabled={enviando} className="w-full">
             {enviando && <LoaderCircle className="animate-spin" />}

@@ -1,10 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, CircleAlert, LoaderCircle, X } from "lucide-react";
+import { Check, LoaderCircle, X } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -18,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { cn } from "@/lib/utils";
 import { authApi, call } from "@/services/apiClient";
+import { AuthErrorAlert } from "../components/AuthErrorAlert";
 import { novaSenhaSchema, REGRAS_SENHA, type NovaSenhaForm } from "../schemas";
 
 /**
@@ -63,12 +63,7 @@ export function NovaSenhaPage() {
           </Link>
         }
       >
-        <Alert variant="destructive" role="alert">
-          <CircleAlert />
-          <AlertDescription>
-            Por segurança, cada link vale por 30 minutos e só pode ser usado uma vez.
-          </AlertDescription>
-        </Alert>
+        <AuthErrorAlert message="Por segurança, cada link vale por 30 minutos e só pode ser usado uma vez." />
       </AuthLayout>
     );
   }
@@ -79,12 +74,7 @@ export function NovaSenhaPage() {
     <AuthLayout title="Criar nova senha" description="Escolha uma senha que você não use em outro serviço.">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(enviar)} className="flex flex-col gap-5" noValidate>
-          {erro && (
-            <Alert variant="destructive" role="alert">
-              <CircleAlert />
-              <AlertDescription>{erro}</AlertDescription>
-            </Alert>
-          )}
+          <AuthErrorAlert message={erro} />
 
           <FormField
             control={form.control}

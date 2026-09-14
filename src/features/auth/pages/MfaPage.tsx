@@ -1,14 +1,14 @@
-import { ArrowLeft, CircleAlert, LoaderCircle, ShieldCheck } from "lucide-react";
+import { ArrowLeft, LoaderCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import type { Location as RouterLocation } from "react-router-dom";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthLayout } from "@/layouts/AuthLayout";
+import { AuthErrorAlert } from "../components/AuthErrorAlert";
 
 /**
  * Segundo fator — obrigatório.
@@ -114,12 +114,7 @@ export function MfaPage() {
       }
     >
       <div className="flex flex-col gap-5">
-        {erro && (
-          <Alert variant="destructive" role="alert">
-            <CircleAlert />
-            <AlertDescription>{erro}</AlertDescription>
-          </Alert>
-        )}
+        <AuthErrorAlert message={erro} />
 
         <div className="flex flex-col gap-3">
           <Label htmlFor="codigo-mfa">Código de verificação</Label>
