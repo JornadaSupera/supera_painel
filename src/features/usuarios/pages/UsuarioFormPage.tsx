@@ -4,7 +4,14 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 
-import { BackendPendente, ErrorState, PageHeader, SkeletonForm, StatusBadge } from "@/components/shared";
+import {
+  BackendPendente,
+  ErrorState,
+  FormSelect,
+  PageHeader,
+  SkeletonForm,
+  StatusBadge,
+} from "@/components/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,13 +25,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   CONSELHO_POR_ESPECIALIDADE,
@@ -47,9 +47,6 @@ import { paraEntrada, usuarioSchema, VALORES_INICIAIS, type UsuarioForm as Valor
  * lado e resume, ao final, o acesso que a combinação produz — para que ninguém
  * descubra o alcance de um papel só depois de conceder.
  */
-
-/** O <Select> do Radix reserva o valor vazio para "nada selecionado". */
-const SEM_ESPECIALIDADE = "nenhuma";
 
 export function UsuarioFormPage() {
   const { id } = useParams<{ id: string }>();
@@ -209,20 +206,11 @@ export function UsuarioFormPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Papel</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {toOptions(PAPEL_LABEL).map((opcao) => (
-                          <SelectItem key={opcao.value} value={opcao.value}>
-                            {opcao.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormSelect
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={toOptions(PAPEL_LABEL)}
+                    />
                     <FormMessage />
                   </FormItem>
                 )}
@@ -234,26 +222,12 @@ export function UsuarioFormPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Especialidade</FormLabel>
-                    <Select
-                      value={field.value || SEM_ESPECIALIDADE}
-                      onValueChange={(valor) =>
-                        field.onChange(valor === SEM_ESPECIALIDADE ? "" : valor)
-                      }
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value={SEM_ESPECIALIDADE}>Nenhuma</SelectItem>
-                        {toOptions(ESPECIALIDADE_LABEL).map((opcao) => (
-                          <SelectItem key={opcao.value} value={opcao.value}>
-                            {opcao.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormSelect
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      options={toOptions(ESPECIALIDADE_LABEL)}
+                      emptyLabel="Nenhuma"
+                    />
                     <FormDescription>
                       {papel === PAPEL.PROFISSIONAL
                         ? "Define o espaço de trabalho da pessoa."
