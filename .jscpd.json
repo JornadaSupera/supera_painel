@@ -1,0 +1,17 @@
+{
+  "path": [
+    "src",
+    "scripts"
+  ],
+  "ignore": [
+    "**/components/ui/**",
+    "**/*.local.mjs"
+  ],
+  "minTokens": 60,
+  "minLines": 5,
+  "reporters": [
+    "console"
+  ],
+  "threshold": 0,
+  "noTips": true
+}
