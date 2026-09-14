@@ -1,13 +1,12 @@
 import { efeitosAdversos } from "@/mocks/protocolos";
 import {
-  ERROR_CODE,
-  fail,
   ok,
   okOne,
   type ListResult,
   type SingleResult,
 } from "@/services/contracts";
 import type { Configuracoes, ItemCatalogo, VersaoLegal } from "@/types/configuracao";
+import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
 import { simulate } from "./_helpers";
 
 /**
@@ -92,20 +91,4 @@ export async function getTermos(): Promise<ListResult<VersaoLegal>> {
   return simulate(() => ok(TERMOS));
 }
 
-const SO_POR_MIGRACAO =
-  "Os catálogos do sistema mudam por migração versionada, com revisão, e não por formulário: o mesmo vocabulário alimenta o diário do paciente, os relatórios e os gatilhos de alerta.";
-
-export async function update(): Promise<SingleResult<Configuracoes>> {
-  return fail(ERROR_CODE.FORBIDDEN, SO_POR_MIGRACAO);
-}
-
-export async function uploadLogo(): Promise<SingleResult<{ url: string }>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, "Não há onde guardar a identidade visual.");
-}
-
-export async function publishTermos(): Promise<SingleResult<VersaoLegal>> {
-  return fail(
-    ERROR_CODE.FORBIDDEN,
-    "Publicar nova versão dos termos cria obrigação de novo aceite para todos os pacientes — é feito pela migração que traz o texto revisado.",
-  );
-}
+export const { update, uploadLogo, publishTermos } = SETTINGS_WRITE_OPERATIONS;
