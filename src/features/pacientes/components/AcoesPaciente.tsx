@@ -2,7 +2,7 @@ import { Ban, Ellipsis, FileText, MessageSquareShare, SquarePen } from "lucide-r
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Can, ConfirmDialog } from "@/components/shared";
+import { Can } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -15,7 +15,8 @@ import { STATUS_PACIENTE } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
 import type { PacienteListItem } from "@/types/paciente";
-import { useDesativarPaciente, useEnviarConvite } from "../hooks/usePacientes";
+import { useEnviarConvite } from "../hooks/usePacientes";
+import { DeactivatePatientDialog } from "./DeactivatePatientDialog";
 
 /**
  * Menu de ações de uma linha da listagem.
@@ -28,7 +29,6 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
   const navigate = useNavigate();
   const [confirmando, setConfirmando] = useState(false);
 
-  const desativar = useDesativarPaciente();
   const convite = useEnviarConvite();
 
   const inativo = paciente.status === STATUS_PACIENTE.INATIVO;
@@ -95,18 +95,10 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <ConfirmDialog
+      <DeactivatePatientDialog
+        paciente={paciente}
         open={confirmando}
         onOpenChange={setConfirmando}
-        title={`Desativar ${paciente.nome}?`}
-        description="A ficha continua no sistema e o histórico é preservado, mas o paciente deixa de aparecer como ativo e perde o acesso ao aplicativo."
-        confirmLabel="Desativar"
-        requireReason
-        loading={desativar.isPending}
-        onConfirm={({ reason }) => {
-          desativar.mutate({ id: paciente.id, motivo: reason });
-          setConfirmando(false);
-        }}
       />
     </div>
   );

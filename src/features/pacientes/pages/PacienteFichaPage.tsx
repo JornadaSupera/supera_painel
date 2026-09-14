@@ -16,7 +16,6 @@ import {
   Can,
   DetailField,
   DetailSection,
-  ConfirmDialog,
   ErrorState,
   PageHeader,
   SkeletonForm,
@@ -38,11 +37,11 @@ import { formatDate, formatDateTime, ageInYears, relativeTime } from "@/lib/form
 import { PERMISSAO } from "@/lib/rbac";
 import { STATUS_CONVITE_LABEL, type PacienteDetalhe } from "@/types/paciente";
 import { CampoSensivel } from "../components/CampoSensivel";
+import { DeactivatePatientDialog } from "../components/DeactivatePatientDialog";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { PacienteForm } from "../components/PacienteForm";
 import {
   useAtualizarPaciente,
-  useDesativarPaciente,
   useEnviarConvite,
   usePaciente,
 } from "../hooks/usePacientes";
@@ -100,7 +99,6 @@ export function PacienteFichaPage() {
 
   const { data: paciente, isLoading, isError, error, refetch } = usePaciente(id);
   const atualizar = useAtualizarPaciente(id ?? "");
-  const desativar = useDesativarPaciente();
   const convite = useEnviarConvite();
 
   const editando = searchParams.get("editar") === "1";
@@ -426,18 +424,11 @@ export function PacienteFichaPage() {
         </DetailSection>
       </div>
 
-      <ConfirmDialog
+      <DeactivatePatientDialog
+        paciente={paciente}
         open={confirmando}
         onOpenChange={setConfirmando}
-        title={`Desativar ${paciente.nome}?`}
-        description="A ficha continua no sistema e o histórico é preservado, mas o paciente deixa de aparecer como ativo e perde o acesso ao aplicativo."
-        confirmLabel="Desativar"
-        requireReason
-        loading={desativar.isPending}
-        onConfirm={({ reason }) => {
-          desativar.mutate({ id: paciente.id, motivo: reason }, { onSuccess: () => navigate("/pacientes") });
-          setConfirmando(false);
-        }}
+        onDeactivated={() => navigate("/pacientes")}
       />
     </div>
   );
