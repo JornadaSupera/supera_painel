@@ -1,11 +1,13 @@
-import { FilterX, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
   Can,
+  ClearFiltersButton,
   DataTable,
   EmptyState,
+  FilterSelect,
   PageHeader,
   SearchInput,
   StatusBadge,
@@ -14,13 +16,6 @@ import {
   type Column,
 } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/auth-context";
@@ -33,7 +28,8 @@ import {
 import { formatNumber } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
-import { temRecorte, useUsuariosStore } from "@/stores/usuarios";
+import { hasActiveFilters } from "@/stores/listStore";
+import { useUsuariosStore } from "@/stores/usuarios";
 import type { UsuarioListItem } from "@/types/usuario";
 import { AcoesUsuario } from "../components/AcoesUsuario";
 import { DistribuicaoEspecialidades } from "../components/DistribuicaoEspecialidades";
@@ -51,9 +47,6 @@ import { useDistribuicao, useUsuarios } from "../hooks/useUsuarios";
  * lá — fica aqui, e não numa rota nova, porque é a mesma pergunta que esta tela
  * responde: quem pode o quê.
  */
-
-/** O <Select> do Radix reserva o valor vazio para "nada selecionado". */
-const TODOS = "todos";
 
 export function UsuariosPage() {
   const navigate = useNavigate();
@@ -76,7 +69,7 @@ export function UsuariosPage() {
   const setPage = useUsuariosStore((estado) => estado.setPage);
   const setPageSize = useUsuariosStore((estado) => estado.setPageSize);
 
-  const filtrada = temRecorte(busca, filtros);
+  const filtrada = hasActiveFilters(busca, filtros);
 
   /**
    * O protótipo diz "16 profissionais cadastrados · 7 especialidades", mas a
@@ -235,46 +228,23 @@ export function UsuariosPage() {
               className="min-w-60 flex-1"
             />
 
-            <Select
-              value={filtros.papel || TODOS}
-              onValueChange={(valor) => setFiltro("papel", valor === TODOS ? "" : valor)}
-            >
-              <SelectTrigger size="sm" aria-label="Papel" className="w-44">
-                <SelectValue placeholder="Papel" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Papel: todos</SelectItem>
-                {toOptions(PAPEL_LABEL).map((opcao) => (
-                  <SelectItem key={opcao.value} value={opcao.value}>
-                    {opcao.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              label="Papel"
+              value={filtros.papel}
+              onChange={(valor) => setFiltro("papel", valor)}
+              options={toOptions(PAPEL_LABEL)}
+              className="w-44"
+            />
 
-            <Select
-              value={filtros.status || TODOS}
-              onValueChange={(valor) => setFiltro("status", valor === TODOS ? "" : valor)}
-            >
-              <SelectTrigger size="sm" aria-label="Status" className="w-36">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TODOS}>Status: todos</SelectItem>
-                {toOptions(STATUS_USUARIO_LABEL).map((opcao) => (
-                  <SelectItem key={opcao.value} value={opcao.value}>
-                    {opcao.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <FilterSelect
+              label="Status"
+              value={filtros.status}
+              onChange={(valor) => setFiltro("status", valor)}
+              options={toOptions(STATUS_USUARIO_LABEL)}
+              className="w-36"
+            />
 
-            {filtrada && (
-              <Button variant="ghost" size="sm" onClick={limparFiltros}>
-                <FilterX />
-                Limpar
-              </Button>
-            )}
+            <ClearFiltersButton visible={filtrada} onClick={limparFiltros} />
           </div>
 
           <div className="bg-card overflow-hidden rounded-2xl border">

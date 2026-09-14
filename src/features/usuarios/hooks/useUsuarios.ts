@@ -1,12 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { STATUS_USUARIO_LABEL, type StatusUsuario } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, permissoesApi, usuariosApi } from "@/services/apiClient";
-import type { ListParams } from "@/services/contracts";
 import { useUsuariosStore } from "@/stores/usuarios";
 import type { MatrizPermissoes, UsuarioEntrada } from "@/types/usuario";
 import type { Papel } from "@/lib/enums";
@@ -28,21 +27,7 @@ const RECURSO = "usuarios";
    ------------------------------------------------------------------------- */
 
 export function useUsuarios() {
-  const busca = useUsuariosStore((estado) => estado.busca);
-  const filtros = useUsuariosStore((estado) => estado.filtros);
-  const sort = useUsuariosStore((estado) => estado.sort);
-  const page = useUsuariosStore((estado) => estado.page);
-  const pageSize = useUsuariosStore((estado) => estado.pageSize);
-
-  const buscaAtrasada = useDebouncedValue(busca);
-
-  const params: ListParams = {
-    page,
-    pageSize,
-    sort,
-    search: buscaAtrasada,
-    filters: filtros,
-  };
+  const params = useListParams(useUsuariosStore);
 
   const query = useQuery({
     queryKey: queryKeys.users.list(params),
