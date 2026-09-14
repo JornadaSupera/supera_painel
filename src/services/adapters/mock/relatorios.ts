@@ -2,16 +2,19 @@ import { FASE_TRATAMENTO_LABEL } from "@/lib/enums";
 import { cids } from "@/mocks/cids";
 import { pacientes } from "@/mocks/pacientes";
 import { protocolos } from "@/mocks/protocolos";
-import {
-  ERROR_CODE,
-  fail,
-  ok,
-  okOne,
-  type ListResult,
-  type SingleResult,
-} from "@/services/contracts";
+import { ERROR_CODE, fail, okOne, type ListResult, type SingleResult } from "@/services/contracts";
 import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
-import { DEFINICOES } from "../relatoriosDefinicoes";
+import {
+  bySpecialtyReport,
+  chatResponseReport,
+  createReportOperations,
+  effectsByProtocolReport,
+  engagementRows,
+  isReportFailure,
+  listDefinitionsWithout,
+  type ReportOutcome,
+  type ReportParams,
+} from "../_reports";
 import { simulate } from "./_helpers";
 import { crossTab } from "./estatisticasClinicas";
 import { getIndicadores } from "./estatisticasOperacionais";
@@ -34,19 +37,7 @@ const SEM_ORIGEM: Record<string, string> = {
 };
 
 export async function listDefinitions(): Promise<ListResult<DefinicaoRelatorio>> {
-  return simulate(() =>
-    ok(
-      DEFINICOES.map((definicao) => {
-        const motivo = SEM_ORIGEM[definicao.slug];
-        return motivo ? { ...definicao, disponivel: false, motivo } : { ...definicao, disponivel: true };
-      }),
-    ),
-  );
-}
-
-interface ParametrosRelatorio {
-  slug: string;
-  dias?: number;
+  return simulate(() => listDefinitionsWithout(SEM_ORIGEM));
 }
 
 const NOME_PROTOCOLO = new Map(protocolos.map((protocolo) => [protocolo.id, protocolo.nome]));
@@ -61,7 +52,7 @@ function contar<T>(itens: T[], chave: (item: T) => string): Map<string, number> 
   return total;
 }
 
-async function montar(slug: string, dias: number): Promise<ResultadoRelatorio | null> {
+async function montar(slug: string, dias: number): Promise<ReportOutcome | null> {
   const ativos = pacientes.filter((paciente) => paciente.status === "ativo");
 
   switch (slug) {
@@ -133,35 +124,11 @@ async function montar(slug: string, dias: number): Promise<ResultadoRelatorio | 
       };
     }
 
-    case "efeitos-por-protocolo": {
-      const cruzamento = await crossTab({ dias, grauMinimo: 2, apenasAtivos: true });
-      const dados = cruzamento.data;
-
-      return {
-        slug,
-        titulo: "Efeitos adversos por protocolo e grau",
-        colunas: [
-          { key: "protocolo", label: "Protocolo" },
-          { key: "efeito", label: "Efeito adverso" },
-          { key: "pacientes", label: "Pacientes", numerica: true },
-          { key: "base", label: "No protocolo", numerica: true },
-          { key: "prevalencia", label: "Prevalência (%)", numerica: true },
-        ],
-        linhas: (dados?.celulas ?? [])
-          .filter((celula) => celula.pacientes_com > 0)
-          .map((celula) => ({
-            protocolo: celula.protocolo,
-            efeito: celula.sintoma_label,
-            pacientes: celula.pacientes_com,
-            base: celula.pacientes_total,
-            prevalencia: celula.percentual ?? 0,
-          }))
-          .sort((a, b) => b.prevalencia - a.prevalencia),
-        resumo: `grau 2 ou maior · ${dados?.pacientes_considerados ?? 0} pacientes · últimos ${dias} dias`,
-        eixo: "efeito",
-        medida: "prevalencia",
-      };
-    }
+    case "efeitos-por-protocolo":
+      return effectsByProtocolReport(
+        dias,
+        await crossTab({ dias, grauMinimo: 2, apenasAtivos: true }),
+      );
 
     case "sessoes-quimioterapia": {
       // A base fictícia não tem agenda; a série vem do volume operacional.
@@ -185,48 +152,8 @@ async function montar(slug: string, dias: number): Promise<ResultadoRelatorio | 
     }
 
     case "faltas-cancelamentos":
-    case "volume-por-especialidade": {
-      const operacionais = await getIndicadores();
-      const linhas = operacionais.data?.por_especialidade ?? [];
-
-      if (slug === "volume-por-especialidade") {
-        return {
-          slug,
-          titulo: "Volume de atendimento por especialidade",
-          colunas: [
-            { key: "especialidade", label: "Especialidade" },
-            { key: "volume", label: "Atendimentos", numerica: true },
-          ],
-          linhas: linhas.map((linha) => ({ especialidade: linha.label, volume: linha.volume })),
-          resumo: `${linhas.reduce((soma, linha) => soma + linha.volume, 0)} compromissos no período`,
-          eixo: "especialidade",
-          medida: "volume",
-        };
-      }
-
-      return {
-        slug,
-        titulo: "Faltas, cancelamentos e remarcações",
-        colunas: [
-          { key: "especialidade", label: "Especialidade" },
-          { key: "faltas", label: "Faltas", numerica: true },
-          { key: "cancelamentos", label: "Cancelamentos", numerica: true },
-          { key: "remarcacoes", label: "Remarcações", numerica: true },
-          { key: "taxa_falta", label: "Taxa de falta (%)", numerica: true },
-        ],
-        linhas: linhas.map((linha) => ({
-          especialidade: linha.label,
-          faltas: linha.faltas,
-          cancelamentos: linha.cancelamentos,
-          remarcacoes: linha.remarcacoes,
-          taxa_falta:
-            linha.volume === 0 ? 0 : Math.round((linha.faltas / linha.volume) * 1000) / 10,
-        })),
-        resumo: "motivos de falta indisponíveis: o catálogo de motivos está vazio",
-        eixo: "especialidade",
-        medida: "faltas",
-      };
-    }
+    case "volume-por-especialidade":
+      return bySpecialtyReport(slug, await getIndicadores());
 
     case "engajamento-app": {
       const comAcesso = pacientes.filter((paciente) => paciente.ultimo_acesso_app_em !== null);
@@ -238,50 +165,26 @@ async function montar(slug: string, dias: number): Promise<ResultadoRelatorio | 
           { key: "indicador", label: "Indicador" },
           { key: "valor", label: "Valor", numerica: true },
         ],
-        linhas: [
-          { indicador: "Pacientes em tratamento", valor: ativos.length },
-          { indicador: `Acessaram o app (${dias} dias)`, valor: comAcesso.length },
-          {
-            indicador: "Taxa de engajamento (%)",
-            valor:
-              ativos.length === 0
-                ? 0
-                : Math.round((comAcesso.length / ativos.length) * 1000) / 10,
-          },
-        ],
+        linhas: engagementRows(
+          ativos.length,
+          comAcesso.length,
+          `Acessaram o app (${dias} dias)`,
+        ),
         resumo: `${comAcesso.length} de ${ativos.length} pacientes ativos acessaram o aplicativo`,
         eixo: "indicador",
         medida: "valor",
       };
     }
 
-    case "tempo-resposta-chat": {
-      const operacionais = await getIndicadores();
-      const indicador = operacionais.data?.indicadores.find(
-        (item) => item.chave === "tempo_resposta_chat",
-      );
-
-      return {
-        slug,
-        titulo: "Tempo médio de resposta no chat",
-        colunas: [
-          { key: "indicador", label: "Indicador" },
-          { key: "valor", label: "Minutos", numerica: true },
-        ],
-        linhas:
-          indicador?.valor == null ? [] : [{ indicador: "Média da equipe", valor: indicador.valor }],
-        resumo: "média da primeira resposta a cada conversa · por equipe, nunca por profissional",
-        eixo: "indicador",
-        medida: "valor",
-      };
-    }
+    case "tempo-resposta-chat":
+      return chatResponseReport(await getIndicadores());
 
     default:
       return null;
   }
 }
 
-export async function run(params: ParametrosRelatorio): Promise<SingleResult<ResultadoRelatorio>> {
+export async function run(params: ReportParams): Promise<SingleResult<ResultadoRelatorio>> {
   const motivo = SEM_ORIGEM[params.slug];
   if (motivo) return fail(ERROR_CODE.NOT_IMPLEMENTED, motivo);
 
@@ -291,43 +194,11 @@ export async function run(params: ParametrosRelatorio): Promise<SingleResult<Res
     return fail(ERROR_CODE.NOT_FOUND, `Relatório "${params.slug}" não existe no catálogo.`);
   }
 
+  if (isReportFailure(resultado)) return resultado;
+
   return simulate(() => okOne(resultado));
 }
 
-export async function exportar(
-  params: ParametrosRelatorio,
-): Promise<ListResult<Record<string, string>>> {
-  const resultado = await run(params);
-
-  if (resultado.error) {
-    return fail(resultado.error.code, resultado.error.message, resultado.error.details);
-  }
-
-  const dados = resultado.data;
-  if (!dados) return ok([]);
-
-  return ok(
-    dados.linhas.map((linha) =>
-      Object.fromEntries(
-        dados.colunas.map((coluna) => [coluna.label, String(linha[coluna.key] ?? "")]),
-      ),
-    ),
-  );
-}
+export const { exportar, schedule, listSchedules, createShareLink } = createReportOperations(run);
 
 export { exportar as export };
-
-const SEM_ENVIO =
-  "Agendar envio e gerar link compartilhável dependem de rotina agendada e de tabela de token no backend.";
-
-export async function schedule(): Promise<SingleResult<never>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, SEM_ENVIO);
-}
-
-export async function listSchedules(): Promise<ListResult<never>> {
-  return ok([]);
-}
-
-export async function createShareLink(): Promise<SingleResult<never>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, SEM_ENVIO);
-}
