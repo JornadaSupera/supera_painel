@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { ACAO_REVISAO, STATUS_CONTEUDO, type AcaoRevisao } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
@@ -43,22 +43,13 @@ export function useFilaRevisao() {
 
 /** A lista "Publicados", com busca, filtros e paginação. */
 export function useConteudos() {
-  const busca = useConteudosStore((estado) => estado.busca);
-  const filtros = useConteudosStore((estado) => estado.filtros);
-  const sort = useConteudosStore((estado) => estado.sort);
-  const page = useConteudosStore((estado) => estado.page);
-  const pageSize = useConteudosStore((estado) => estado.pageSize);
-
-  const buscaAtrasada = useDebouncedValue(busca);
+  const recorte = useListParams(useConteudosStore);
 
   const params: ListParams = {
-    page,
-    pageSize,
-    sort,
-    search: buscaAtrasada,
+    ...recorte,
     // Sem status escolhido, a tabela mostra o que está no ar. É a pergunta que
     // ela responde no protótipo: "o que o paciente está vendo hoje".
-    filters: { ...filtros, status: filtros.status || STATUS_CONTEUDO.PUBLICADO },
+    filters: { ...recorte.filters, status: recorte.filters?.status || STATUS_CONTEUDO.PUBLICADO },
   };
 
   const query = useQuery({

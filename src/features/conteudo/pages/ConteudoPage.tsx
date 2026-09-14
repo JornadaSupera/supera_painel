@@ -1,12 +1,14 @@
-import { EyeOff, FilterX } from "lucide-react";
+import { EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import {
   BackendPendente,
   Can,
+  ClearFiltersButton,
   DataTable,
   EmptyState,
   ErrorState,
+  FilterSelect,
   PageHeader,
   SearchInput,
   SkeletonCards,
@@ -15,13 +17,6 @@ import {
   type Column,
 } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
 import {
   ACAO_REVISAO,
@@ -34,7 +29,8 @@ import {
 import { formatNumber } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
-import { temRecorte, useConteudosStore } from "@/stores/conteudos";
+import { useConteudosStore } from "@/stores/conteudos";
+import { hasActiveFilters } from "@/stores/listStore";
 import type { ConteudoListItem } from "@/types/conteudo";
 import { CartaoRevisao } from "../components/CartaoRevisao";
 import { DialogRevisao } from "../components/DialogRevisao";
@@ -59,8 +55,6 @@ import { useConteudos, useFilaRevisao, useRevisarConteudo } from "../hooks/useCo
  *    área; o painel administrativo revisa.
  */
 
-const TODOS = "todos";
-
 export function ConteudoPage() {
   const { can } = useAuth();
 
@@ -83,7 +77,7 @@ export function ConteudoPage() {
   const setPage = useConteudosStore((estado) => estado.setPage);
   const setPageSize = useConteudosStore((estado) => estado.setPageSize);
 
-  const filtrada = temRecorte(busca, filtros);
+  const filtrada = hasActiveFilters(busca, filtros);
   const semContagemDeAcessos = motivoIndisponivel("conteudos.list.visualizacoes");
 
   function abrirDecisao(conteudo: ConteudoListItem, proximaAcao: AcaoRevisao) {
@@ -260,63 +254,32 @@ export function ConteudoPage() {
             className="min-w-60 flex-1"
           />
 
-          <Select
-            value={filtros.status || TODOS}
-            onValueChange={(valor) => setFiltro("status", valor === TODOS ? "" : valor)}
-          >
-            <SelectTrigger size="sm" aria-label="Status" className="w-44">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS}>Status: todos</SelectItem>
-              {toOptions(STATUS_CONTEUDO_LABEL).map((opcao) => (
-                <SelectItem key={opcao.value} value={opcao.value}>
-                  {opcao.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            label="Status"
+            value={filtros.status}
+            onChange={(valor) => setFiltro("status", valor)}
+            options={toOptions(STATUS_CONTEUDO_LABEL)}
+            className="w-44"
+          />
 
-          <Select
-            value={filtros.especialidade || TODOS}
-            onValueChange={(valor) => setFiltro("especialidade", valor === TODOS ? "" : valor)}
-          >
-            <SelectTrigger size="sm" aria-label="Área" className="w-48">
-              <SelectValue placeholder="Área" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS}>Área: todas</SelectItem>
-              {toOptions(ESPECIALIDADE_LABEL).map((opcao) => (
-                <SelectItem key={opcao.value} value={opcao.value}>
-                  {opcao.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            label="Área"
+            allLabel="Área: todas"
+            value={filtros.especialidade}
+            onChange={(valor) => setFiltro("especialidade", valor)}
+            options={toOptions(ESPECIALIDADE_LABEL)}
+            className="w-48"
+          />
 
-          <Select
-            value={filtros.tipo || TODOS}
-            onValueChange={(valor) => setFiltro("tipo", valor === TODOS ? "" : valor)}
-          >
-            <SelectTrigger size="sm" aria-label="Tipo" className="w-36">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS}>Tipo: todos</SelectItem>
-              {toOptions(TIPO_CONTEUDO_LABEL).map((opcao) => (
-                <SelectItem key={opcao.value} value={opcao.value}>
-                  {opcao.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <FilterSelect
+            label="Tipo"
+            value={filtros.tipo}
+            onChange={(valor) => setFiltro("tipo", valor)}
+            options={toOptions(TIPO_CONTEUDO_LABEL)}
+            className="w-36"
+          />
 
-          {filtrada && (
-            <Button variant="ghost" size="sm" onClick={limparFiltros}>
-              <FilterX />
-              Limpar
-            </Button>
-          )}
+          <ClearFiltersButton visible={filtrada} onClick={limparFiltros} />
         </div>
 
         <div className="bg-card overflow-hidden rounded-2xl border">
