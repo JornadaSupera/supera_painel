@@ -1,5 +1,5 @@
 import { Info, LoaderCircle, RotateCcw, Save } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { ErrorState, SkeletonTable } from "@/components/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -26,34 +26,50 @@ import { useMatrizPermissoes, useSalvarMatriz } from "../hooks/useUsuarios";
 
 export function MatrizPermissoes() {
   const { data: matriz, isLoading, isError, error, refetch } = useMatrizPermissoes();
-  const salvar = useSalvarMatriz();
-
-  const [rascunho, setRascunho] = useState<Record<Papel, Permissao[]> | null>(null);
-
-  // O rascunho nasce do que veio do servidor e é descartado a cada nova carga:
-  // editar por cima de uma matriz desatualizada apagaria a alteração de outra
-  // pessoa sem aviso.
-  useEffect(() => {
-    if (matriz) setRascunho(matriz.concedidas);
-  }, [matriz]);
-
-  const alterado = useMemo(() => {
-    if (!matriz || !rascunho) return false;
-
-    return matriz.papeis.some((papel) => {
-      const antes = [...(matriz.concedidas[papel] ?? [])].sort();
-      const agora = [...(rascunho[papel] ?? [])].sort();
-      return antes.join("|") !== agora.join("|");
-    });
-  }, [matriz, rascunho]);
 
   if (isLoading) return <SkeletonTable columns={4} rows={10} />;
   if (isError || !matriz) return <ErrorState error={error} onRetry={() => void refetch()} />;
-  if (!rascunho) return <SkeletonTable columns={4} rows={10} />;
+
+  /*
+   * O editor só monta com a matriz em mãos, e inicializa o rascunho direto dela.
+   *
+   * Antes o rascunho nascia `null` e era copiado por efeito: a primeira
+   * renderização COM dado ainda caía no esqueleto, e o efeito provocava um
+   * commit a mais — além de deixar a sincronização do rascunho delicada, que é
+   * a diferença entre descartar uma edição de propósito e descartá-la por
+   * acidente.
+   *
+   * A `key` é a assinatura do CONTEÚDO, não o instante da resposta: refetch que
+   * devolve a mesma matriz preserva o que a pessoa estava editando, e matriz que
+   * mudou de verdade no servidor remonta o editor e descarta o rascunho —
+   * salvar por cima da alteração de outra pessoa é o que isso evita.
+   */
+  return <EditorDaMatriz key={assinaturaDa(matriz)} matriz={matriz} />;
+}
+
+/** Assinatura estável do que está concedido, para a `key` do editor. */
+function assinaturaDa(matriz: Matriz): string {
+  return matriz.papeis
+    .map((papel) => `${papel}:${[...(matriz.concedidas[papel] ?? [])].sort().join(",")}`)
+    .join("|");
+}
+
+function EditorDaMatriz({ matriz }: { matriz: Matriz }) {
+  const salvar = useSalvarMatriz();
+  const [rascunho, setRascunho] = useState<Record<Papel, Permissao[]>>(matriz.concedidas);
+
+  const alterado = useMemo(
+    () =>
+      matriz.papeis.some((papel) => {
+        const antes = [...(matriz.concedidas[papel] ?? [])].sort();
+        const agora = [...(rascunho[papel] ?? [])].sort();
+        return antes.join("|") !== agora.join("|");
+      }),
+    [matriz, rascunho],
+  );
 
   const alternar = (papel: Papel, permissao: Permissao) => {
     setRascunho((atual) => {
-      if (!atual) return atual;
       const lista = atual[papel] ?? [];
 
       return {
