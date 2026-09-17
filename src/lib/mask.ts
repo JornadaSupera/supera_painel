@@ -30,10 +30,21 @@ type Value = string | null | undefined;
  * truth, but switching to `•••.•••.789-••` is a one-line change — and the call
  * belongs to the clinic's data protection officer.
  */
+/**
+ * "52998224725" → "529.***.***-25"
+ *
+ * É a mesma forma que a coluna mascarada do backend devolve na listagem de
+ * pacientes. O painel não escolhe um recorte próprio: se a lista vem mascarada
+ * de um jeito e a ficha de outro, a diferença se lê como defeito de cadastro e
+ * manda a recepção conferir um número que está certo.
+ *
+ * Cinco de onze dígitos ficam visíveis, e é o suficiente para confirmar um CPF
+ * que o operador já tem em mãos — não para coletar um que ele não tem.
+ */
 export function maskCpf(cpf: Value): string {
   const digits = digitsOnly(cpf);
   if (digits.length !== 11) return EMPTY;
-  return `•••.•••.${digits.slice(6, 9)}-${digits.slice(9, 11)}`;
+  return `${digits.slice(0, 3)}.***.***-${digits.slice(9, 11)}`;
 }
 
 /** "12345678909" → "123.456.789-09". Only under an explicit, audited action. */
