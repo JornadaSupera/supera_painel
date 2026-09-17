@@ -33,6 +33,56 @@ const CODIGO_EXTRA: Record<string, ErrorCode> = {
   // Violação de chave estrangeira. No desenho deste banco é quase sempre
   // "a linha pai não existe ou não é sua".
   "23503": ERROR_CODE.VALIDATION,
+  // `invalid_parameter_value`. As RPCs de escrita o usam para argumento
+  // recusado — CPF fora do formato, fase de tratamento inexistente. Sem esta
+  // linha caía em UNKNOWN, e a tela dizia "erro inesperado" para um campo
+  // digitado errado.
+  "22023": ERROR_CODE.VALIDATION,
+};
+
+/**
+ * Sentinelas das RPCs, em português.
+ *
+ * As funções do banco levantam um identificador estável (`invalid_cpf`,
+ * `specialty_required`) em vez de uma frase: o texto é decisão de interface, e
+ * traduzi-lo no servidor congelaria o idioma do painel dentro de uma migration.
+ * Quem traduz é este mapa.
+ *
+ * Só entram aqui as que a pessoa que opera consegue resolver. `forbidden` fica
+ * de fora de propósito: o contrato já tem mensagem para FORBIDDEN, e repetir a
+ * regra de permissão em cada recusa não ajuda ninguém a agir.
+ */
+const MENSAGEM_POR_SENTINELA: Record<string, string> = {
+  /* ---------------------------------------------------------- paciente */
+  invalid_cpf: "CPF inválido: são 11 dígitos.",
+  patient_cpf_already_registered:
+    "Já existe ficha ativa com este CPF. Abra a ficha existente em vez de cadastrar de novo.",
+  patient_cpf_registered_inactive:
+    "Já existe ficha com este CPF, e ela está desativada. Reative a ficha existente.",
+  patient_not_found: "Ficha não encontrada.",
+  patient_inactive: "A ficha está desativada. Reative antes de convidar.",
+  patient_already_activated:
+    "Esta ficha já tem conta vinculada. Desfaça o vínculo antes de convidar de novo.",
+  missing_destination:
+    "Falta o destino do convite. Preencha o celular da ficha antes de emitir.",
+  invitation_not_pending: "Não há convite pendente para cancelar.",
+  patient_not_linked: "Esta ficha não tem conta vinculada.",
+  cpf_frozen_after_activation:
+    "O CPF não muda depois que o paciente ativou o app. Desfaça o vínculo da conta antes de corrigi-lo.",
+  unknown_treatment_phase: "Esta fase de tratamento não está ativa no cadastro.",
+
+  /* ------------------------------------------------------ profissional */
+  account_not_found:
+    "Esta pessoa ainda não tem conta na plataforma. A conta precisa existir antes do perfil.",
+  professional_already_registered: "Esta conta já tem perfil de profissional.",
+  council_registration_required: "Informe o registro no conselho.",
+  specialty_required:
+    "Escolha ao menos uma especialidade: sem nenhuma, o perfil não consegue registrar nada.",
+  unknown_specialty: "Especialidade desconhecida ou desativada.",
+  primary_specialty_not_in_list: "A especialidade principal precisa estar entre as escolhidas.",
+  professional_not_found: "Profissional não encontrado.",
+  cannot_manage_own_professional_profile:
+    "Ninguém edita o próprio perfil profissional. Peça a outro administrador.",
 };
 
 export function traduzirErro(erro: ErroPostgrest | null | undefined): ErrorCode {
@@ -43,15 +93,21 @@ export function traduzirErro(erro: ErroPostgrest | null | undefined): ErrorCode 
 }
 
 /**
- * Mensagem a exibir.
+ * Mensagem a exibir, na ordem em que a informação é mais útil.
  *
- * O `HINT` das funções deste banco é escrito para ser lido por quem opera o
- * painel — "peça a outro administrador", "promova outro antes de desativá-lo".
- * Quando existe, é melhor do que qualquer texto genérico nosso. Sem ele, o
- * contrato usa a mensagem padrão do código de erro.
+ * 1. O `HINT` das funções deste banco é escrito para ser lido por quem opera o
+ *    painel — "peça a outro administrador", "desvincule a conta antes". Quando
+ *    existe, é melhor do que qualquer texto genérico nosso.
+ * 2. Sem `HINT`, a sentinela traduzida: `message` traz um identificador estável
+ *    (`invalid_cpf`), que é preciso para o código e ilegível na tela.
+ * 3. Sem as duas, o contrato usa a mensagem padrão do código de erro.
  */
 export function mensagemDoErro(erro: ErroPostgrest | null | undefined): string | undefined {
-  return erro?.hint?.trim() || undefined;
+  const hint = erro?.hint?.trim();
+  if (hint) return hint;
+
+  const sentinela = erro?.message?.trim();
+  return (sentinela && MENSAGEM_POR_SENTINELA[sentinela]) || undefined;
 }
 
 /** Converte um erro do PostgREST em resposta de falha do contrato. */
