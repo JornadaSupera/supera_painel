@@ -46,6 +46,9 @@ export { SearchInput } from "./SearchInput";
 
 export { SkeletonCards, SkeletonChart, SkeletonForm, SkeletonTable } from "./Skeletons";
 
+export { SourceErrorAlert, SourceErrorChip } from "./SourceError";
+export type { SourceErrorProps } from "./SourceError";
+
 export { EmptyState, ErrorState, Loading } from "./StateBlock";
 export type { ErrorLike } from "./StateBlock";
 

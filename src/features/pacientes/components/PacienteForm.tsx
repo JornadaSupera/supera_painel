@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm, useFormContext } from "react-hook-form";
 
-import { FormSelect } from "@/components/shared";
+import { FormSelect, SourceErrorAlert } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -108,6 +108,25 @@ export function PacienteForm({
   const efeitos = useEfeitosAdversos();
   const { profissionais } = useProfissionais(ESPECIALIDADE.MEDICO);
 
+  /*
+   * Fontes de vocabulário que o cadastro NÃO pode dispensar.
+   *
+   * `data ?? []` transformava falha de backend em lista vazia, e lista vazia se
+   * lê como resposta legítima: "não há CID cadastrado". Ninguém repete uma
+   * requisição que parece ter dado certo, e uma ficha preenchida contra um
+   * vocabulário que não carregou fica errada, não incompleta.
+   *
+   * Protocolo fica de fora da lista de obrigatórias porque, no Supabase, ele
+   * legitimamente vem vazio: `protocol_name` é texto livre, sem catálogo. Erro
+   * ali é erro de rede, e é tratado pelo próprio seletor.
+   */
+  const fontesObrigatorias = [
+    { label: "a lista de CIDs", query: cids },
+    { label: "a lista de efeitos adversos", query: efeitos },
+  ].filter((fonte) => fonte.query.isError);
+
+  const fonteFaltando = fontesObrigatorias.length > 0;
+
   const atual = ETAPAS[etapa];
   const ultima = etapa === ETAPAS.length - 1;
 
@@ -125,6 +144,16 @@ export function PacienteForm({
         noValidate
         className="flex max-w-3xl flex-col gap-5"
       >
+        {/* Vem antes das etapas: quem abre o formulário precisa saber que ele
+            não vai salvar antes de preencher três telas. */}
+        {fontesObrigatorias.map((fonte) => (
+          <SourceErrorAlert
+            key={fonte.label}
+            label={fonte.label}
+            onRetry={() => void fonte.query.refetch()}
+          />
+        ))}
+
         {/* --------------------------------------------------------- passos */}
         <ol className="flex flex-wrap items-center gap-2" aria-label="Etapas do cadastro">
           {ETAPAS.map((passo, indice) => {
@@ -488,7 +517,15 @@ export function PacienteForm({
           </Button>
 
           {ultima ? (
-            <Button type="submit" disabled={salvando}>
+            <Button
+              type="submit"
+              disabled={salvando || fonteFaltando}
+              title={
+                fonteFaltando
+                  ? "Uma lista de apoio não carregou. O salvamento volta quando ela carregar."
+                  : undefined
+              }
+            >
               {salvando ? <LoaderCircle className="animate-spin" /> : <Check />}
               {edicao ? "Salvar alterações" : "Cadastrar paciente"}
             </Button>
