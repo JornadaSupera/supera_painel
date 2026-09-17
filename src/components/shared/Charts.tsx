@@ -101,6 +101,17 @@ function ChartTooltip({
  * Handles loading, error and empty BEFORE mounting the chart.
  * Mounting Recharts with an empty array produces ghost axes — better not to
  * mount at all.
+ *
+ * > [!] PRECEDENCE: error, then loading, then empty — the same order as
+ * > `DataTable`, and the two used to disagree.
+ * The chart checked `loading` first, so a failed read that was being retried
+ * kept showing a skeleton: the screen said "loading" about something that had
+ * already failed, and the table right next to it said "error" about the same
+ * request. Whichever order is chosen, the two shells have to agree, or the same
+ * failure reads as two different states on one screen.
+ *
+ * Error first is the honest order: a request that failed is not in progress,
+ * and the retry belongs to the person, not to a spinner.
  */
 function ChartFrame({
   loading,
@@ -117,8 +128,8 @@ function ChartFrame({
   height?: number;
   children: ReactElement;
 }) {
-  if (loading) return <SkeletonChart />;
   if (error) return <ErrorState error={error} onRetry={onRetry} compact />;
+  if (loading) return <SkeletonChart />;
 
   if (empty) {
     return (

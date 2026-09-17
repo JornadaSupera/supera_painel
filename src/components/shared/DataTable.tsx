@@ -54,11 +54,23 @@ export interface DataTableProps<T> {
   onRetry?: () => void;
   sort?: Sort | null;
   onSortChange?: (sort: Sort) => void;
-  selectable?: boolean;
-  selectedIds?: string[];
-  onSelectionChange?: (ids: string[]) => void;
-  /** Actions in the bar that appears once there is a selection. */
-  bulkActions?: ReactNode;
+  /**
+   * Row selection, as ONE object.
+   *
+   * It used to be four independent props, and three of the combinations they
+   * allowed were broken states the compiler accepted: `selectable` without
+   * `onChange` rendered checkboxes that could be ticked and changed nothing
+   * (the handlers used optional chaining), `selectedIds` without `selectable`
+   * held a selection nobody could see, and bulk actions without a selection
+   * had no bar to live in. Passing the object means the table cannot offer a
+   * control it will not honour.
+   */
+  selection?: {
+    ids: string[];
+    onChange: (ids: string[]) => void;
+    /** Actions in the bar that appears once there is a selection. */
+    actions?: ReactNode;
+  };
   onRowClick?: (row: T) => void;
   density?: "comfortable" | "compact";
   pagination?: Omit<PaginationProps, "label">;
@@ -80,10 +92,7 @@ export function DataTable<T>({
   onRetry,
   sort,
   onSortChange,
-  selectable = false,
-  selectedIds = [],
-  onSelectionChange,
-  bulkActions,
+  selection,
   onRowClick,
   density = "comfortable",
   pagination,
@@ -93,19 +102,20 @@ export function DataTable<T>({
   caption,
   className,
 }: DataTableProps<T>) {
-  const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const selecionavel = selection !== undefined;
+  const selected = useMemo(() => new Set(selection?.ids ?? []), [selection?.ids]);
 
   const visibleIds = data.map(getRowId);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id));
   const someSelected = visibleIds.some((id) => selected.has(id)) && !allSelected;
 
-  const toggleAll = () => onSelectionChange?.(allSelected ? [] : visibleIds);
+  const toggleAll = () => selection?.onChange(allSelected ? [] : visibleIds);
 
   const toggleRow = (id: string) => {
     const next = new Set(selected);
     if (next.has(id)) next.delete(id);
     else next.add(id);
-    onSelectionChange?.([...next]);
+    selection?.onChange([...next]);
   };
 
   const sortBy = (column: Column<T>) => {
@@ -118,11 +128,18 @@ export function DataTable<T>({
     });
   };
 
-  const totalColumns = columns.length + (selectable ? 1 : 0);
+  const totalColumns = columns.length + (selecionavel ? 1 : 0);
   const alignment = (align?: Column<T>["align"]) =>
     align === "right" ? "text-right" : align === "center" ? "text-center" : undefined;
 
-  /* ----------------------------------------------------------------- states */
+  /* -----------------------------------------------------------------
+     STATES — precedence: error, then loading, then empty.
+
+     The same order as `ChartFrame` in `Charts.tsx`, and the two used to
+     disagree: the chart checked loading first. A failed read being retried then
+     showed a skeleton in the chart and an error in the table, on one screen,
+     about one request.
+     ----------------------------------------------------------------- */
 
   if (error) {
     return (
@@ -157,12 +174,12 @@ export function DataTable<T>({
 
   return (
     <div className={cn("flex min-w-0 flex-col", className)}>
-      {selectable && selected.size > 0 && (
+      {selecionavel && selected.size > 0 && (
         <div className="bg-primary/10 border-primary/25 flex items-center justify-between gap-4 border-b px-5 py-3 text-sm">
           <span className="font-medium">
             {selected.size} {selected.size === 1 ? "selecionado" : "selecionados"}
           </span>
-          <div className="flex items-center gap-2">{bulkActions}</div>
+          <div className="flex items-center gap-2">{selection?.actions}</div>
         </div>
       )}
 
@@ -177,7 +194,7 @@ export function DataTable<T>({
 
           <TableHeader>
             <TableRow className="bg-muted/30 hover:bg-muted/30">
-              {selectable && (
+              {selecionavel && (
                 <TableHead className="w-11">
                   <Checkbox
                     checked={allSelected ? true : someSelected ? "indeterminate" : false}
@@ -267,7 +284,7 @@ export function DataTable<T>({
                     isSelected && "bg-primary/8 hover:bg-primary/12",
                   )}
                 >
-                  {selectable && (
+                  {selecionavel && (
                     <TableCell
                       className={cn("w-11", cellPadding)}
                       // Clicking the checkbox must not open the row.

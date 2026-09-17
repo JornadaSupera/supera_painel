@@ -419,15 +419,16 @@ export function DesignSystemPreview() {
               data={PACIENTES}
               sort={ordenacao}
               onSortChange={setOrdenacao}
-              selectable
-              selectedIds={selecionados}
-              onSelectionChange={setSelecionados}
-              bulkActions={
-                <Button size="sm" variant="outline">
-                  <Download />
-                  Exportar selecionados
-                </Button>
-              }
+              selection={{
+                ids: selecionados,
+                onChange: setSelecionados,
+                actions: (
+                  <Button size="sm" variant="outline">
+                    <Download />
+                    Exportar selecionados
+                  </Button>
+                ),
+              }}
               label="pacientes"
               pagination={{
                 page: 1,
@@ -565,7 +566,6 @@ export function DesignSystemPreview() {
         title="Desativar paciente?"
         description="O paciente perde o acesso ao aplicativo. O histórico é preservado e a ação fica registrada na trilha de auditoria."
         confirmLabel="Desativar"
-        requireReason
       />
     </div>
   );
