@@ -62,6 +62,22 @@ export interface PasswordResetInput {
   senha: string;
 }
 
+/**
+ * Proof carried by a recovery link opened from the patient app's e-mail.
+ *
+ * Supabase delivers it in one of two shapes, depending on the e-mail template:
+ * a `token_hash` still to be exchanged, or a recovery session already issued
+ * (implicit flow, in the URL fragment).
+ */
+export type RecoveryCredential =
+  | { kind: "token_hash"; token_hash: string }
+  | { kind: "session"; access_token: string; refresh_token: string };
+
+export interface PasswordRecoveryInput {
+  credential: RecoveryCredential;
+  password: string;
+}
+
 export interface AuthOperations {
   /** Nunca devolve sessão direto: o segundo fator é obrigatório. */
   signIn(params: { email: string; senha: string }): Promise<SingleResult<ResultadoLogin>>;
@@ -77,6 +93,17 @@ export interface AuthOperations {
   requestPasswordReset(params: PasswordResetRequest): Promise<SingleResult<{ enviado: true }>>;
 
   resetPassword(params: PasswordResetInput): Promise<SingleResult<{ alterada: true }>>;
+
+  /**
+   * Public password change for app accounts (patients and caregivers).
+   *
+   * Never yields a session: it ends signed out, whatever the account is.
+   * Error codes the screen relies on:
+   *   UNAUTHORIZED → the link is expired or spent; a new one is needed
+   *   VALIDATION   → the password was refused; the same link can retry
+   *   anything else → transient; the same link can retry
+   */
+  completePasswordRecovery(params: PasswordRecoveryInput): Promise<SingleResult<{ changed: true }>>;
 }
 
 /* ---------------------------------------------------------------- Fase 4 */
@@ -255,15 +282,27 @@ export interface EstatisticasClinicasOperations {
   compareProtocolos(params?: FiltroClinico): Promise<ListResult<ComparacaoProtocolo>>;
 }
 
+/**
+ * Janela dos indicadores operacionais.
+ *
+ * A tela usa o padrão de sete meses, que é o que o gráfico desenha; os
+ * relatórios passam a própria janela, para que o resumo do cartão descreva o
+ * período que foi de fato medido em vez de um período que a tela escolheu.
+ */
+export interface JanelaOperacional {
+  /** Dias corridos até agora. Ausente usa o padrão da tela. */
+  dias?: number;
+}
+
 export interface EstatisticasOperacionaisOperations {
   /** Indicadores, tabela por especialidade e série mensal, de uma leitura só. */
-  getIndicadores(): Promise<SingleResult<EstatisticasOperacionais>>;
+  getIndicadores(params?: JanelaOperacional): Promise<SingleResult<EstatisticasOperacionais>>;
 
-  getTempoResposta(): Promise<SingleResult<IndicadorOperacional>>;
-  getAdesaoAgenda(): Promise<ListResult<LinhaEspecialidade>>;
-  getGargalos(): Promise<ListResult<PontoVolume>>;
+  getTempoResposta(params?: JanelaOperacional): Promise<SingleResult<IndicadorOperacional>>;
+  getAdesaoAgenda(params?: JanelaOperacional): Promise<ListResult<LinhaEspecialidade>>;
+  getGargalos(params?: JanelaOperacional): Promise<ListResult<PontoVolume>>;
 
-  /** Sem origem no banco: não há tabela de alerta nem regra de criticidade. */
+  /** A fila existe no banco; o que falta é gatilho de criticidade cadastrado. */
   getFilaAlertas(): Promise<ListResult<never>>;
 }
 
@@ -298,6 +337,53 @@ export interface RelatoriosOperations {
   listSchedules(): Promise<ListResult<never>>;
   createShareLink(params: { slug: string }): Promise<SingleResult<never>>;
 }
+
+/* -------------------------------------------------------------------------
+   O QUE LIGA O INVENTÁRIO ÀS ASSINATURAS
+   ------------------------------------------------------------------------- */
+
+/**
+ * Cada recurso do inventário e a interface concreta que o descreve.
+ *
+ * `resources.ts` garante que a operação **existe** nos dois adapters; este mapa
+ * é o que garante que ela tem a **mesma assinatura** nos dois. A distinção
+ * importa: o tipo `Adapter` derivado do inventário declara cada operação como
+ * `(...args: never[]) => Promise<unknown>`, que aceita qualquer coisa — mock e
+ * Supabase podiam divergir em parâmetro ou em retorno e ainda compilar, e o
+ * `as unknown as` das fachadas fazia o consumidor confiar numa assinatura
+ * garantida apenas por coerção.
+ */
+export interface ResourceOperations {
+  auth: AuthOperations;
+  dashboard: DashboardOperations;
+  pacientes: PacientesOperations;
+  catalogos: CatalogosOperations;
+  usuarios: UsuariosOperations;
+  permissoes: PermissoesOperations;
+  conteudos: ConteudosOperations;
+  aprovacoes: AprovacoesOperations;
+  auditoria: AuditoriaOperations;
+  estatisticasClinicas: EstatisticasClinicasOperations;
+  estatisticasOperacionais: EstatisticasOperacionaisOperations;
+  configuracoes: ConfiguracoesOperations;
+  relatorios: RelatoriosOperations;
+}
+
+/**
+ * A forma que o bloco `implemented` de cada adapter precisa satisfazer.
+ *
+ * `Partial` por recurso, e não por adapter: operação **ausente** continua
+ * legítima — `buildAdapter` a preenche com o stub NOT_IMPLEMENTED, que é o que
+ * mantém o painel explicando em vez de estourando. O que deixa de ser legítimo
+ * é operação **presente com assinatura errada**, que era exatamente o que
+ * passava.
+ *
+ * Use com `satisfies`, nunca com anotação de tipo: `satisfies` verifica sem
+ * apagar os tipos concretos dos módulos.
+ */
+export type PartialAdapterModules = {
+  [R in keyof ResourceOperations]: Partial<ResourceOperations[R]>;
+};
 
 export type { DesafioMfa, ResultadoLogin, Sessao };
 export type { DefinicaoRelatorio, ResultadoRelatorio };

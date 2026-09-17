@@ -32,6 +32,7 @@ export const RESOURCES = {
       "getSession",
       "requestPasswordReset",
       "resetPassword",
+      "completePasswordRecovery",
     ],
   },
   dashboard: {
@@ -156,9 +157,16 @@ export type ResourceName = keyof Resources;
 /**
  * Forma de um adapter, derivada do inventário acima.
  *
- * Isto é o que torna a promessa da troca de backend verificável: um adapter a
- * que falte uma operação **não compila**. A garantia deixa de depender de
- * disciplina.
+ * Garante a **superfície**: o nome de cada operação existe nos dois adapters.
+ * Não garante a assinatura — `(...args: never[]) => Promise<unknown>` aceita
+ * qualquer coisa, porque o inventário é percorrido em runtime e o tipo derivado
+ * dele é necessariamente genérico.
+ *
+ * A assinatura é verificada em outro lugar, e é bom saber onde antes de confiar
+ * nesta: `PartialAdapterModules`, em `contracts/operations.ts`, aplicado com
+ * `satisfies` no bloco `implemented` de cada adapter. É ele que faz um adapter
+ * com parâmetro ou retorno divergente **não compilar** — esta declaração
+ * sozinha deixaria passar.
  */
 export type Adapter = {
   [R in ResourceName]: {

@@ -3,7 +3,12 @@ import type { User } from "@supabase/supabase-js";
 import { MFA_REQUIRED } from "@/lib/env";
 import { PAPEL, type Papel } from "@/lib/enums";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
-import type { PasswordResetInput, PasswordResetRequest } from "@/services/contracts/operations";
+import type {
+  PasswordRecoveryInput,
+  PasswordResetInput,
+  PasswordResetRequest,
+  RecoveryCredential,
+} from "@/services/contracts/operations";
 import type { DesafioMfa, ResultadoLogin, Sessao, UsuarioAutenticado } from "@/types/auth";
 import { maskDestination } from "../_people";
 import { executar, falhaDe, umDe } from "./_helpers";
@@ -363,8 +368,103 @@ export async function resetPassword({
     if (erroToken) return fail(ERROR_CODE.VALIDATION, "Link inválido ou expirado.");
 
     const { error } = await supabase.auth.updateUser({ password: senha });
+
+    // The recovery session only existed to change the password. Left open, it
+    // would outlive the screen in this tab's client — the login screen is
+    // where a session should start.
+    await supabase.auth.signOut({ scope: "local" });
+
     if (error) return falhaDe(error);
 
     return okOne({ alterada: true as const });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   RECOVERY FOR APP ACCOUNTS
+   -------------------------------------------------------------------------
+   Patients and caregivers reset their password on this domain, but they are
+   not panel users. The recovery session exists only long enough to call
+   `updateUser`, lives in this tab's memory (`persistSession: false`) and is
+   discarded right after — nothing here reaches `AuthContext`.
+   ------------------------------------------------------------------------- */
+
+const LINK_SPENT = "Este link expirou ou já foi usado.";
+
+/** Password refusals the person can fix by choosing another one. */
+const PASSWORD_REFUSALS: Record<string, string> = {
+  weak_password: "O servidor recusou esta senha por ser fraca. Escolha outra.",
+  same_password: "A nova senha precisa ser diferente da anterior.",
+};
+
+/**
+ * The credential already exchanged in this tab. A refused password consumes
+ * the link on the first attempt, so a retry must reuse the session it opened
+ * instead of verifying a token that no longer exists.
+ */
+let exchangedCredential: string | null = null;
+
+function credentialKey(credential: RecoveryCredential): string {
+  return credential.kind === "token_hash" ? credential.token_hash : credential.access_token;
+}
+
+async function discardRecoverySession(): Promise<void> {
+  exchangedCredential = null;
+
+  try {
+    // Local scope: ends this tab's recovery session without signing the
+    // person out of the app on their phone.
+    await getSupabaseClient().auth.signOut({ scope: "local" });
+  } catch {
+    // The session dies with the tab anyway; failing here must not turn a
+    // changed password into an error screen.
+  }
+}
+
+export async function completePasswordRecovery({
+  credential,
+  password,
+}: PasswordRecoveryInput): Promise<SingleResult<{ changed: true }>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+    const key = credentialKey(credential);
+
+    if (exchangedCredential !== key) {
+      const { error } =
+        credential.kind === "token_hash"
+          ? await supabase.auth.verifyOtp({ token_hash: credential.token_hash, type: "recovery" })
+          : await supabase.auth.setSession({
+              access_token: credential.access_token,
+              refresh_token: credential.refresh_token,
+            });
+
+      if (error) {
+        await discardRecoverySession();
+        if (error.status === 429) return fail(ERROR_CODE.RATE_LIMITED);
+        return fail(ERROR_CODE.UNAUTHORIZED, LINK_SPENT);
+      }
+
+      exchangedCredential = key;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      const refusal = error.code ? PASSWORD_REFUSALS[error.code] : undefined;
+      if (refusal) return fail(ERROR_CODE.VALIDATION, refusal);
+
+      if (error.status === 429) return fail(ERROR_CODE.RATE_LIMITED);
+
+      // The recovery session expired or was revoked while the form was open.
+      if (error.status === 401 || error.status === 403 || error.code === "session_not_found") {
+        await discardRecoverySession();
+        return fail(ERROR_CODE.UNAUTHORIZED, LINK_SPENT);
+      }
+
+      return falhaDe(error);
+    }
+
+    await discardRecoverySession();
+    return okOne({ changed: true as const });
   });
 }

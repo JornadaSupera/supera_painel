@@ -3,7 +3,11 @@ import { STATUS_USUARIO } from "@/lib/enums";
 import { usuarios } from "@/mocks/usuarios";
 import type { UsuarioMock } from "@/mocks/usuarios";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
-import type { PasswordResetInput, PasswordResetRequest } from "@/services/contracts/operations";
+import type {
+  PasswordRecoveryInput,
+  PasswordResetInput,
+  PasswordResetRequest,
+} from "@/services/contracts/operations";
 import type { DesafioMfa, ResultadoLogin, Sessao, UsuarioAutenticado } from "@/types/auth";
 import { maskDestination } from "../_people";
 import { now, simulate, uuid } from "./_helpers";
@@ -230,5 +234,42 @@ export async function resetPassword({
     if (senha.length < 10) return fail(ERROR_CODE.VALIDATION, "A senha não atende aos requisitos.");
 
     return okOne({ alterada: true as const });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   RECOVERY FOR APP ACCOUNTS
+   -------------------------------------------------------------------------
+   Links to exercise every state of `/redefinir-senha` in development:
+
+     ?token_hash=qualquer-valor   → form, then success
+     ?token_hash=expirado         → link expired
+     #error_code=otp_expired      → link expired (rejected before the form)
+
+   The password `Anterior@2026` simulates "same as the previous one".
+   ------------------------------------------------------------------------- */
+
+const MOCK_EXPIRED_TOKEN = "expirado";
+const MOCK_PREVIOUS_PASSWORD = "Anterior@2026";
+
+/** Links already used. A recovery link works once, as it does in Supabase. */
+const spentRecoveryLinks = new Set<string>();
+
+export async function completePasswordRecovery({
+  credential,
+  password,
+}: PasswordRecoveryInput): Promise<SingleResult<{ changed: true }>> {
+  return simulate(() => {
+    const key = credential.kind === "token_hash" ? credential.token_hash : credential.access_token;
+
+    if (key === MOCK_EXPIRED_TOKEN || spentRecoveryLinks.has(key)) {
+      return fail(ERROR_CODE.UNAUTHORIZED, "Este link expirou ou já foi usado.");
+    }
+    if (password === MOCK_PREVIOUS_PASSWORD) {
+      return fail(ERROR_CODE.VALIDATION, "A nova senha precisa ser diferente da anterior.");
+    }
+
+    spentRecoveryLinks.add(key);
+    return okOne({ changed: true as const });
   });
 }
