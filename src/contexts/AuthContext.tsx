@@ -1,11 +1,13 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { audit } from "@/lib/audit";
+import { audit, setAuditActor } from "@/lib/audit";
 import { SESSION, SESSION_EXPIRES } from "@/lib/env";
 import { can, canAny, resolverPermissoes, type Permissao } from "@/lib/rbac";
 import { authApi, call } from "@/services/apiClient";
 import type { DesafioMfa, Sessao } from "@/types/auth";
 import { AuthContext, type AuthContextValue, type LogoutReason } from "./auth-context";
+import { SessionClockContext, type SessionClockValue } from "./session-clock";
 
 /**
  * Authentication provider.
@@ -23,6 +25,7 @@ const ONE_MINUTE = 60_000;
 const TICK_INTERVAL = 15_000;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Sessao | null>(null);
   const [mfaChallenge, setMfaChallenge] = useState<DesafioMfa | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data } = await call(() => authApi.getSession());
         if (active && data) {
           setSession(data);
+          setAuditActor({ id: data.usuario.id, name: data.usuario.nome });
           lastActivity.current = Date.now();
         }
       } catch {
@@ -62,6 +66,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     lastActivity.current = Date.now();
   }, []);
 
+  /**
+   * Drops every cached answer that belonged to the previous identity.
+   *
+   * The `QueryClient` is created once per mount of the SPA, and its keys carry
+   * no user: without this, a second account signing in on the same tab would be
+   * served the first account's patients, audit trail, users and permissions
+   * straight from the cache — fresh, so not even refetched. It is an
+   * authorization boundary, not a tidiness measure.
+   *
+   * Cancel first, then clear: a request already in flight resolves after the
+   * clear and would repopulate the cache it was supposed to leave behind.
+   */
+  const discardCachedIdentity = useCallback(async () => {
+    try {
+      await queryClient.cancelQueries();
+    } finally {
+      // Clears queries AND mutations. Runs even if a cancellation throws —
+      // leaving the previous identity's data behind is the worse outcome.
+      queryClient.clear();
+    }
+  }, [queryClient]);
+
   const signOut = useCallback(
     async (reason: LogoutReason = "user") => {
       const userId = session?.usuario.id;
@@ -70,7 +96,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setMfaChallenge(null);
       setSecondsUntilExpiry(null);
 
+      await discardCachedIdentity();
+
       if (userId) audit.logout(userId, reason);
+
+      // After the logout event, not before: the event itself belongs to whoever
+      // was signed in.
+      setAuditActor(null);
 
       try {
         await authApi.signOut();
@@ -79,25 +111,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // keeping the user signed in would be the worse of the two outcomes.
       }
     },
-    [session],
+    [session, discardCachedIdentity],
   );
 
-  const signIn = useCallback(async ({ email, password }: { email: string; password: string }) => {
-    const { data } = await call(() => authApi.signIn({ email, senha: password }));
-    if (!data) throw new Error("Não foi possível iniciar o acesso.");
+  const signIn = useCallback(
+    async ({ email, password }: { email: string; password: string }) => {
+      const { data } = await call(() => authApi.signIn({ email, senha: password }));
+      if (!data) throw new Error("Não foi possível iniciar o acesso.");
 
-    // Sign-in ends in one of two places: the second factor screen, or the
-    // panel. Which one is the data layer's call, not this component's.
-    if (data.sessao) {
-      setSession(data.sessao);
-      setMfaChallenge(null);
-      lastActivity.current = Date.now();
-      audit.login(data.sessao.usuario.id);
-      return;
-    }
+      // Sign-in ends in one of two places: the second factor screen, or the
+      // panel. Which one is the data layer's call, not this component's.
+      if (data.sessao) {
+        // The other end of the boundary: signing in without a sign-out in
+        // between (a second account on the same tab) must not inherit the cache.
+        await discardCachedIdentity();
+        setSession(data.sessao);
+        setMfaChallenge(null);
+        lastActivity.current = Date.now();
+        setAuditActor({ id: data.sessao.usuario.id, name: data.sessao.usuario.nome });
+        audit.login(data.sessao.usuario.id);
+        return;
+      }
 
-    setMfaChallenge(data.mfa);
-  }, []);
+      setMfaChallenge(data.mfa);
+    },
+    [discardCachedIdentity],
+  );
 
   const confirmMfa = useCallback(
     async (code: string) => {
@@ -108,12 +147,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       );
       if (!data) throw new Error("Não foi possível concluir o acesso.");
 
+      await discardCachedIdentity();
       setSession(data);
       setMfaChallenge(null);
       lastActivity.current = Date.now();
+      setAuditActor({ id: data.usuario.id, name: data.usuario.nome });
       audit.login(data.usuario.id);
     },
-    [mfaChallenge],
+    [mfaChallenge, discardCachedIdentity],
   );
 
   const cancelMfa = useCallback(() => setMfaChallenge(null), []);
@@ -188,10 +229,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [session, signOut, renewActivity]);
 
-  const isExpiringSoon =
-    secondsUntilExpiry !== null && secondsUntilExpiry <= SESSION.warnMinutes * 60;
+  /* ----------------------------------------------------------- the values */
 
-  /* ----------------------------------------------------------- the value */
+  /*
+   * TWO contexts, and the split is not tidiness.
+   *
+   * The clock ticks every fifteen seconds. With the countdown on the same value
+   * as the permissions, every tick rerendered every consumer of `useAuth()` —
+   * the route guards, every `<Can>` in the tree, the sidebar, the topbar — none
+   * of which read it. Now only the expiry warning subscribes to the clock, and
+   * `useAuth()` changes when authentication changes.
+   */
+  const clock = useMemo<SessionClockValue>(
+    () => ({
+      secondsUntilExpiry,
+      isExpiringSoon:
+        secondsUntilExpiry !== null && secondsUntilExpiry <= SESSION.warnMinutes * 60,
+    }),
+    [secondsUntilExpiry],
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -208,8 +264,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       can: canDo,
       canAny: canAnyOf,
       renewActivity,
-      secondsUntilExpiry,
-      isExpiringSoon,
     }),
     [
       session,
@@ -223,12 +277,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       canDo,
       canAnyOf,
       renewActivity,
-      secondsUntilExpiry,
-      isExpiringSoon,
     ],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <SessionClockContext.Provider value={clock}>{children}</SessionClockContext.Provider>
+    </AuthContext.Provider>
+  );
 }
 
 export default AuthProvider;

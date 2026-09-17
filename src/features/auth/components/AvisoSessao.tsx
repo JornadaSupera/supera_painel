@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/auth-context";
+import { useSessionClock } from "@/contexts/session-clock";
 
 /**
  * Aviso de sessão prestes a expirar.
@@ -13,7 +14,10 @@ import { useAuth } from "@/contexts/auth-context";
  * Montado uma vez, dentro da área autenticada.
  */
 export function AvisoSessao() {
-  const { isExpiringSoon, secondsUntilExpiry, renewActivity, isAuthenticated } = useAuth();
+  const { renewActivity, isAuthenticated } = useAuth();
+  // Único consumidor do relógio, e por isso o único componente que rerenderiza
+  // a cada tique. Ver `contexts/session-clock.ts`.
+  const { isExpiringSoon, secondsUntilExpiry } = useSessionClock();
 
   /** Evita reemitir o mesmo aviso a cada tick do relógio. */
   const avisoAtivo = useRef<string | number | null>(null);

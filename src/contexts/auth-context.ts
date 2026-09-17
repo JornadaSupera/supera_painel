@@ -35,11 +35,14 @@ export interface AuthContextValue {
 
   /** Marks user activity, pushing the idle logout further out. */
   renewActivity(): void;
-  /** Seconds left until the automatic logout; `null` without a session. */
-  secondsUntilExpiry: number | null;
-  /** True when little time is left and the warning should appear. */
-  isExpiringSoon: boolean;
 }
+
+/*
+ * The countdown is NOT here — see `session-clock.ts`.
+ *
+ * It ticks every fifteen seconds, and on this value it would rerender every
+ * consumer of authentication on every tick, none of which read it.
+ */
 
 export type LogoutReason = "user" | "idle" | "session_expired";
 
