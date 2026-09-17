@@ -22,11 +22,12 @@ import type {
   DistribuicaoEspecialidade,
   LogAcesso,
   UsuarioDetalhe,
+  ContaDisponivel,
   UsuarioEntrada,
   UsuarioListItem,
 } from "@/types/usuario";
 import { USER_DEFAULT_SORT, USER_SEARCH_FIELDS } from "../_people";
-import { now, paginate, simulate, uuid } from "./_helpers";
+import { now, paginate, simulate } from "./_helpers";
 
 /**
  * Profissionais do painel.
@@ -78,6 +79,9 @@ function toDetalhe(row: UsuarioMock): UsuarioDetalhe {
 
   return {
     ...toListItem(row),
+    // A base fictícia tem uma especialidade por pessoa; o backend permite
+    // várias. A lista de uma só mantém a mesma forma dos dois lados.
+    especialidades: row.especialidade ? [row.especialidade] : [],
     permissoes_extras: row.permissoes_extras,
     permissoes_efetivas: [...efetivas],
   };
@@ -148,40 +152,52 @@ export async function listAccessLogs({
    ESCRITA
    ------------------------------------------------------------------------- */
 
+/**
+ * Concede o perfil a uma conta que já existe.
+ *
+ * O mock reproduz a regra do backend: a conta é pré-requisito, e cadastrar é
+ * conceder — não criar acesso. `contasSemPerfil` é a lista fictícia de quem se
+ * cadastrou e ainda não recebeu perfil.
+ */
 export async function create(entrada: UsuarioEntrada): Promise<SingleResult<UsuarioDetalhe>> {
   return simulate(() => {
-    const email = entrada.email.trim().toLowerCase();
+    const conta = contasSemPerfil.find((candidata) => candidata.id === entrada.account_id);
 
-    if (usuarios.some((usuario) => usuario.email === email)) {
-      return fail(ERROR_CODE.CONFLICT, "Já existe um profissional com este e-mail.");
+    if (!conta) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "Esta conta não está disponível: ou não existe, ou já tem perfil no painel.",
+      );
     }
 
-    const agora = now();
-
     const row: UsuarioMock = {
-      id: uuid(),
-      nome: entrada.nome.trim(),
-      tratamento: entrada.tratamento?.trim() || null,
-      email,
+      id: conta.id,
+      nome: conta.nome,
+      // Sem coluna no backend — ver `UsuarioEntrada`.
+      tratamento: null,
+      email: conta.email,
       // O mock nunca guarda senha escolhida por outra pessoa: o profissional
       // define a dele pelo link de primeiro acesso.
       senha_mock: "",
       papel: entrada.papel,
-      especialidade: entrada.especialidade ?? null,
+      especialidade: entrada.especialidade_principal ?? entrada.especialidades[0] ?? null,
       registro: entrada.registro?.trim() || null,
       avatar_url: null,
       status: STATUS_USUARIO.ATIVO,
-      // Segundo fator obrigatório por padrão: desligar é a exceção, e exige
-      // justificativa registrada.
-      mfa_ativo: entrada.mfa_ativo ?? true,
-      horario_inicio: entrada.horario_inicio ?? "08:00",
-      horario_fim: entrada.horario_fim ?? "18:00",
-      permissoes_extras: entrada.permissoes_extras ?? [],
+      // Segundo fator ligado por padrão na base fictícia. O backend não sabe
+      // dizer isso de outra conta: o autenticador é da pessoa.
+      mfa_ativo: true,
+      horario_inicio: null,
+      horario_fim: null,
+      permissoes_extras: [],
       ultimo_acesso_em: null,
-      criado_em: agora,
+      criado_em: now(),
     };
 
     usuarios.push(row);
+    // A conta deixou de estar disponível no instante em que recebeu o perfil.
+    contasSemPerfil.splice(contasSemPerfil.indexOf(conta), 1);
+
     return okOne(toDetalhe(row));
   });
 }
@@ -194,25 +210,42 @@ export async function update({
   dados: Partial<UsuarioEntrada>;
 }): Promise<SingleResult<UsuarioDetalhe>> {
   return comUsuario(id, (row) => {
-    if (dados.email) {
-      const email = dados.email.trim().toLowerCase();
-      if (usuarios.some((usuario) => usuario.email === email && usuario.id !== id)) {
-        return fail(ERROR_CODE.CONFLICT, "Já existe um profissional com este e-mail.");
-      }
-      row.email = email;
-    }
-
-    if (dados.nome !== undefined) row.nome = dados.nome.trim();
-    if (dados.tratamento !== undefined) row.tratamento = dados.tratamento?.trim() || null;
-    if (dados.papel !== undefined) row.papel = dados.papel;
-    if (dados.especialidade !== undefined) row.especialidade = dados.especialidade;
+    // Nome, e-mail e papel não entram: os dois primeiros são da conta, mantidos
+    // pelo titular, e trocar de papel é ato próprio — não uma edição de
+    // cadastro. Ver `update` no adapter Supabase.
     if (dados.registro !== undefined) row.registro = dados.registro?.trim() || null;
-    if (dados.horario_inicio !== undefined) row.horario_inicio = dados.horario_inicio;
-    if (dados.horario_fim !== undefined) row.horario_fim = dados.horario_fim;
-    if (dados.permissoes_extras !== undefined) row.permissoes_extras = dados.permissoes_extras;
+
+    if (dados.especialidades !== undefined) {
+      row.especialidade = dados.especialidade_principal ?? dados.especialidades[0] ?? null;
+    }
 
     return okOne(toDetalhe(row));
   });
+}
+
+/**
+ * Contas fictícias que se cadastraram e ainda não receberam perfil.
+ *
+ * Mutável de propósito: conceder um perfil retira a conta da lista, que é o que
+ * o backend faz — lá o recorte é "sem linha em `admins` nem em `professionals`".
+ */
+const contasSemPerfil: ContaDisponivel[] = [
+  {
+    id: "b7c1f1d4-0000-4000-8000-000000000101",
+    nome: "Marina Kruger",
+    email: "marina.kruger@cosc.com.br",
+    criado_em: now(),
+  },
+  {
+    id: "b7c1f1d4-0000-4000-8000-000000000102",
+    nome: "Otávio Bertoldi",
+    email: "otavio.bertoldi@cosc.com.br",
+    criado_em: now(),
+  },
+];
+
+export async function listContasSemPerfil(): Promise<ListResult<ContaDisponivel>> {
+  return simulate(() => ok([...contasSemPerfil], contasSemPerfil.length));
 }
 
 export async function setStatus({

@@ -82,6 +82,15 @@ export const RESOURCES = {
        * crescer.
        */
       "getDistribuicao",
+      /**
+       * Contas que ainda não têm perfil no painel.
+       *
+       * O cadastro de profissional é uma CONCESSÃO sobre conta existente, não a
+       * criação de um acesso: quem cria a conta é a própria pessoa, e o painel
+       * não tem servidor para criá-la em nome de ninguém. Esta operação é o que
+       * alimenta o seletor de quem pode receber o perfil.
+       */
+      "listContasSemPerfil",
     ],
   },
   permissoes: {

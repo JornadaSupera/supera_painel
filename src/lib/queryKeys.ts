@@ -66,6 +66,8 @@ export const queryKeys = {
   users: {
     ...entity("users"),
     accessLogs: (id: string) => ["users", "detail", id, "access-logs"] as const,
+    /** Sob `users` de propósito: conceder um perfil encolhe esta lista. */
+    contasSemPerfil: () => ["users", "accounts-without-profile"] as const,
   },
 
   contents: {

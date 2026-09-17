@@ -29,6 +29,7 @@ import type {
   ResultadoConvite,
 } from "@/types/paciente";
 import type {
+  ContaDisponivel,
   DistribuicaoEspecialidade,
   LogAcesso,
   MatrizPermissoes,
@@ -180,6 +181,9 @@ export interface UsuariosOperations {
   listAccessLogs(params: { id: string } & ListParams): Promise<ListResult<LogAcesso>>;
 
   getDistribuicao(): Promise<ListResult<DistribuicaoEspecialidade>>;
+
+  /** Contas sem perfil no painel — quem pode receber um. Ver `UsuarioEntrada`. */
+  listContasSemPerfil(): Promise<ListResult<ContaDisponivel>>;
 }
 
 export interface PermissoesOperations {

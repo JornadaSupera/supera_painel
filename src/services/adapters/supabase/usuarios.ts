@@ -20,9 +20,11 @@ import {
   type SingleResult,
 } from "@/services/contracts";
 import type {
+  ContaDisponivel,
   DistribuicaoEspecialidade,
   LogAcesso,
   UsuarioDetalhe,
+  UsuarioEntrada,
   UsuarioListItem,
 } from "@/types/usuario";
 import { paginate } from "../_list";
@@ -100,6 +102,20 @@ function especialidadeVigente(vinculos: VinculoEspecialidade[]): Especialidade |
   return paraEspecialidade(umDe(escolhido?.specialties)?.code);
 }
 
+/**
+ * Todas as áreas vigentes.
+ *
+ * `ended_at` nulo é o que define "vale hoje": tirar alguém de uma área encerra
+ * a vigência e mantém a linha, então filtrar pela data é obrigatório — sem
+ * isso, a tela de edição traria de volta uma área que já foi revogada.
+ */
+function especialidadesVigentes(vinculos: VinculoEspecialidade[]): Especialidade[] {
+  return vinculos
+    .filter((vinculo) => !vinculo.ended_at)
+    .map((vinculo) => paraEspecialidade(umDe(vinculo.specialties)?.code))
+    .filter((especialidade): especialidade is Especialidade => especialidade !== null);
+}
+
 function projetar(linha: LinhaConta): UsuarioListItem | null {
   const admin = umDe(linha.admins);
   const profissional = umDe(linha.professionals);
@@ -148,13 +164,20 @@ function projetar(linha: LinhaConta): UsuarioListItem | null {
  * a matriz vire dado, a fonte é a mesma que o `<Can>` usa, para que a tela e a
  * checagem não discordem.
  */
-function detalhar(item: UsuarioListItem): UsuarioDetalhe {
+function detalhar(item: UsuarioListItem, linha: LinhaConta): UsuarioDetalhe {
   const efetivas = resolverPermissoes(
     { papel: item.papel, especialidade: item.especialidade, permissoesExtras: [] },
     concedidas,
   );
 
-  return { ...item, permissoes_extras: [], permissoes_efetivas: [...efetivas] };
+  const profissional = umDe(linha.professionals);
+
+  return {
+    ...item,
+    especialidades: especialidadesVigentes(profissional?.professional_specialties ?? []),
+    permissoes_extras: [],
+    permissoes_efetivas: [...efetivas],
+  };
 }
 
 /* -------------------------------------------------------------------------
@@ -192,10 +215,11 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Usua
 
     if (error) return falhaDe(error);
 
-    const item = data ? projetar(data as unknown as LinhaConta) : null;
-    if (!item) return fail(ERROR_CODE.NOT_FOUND, "Profissional não encontrado.");
+    const linha = data as unknown as LinhaConta | null;
+    const item = linha ? projetar(linha) : null;
+    if (!item || !linha) return fail(ERROR_CODE.NOT_FOUND, "Profissional não encontrado.");
 
-    return okOne(detalhar(item));
+    return okOne(detalhar(item, linha));
   });
 }
 
@@ -361,30 +385,213 @@ export async function resetPassword({
 }
 
 /* -------------------------------------------------------------------------
-   O QUE O BACKEND AINDA NÃO OFERECE
+   CADASTRO DE PERFIL
    -------------------------------------------------------------------------
-   As três operações abaixo não têm caminho no banco. Existem como recusa
-   explícita, e não como stub genérico, porque a tela usa a mensagem para
-   desabilitar a ação ANTES de o usuário preencher um formulário inteiro.
+   Cadastrar aqui é CONCEDER um perfil sobre conta que já existe, e não criar um
+   acesso. A distinção não é formal:
 
-   - `create` / `update`: `professionals` e `admins` só têm política de SELECT.
-     Não há INSERT para `authenticated` nem RPC de cadastro; promover uma conta
-     existente a administrador pressupõe a conta já criada no Auth por um
-     servidor — o painel não tem esse servidor.
-   - `setMfa`: o GoTrue só expõe e gerencia os fatores da sessão em curso.
-     Ligar ou desligar o segundo fator de outra pessoa não é operação de
-     cliente.
+   - o painel roda no navegador, com a chave pública. Criar conta de terceiro
+     exige a chave de serviço, que jamais entra num bundle;
+   - e quem define a senha tem que ser o titular. Administrador que escolhe
+     senha alheia quebra o não repúdio da trilha — a partir dali, "foi você que
+     fez" deixa de ser uma afirmação sustentável.
+
+   Daí `listContasSemPerfil`: a pessoa se cadastra, aparece no seletor, e a
+   administração concede.
+
+   > [!] Ninguém concede a si mesmo.
+   O banco recusa o ato reflexivo em qualquer operação de perfil profissional, e
+   o motivo é a psicologia: a especialidade decide sigilo para a plataforma
+   inteira, e um administrador que se autoconcedesse `psicologia` leria o que a
+   clínica decidiu que a administração não lê. A guarda não proíbe acumular os
+   dois papéis — exige que OUTRA pessoa faça a concessão, e as duas ficam na
+   trilha com nomes diferentes.
    ------------------------------------------------------------------------- */
 
-const EM_DESENVOLVIMENTO =
-  "Ainda em desenvolvimento: o backend não expõe esta operação. Fale com o responsável pelo banco.";
+/**
+ * Contas ainda sem perfil no painel.
+ *
+ * `accounts` tem política de leitura para administrador, e `professionals` e
+ * `admins` são legíveis por qualquer sessão autenticada — então o recorte sai
+ * de uma consulta só, sem RPC.
+ */
+export async function listContasSemPerfil(): Promise<ListResult<ContaDisponivel>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("accounts")
+      .select("id, full_name, email, created_at, is_active, admins ( id ), professionals ( id )")
+      .order("created_at", { ascending: false });
 
-export async function create(): Promise<SingleResult<UsuarioDetalhe>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, `Cadastro de profissional. ${EM_DESENVOLVIMENTO}`);
+    if (error) return falhaDe(error);
+
+    const linhas = data as unknown as {
+      id: string;
+      full_name: string | null;
+      email: string;
+      created_at: string;
+      is_active: boolean;
+      admins: { id: string } | { id: string }[] | null;
+      professionals: { id: string } | { id: string }[] | null;
+    }[];
+
+    const disponiveis = linhas
+      // Conta desativada fica de fora: conceder perfil a quem não entra produz
+      // um cadastro que parece pronto e não funciona.
+      .filter((linha) => linha.is_active && !umDe(linha.admins) && !umDe(linha.professionals))
+      .map<ContaDisponivel>((linha) => ({
+        id: linha.id,
+        nome: linha.full_name?.trim() || linha.email,
+        email: linha.email,
+        criado_em: linha.created_at,
+      }));
+
+    return ok(disponiveis, disponiveis.length);
+  });
 }
 
-export async function update(): Promise<SingleResult<UsuarioDetalhe>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, `Edição de profissional. ${EM_DESENVOLVIMENTO}`);
+/** O id do PERFIL profissional de uma conta — é ele que as RPCs recebem. */
+async function idDoProfissional(
+  accountId: string,
+): Promise<string | null | ReturnType<typeof falhaDe>> {
+  const { data, error } = await getSupabaseClient()
+    .from("professionals")
+    .select("id")
+    .eq("account_id", accountId)
+    .maybeSingle();
+
+  if (error) return falhaDe(error);
+
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+/** Códigos de especialidade do painel → ids do catálogo do banco. */
+async function idsDasEspecialidades(
+  especialidades: Especialidade[],
+): Promise<Map<Especialidade, string> | ReturnType<typeof falhaDe>> {
+  const { data, error } = await getSupabaseClient().from("specialties").select("id, code, is_active");
+
+  if (error) return falhaDe(error);
+
+  const porCodigo = new Map<Especialidade, string>();
+
+  for (const linha of (data ?? []) as { id: string; code: string; is_active: boolean }[]) {
+    const especialidade = paraEspecialidade(linha.code);
+    if (especialidade && linha.is_active) porCodigo.set(especialidade, linha.id);
+  }
+
+  // Especialidade pedida que o catálogo não tem é erro de cadastro, não lista
+  // vazia: mandar um array menor concederia áreas a menos em silêncio.
+  const faltando = especialidades.filter((especialidade) => !porCodigo.has(especialidade));
+  if (faltando.length > 0) {
+    return fail(
+      ERROR_CODE.VALIDATION,
+      `Especialidade sem correspondência ativa no cadastro: ${faltando.join(", ")}.`,
+    ) as ReturnType<typeof falhaDe>;
+  }
+
+  return porCodigo;
+}
+
+/**
+ * `gestor` não existe como perfil no banco.
+ *
+ * Há `admins` e `professionals`, e nada entre os dois. O papel continua na
+ * matriz de permissões do painel porque descreve um alcance real, mas não há
+ * onde gravá-lo — conceder aqui produziria uma pessoa que a lista não mostra.
+ */
+const SEM_PERFIL_NO_BANCO =
+  "O papel de gestor não existe como perfil no cadastro: há administrador e profissional, e nada entre os dois. Escolha um dos dois ou fale com o responsável pelo banco.";
+
+export async function create(entrada: UsuarioEntrada): Promise<SingleResult<UsuarioDetalhe>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    if (entrada.papel === PAPEL.GESTOR) {
+      return fail(ERROR_CODE.NOT_IMPLEMENTED, SEM_PERFIL_NO_BANCO);
+    }
+
+    if (entrada.papel === PAPEL.ADMIN) {
+      const { error } = await supabase.rpc("create_admin", { p_account_id: entrada.account_id });
+      if (error) return falhaDe(error);
+
+      return getById({ id: entrada.account_id });
+    }
+
+    const ids = await idsDasEspecialidades(entrada.especialidades);
+    if (!(ids instanceof Map)) return ids;
+
+    const principal = entrada.especialidade_principal ?? entrada.especialidades[0] ?? null;
+
+    const { error } = await supabase.rpc("create_professional", {
+      p_account_id: entrada.account_id,
+      p_council_registration: entrada.registro ?? "",
+      p_specialty_ids: entrada.especialidades.map((especialidade) => ids.get(especialidade)),
+      p_primary_specialty_id: principal ? (ids.get(principal) ?? null) : null,
+    });
+
+    if (error) return falhaDe(error);
+
+    return getById({ id: entrada.account_id });
+  });
+}
+
+/**
+ * Correção do perfil.
+ *
+ * Nome e e-mail NÃO entram: são colunas de `accounts`, e a única política de
+ * escrita ali é a do próprio titular. Não é lacuna — é a mesma razão da senha:
+ * a identidade de uma pessoa é mantida por ela.
+ *
+ * Trocar de papel também não: promover a administrador e revogar um perfil são
+ * atos distintos, cada um com a sua trava, e um `<Select>` que faz os dois
+ * esconde qual deles aconteceu.
+ */
+export async function update({
+  id,
+  dados,
+}: {
+  id: string;
+  dados: Partial<UsuarioEntrada>;
+}): Promise<SingleResult<UsuarioDetalhe>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const profissional = await idDoProfissional(id);
+    if (typeof profissional !== "string") {
+      if (profissional !== null) return profissional;
+
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "Esta conta não tem perfil de profissional. Registro de conselho e áreas só existem para quem o tem.",
+      );
+    }
+
+    if (dados.registro !== undefined) {
+      const { error } = await supabase.rpc("update_professional", {
+        p_professional_id: profissional,
+        p_council_registration: dados.registro ?? "",
+      });
+
+      if (error) return falhaDe(error);
+    }
+
+    if (dados.especialidades?.length) {
+      const ids = await idsDasEspecialidades(dados.especialidades);
+      if (!(ids instanceof Map)) return ids;
+
+      const principal = dados.especialidade_principal ?? dados.especialidades[0] ?? null;
+
+      const { error } = await supabase.rpc("set_professional_specialties", {
+        p_professional_id: profissional,
+        p_specialty_ids: dados.especialidades.map((especialidade) => ids.get(especialidade)),
+        p_primary_specialty_id: principal ? (ids.get(principal) ?? null) : null,
+      });
+
+      if (error) return falhaDe(error);
+    }
+
+    return getById({ id });
+  });
 }
 
 export async function setMfa(): Promise<SingleResult<UsuarioDetalhe>> {

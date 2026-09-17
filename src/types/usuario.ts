@@ -45,6 +45,14 @@ export interface UsuarioListItem {
 }
 
 export interface UsuarioDetalhe extends UsuarioListItem {
+  /**
+   * TODAS as áreas vigentes, e não só a principal.
+   *
+   * O vínculo é temporal do lado do banco: tirar alguém de uma área encerra a
+   * vigência e a linha fica, porque a pergunta que uma auditoria faz é quem
+   * podia ler o quê, em que data. Aqui aparecem as que valem hoje.
+   */
+  especialidades: Especialidade[];
   permissoes_extras: Permissao[];
   /**
    * Conjunto efetivo, já resolvido: papel → especialidade → extras.
@@ -55,17 +63,37 @@ export interface UsuarioDetalhe extends UsuarioListItem {
   permissoes_efetivas: Permissao[];
 }
 
+/**
+ * Corpo do cadastro e da edição de usuário do painel.
+ *
+ * > [!] Cadastrar é CONCEDER um perfil, não criar um acesso.
+ * A conta nasce quando a própria pessoa se cadastra; o painel não tem servidor
+ * para criá-la em nome de terceiros, e criar senha alheia quebraria o não
+ * repúdio da trilha. Por isso a entrada carrega `account_id` em vez de nome e
+ * e-mail: os dois são da conta, e quem os corrige é o titular.
+ *
+ * Tratamento, janela de atendimento no chat e segundo fator não estão aqui
+ * porque não têm coluna: o primeiro não existe no cadastro, a segunda é
+ * configuração que ninguém guarda ainda, e o terceiro é gerenciado pela pessoa
+ * no aplicativo autenticador dela.
+ */
 export interface UsuarioEntrada {
-  nome: string;
-  tratamento?: string | null;
-  email: string;
+  /** Conta existente que recebe o perfil. */
+  account_id: string;
   papel: Papel;
-  especialidade?: Especialidade | null;
+  /** Áreas vigentes. Vazio para administrador. */
+  especialidades: Especialidade[];
+  /** A área que agrupa a carteira. Na omissão, a primeira da lista. */
+  especialidade_principal?: Especialidade | null;
   registro?: string | null;
-  horario_inicio?: string | null;
-  horario_fim?: string | null;
-  permissoes_extras?: Permissao[];
-  mfa_ativo?: boolean;
+}
+
+/** Uma conta que ainda não tem perfil no painel — candidata a receber um. */
+export interface ContaDisponivel {
+  id: string;
+  nome: string;
+  email: string;
+  criado_em: string;
 }
 
 /** Um quadrado da faixa de distribuição no topo da tela. */

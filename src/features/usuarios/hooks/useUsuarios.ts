@@ -87,11 +87,27 @@ export function useCriarUsuario() {
     onSuccess: async (usuario) => {
       if (usuario) audit.update(RECURSO, usuario.id, { operacao: "criacao", papel: usuario.papel });
       await invalidar();
-      toast.success("Profissional cadastrado", {
-        description: "Ele recebe por e-mail o link para definir a própria senha.",
+      // O texto não promete e-mail: a conta já existe e a senha é dela. O que
+      // acabou de acontecer foi a concessão do perfil, e é isso que se diz.
+      toast.success("Perfil concedido", {
+        description: usuario ? `${usuario.nome} já aparece na lista de usuários.` : undefined,
       });
     },
     onError: (erro) => toast.error("Não foi possível cadastrar", { description: erro.message }),
+  });
+}
+
+/**
+ * Contas que ainda não têm perfil no painel.
+ *
+ * É o seletor do cadastro. Fica em `useQuery` e não em estado local porque a
+ * lista encolhe a cada concessão — e a invalidação de `users.all` já a derruba.
+ */
+export function useContasSemPerfil(habilitado = true) {
+  return useQuery({
+    queryKey: queryKeys.users.contasSemPerfil(),
+    enabled: habilitado,
+    queryFn: async () => (await call(() => usuariosApi.listContasSemPerfil())).data,
   });
 }
 
