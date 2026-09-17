@@ -1,6 +1,7 @@
 // Both adapters register the same resources on purpose — `RESOURCES` checks
 // the surface at compile time — so this block mirrors the other adapter.
 // jscpd:ignore-start
+import type { PartialAdapterModules } from "../../contracts/operations";
 import { buildAdapter } from "../_stub";
 import * as aprovacoes from "./aprovacoes";
 import * as auditoria from "./auditoria";
@@ -48,7 +49,7 @@ const implemented = {
   estatisticasOperacionais,
   configuracoes,
   relatorios,
-};
+} satisfies PartialAdapterModules;
 // jscpd:ignore-end
 
 /**
@@ -64,13 +65,26 @@ const implemented = {
  * Cada linha sai daqui no dia em que o banco ganhar a política ou a função
  * correspondente — e nenhuma tela muda junto.
  */
+/**
+ * Ordenação da listagem de pacientes.
+ *
+ * `read_patient_list` aceita `full_name`, `birth_date` e `created_at`, e
+ * **recusa** qualquer outro valor de `p_order_by` — não há SQL dinâmico do outro
+ * lado. Ordenar por CID, fase ou situação exigiria ordenar a página atual no
+ * cliente, o que ordenaria vinte linhas e chamaria isso de ordenação da base:
+ * a segunda página voltaria a começar do começo.
+ */
+const SEM_ORDENACAO_NO_SERVIDOR =
+  "A listagem do backend ordena por nome, nascimento e data de cadastro. Ordenar por esta coluna exigiria ordenar só a página visível, o que embaralharia a paginação em vez de ordenar a base.";
+
 export const INDISPONIVEIS: Readonly<Record<string, string>> = {
-  "pacientes.list.cid":
-    "A listagem não traz o CID: o diagnóstico só se lê paciente a paciente, e cada leitura registra um acesso ao prontuário. Ele aparece na ficha.",
   "pacientes.list.risco":
-    "Não há classificação de risco no backend: nenhuma tabela de alerta e nenhuma regra de criticidade. Calcular no painel seria inferência clínica no front-end.",
-  "pacientes.list.protocolo":
-    "A listagem não traz o protocolo: o plano terapêutico só se lê paciente a paciente. Ele aparece na ficha.",
+    "Não há classificação de risco no backend, e não vai haver nesta fase: “risco” são as etiquetas da sistematização de enfermagem do Gemed, que estão fora do escopo de leitura contratado. Calcular no painel seria inferência clínica no front-end.",
+  "pacientes.filter.protocolo":
+    "O filtro por protocolo existe no backend, mas não há catálogo de protocolos para oferecer: `protocol_name` é texto livre no plano terapêutico, sem tabela de domínio. Levantar os nomes em uso exigiria ler o plano de cada paciente, uma leitura auditada por paciente, só para preencher um seletor.",
+  "pacientes.sort.cid": SEM_ORDENACAO_NO_SERVIDOR,
+  "pacientes.sort.fase": SEM_ORDENACAO_NO_SERVIDOR,
+  "pacientes.sort.status": SEM_ORDENACAO_NO_SERVIDOR,
   "pacientes.create":
     "O cadastro de paciente ainda não existe no backend: a tabela só permite leitura.",
   "pacientes.update": "A edição de ficha ainda não existe no backend.",
@@ -101,32 +115,33 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
     "Não há contagem de acessos: favorito e leitura vivem na biblioteca do paciente, e nem a equipe nem a administração têm política de leitura ali.",
 
   /* -------------------------------------------------------------------------
-     LEITURA CLÍNICA EM CONJUNTO — a ausência que atinge três telas
+     LEITURA CLÍNICA EM CONJUNTO — a ausência que atingia três telas
      -------------------------------------------------------------------------
      As políticas de leitura da equipe são `TO clinical_reader`, e o papel de
      quem faz login (`authenticated`) não é membro dele: quem alcança aquelas
      linhas são as funções `read_*`, que têm `clinical_reader` como dono. Um
      `.from()` nessas tabelas devolve zero linhas SEM erro — e uma tela que soma
-     zero linhas publica `0` com cara de medição.
+     zero linhas publica `0` com cara de medição. Era o estado das três telas de
+     número.
 
-     As `read_*` existem, mas são por paciente ou por conversa. Montar
-     estatística com elas exigiria varrer a base a cada abertura de tela, e cada
-     chamada grava acesso a prontuário em `audit_log`: o gráfico produziria
-     centenas de "administrador leu o prontuário de fulano". Trocaríamos número
-     errado por rastro sujo.
+     A família `summarize_*` resolveu isso: o banco devolve a contagem já somada,
+     **sem que nenhuma linha de prontuário chegue ao navegador**. É melhor em
+     privacidade do que somar no cliente, e paga UMA leitura auditada onde a soma
+     no cliente pagava uma por paciente. `estatisticasClinicas.crossTab` e
+     `estatisticasOperacionais.getIndicadores` saíram desta lista.
 
-     O que libera é agregação no banco — função de resumo que devolva contagem,
-     nunca linha. Ela é MELHOR em privacidade do que o que havia antes, porque
-     nenhum registro de sintoma precisa chegar ao navegador.
+     O que continua fora tem causa própria, e nenhuma delas é de leitura.
      ------------------------------------------------------------------------- */
-  "estatisticasClinicas.crossTab":
-    "O cruzamento depende de ler diário e plano de toda a base ao mesmo tempo, e o backend só oferece essa leitura paciente a paciente. Falta uma leitura agregada, que devolva a contagem já somada sem expor registro de ninguém.",
-  "estatisticasOperacionais.getIndicadores":
-    "Os indicadores saem da agenda e do chat da clínica inteira, e o backend não oferece essa leitura em conjunto: a agenda só se lê por paciente e a conversa uma a uma.",
+  "estatisticasClinicas.prevalencia":
+    "O resumo do banco devolve quantos registros e quantas pessoas relataram cada sintoma em cada grau, mas não devolve quantos pacientes havia no protocolo no período — o denominador da prevalência. Sem ele o mapa mostra contagem de registros, que é exata, em vez de um percentual sobre denominador ausente.",
+  "estatisticasOperacionais.mensagensPorDia":
+    "O resumo do chat conta conversas, não mensagens: a unidade é a conversa aberta e o instante da primeira resposta da equipe. Contar mensagens exigiria ler cada conversa, e cada leitura registra acesso a conteúdo clínico.",
   "estatisticasOperacionais.getFilaAlertas":
-    "Não existe fila de alertas no backend: não há tabela de alerta, regra de criticidade nem registro de conduta. Quem define o que é grave é a equipe assistencial, não o painel.",
+    "A fila de alertas existe no backend, mas nenhum gatilho de criticidade foi cadastrado: sem regra, nenhum alerta dispara, e a fila está vazia por configuração, não por ausência de ocorrência. O limiar é decisão clínica, e cadastrá-lo é ato da administração.",
+  "estatisticasOperacionais.porProfissional":
+    "O recorte dos resumos é por especialidade, e por profissional não existe — no backend nem aqui. Ranquear pessoa por volume ou por tempo de resposta transformaria um painel de operação em avaliação individual de desempenho, e com poucos casos a média re-identifica quem atendeu.",
   "relatorios.agregados":
-    "Dez dos doze relatórios dependem de leitura clínica em conjunto — agenda, diário, plano e diagnóstico de toda a base — que o backend ainda não oferece. Cada um diz o seu motivo no próprio cartão.",
+    "Três dos doze relatórios não têm origem no backend: alertas de IA, NPS e conteúdo mais acessado. Cada um diz o seu motivo no próprio cartão.",
 };
 
 export const supabaseAdapter = buildAdapter({ name: "supabase", implemented });
