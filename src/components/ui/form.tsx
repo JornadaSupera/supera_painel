@@ -23,9 +23,17 @@ type FormFieldContextValue<
   name: TName
 }
 
-const FormFieldContext = React.createContext<FormFieldContextValue>(
-  {} as FormFieldContextValue
-)
+/**
+ * `null`, not an empty object forced by a cast.
+ *
+ * The upstream default is `{} as FormFieldContextValue`, which makes the guard
+ * in `useFormField` unreachable: the context is always truthy, so a form part
+ * used outside its provider reads `name: undefined` and carries on. The field
+ * then reports on the wrong path, `aria-describedby` points at ids nobody has,
+ * and the label stops being announced with its input. A part used in the wrong
+ * place has to fail loudly, not degrade the accessibility tree in silence.
+ */
+const FormFieldContext = React.createContext<FormFieldContextValue | null>(null)
 
 const FormField = <
   TFieldValues extends FieldValues = FieldValues,
@@ -43,13 +51,20 @@ const FormField = <
 const useFormField = () => {
   const fieldContext = React.useContext(FormFieldContext)
   const itemContext = React.useContext(FormItemContext)
+
+  // Both checks come BEFORE the first use of a context value. Upstream reads
+  // `fieldContext.name` two lines above its own guard, so the guard only ever
+  // ran after the crash it was meant to prevent.
+  if (!fieldContext) {
+    throw new Error("useFormField precisa estar dentro de <FormField>.")
+  }
+  if (!itemContext) {
+    throw new Error("useFormField precisa estar dentro de <FormItem>.")
+  }
+
   const { getFieldState } = useFormContext()
   const formState = useFormState({ name: fieldContext.name })
   const fieldState = getFieldState(fieldContext.name, formState)
-
-  if (!fieldContext) {
-    throw new Error("useFormField should be used within <FormField>")
-  }
 
   const { id } = itemContext
 
@@ -67,9 +82,8 @@ type FormItemContextValue = {
   id: string
 }
 
-const FormItemContext = React.createContext<FormItemContextValue>(
-  {} as FormItemContextValue
-)
+/** Same reason as `FormFieldContext`: no default that hides a missing provider. */
+const FormItemContext = React.createContext<FormItemContextValue | null>(null)
 
 function FormItem({ className, ...props }: React.ComponentProps<"div">) {
   const id = React.useId()
