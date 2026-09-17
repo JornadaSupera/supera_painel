@@ -29,6 +29,8 @@ export interface FormSelectProps {
    * string — for optional fields.
    */
   emptyLabel?: string;
+  /** Locks the field while keeping the current value readable. */
+  disabled?: boolean;
   /** Applied to the trigger and to the list, e.g. `capitalize` for lowercase labels. */
   className?: string;
 }
@@ -39,6 +41,7 @@ export function FormSelect({
   options,
   placeholder,
   emptyLabel,
+  disabled,
   className,
 }: FormSelectProps) {
   const optional = emptyLabel !== undefined;
@@ -47,6 +50,7 @@ export function FormSelect({
     <Select
       value={optional ? toSelectValue(value) : value}
       onValueChange={(next) => onValueChange(optional ? fromSelectValue(next) : next)}
+      disabled={disabled}
     >
       <FormControl>
         <SelectTrigger className={cn("w-full", className)}>
