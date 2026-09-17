@@ -72,3 +72,25 @@ export const novaSenhaSchema = z
   });
 
 export type NovaSenhaForm = z.infer<typeof novaSenhaSchema>;
+
+/**
+ * Password policy for app accounts (patients and caregivers).
+ *
+ * Length only. The panel's stricter rule protects staff access to clinical
+ * records; the app reaches a different audience and follows its own policy.
+ */
+export const APP_PASSWORD_MIN_LENGTH = 8;
+
+export const appPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(APP_PASSWORD_MIN_LENGTH, `A senha precisa ter pelo menos ${APP_PASSWORD_MIN_LENGTH} caracteres.`),
+    confirmation: z.string().min(1, "Repita a senha."),
+  })
+  .refine((values) => values.password === values.confirmation, {
+    message: "As senhas não coincidem.",
+    path: ["confirmation"],
+  });
+
+export type AppPasswordForm = z.infer<typeof appPasswordSchema>;

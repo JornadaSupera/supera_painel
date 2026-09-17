@@ -45,6 +45,9 @@ const EstatisticasOperacionaisPage = lazy(
 );
 const AuditoriaPage = lazy(() => import("@/features/auditoria/pages/AuditoriaPage"));
 const ConfiguracoesPage = lazy(() => import("@/features/configuracoes/pages/ConfiguracoesPage"));
+/* Not a panel screen: its audience is app users, so it stays out of the bundle
+   that panel staff load first. */
+const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
 const DesignSystemPreview = lazy(() => import("@/app/DesignSystemPreview"));
 
 export function AppRoutes() {
@@ -59,6 +62,11 @@ export function AppRoutes() {
           <Route path="/login/mfa" element={<MfaPage />} />
           <Route path="/recuperar-senha" element={<RecuperarSenhaPage />} />
           <Route path="/nova-senha" element={<NovaSenhaPage />} />
+
+          {/* App accounts (patients and caregivers) land here from the
+              recovery e-mail. Outside every guard and layout of the panel:
+              the page changes the password and leads nowhere else. */}
+          <Route path="/redefinir-senha" element={<PasswordRecoveryPage />} />
 
           {/* ---------------------------------------------------- protected */}
           <Route element={<ProtectedRoute />}>
@@ -84,15 +92,18 @@ export function AppRoutes() {
                   requires `usuarios:manage`, not the list read. */}
               <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_MANAGE} />}>
                 <Route path="/usuarios/novo" element={<UsuarioFormPage />} />
-                {/* A ficha é leitura; a edição tem rota própria. Abrir um
-                    profissional levava direto ao formulário, e com a edição
-                    indisponível no backend a linha não abria nada. */}
                 <Route path="/usuarios/:id/editar" element={<UsuarioFormPage />} />
-                <Route path="/usuarios/:id" element={<UsuarioDetalhePage />} />
               </Route>
 
+              {/* The record is READ, and it belongs with the list.
+                  It used to sit under `usuarios:manage`, which the gestor does
+                  not hold: they saw the list, clicked a row and were blocked by
+                  the guard — a screen that offers a link it will refuse. The
+                  form keeps its own route above, so editing stays behind
+                  `manage`. */}
               <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_READ} />}>
                 <Route path="/usuarios" element={<UsuariosPage />} />
+                <Route path="/usuarios/:id" element={<UsuarioDetalhePage />} />
               </Route>
 
               <Route element={<PermissionRoute permission={PERMISSAO.CONTEUDO_READ} />}>
