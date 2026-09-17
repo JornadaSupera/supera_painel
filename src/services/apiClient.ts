@@ -84,6 +84,14 @@ export async function call<T extends { error: ApiError | null }>(
    necessariamente genérico. Aqui cada recurso recebe sua assinatura concreta,
    declarada em `contracts/operations.ts`. É o único lugar do projeto onde essa
    conversão acontece — as telas consomem já tipado.
+
+   O `as unknown as` abaixo era o elo fraco: ele fazia o consumidor confiar numa
+   assinatura garantida só por coerção, e mock e Supabase podiam divergir em
+   parâmetro ou em retorno sem que nada reclamasse. A coerção continua — é o
+   preço de montar o adapter em runtime —, mas agora ela é **verificada na
+   origem**: cada adapter aplica `satisfies PartialAdapterModules` no próprio
+   bloco `implemented`, então uma divergência falha na compilação do adapter,
+   antes de chegar aqui.
    ------------------------------------------------------------------------- */
 
 export const authApi = api.auth as unknown as AuthOperations;

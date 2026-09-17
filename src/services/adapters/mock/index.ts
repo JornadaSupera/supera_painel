@@ -1,6 +1,7 @@
 // Both adapters register the same resources on purpose — `RESOURCES` checks
 // the surface at compile time — so this block mirrors the other adapter.
 // jscpd:ignore-start
+import type { PartialAdapterModules } from "../../contracts/operations";
 import { buildAdapter } from "../_stub";
 import * as aprovacoes from "./aprovacoes";
 import * as auditoria from "./auditoria";
@@ -42,7 +43,7 @@ const implemented = {
   estatisticasOperacionais, // Fase 13
   configuracoes, // Fase 9
   relatorios, // Fase 8
-};
+} satisfies PartialAdapterModules;
 // jscpd:ignore-end
 
 /**
