@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { FiltroClinico } from "@/services/contracts/operations";
 import { MapaDeCalor } from "../components/MapaDeCalor";
 import { useComparacaoProtocolos, useCruzamentoClinico } from "../hooks/useEstatisticas";
@@ -65,6 +66,8 @@ export function EstatisticasClinicasPage() {
   const comparacao = useComparacaoProtocolos(filtro);
 
   const dados = cruzamento.data;
+  const porPercentual = dados?.prevalencia_disponivel ?? true;
+  const filtroIgnorado = dados?.filtros_ignorados?.includes("apenasAtivos") ?? false;
 
   // "Vazio" só vale quando a consulta REALIZOU e não achou nada. Sem o
   // `!isError`, uma leitura que falhou cai no mesmo ramo e a tela explica a
@@ -117,15 +120,33 @@ export function EstatisticasClinicasPage() {
             id="apenas-ativos"
             checked={apenasAtivos}
             onCheckedChange={(marcado) => setApenasAtivos(marcado === true)}
+            disabled={filtroIgnorado}
           />
-          <Label htmlFor="apenas-ativos" className="text-xs font-normal">
+          <Label
+            htmlFor="apenas-ativos"
+            className={cn("text-xs font-normal", filtroIgnorado && "text-muted-foreground")}
+          >
             Apenas pacientes ativos
           </Label>
+          {/* Um controle que não muda o resultado é pior que um controle
+              ausente: quem o marca passa a acreditar num recorte que não houve.
+              A origem declara o que ignorou, e aqui ele fica desabilitado com o
+              motivo à mão em vez de desaparecer da tela. */}
+          {filtroIgnorado && (
+            <span
+              className="text-muted-foreground text-[11px]"
+              title="A leitura agregada do banco soma sobre os registros de diário do período, e diário de paciente arquivado continua sendo registro daquele período. O recorte por situação do paciente entra quando a função aceitá-lo."
+            >
+              (indisponível nesta origem)
+            </span>
+          )}
         </div>
 
         {dados && (
           <span className="text-muted-foreground text-[11px]">
-            {formatNumber(dados.pacientes_considerados)} pacientes no recorte
+            {dados.pacientes_considerados === null
+              ? `${formatNumber(dados.registros_considerados)} registros no recorte`
+              : `${formatNumber(dados.pacientes_considerados)} pacientes no recorte`}
           </span>
         )}
       </div>
@@ -146,7 +167,9 @@ export function EstatisticasClinicasPage() {
         <header className="mb-4">
           <h2 className="text-foreground text-sm font-semibold">Mapa de calor</h2>
           <p className="text-muted-foreground text-xs">
-            % de pacientes com o sintoma em grau {grauMinimo} ou maior, por protocolo
+            {porPercentual
+              ? `% de pacientes com o sintoma em grau ${grauMinimo} ou maior, por protocolo`
+              : `Registros do sintoma em grau ${grauMinimo} ou maior, por protocolo`}
           </p>
         </header>
 
@@ -159,7 +182,7 @@ export function EstatisticasClinicasPage() {
         {vazio && (
           <EmptyState
             title="Nada a cruzar no recorte"
-            description="Não há plano terapêutico vigente com registro de sintoma no período escolhido. Amplie o período ou inclua pacientes inativos."
+            description="Nenhum registro de sintoma no período escolhido atinge o grau mínimo. Amplie o período ou baixe o grau mínimo."
           />
         )}
 
@@ -169,7 +192,11 @@ export function EstatisticasClinicasPage() {
       {/* ------------------------------------------------ leitura comparativa */}
       <ChartCard
         title="Visualização comparativa"
-        description={`Prevalência média de efeitos em grau ${grauMinimo}+ por protocolo`}
+        description={
+          porPercentual
+            ? `Prevalência média de efeitos em grau ${grauMinimo}+ por protocolo`
+            : `Registros de efeitos em grau ${grauMinimo}+ por protocolo`
+        }
       >
         {comparacao.isLoading ? (
           <SkeletonChart />
@@ -184,11 +211,17 @@ export function EstatisticasClinicasPage() {
           <BarChart
             data={(comparacao.data ?? []).map((linha) => ({
               protocolo: linha.protocolo,
-              prevalencia: linha.prevalencia_media ?? 0,
+              // Sem denominador a barra mede registros, não percentual. Plotar
+              // `prevalencia_media ?? 0` desenharia um gráfico de zeros com
+              // eixo de porcentagem — a forma mais convincente de afirmar que
+              // nenhum protocolo tem efeito adverso.
+              medida: (porPercentual ? linha.prevalencia_media : linha.registros) ?? 0,
             }))}
             xKey="protocolo"
-            series={[{ key: "prevalencia", label: "Prevalência média" }]}
-            suffix="%"
+            series={[
+              { key: "medida", label: porPercentual ? "Prevalência média" : "Registros" },
+            ]}
+            suffix={porPercentual ? "%" : undefined}
             height={220}
           />
         )}
@@ -198,9 +231,11 @@ export function EstatisticasClinicasPage() {
         <StatusBadge tone="neutral" size="sm" className="mr-1.5">
           Sem identificação
         </StatusBadge>
-        Os números são contagens de pacientes distintos, nunca de registros — quem anotou o mesmo
-        sintoma em vinte dias conta uma vez. Nenhuma linha desta tela identifica paciente, e a
-        leitura clínica do que os números significam é da equipe.
+        {porPercentual
+          ? "Os números são contagens de pacientes distintos, nunca de registros — quem anotou o mesmo sintoma em vinte dias conta uma vez."
+          : "Os números são contagens de registros — quem anotou o mesmo sintoma em vinte dias conta vinte vezes. É carga de relato, não prevalência, e as duas leituras não se substituem."}{" "}
+        Nenhuma linha desta tela identifica paciente, e a leitura clínica do que os números
+        significam é da equipe.
       </p>
     </div>
   );

@@ -1,88 +1,225 @@
-import { ERROR_CODE, fail, type ListResult, type SingleResult } from "@/services/contracts";
-import type { ComparacaoProtocolo, CruzamentoClinico } from "@/types/estatisticas";
+import { failWith, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
+import type {
+  CelulaCruzamento,
+  ComparacaoProtocolo,
+  CruzamentoClinico,
+} from "@/types/estatisticas";
+import { executar } from "./_helpers";
+import {
+  SEM_PROTOCOLO_LABEL,
+  falhou,
+  janelaDeDias,
+  resumirSintomas,
+  type LinhaResumoSintoma,
+} from "./_summaries";
 
 /**
  * Estatísticas clínicas — Protocolo × Efeito × Grau.
  *
- * A pergunta da tela: de cada 100 pacientes em determinado protocolo, quantos
+ * A pergunta original da tela: de cada 100 pacientes de um protocolo, quantos
  * relataram determinado sintoma em grau igual ou acima do escolhido?
  *
- * **Hoje o painel não consegue responder, e passou a dizer isso.**
+ * > [!] O que mudou
+ * A versão anterior desta tela lia `diary_symptom_reports` linha a linha e cruzava
+ * em memória — prontuário viajando para o navegador para virar estatística, com
+ * teto de 5.000 registros e aviso de truncamento na tela. Antes dela, uma versão
+ * que somava sobre zero linhas e publicava o mapa vazio explicando o vazio com
+ * uma causa falsa ("amplie o período").
  *
- * > [!] Por que a leitura não alcança
- * As políticas de leitura clínica da equipe (`treatment_plans_select_admin`,
- * `diary_entries_select_admin`, `diary_symptom_reports_select_via_entry_reader`)
- * estão declaradas `TO clinical_reader`, e `authenticated` — o papel de quem faz
- * login — **não é membro dele**. Quem alcança aquelas linhas são as funções
- * `read_*`, `SECURITY DEFINER` com owner `clinical_reader`.
+ * Agora o cruzamento sai de `summarize_symptoms_by_protocol`: uma leitura, somada
+ * no banco, **sem nenhuma linha de diário no navegador** e sem teto. O agregado
+ * melhora a privacidade em vez de afrouxá-la, e paga **uma** leitura auditada
+ * onde a soma no cliente pagava uma por paciente.
  *
- * Um `.from("diary_symptom_reports")` feito pelo painel devolve **zero linhas e
- * nenhum erro**. Era assim que esta tela funcionava: ela montava o cruzamento em
- * memória sobre zero linhas e desenhava um mapa de calor vazio, explicando o
- * vazio com uma causa falsa ("amplie o período"). O período nunca foi o
- * problema.
+ * > [!] O RESUMO NÃO DEVOLVE DENOMINADOR — e por isso não há percentual
+ * A função devolve `report_count` e `patient_count` por protocolo × sintoma ×
+ * **grau**. Faltam duas coisas para a prevalência:
  *
- * > [!] Por que as `read_*` não resolvem
- * Elas existem, mas são **por paciente** (`read_diary_entries(p_patient_id)`) e
- * por registro (`read_diary_symptom_reports(p_diary_entry_id)`). Montar o
- * cruzamento por elas exigiria varrer a base inteira a cada abertura da tela —
- * e **cada chamada grava uma linha em `audit_log`**. Desenhar um gráfico
- * produziria centenas de registros de "administrador leu o prontuário de
- * fulano", que é exatamente o evento que a trilha existe para sinalizar.
- * Trocaríamos um número errado por um rastro sujo.
+ *  1. **O total de pacientes do protocolo no recorte** — o denominador. Nenhuma
+ *     coluna o traz, e nenhuma combinação das que existem o reconstrói.
+ *  2. **Pacientes distintos com grau ≥ N.** `patient_count` é distinto *dentro*
+ *     de um grau. Quem relatou grau 2 num dia e grau 3 noutro aparece nos dois
+ *     baldes; somar recontaria a pessoa. O maior balde é um **piso** seguro.
  *
- * > [!] O que destrava
- * Uma função de resumo no banco que devolva o cruzamento **já somado** —
- * protocolo, sintoma, grau, quantidade —, sem que nenhuma linha de prontuário
- * chegue ao navegador. Isso é melhor do que a versão anterior inclusive em
- * privacidade: antes o painel puxava registro de sintoma de pessoas
- * identificáveis para somar no cliente.
+ * Não se aproxima nem um nem outro. Emprestar o denominador de
+ * `read_patient_list(p_protocol)` pareceria resolver, mas ali o protocolo é o
+ * **vigente hoje**, enquanto o numerador é atribuído ao protocolo **da data do
+ * evento** — a razão entre os dois seria um percentual com numerador e
+ * denominador de universos diferentes, e nada na tela denunciaria a mistura.
  *
- * Quando ela existir, `crossTab` vira um `.rpc()` que devolve `CruzamentoClinico`
- * e **a tela não muda** — o contrato desta função é justamente o de um `.rpc()`.
+ * Então o mapa mostra o que é exato: **registros**. E declara, em voz alta, o que
+ * falta para voltar a mostrar percentual. Pedido registrado com o responsável
+ * pelo banco.
+ *
+ * > [!] O balde de protocolo nulo é resultado
+ * Conta os eventos de paciente **sem plano terapêutico registrado na data**, e
+ * enquanto o Gemed estiver desligado é a maioria — o plano só entra por RPC
+ * manual. A linha é rotulada, não descartada: ela é exatamente a informação que
+ * diz de quanto da base o painel ainda não sabe o protocolo.
  */
 
-/**
- * O motivo, escrito para quem opera o painel.
- *
- * Descreve a regra, não o arquivo: quem lê precisa saber o que pedir e a quem.
- */
-export const SEM_ORIGEM_CRUZAMENTO =
-  "O cruzamento depende de ler o diário e o plano terapêutico de toda a base ao mesmo tempo, e o backend só oferece essa leitura paciente a paciente — cada uma registrando um acesso ao prontuário. Falta uma leitura agregada, que devolva a contagem já somada sem expor registro de ninguém. Enquanto ela não existe, o painel prefere não exibir número a exibir um número que não mediu.";
+/** O que impede o percentual, escrito para quem opera o painel. */
+const SEM_DENOMINADOR =
+  "A leitura agregada do banco devolve quantos registros e quantas pessoas relataram cada sintoma em cada grau, mas não devolve quantos pacientes havia no protocolo no período — que é o denominador da prevalência. Sem ele o mapa mostra a contagem de registros, que é exata, em vez de um percentual calculado sobre um denominador ausente. Pedido registrado com o responsável pelo banco.";
+
+/** A observação sobre o piso, quando o recorte junta mais de um grau. */
+const PACIENTES_SAO_PISO =
+  "Com mais de um grau no recorte, a contagem de pacientes é um piso: o resumo conta pessoas distintas dentro de cada grau, e quem relatou dois graus diferentes no período apareceria duas vezes se os baldes fossem somados.";
 
 interface Parametros {
   /** Grau mínimo considerado presença do sintoma. O protótipo usa 2. */
   grauMinimo?: number;
   /** Recorte temporal do diário. O protótipo usa os últimos 90 dias. */
   dias?: number;
-  /** Só pacientes ativos — como a caixa de seleção do protótipo. */
+  /**
+   * Só pacientes ativos — a caixa de seleção do protótipo.
+   *
+   * O resumo do banco não recorta por situação do paciente: ele agrega sobre os
+   * registros de diário do período, e diário de paciente arquivado continua
+   * sendo registro daquele período. O parâmetro fica na assinatura porque é o
+   * recorte que a função vai receber quando aceitá-lo, e `apenasAtivos_ignorado`
+   * na resposta é o que impede a tela de afirmar um filtro que não houve.
+   */
   apenasAtivos?: boolean;
 }
 
-/**
- * O cruzamento, quando houver de onde tirá-lo.
- *
- * Os parâmetros continuam na assinatura de propósito: eles são o recorte que a
- * função de resumo vai receber, e mantê-los aqui é o que faz a troca de origem
- * não tocar na tela.
- */
-export async function crossTab(_params: Parametros = {}): Promise<SingleResult<CruzamentoClinico>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, SEM_ORIGEM_CRUZAMENTO);
+/* -------------------------------------------------------------------------
+   MONTAGEM DO CRUZAMENTO
+   ------------------------------------------------------------------------- */
+
+interface Acumulado {
+  registros: number;
+  /** Maior `patient_count` entre os graus do recorte — o piso de distintos. */
+  pisoPacientes: number;
+  /** Quantos graus diferentes entraram na célula. Um só ⇒ o piso é exato. */
+  graus: number;
+}
+
+function montar(linhas: LinhaResumoSintoma[], grauMinimo: number): CruzamentoClinico {
+  const noRecorte = linhas.filter((linha) => linha.grade >= grauMinimo);
+
+  const porCelula = new Map<string, Acumulado>();
+  const rotuloSintoma = new Map<string, string>();
+  const protocolos = new Set<string>();
+  let registrosConsiderados = 0;
+
+  for (const linha of noRecorte) {
+    // Sintoma sem id não tem coluna no mapa: o resumo já traz o rótulo por LEFT
+    // JOIN para que sintoma aposentado não desapareça, mas sem id não há chave.
+    if (!linha.symptom_id) continue;
+
+    const protocolo = linha.protocol_name ?? SEM_PROTOCOLO_LABEL;
+    protocolos.add(protocolo);
+    rotuloSintoma.set(linha.symptom_id, linha.symptom_label ?? "Sintoma aposentado");
+
+    const chave = `${protocolo}\u0000${linha.symptom_id}`;
+    const atual = porCelula.get(chave) ?? { registros: 0, pisoPacientes: 0, graus: 0 };
+
+    atual.registros += linha.report_count;
+    atual.pisoPacientes = Math.max(atual.pisoPacientes, linha.patient_count);
+    atual.graus += 1;
+
+    porCelula.set(chave, atual);
+    registrosConsiderados += linha.report_count;
+  }
+
+  // "Sem plano terapêutico" vai para o fim: é balde legítimo, e não o primeiro
+  // protocolo por acidente de ordenação alfabética.
+  const listaProtocolos = [...protocolos].sort((a, b) => {
+    if (a === SEM_PROTOCOLO_LABEL) return 1;
+    if (b === SEM_PROTOCOLO_LABEL) return -1;
+    return a.localeCompare(b, "pt-BR");
+  });
+
+  const sintomas = [...rotuloSintoma.entries()]
+    .map(([id, label]) => ({ id, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+
+  const celulas: CelulaCruzamento[] = [];
+
+  for (const protocolo of listaProtocolos) {
+    for (const sintoma of sintomas) {
+      const acumulado = porCelula.get(`${protocolo}\u0000${sintoma.id}`);
+      if (!acumulado) continue;
+
+      celulas.push({
+        protocolo,
+        sintoma_id: sintoma.id,
+        sintoma_label: sintoma.label,
+        registros: acumulado.registros,
+        pacientes_com: acumulado.pisoPacientes,
+        pacientes_exato: acumulado.graus === 1,
+        pacientes_total: null,
+        percentual: null,
+      });
+    }
+  }
+
+  const algumPiso = celulas.some((celula) => !celula.pacientes_exato);
+
+  return {
+    protocolos: listaProtocolos,
+    sintomas,
+    celulas,
+    grau_minimo: grauMinimo,
+    pacientes_considerados: null,
+    registros_considerados: registrosConsiderados,
+    prevalencia_disponivel: false,
+    motivo_sem_prevalencia: algumPiso ? `${SEM_DENOMINADOR} ${PACIENTES_SAO_PISO}` : SEM_DENOMINADOR,
+    filtros_ignorados: ["apenasAtivos"],
+    // O resumo não tem teto: ele conta no banco em vez de devolver linhas.
+    truncado: false,
+  };
+}
+
+/* -------------------------------------------------------------------------
+   LEITURA
+   ------------------------------------------------------------------------- */
+
+async function cruzar(params: Parametros): Promise<SingleResult<CruzamentoClinico>> {
+  return executar(async () => {
+    const resumo = await resumirSintomas({ janela: janelaDeDias(params.dias ?? 90) });
+    if (falhou(resumo)) return resumo;
+
+    return okOne(montar(resumo.linhas, params.grauMinimo ?? 2));
+  });
+}
+
+export async function crossTab(params: Parametros = {}): Promise<SingleResult<CruzamentoClinico>> {
+  return cruzar(params);
 }
 
 /** Mesmo cruzamento — o mapa de calor é a forma de desenhá-lo, não outro dado. */
 export async function heatmap(params: Parametros = {}): Promise<SingleResult<CruzamentoClinico>> {
-  return crossTab(params);
+  return cruzar(params);
 }
 
 /**
- * Prevalência média por protocolo.
+ * Leitura comparativa por protocolo.
  *
- * Deriva do mesmo cruzamento, então compartilha a mesma ausência de origem —
- * uma média de percentuais que não existem não é um número menos errado.
+ * Sem denominador não há média de prevalência, e uma média de percentuais que não
+ * existem não é um número menos errado. O que sai é a carga de relato —
+ * registros do protocolo no recorte —, que é exata e responde à mesma pergunta
+ * comparativa: onde a equipe recebe mais relato de efeito.
  */
 export async function compareProtocolos(
-  _params: Parametros = {},
+  params: Parametros = {},
 ): Promise<ListResult<ComparacaoProtocolo>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, SEM_ORIGEM_CRUZAMENTO);
+  return executar(async () => {
+    const cruzamento = await cruzar(params);
+    if (cruzamento.error) return failWith(cruzamento.error);
+
+    const dados = cruzamento.data;
+    const linhas = (dados?.protocolos ?? []).map<ComparacaoProtocolo>((protocolo) => ({
+      protocolo,
+      pacientes_total: null,
+      prevalencia_media: null,
+      registros: (dados?.celulas ?? [])
+        .filter((celula) => celula.protocolo === protocolo)
+        .reduce((soma, celula) => soma + celula.registros, 0),
+    }));
+
+    const ordenadas = [...linhas].sort((a, b) => b.registros - a.registros);
+    return ok(ordenadas, ordenadas.length);
+  });
 }

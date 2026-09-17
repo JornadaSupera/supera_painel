@@ -57,30 +57,62 @@ export function effectsByProtocolReport(
   if (cruzamento.error) return failWith(cruzamento.error);
 
   const dados = cruzamento.data;
+  const grau = dados?.grau_minimo ?? 2;
+
+  /*
+   * O relatório segue a medida do cruzamento, e não o contrário.
+   *
+   * Com denominador, a coluna que ordena é a prevalência. Sem ele, publicar uma
+   * coluna "Prevalência (%)" preenchida com `?? 0` daria a um relatório
+   * exportável — que sai da clínica em PDF e em CSV — uma coluna de zeros com
+   * cara de medição. Aí a medida é o registro, que é exato, e o cabeçalho diz
+   * isso.
+   */
+  const porPercentual = dados?.prevalencia_disponivel ?? true;
+
+  const colunasBase = [
+    { key: "protocolo", label: "Protocolo" },
+    { key: "efeito", label: "Efeito adverso" },
+  ];
+
+  const linhas = (dados?.celulas ?? [])
+    .filter((celula) => (porPercentual ? celula.pacientes_com > 0 : celula.registros > 0))
+    .map((celula) => ({
+      protocolo: celula.protocolo,
+      efeito: celula.sintoma_label,
+      pacientes: celula.pacientes_com,
+      base: celula.pacientes_total ?? "",
+      prevalencia: celula.percentual ?? 0,
+      registros: celula.registros,
+    }));
+
+  const pacientesLabel = dados?.celulas.every((celula) => celula.pacientes_exato)
+    ? "Pacientes"
+    : "Pacientes (mínimo)";
 
   return {
     slug: "efeitos-por-protocolo",
     titulo: "Efeitos adversos por protocolo e grau",
-    colunas: [
-      { key: "protocolo", label: "Protocolo" },
-      { key: "efeito", label: "Efeito adverso" },
-      { key: "pacientes", label: "Pacientes", numerica: true },
-      { key: "base", label: "No protocolo", numerica: true },
-      { key: "prevalencia", label: "Prevalência (%)", numerica: true },
-    ],
-    linhas: (dados?.celulas ?? [])
-      .filter((celula) => celula.pacientes_com > 0)
-      .map((celula) => ({
-        protocolo: celula.protocolo,
-        efeito: celula.sintoma_label,
-        pacientes: celula.pacientes_com,
-        base: celula.pacientes_total,
-        prevalencia: celula.percentual ?? 0,
-      }))
-      .sort((a, b) => b.prevalencia - a.prevalencia),
-    resumo: `grau ${dados?.grau_minimo ?? 2} ou maior · ${dados?.pacientes_considerados ?? 0} pacientes · últimos ${dias} dias`,
+    colunas: porPercentual
+      ? [
+          ...colunasBase,
+          { key: "pacientes", label: pacientesLabel, numerica: true },
+          { key: "base", label: "No protocolo", numerica: true },
+          { key: "prevalencia", label: "Prevalência (%)", numerica: true },
+        ]
+      : [
+          ...colunasBase,
+          { key: "registros", label: "Registros", numerica: true },
+          { key: "pacientes", label: pacientesLabel, numerica: true },
+        ],
+    linhas: porPercentual
+      ? [...linhas].sort((a, b) => b.prevalencia - a.prevalencia)
+      : [...linhas].sort((a, b) => b.registros - a.registros),
+    resumo: porPercentual
+      ? `grau ${grau} ou maior · ${dados?.pacientes_considerados ?? 0} pacientes · últimos ${dias} dias`
+      : `grau ${grau} ou maior · ${dados?.registros_considerados ?? 0} registros · últimos ${dias} dias · prevalência indisponível: a origem não devolve o total de pacientes por protocolo`,
     eixo: "efeito",
-    medida: "prevalencia",
+    medida: porPercentual ? "prevalencia" : "registros",
   };
 }
 

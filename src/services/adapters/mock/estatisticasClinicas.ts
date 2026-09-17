@@ -73,12 +73,19 @@ function montar(params: Parametros): CruzamentoClinico {
 
     for (const sintoma of sintomas) {
       const percentual = prevalencia(protocolo, sintoma.label, grau_minimo);
+      const pacientes_com = Math.round((percentual / 100) * pacientes_total);
 
       celulas.push({
         protocolo,
         sintoma_id: sintoma.id,
         sintoma_label: sintoma.label,
-        pacientes_com: Math.round((percentual / 100) * pacientes_total),
+        // Três relatos por paciente no recorte: quem sente o efeito anota mais
+        // de uma vez. Fixo de propósito — número que muda a cada F5 não confere.
+        registros: pacientes_com * 3,
+        pacientes_com,
+        // No mock a base inteira está em memória, então o distinto é o número
+        // cheio. No backend é piso; a diferença fica declarada nos dois lados.
+        pacientes_exato: true,
         pacientes_total,
         percentual: pacientes_total === 0 ? null : percentual,
       });
@@ -91,7 +98,8 @@ function montar(params: Parametros): CruzamentoClinico {
     celulas,
     grau_minimo,
     pacientes_considerados: considerados.length,
-    registros_considerados: celulas.length,
+    registros_considerados: celulas.reduce((soma, celula) => soma + celula.registros, 0),
+    prevalencia_disponivel: true,
     truncado: false,
   };
 }
@@ -123,6 +131,7 @@ export async function compareProtocolos(
           pacientes_total: doProtocolo[0]?.pacientes_total ?? 0,
           prevalencia_media:
             doProtocolo.length === 0 ? null : Math.round(soma / doProtocolo.length),
+          registros: doProtocolo.reduce((total, celula) => total + celula.registros, 0),
         };
       }),
     );
