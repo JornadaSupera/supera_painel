@@ -1,3 +1,4 @@
+import { sessionEvents, type RecordedEvent } from "@/lib/audit";
 import {
   ACAO_AUDITORIA,
   ORIGEM_AUDITORIA,
@@ -48,7 +49,7 @@ function pacienteDoRegistro(indice: number): { id: string; nome: string } | null
   return paciente ? { id: paciente.id, nome: paciente.nome } : null;
 }
 
-const registros: AuditoriaListItem[] = acessos.map((acesso, indice) => {
+const semente: AuditoriaListItem[] = acessos.map((acesso, indice) => {
   const paciente = pacienteDoRegistro(indice);
 
   return {
@@ -68,12 +69,56 @@ const registros: AuditoriaListItem[] = acessos.map((acesso, indice) => {
   };
 });
 
+const NOME_POR_PACIENTE = new Map(pacientes.map((paciente) => [paciente.id, paciente.nome]));
+
+/**
+ * Um evento da sessão atual, na forma que a tela de auditoria lê.
+ *
+ * `lib/audit.ts` mantinha a fila e **ninguém a consumia**: o painel afirmava
+ * alimentar a tela em desenvolvimento e a trilha saía só da semente estática.
+ * O efeito era que nenhuma ação da própria sessão aparecia, e o modo mock não
+ * exercitava o fluxo de ponta a ponta — exportar a base não deixava rastro
+ * visível nem ali, onde o rastro é o produto.
+ *
+ * O IP fica `null`: o navegador não conhece o próprio endereço público, e
+ * inventar um faria a coluna parecer informação.
+ */
+function paraLinha(evento: RecordedEvent): AuditoriaListItem {
+  const recurso = evento.resource;
+
+  return {
+    id: evento.id,
+    criado_em: evento.created_at,
+    acao: evento.action,
+    usuario_id: evento.actor_id,
+    usuario_nome: evento.actor_name,
+    recurso,
+    recurso_label: RECURSO_AUDITORIA_LABEL[recurso] ?? recurso,
+    recurso_id: evento.resource_id ?? null,
+    paciente_id: evento.patient_id ?? null,
+    paciente_nome: evento.patient_id ? (NOME_POR_PACIENTE.get(evento.patient_id) ?? null) : null,
+    linhas: typeof evento.details?.linhas === "number" ? evento.details.linhas : 1,
+    origem: evento.origin,
+    ip: null,
+  };
+}
+
+/**
+ * A trilha lida pela tela: o que a sessão fez, mais a semente.
+ *
+ * Função, e não constante, porque a fila cresce durante o uso — uma constante
+ * de módulo congelaria a trilha no instante em que o arquivo foi importado.
+ */
+function trilha(): AuditoriaListItem[] {
+  return [...sessionEvents().map(paraLinha), ...semente];
+}
+
 const CAMPOS_BUSCA = ["usuario_nome", "recurso_label", "paciente_nome"];
 
 export async function list(params: ListParams = {}): Promise<ListResult<AuditoriaListItem>> {
   return simulate(() =>
     paginate(
-      registros,
+      trilha(),
       { ...params, sort: params.sort ?? AUDIT_DEFAULT_SORT },
       { searchFields: CAMPOS_BUSCA, rangeField: "criado_em" },
     ),
@@ -82,7 +127,7 @@ export async function list(params: ListParams = {}): Promise<ListResult<Auditori
 
 export async function getById({ id }: { id: string }): Promise<SingleResult<AuditoriaListItem>> {
   return simulate(() => {
-    const registro = registros.find((linha) => linha.id === id);
+    const registro = trilha().find((linha) => linha.id === id);
     if (!registro) return fail(ERROR_CODE.NOT_FOUND, "Registro de auditoria não encontrado.");
 
     return okOne(registro);
@@ -103,7 +148,7 @@ export async function getFacets(
     const desde = params.range?.from;
     const ate = params.range?.to;
 
-    const naJanela = registros.filter((linha) => {
+    const naJanela = trilha().filter((linha) => {
       if (desde && linha.criado_em < desde) return false;
       if (ate && linha.criado_em > ate) return false;
       return true;
@@ -145,7 +190,7 @@ export async function getSummary(
 
     return okOne(
       summarizeAudit({
-        actions: registros
+        actions: trilha()
           .filter((registro) => Date.parse(registro.criado_em) >= desde)
           .map((registro) => registro.acao),
         countable: CONTAVEIS,
@@ -159,7 +204,7 @@ export async function getSummary(
 export async function exportar(
   params: ListParams = {},
 ): Promise<ListResult<Record<string, string>>> {
-  return toAuditExport(await list({ ...params, page: 1, pageSize: registros.length || 1 }));
+  return toAuditExport(await list({ ...params, page: 1, pageSize: trilha().length || 1 }));
 }
 
 export { exportar as export };

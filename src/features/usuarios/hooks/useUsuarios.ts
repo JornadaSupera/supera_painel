@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { toListQuery } from "@/hooks/listQuery";
 import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { STATUS_USUARIO_LABEL, type StatusUsuario } from "@/lib/enums";
@@ -35,12 +36,8 @@ export function useUsuarios() {
     placeholderData: (anterior) => anterior,
   });
 
-  return {
-    ...query,
-    usuarios: query.data?.data ?? [],
-    total: query.data?.count ?? 0,
-    params,
-  };
+  const { items, ...status } = toListQuery(query);
+  return { ...status, usuarios: items, params };
 }
 
 export function useUsuario(id: string | undefined) {
@@ -64,14 +61,9 @@ export function useAcessos(id: string | undefined, aberto: boolean) {
   return useQuery({
     queryKey: queryKeys.users.accessLogs(id ?? ""),
     enabled: Boolean(id) && aberto,
-    queryFn: async () => {
-      const resultado = await call(() =>
-        usuariosApi.listAccessLogs({ id: id as string, page: 1, pageSize: 50 }),
-      );
-      // Consultar o rastro de outra pessoa também deixa rastro.
-      audit.read("usuarios/acessos", id);
-      return resultado;
-    },
+    // Consultar o rastro de outra pessoa também deixa rastro — e é o banco que
+    // o grava, dentro da função que entrega a trilha. Ver `lib/audit.ts`.
+    queryFn: () => call(() => usuariosApi.listAccessLogs({ id: id as string, page: 1, pageSize: 50 })),
   });
 }
 
@@ -197,9 +189,13 @@ export function useSalvarMatriz() {
       return data;
     },
     onSuccess: async () => {
-      // Invalida usuários também: as permissões efetivas de cada um mudam junto.
-      await queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.users.all });
+      // Invalida usuários também: as permissões efetivas de cada um mudam
+      // junto. Em paralelo — as duas entidades não dependem uma da outra, e
+      // encadear só soma latência antes de a tela atualizar.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.users.all }),
+      ]);
 
       toast.success("Permissões atualizadas", {
         description: "Cada pessoa passa a usar as novas permissões no próximo acesso.",

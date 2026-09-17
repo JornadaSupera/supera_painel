@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { audit } from "@/lib/audit";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, estatisticasClinicasApi, estatisticasOperacionaisApi } from "@/services/apiClient";
 import type { FiltroClinico } from "@/services/contracts/operations";
@@ -8,23 +7,23 @@ import type { FiltroClinico } from "@/services/contracts/operations";
 /**
  * Leitura das duas telas de estatística.
  *
- * O cruzamento clínico registra auditoria mesmo sendo agregado: ele nasce do
- * diário de sintomas de pessoas identificáveis, e "quem consultou a base
- * clínica, e com que recorte" é pergunta legítima numa apuração. O agregado
- * protege a identidade na TELA; não torna o acesso irrelevante.
+ * > [!] A auditoria do acesso é do BANCO, não deste arquivo
+ * As funções de resumo são `SECURITY DEFINER` e gravam em `audit_log` antes de
+ * responder, com quem chamou e quantos registros a varredura alcançou. O acesso
+ * é registrado mesmo sendo agregado — "quem consultou a base clínica, e com que
+ * recorte" é pergunta legítima numa apuração.
  *
- * As operacionais não registram: agenda e chat entram ali como contagem de
- * eventos da clínica, sem recorte que aponte para uma pessoa.
+ * Emitir o mesmo evento aqui duplicaria a trilha e divergiria dela: o registro
+ * do cliente ficava dentro do `queryFn`, então uma tela servida pelo cache não
+ * gerava evento, e um refetch por foco de janela gerava um evento sem que
+ * ninguém tivesse pedido nada. Auditoria cuja semântica muda com a política de
+ * cache não é auditoria.
  */
 
 export function useCruzamentoClinico(filtro: FiltroClinico) {
   return useQuery({
     queryKey: queryKeys.statistics.clinical(filtro),
-    queryFn: async () => {
-      const resultado = await call(() => estatisticasClinicasApi.crossTab(filtro));
-      audit.read("estatisticas/clinicas", undefined);
-      return resultado.data;
-    },
+    queryFn: async () => (await call(() => estatisticasClinicasApi.crossTab(filtro))).data,
     placeholderData: (anterior) => anterior,
   });
 }

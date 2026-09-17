@@ -28,13 +28,7 @@ export function useRelatorio(slug: string | undefined, dias: number) {
   return useQuery({
     queryKey: queryKeys.reports.run(slug ?? "", { dias }),
     enabled: Boolean(slug),
-    queryFn: async () => {
-      const resultado = await call(() =>
-        relatoriosApi.run({ slug: slug as string, dias }),
-      );
-      audit.read(`${RECURSO}/${slug}`, undefined);
-      return resultado.data;
-    },
+    queryFn: async () => (await call(() => relatoriosApi.run({ slug: slug as string, dias }))).data,
   });
 }
 

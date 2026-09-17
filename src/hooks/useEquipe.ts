@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import type { Especialidade } from "@/lib/enums";
+import { toListQuery } from "./listQuery";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, usuariosApi } from "@/services/apiClient";
 
@@ -30,5 +31,6 @@ export function useProfissionais(especialidade?: Especialidade) {
     staleTime: CINCO_MINUTOS,
   });
 
-  return { ...query, profissionais: query.data?.data ?? [] };
+  const { items, ...status } = toListQuery(query);
+  return { ...status, profissionais: items };
 }

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { toListQuery } from "@/hooks/listQuery";
 import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { ACAO_REVISAO, STATUS_CONTEUDO, type AcaoRevisao } from "@/lib/enums";
@@ -34,11 +35,8 @@ export function useFilaRevisao() {
     queryFn: () => call(() => aprovacoesApi.listQueue({ page: 1, pageSize: 50 })),
   });
 
-  return {
-    ...query,
-    fila: query.data?.data ?? [],
-    total: query.data?.count ?? 0,
-  };
+  const { items, ...status } = toListQuery(query);
+  return { ...status, fila: items };
 }
 
 /** A lista "Publicados", com busca, filtros e paginação. */
@@ -58,12 +56,8 @@ export function useConteudos() {
     placeholderData: (anterior) => anterior,
   });
 
-  return {
-    ...query,
-    conteudos: query.data?.data ?? [],
-    total: query.data?.count ?? 0,
-    params,
-  };
+  const { items, ...status } = toListQuery(query);
+  return { ...status, conteudos: items, params };
 }
 
 export function useConteudo(id: string | undefined) {
@@ -83,11 +77,7 @@ export function useComparacao(id: string | undefined, aberto: boolean) {
   return useQuery({
     queryKey: queryKeys.approvals.diff(id ?? "", 0),
     enabled: Boolean(id) && aberto,
-    queryFn: async () => {
-      const resultado = await call(() => aprovacoesApi.getDiff({ id: id as string }));
-      audit.read(`${RECURSO}/comparacao`, id);
-      return resultado.data;
-    },
+    queryFn: async () => (await call(() => aprovacoesApi.getDiff({ id: id as string }))).data,
   });
 }
 
@@ -109,12 +99,21 @@ export function useVersoes(orientacaoId: string | undefined, aberto: boolean) {
    DECISÃO
    ------------------------------------------------------------------------- */
 
+/**
+ * Conteúdo e fila de aprovação caminham juntos: uma decisão editorial muda a
+ * versão e tira a linha da fila.
+ *
+ * Em paralelo, não em série: são duas entidades independentes, e aguardar uma
+ * para começar a outra só soma a latência das duas antes de a tela atualizar.
+ */
 function useInvalidarConteudo() {
   const queryClient = useQueryClient();
 
   return async () => {
-    await queryClient.invalidateQueries({ queryKey: queryKeys.contents.all });
-    await queryClient.invalidateQueries({ queryKey: queryKeys.approvals.all });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.contents.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.approvals.all }),
+    ]);
   };
 }
 

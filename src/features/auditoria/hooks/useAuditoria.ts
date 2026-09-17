@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { toListQuery } from "@/hooks/listQuery";
 import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { downloadFile, nameWithDate, toCsv } from "@/lib/csv";
@@ -40,12 +41,8 @@ export function useTrilha() {
     placeholderData: (anterior) => anterior,
   });
 
-  return {
-    ...query,
-    registros: query.data?.data ?? [],
-    total: query.data?.count ?? 0,
-    params,
-  };
+  const { items, ...status } = toListQuery(query);
+  return { ...status, registros: items, params };
 }
 
 /**

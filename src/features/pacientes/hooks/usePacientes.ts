@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { toListQuery } from "@/hooks/listQuery";
 import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { downloadCsv } from "@/lib/csv";
@@ -40,24 +41,22 @@ export function usePacientes() {
     placeholderData: (anterior) => anterior,
   });
 
-  return {
-    ...query,
-    pacientes: query.data?.data ?? [],
-    total: query.data?.count ?? 0,
-    params,
-  };
+  const { items, ...status } = toListQuery(query);
+  return { ...status, pacientes: items, params };
 }
 
-/** Ficha completa. O acesso a uma ficha individual é um evento de auditoria. */
+/**
+ * Ficha completa.
+ *
+ * Abrir uma ficha é um evento de auditoria, e quem o grava é o banco:
+ * `read_patient` registra a leitura no titular antes de devolver a linha. O
+ * painel não emite o evento em paralelo — ver `lib/audit.ts`.
+ */
 export function usePaciente(id: string | undefined) {
   return useQuery({
     queryKey: queryKeys.patients.detail(id ?? ""),
     enabled: Boolean(id),
-    queryFn: async () => {
-      const { data } = await call(() => pacientesApi.getById({ id: id as string }));
-      if (data) audit.read(RECURSO, data.id, data.id);
-      return data;
-    },
+    queryFn: async () => (await call(() => pacientesApi.getById({ id: id as string }))).data,
   });
 }
 
