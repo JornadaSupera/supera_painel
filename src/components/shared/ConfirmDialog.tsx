@@ -35,8 +35,6 @@ export interface ConfirmDialogProps {
   tone?: "danger" | "warning";
   confirmLabel?: string;
   cancelLabel?: string;
-  /** Asks for a justification — the text goes to the audit trail. */
-  requireReason?: boolean;
   loading?: boolean;
 }
 
@@ -51,7 +49,6 @@ export function ConfirmDialog({
   tone = "danger",
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
-  requireReason = false,
   loading = false,
 }: ConfirmDialogProps) {
   const reasonId = useId();
@@ -63,7 +60,7 @@ export function ConfirmDialog({
     if (open) setReason("");
   }, [open]);
 
-  const reasonIsValid = !requireReason || reason.trim().length >= MIN_REASON_LENGTH;
+  const reasonIsValid = reason.trim().length >= MIN_REASON_LENGTH;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -87,31 +84,33 @@ export function ConfirmDialog({
           </div>
         </AlertDialogHeader>
 
-        {requireReason && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={reasonId}>
-              Motivo
-              <span className="text-destructive" aria-hidden="true">
-                *
-              </span>
-              <span className="sr-only">(obrigatório)</span>
-            </Label>
+        {/* A justificativa não é opcional, e por isso não há prop para
+            desligá-la. `onConfirm` sempre exigiu `{ reason }`, e todos os usos
+            já pediam o campo: a bandeira só permitia um quarto estado em que o
+            diálogo entregava string vazia para a trilha de auditoria. */}
+        <div className="flex flex-col gap-2">
+          <Label htmlFor={reasonId}>
+            Motivo
+            <span className="text-destructive" aria-hidden="true">
+              *
+            </span>
+            <span className="sr-only">(obrigatório)</span>
+          </Label>
 
-            <Textarea
-              id={reasonId}
-              value={reason}
-              onChange={(event) => setReason(event.target.value)}
-              maxLength={280}
-              rows={3}
-              placeholder="Descreva o motivo desta ação"
-              aria-describedby={`${reasonId}-hint`}
-            />
+          <Textarea
+            id={reasonId}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            maxLength={280}
+            rows={3}
+            placeholder="Descreva o motivo desta ação"
+            aria-describedby={`${reasonId}-hint`}
+          />
 
-            <p id={`${reasonId}-hint`} className="text-muted-foreground text-xs">
-              Registrado na trilha de auditoria. Mínimo de {MIN_REASON_LENGTH} caracteres.
-            </p>
-          </div>
-        )}
+          <p id={`${reasonId}-hint`} className="text-muted-foreground text-xs">
+            Registrado na trilha de auditoria. Mínimo de {MIN_REASON_LENGTH} caracteres.
+          </p>
+        </div>
 
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading}>{cancelLabel}</AlertDialogCancel>

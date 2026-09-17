@@ -143,7 +143,6 @@ export function AcoesUsuario({
         title="Desativar o segundo fator?"
         description={`${usuario.nome} passará a entrar apenas com e-mail e senha. O painel dá acesso a prontuário oncológico — trate isto como exceção temporária.`}
         confirmLabel="Desativar"
-        requireReason
         loading={alterarMfa.isPending}
         onConfirm={({ reason }) => {
           alterarMfa.mutate({ id: usuario.id, ativo: false, motivo: reason });

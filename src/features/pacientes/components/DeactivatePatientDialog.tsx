@@ -28,7 +28,6 @@ export function DeactivatePatientDialog({
       title={`Desativar ${paciente.nome}?`}
       description="A ficha continua no sistema e o histórico é preservado, mas o paciente deixa de aparecer como ativo e perde o acesso ao aplicativo."
       confirmLabel="Desativar"
-      requireReason
       loading={desativar.isPending}
       onConfirm={({ reason }) => {
         desativar.mutate({ id: paciente.id, motivo: reason }, { onSuccess: onDeactivated });
