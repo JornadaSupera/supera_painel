@@ -1,4 +1,4 @@
-import { Activity, CalendarX, Clock, MessageSquare } from "lucide-react";
+import { Activity, CalendarX, Clock, MessageSquareDashed } from "lucide-react";
 import type { ComponentType } from "react";
 
 import {
@@ -41,14 +41,14 @@ const ICONES: Record<string, ComponentType> = {
   tempo_resposta_chat: Clock,
   taxa_falta: CalendarX,
   atendimentos_semana: Activity,
-  mensagens_dia: MessageSquare,
+  conversas_sem_resposta: MessageSquareDashed,
 };
 
 const MOTIVO_SEM_PARAMETRO =
   "Meta mensal e capacidade máxima não existem como dado: não há tabela de parâmetro operacional no banco. Assim que a clínica registrar os dois números, as linhas de referência aparecem no gráfico.";
 
 const MOTIVO_SEM_ALERTAS =
-  "A fila de alertas depende de uma tabela de alerta e de uma regra de criticidade, que o backend ainda não tem. Deduzir alerta a partir do grau do sintoma seria inferência clínica no painel, que o escopo não permite.";
+  "A fila de alertas já existe no backend — o que não existe é gatilho. Nenhum limiar de criticidade foi cadastrado, e sem regra nenhum alerta dispara: a fila está vazia por configuração, não por ausência de ocorrência. O limiar é decisão clínica, e cadastrá-lo é ato da administração. Enquanto não houver regra, o painel não exibe o número: “zero alertas” seria lido como tranquilidade.";
 
 export function EstatisticasOperacionaisPage() {
   const { data, isLoading, isError, error, refetch } = useEstatisticasOperacionais();
@@ -131,7 +131,10 @@ export function EstatisticasOperacionaisPage() {
       )}
 
       {/* ---------------------------------------------------- volume mensal */}
-      <ChartCard title="Volume de sessões" description="Compromissos por mês nos últimos 7 meses">
+      <ChartCard
+        title="Volume de sessões"
+        description="Compromissos por mês nos últimos 7 meses · o mês corrente vai até hoje, e por isso aparece menor"
+      >
         {isLoading ? (
           <SkeletonChart />
         ) : isError ? (
@@ -157,7 +160,9 @@ export function EstatisticasOperacionaisPage() {
       <section className="flex flex-col gap-3">
         <h2 className="text-foreground text-sm font-semibold">
           Atendimentos por especialidade
-          <span className="text-muted-foreground font-normal"> · últimos 7 meses</span>
+          <span className="text-muted-foreground font-normal">
+            {" · últimos 7 meses · compromisso sem profissional entra como “sem área de origem”"}
+          </span>
         </h2>
 
         <div className="bg-card overflow-hidden rounded-2xl border">
@@ -172,8 +177,8 @@ export function EstatisticasOperacionaisPage() {
             onRetry={() => void refetch()}
             emptyState={
               <EmptyState
-                title="Nenhum compromisso com área de origem"
-                description="Os compromissos do período não têm especialidade de origem registrada, então não há como distribuí-los por área."
+                title="Nenhum compromisso no período"
+                description="A agenda não registrou compromisso nos últimos 7 meses. Compromisso sem profissional não é descartado: ele apareceria aqui como “sem área de origem”."
               />
             }
           />

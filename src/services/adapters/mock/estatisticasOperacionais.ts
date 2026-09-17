@@ -73,11 +73,14 @@ const INDICADORES: IndicadorOperacional[] = [
     contexto: "por especialidade média",
   },
   {
-    chave: "mensagens_dia",
-    label: "Mensagens / dia",
-    valor: 47,
+    // Mesma chave do adapter Supabase. O mock existe para conferir o desenho da
+    // tela, e um indicador que só um dos dois lados produz não confere nada.
+    chave: "conversas_sem_resposta",
+    label: "Conversas s/ resposta",
+    valor: 9,
     unidade: "",
-    contexto: "recebidas no chat",
+    contexto: "de 214 abertas no período",
+    inverter_cor: true,
   },
 ];
 
