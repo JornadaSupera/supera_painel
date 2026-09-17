@@ -85,14 +85,24 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "pacientes.sort.cid": SEM_ORDENACAO_NO_SERVIDOR,
   "pacientes.sort.fase": SEM_ORDENACAO_NO_SERVIDOR,
   "pacientes.sort.status": SEM_ORDENACAO_NO_SERVIDOR,
-  "pacientes.create":
-    "O cadastro de paciente ainda não existe no backend: a tabela só permite leitura.",
-  "pacientes.update": "A edição de ficha ainda não existe no backend.",
-  "pacientes.deactivate": "A desativação de paciente ainda não existe no backend.",
-  "pacientes.sendInvite":
-    "O convite de acesso ao app ainda não existe no backend: falta o vínculo entre a ficha e a conta.",
-  "usuarios.create": "O cadastro de profissional ainda não existe no backend.",
-  "usuarios.update": "A edição de profissional ainda não existe no backend.",
+  "pacientes.form.diagnostico":
+    "Diagnóstico, estadiamento, protocolo e fase não são preenchidos no painel administrativo: registrá-los é ato clínico, e ainda não está decidido se este perfil pode praticá-lo. A ficha continua exibindo o que vier do sistema do consultório.",
+  "pacientes.form.sexo":
+    "Não há coluna de sexo no cadastro, e nenhuma tela do escopo a exibe. Coletar o campo gravaria no vazio.",
+  "pacientes.deactivate.motivo":
+    "O motivo da desativação não chega ao backend: a trilha guarda o ato e o ator, e não tem coluna de justificativa. O texto fica no registro do painel.",
+  "pacientes.historico.remover":
+    "Alergia e reação prévia não se apagam: o registro clínico é imutável, e a única operação do backend é acrescentar. Corrigir um termo errado é acrescentar o certo.",
+  "pacientes.convite.envio":
+    "O convite é emitido, não enviado: não há provedor de mensagem contratado. O código aparece uma vez na tela para ser passado ao paciente.",
+  "usuarios.create.conta":
+    "O painel não cria contas: ele concede perfil a quem já se cadastrou. Criar acesso de terceiro exigiria a chave de serviço, que nunca entra no navegador — e quem escolhe a senha tem que ser o titular, senão a trilha deixa de sustentar quem fez o quê.",
+  "usuarios.update.identidade":
+    "Nome e e-mail são da conta, e a única política de escrita ali é a do próprio titular. Corrigi-los é ato da pessoa, não da administração.",
+  "usuarios.papel.gestor":
+    "Gestor não existe como perfil no cadastro: há administrador e profissional, e nada entre os dois. O papel segue na matriz de permissões porque descreve um alcance real, mas não há onde gravá-lo.",
+  "usuarios.list.horario":
+    "Não há onde guardar a janela de atendimento no chat: nenhuma tabela tem as duas colunas de horário.",
   "usuarios.pause":
     "Pausar acesso ainda não existe no backend: só há ativo e inativo. Desativar revoga o acesso na hora.",
   "usuarios.setMfa":
