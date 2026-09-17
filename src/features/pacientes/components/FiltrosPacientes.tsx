@@ -1,4 +1,9 @@
-import { ClearFiltersButton, FilterSelect, SearchInput } from "@/components/shared";
+import {
+  ClearFiltersButton,
+  FilterSelect,
+  SearchInput,
+  SourceErrorChip,
+} from "@/components/shared";
 import { useCids, useProtocolos } from "@/hooks/useCatalogos";
 import { motivoIndisponivel } from "@/services/apiClient";
 import {
@@ -19,10 +24,16 @@ import { usePacientesStore, type FiltrosPacientes as Filtros } from "@/stores/pa
  * que é onde o protótipo mostra como esse controle se parece aqui.
  */
 export function FiltrosPacientes() {
-  // Filtrar por um campo que a listagem não traz devolveria sempre lista vazia,
-  // sem erro nenhum — o pior tipo de controle: o que parece funcionar.
+  /*
+   * Filtrar por um campo que a origem não oferece devolveria sempre lista vazia,
+   * sem erro nenhum — o pior tipo de controle: o que parece funcionar.
+   *
+   * O filtro por protocolo tem uma ausência própria, e por isso a chave é outra:
+   * o backend ACEITA o filtro, o que não existe é catálogo de protocolos para
+   * oferecer no seletor. Um `<Select>` sem opção nenhuma é o mesmo beco.
+   */
   const semCid = motivoIndisponivel("pacientes.list.cid") !== null;
-  const semProtocolo = motivoIndisponivel("pacientes.list.protocolo") !== null;
+  const semProtocolo = motivoIndisponivel("pacientes.filter.protocolo") !== null;
   const semRisco = motivoIndisponivel("pacientes.list.risco") !== null;
 
   const busca = usePacientesStore((estado) => estado.busca);
@@ -58,25 +69,38 @@ export function FiltrosPacientes() {
         className="min-w-60 flex-1"
       />
 
-      {!semProtocolo && (
-        <FilterSelect
-          label="Protocolo"
-          value={filtros.protocolo_id}
-          onChange={aplicar("protocolo_id")}
-          options={opcoesProtocolo}
-          className="w-52"
-        />
-      )}
+      {/* Seletor cujo catálogo falhou some e dá lugar ao motivo: uma lista
+          vazia por erro de rede é indistinguível de uma lista vazia legítima, e
+          quem vê "Protocolo: todos" sem opção nenhuma conclui que a clínica não
+          tem protocolo cadastrado. */}
+      {!semProtocolo &&
+        (protocolos.isError ? (
+          <SourceErrorChip
+            label="A lista de protocolos"
+            onRetry={() => void protocolos.refetch()}
+          />
+        ) : (
+          <FilterSelect
+            label="Protocolo"
+            value={filtros.protocolo_id}
+            onChange={aplicar("protocolo_id")}
+            options={opcoesProtocolo}
+            className="w-52"
+          />
+        ))}
 
-      {!semCid && (
-        <FilterSelect
-          label="CID"
-          value={filtros.cid}
-          onChange={aplicar("cid")}
-          options={opcoesCid}
-          className="w-40"
-        />
-      )}
+      {!semCid &&
+        (cids.isError ? (
+          <SourceErrorChip label="A lista de CIDs" onRetry={() => void cids.refetch()} />
+        ) : (
+          <FilterSelect
+            label="CID"
+            value={filtros.cid}
+            onChange={aplicar("cid")}
+            options={opcoesCid}
+            className="w-40"
+          />
+        ))}
 
       <FilterSelect
         label="Fase"

@@ -1,11 +1,12 @@
-import { FASE_TRATAMENTO_LABEL, RISCO_LABEL, STATUS_PACIENTE, STATUS_PACIENTE_LABEL } from "@/lib/enums";
-import { ageInYears, formatDate } from "@/lib/format";
+import { FASE_TRATAMENTO_LABEL, STATUS_PACIENTE, STATUS_PACIENTE_LABEL } from "@/lib/enums";
+import { ageInYears } from "@/lib/format";
 import { maskCpf, maskEmail, maskPhone } from "@/lib/mask";
 import {
   ERROR_CODE,
   fail,
   ok,
   okOne,
+  type FilterValue,
   type ListParams,
   type ListResult,
   type SingleResult,
@@ -18,11 +19,10 @@ import type {
   PiiRevelada,
   StatusConvite,
 } from "@/types/paciente";
-import { paginate } from "../_list";
 import { PATIENT_DEFAULT_SORT, normalizePatientSearch } from "../_people";
 import { TETO_READ, executar, falhaDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
-import { codigoExibidoDoPaciente, paraFase } from "./mapping";
+import { codigoExibidoDoPaciente, paraCodigoDeFase, paraFase } from "./mapping";
 
 /**
  * Pacientes.
@@ -36,23 +36,24 @@ import { codigoExibidoDoPaciente, paraFase } from "./mapping";
  *    zero linhas, silenciosamente. É o pedágio de auditoria, e ele é exigência
  *    de LGPD, não detalhe de implementação.
  *
- * 2. **`read_patients` aceita só `p_limit` e `p_offset`.** Não há busca, filtro,
- *    ordenação nem total. O que a tela pede além disso é resolvido sobre a
- *    janela que a função devolveu — e o teto do servidor é de 200 linhas.
+ * 2. **A listagem é `read_patient_list`, e ela resolve tudo no servidor** —
+ *    busca sem acento, filtro por protocolo, CID e fase, ordenação e o **total
+ *    do conjunto filtrado**. `read_patients`, a antiga, aceitava só `p_limit` e
+ *    `p_offset`, e é isso que este arquivo deixou de usar.
  *
- * 3. **O cadastro é de duas metades, e só uma é gravável.** Nome, CPF,
- *    nascimento, telefone e e-mail vivem em `patients`, que tem GRANT de
- *    INSERT e UPDATE mas nenhuma política de RLS para esses verbos — logo, são
- *    somente leitura. Já diagnóstico, alergias, protocolo e fase têm RPC
- *    própria (`upsert_patient_diagnosis`, `add_patient_clinical_history`,
- *    `set_treatment_plan`, `set_treatment_phase`) e são graváveis hoje.
+ * 3. **A ficha continua em duas leituras diferentes da listagem.**
+ *    `read_patient` devolve a linha inteira de `patients`; diagnóstico, plano e
+ *    histórico saem de três funções próprias. Cada uma é um acesso registrado no
+ *    titular — e é por isso que a listagem não as chama.
  *
- * > [!] O mascaramento acontece aqui, no cliente.
- * O desenho original previa uma view mascarada no Postgres — `read_patient`
- * devolve `SETOF patients`, com CPF, telefone e e-mail em claro. Enquanto a
- * view não existir, `revealPii` não é uma barreira, é uma convenção de
- * interface: o valor completo já chegou ao navegador. Está registrado no resumo
- * da entrega como pendência para o responsável pelo banco.
+ * > [!] O CPF da LISTA é mascarado pelo banco; o da FICHA, aqui.
+ * `read_patient_list` devolve `cpf_masked`, e o documento inteiro não sai da
+ * clínica — não há o que vazar no DevTools nem no cache do navegador.
+ * `read_patient` ainda devolve `SETOF patients`, com CPF, telefone e e-mail em
+ * claro: ali `revealPii` não é uma barreira, é convenção de interface, porque o
+ * valor completo já chegou. `lib/mask.ts` reproduz a mesma forma do banco para
+ * que lista e ficha não pareçam divergir. A view mascarada para `read_patient`
+ * continua pendente com o responsável pelo banco.
  */
 
 /* -------------------------------------------------------------------------
@@ -98,6 +99,31 @@ interface LinhaPlano {
 interface Catalogos {
   cidPorId: Map<string, { code: string; label: string }>;
   fasePorId: Map<string, string>;
+}
+
+/**
+ * Fases do tratamento, nos dois sentidos.
+ *
+ * A listagem precisa dos dois: `read_patient_list` devolve `treatment_phase_id`
+ * e recebe `p_treatment_phase_id`, enquanto a tela fala em código de fase. O
+ * catálogo é curto e de leitura direta, sem pedágio de auditoria.
+ */
+interface Fases {
+  porId: Map<string, string>;
+  idPorCodigo: Map<string, string>;
+}
+
+async function carregarFases(): Promise<Fases | ReturnType<typeof falhaDe>> {
+  const { data, error } = await getSupabaseClient().from("treatment_phases").select("id, code");
+
+  if (error) return falhaDe(error);
+
+  const linhas = (data ?? []) as { id: string; code: string }[];
+
+  return {
+    porId: new Map(linhas.map((linha) => [linha.id, linha.code])),
+    idPorCodigo: new Map(linhas.map((linha) => [linha.code, linha.id])),
+  };
 }
 
 async function carregarCatalogos(): Promise<Catalogos | ReturnType<typeof falhaDe>> {
@@ -214,60 +240,175 @@ function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDet
 }
 
 /* -------------------------------------------------------------------------
-   LEITURA
+   LISTAGEM — `read_patient_list`
+   -------------------------------------------------------------------------
+   A função de listagem do banco resolve NO SERVIDOR o que este arquivo antes
+   resolvia sobre uma janela de 200 linhas: busca sem acento, filtro por
+   protocolo, CID e fase, ordenação e — o que consertou o defeito mais caro — o
+   **total do conjunto filtrado**, que vem em cada linha.
+
+   O que a versão anterior fazia, e por que era errado: `read_patients` só aceita
+   `p_limit` e `p_offset`, e o servidor para em 200. A lista contava 200 e
+   paginava sobre eles, então **a partir do paciente 201 a base ficava
+   invisível** — sem erro, sem aviso, com uma paginação que dizia saber quantas
+   páginas tinha.
+
+   `read_patients` continua no ar até a migration que a aposenta. Este arquivo
+   deixou de usá-la, e é esse o aviso que o responsável pelo banco espera.
    ------------------------------------------------------------------------- */
 
-// O CPF chega mascarado na projeção: um termo numérico casa apenas com os
-// dígitos visíveis — é o que a listagem oferece sem trazer o documento inteiro
-// de todo mundo para o navegador.
-const CAMPOS_BUSCA = ["nome", "codigo", "cpf_mascarado"];
-
-/** A janela inteira que `read_patients` devolve, já projetada para a listagem. */
-async function carregarItens(): Promise<PacienteListItem[] | ReturnType<typeof falhaDe>> {
-  const catalogos = await carregarCatalogos();
-  if (!("cidPorId" in catalogos)) return catalogos;
-
-  const { data, error } = await getSupabaseClient().rpc("read_patients", {
-    p_limit: TETO_READ,
-    p_offset: 0,
-  });
-
-  if (error) return falhaDe(error);
-
-  return ((data ?? []) as LinhaPaciente[]).map((linha) => projetar(linha, { catalogos }));
-}
-
-/** Busca, filtro, ordenação e página sobre a janela — os mesmos da tela. */
-function recortar(itens: PacienteListItem[], params: ListParams): ListResult<PacienteListItem> {
-  return paginate(
-    itens,
-    {
-      ...params,
-      search: normalizePatientSearch(params.search),
-      sort: params.sort ?? PATIENT_DEFAULT_SORT,
-    },
-    { searchFields: CAMPOS_BUSCA },
-  );
+/** Uma linha de `read_patient_list` — projeção estreita, com CPF já mascarado. */
+interface LinhaListaPaciente {
+  patient_id: string;
+  full_name: string;
+  cpf_masked: string | null;
+  birth_date: string;
+  is_active: boolean;
+  has_account: boolean;
+  treatment_phase_id: string | null;
+  treatment_phase_label: string | null;
+  protocol_name: string | null;
+  current_cycle_number: number | null;
+  primary_cid10_code: string | null;
+  primary_cid10_label: string | null;
+  /** Total do conjunto FILTRADO, repetido em cada linha. */
+  total_count: number;
 }
 
 /**
- * Listagem.
+ * Campos de ordenação que a função aceita. Qualquer outro é **recusado** pelo
+ * servidor — não há SQL dinâmico do outro lado —, então o que a tela pedir fora
+ * desta lista cai no padrão em vez de virar erro na cara de quem clicou.
+ */
+const ORDENACAO: Record<string, "full_name" | "birth_date" | "created_at"> = {
+  nome: "full_name",
+  nascimento: "birth_date",
+  criado_em: "created_at",
+};
+
+/** O primeiro valor de um filtro, como texto — ou `null` quando não há filtro. */
+function primeiro(valor: FilterValue): string | null {
+  const texto = Array.isArray(valor) ? valor[0] : valor;
+  return texto === undefined || texto === null || texto === "" ? null : String(texto);
+}
+
+/**
+ * `"ativo"`/`"inativo"` → `p_is_active`.
  *
- * Uma consulta traz a janela inteira permitida pelo servidor; busca, filtro,
- * ordenação e paginação são resolvidos sobre ela. Não é preferência: a função
- * do banco não aceita nenhuma dessas coisas, e paginar por `p_offset` sem saber
- * o total daria uma paginação que não sabe quantas páginas tem.
+ * `null` traz ativos e arquivados, que é o comportamento certo para "Status:
+ * todos" — e o único jeito de a recepção encontrar uma ficha desativada para
+ * reativá-la em vez de cadastrar a pessoa de novo.
+ */
+function situacaoFiltrada(valor: FilterValue): boolean | null {
+  const status = primeiro(valor);
+  if (status === STATUS_PACIENTE.ATIVO) return true;
+  if (status === STATUS_PACIENTE.INATIVO) return false;
+  return null;
+}
+
+function projetarLinha(linha: LinhaListaPaciente, fases: Fases): PacienteListItem {
+  return {
+    id: linha.patient_id,
+    codigo: codigoExibidoDoPaciente(linha.patient_id),
+    nome: linha.full_name,
+    // Vem mascarado do banco: o documento inteiro não sai da clínica para a
+    // lista. O completo continua em `read_patient`, um paciente por vez.
+    cpf_mascarado: linha.cpf_masked ?? "—",
+    nascimento: linha.birth_date,
+    // `patients` não tem coluna de sexo. `null` mantém a ficha honesta: o campo
+    // aparece vazio em vez de exibir um valor que ninguém informou.
+    sexo: null,
+    cid: linha.primary_cid10_code ?? "",
+    cid_descricao: linha.primary_cid10_label ?? "",
+    // `treatment_plans.protocol_name` é texto livre, não chave estrangeira: não
+    // existe id de protocolo para referenciar. O nome serve aos dois.
+    protocolo_id: linha.protocol_name ?? "",
+    protocolo_nome: linha.protocol_name ?? "—",
+    fase: paraFase(linha.treatment_phase_id ? fases.porId.get(linha.treatment_phase_id) : null),
+    status: linha.is_active ? STATUS_PACIENTE.ATIVO : STATUS_PACIENTE.INATIVO,
+    // Não há classificação de risco no banco, e não vai haver nesta fase:
+    // "risco" são as etiquetas da sistematização de enfermagem do Gemed, fora
+    // do escopo de leitura contratado. Calcular no painel seria inferência
+    // clínica no front-end.
+    risco: null,
+    // Sai `has_account`, não `account_id`: é o que a lista precisa saber. O
+    // convite pendente vive em `patient_invitations`, que é outra leitura.
+    convite_status: linha.has_account ? "aceito" : "nao_enviado",
+    // A projeção da lista não traz `created_at` — a ordenação por ele existe no
+    // servidor, a coluna não. Aparece na ficha, onde `read_patient` devolve a
+    // linha inteira.
+    criado_em: null,
+  };
+}
+
+/** Uma página de `read_patient_list`, com os filtros da tela já traduzidos. */
+async function paginaDaLista(
+  params: ListParams,
+  fases: Fases,
+  limite: number,
+  deslocamento: number,
+): Promise<LinhaListaPaciente[] | ReturnType<typeof falhaDe>> {
+  const filtros = params.filters ?? {};
+  const ordem = params.sort ?? PATIENT_DEFAULT_SORT;
+
+  // A tela filtra por código de fase; a função recebe o id. `manutencao` não
+  // existe em `treatment_phases`, então cai em `null` — sem filtro, e não um
+  // filtro que o servidor recusaria.
+  const codigoDaFase = paraCodigoDeFase(primeiro(filtros.fase));
+
+  const { data, error } = await getSupabaseClient().rpc("read_patient_list", {
+    p_search: normalizePatientSearch(params.search) || null,
+    p_protocol: primeiro(filtros.protocolo_id),
+    p_cid10_code: primeiro(filtros.cid),
+    p_treatment_phase_id: codigoDaFase ? (fases.idPorCodigo.get(codigoDaFase) ?? null) : null,
+    p_is_active: situacaoFiltrada(filtros.status),
+    // Coluna que a tela ordena e o servidor não conhece cai no padrão da tela,
+    // em vez de virar `undefined` — que faria o PostgREST usar o DEFAULT da
+    // função e ordenar por nome sem ninguém ter pedido.
+    p_order_by: ORDENACAO[ordem.field] ?? "created_at",
+    p_order_desc: ordem.direction === "desc",
+    p_limit: limite,
+    p_offset: deslocamento,
+  });
+
+  if (error) return falhaDe(error);
+  return (data ?? []) as LinhaListaPaciente[];
+}
+
+/**
+ * Listagem paginada no servidor.
  *
- * Os diagnósticos vêm por paciente, e cada chamada é auditada — por isso a
- * listagem NÃO os busca. CID e protocolo aparecem preenchidos na ficha, onde a
- * leitura individual já é um evento registrado de qualquer forma.
+ * O total vem em `total_count`, repetido em cada linha — e some quando a página
+ * está vazia, porque não há linha para carregá-lo. Página vazia com deslocamento
+ * é quase sempre um recorte que encolheu debaixo de uma paginação que ficou
+ * parada numa página que não existe mais; nesse caso a função refaz a consulta
+ * do começo **só para saber o total**, para que a tela ofereça a volta em vez de
+ * dizer "nenhum paciente" sobre uma base cheia.
  */
 export async function list(params: ListParams = {}): Promise<ListResult<PacienteListItem>> {
   return executar(async () => {
-    const itens = await carregarItens();
-    if (!Array.isArray(itens)) return itens;
+    const fases = await carregarFases();
+    if (!("porId" in fases)) return fases;
 
-    return recortar(itens, params);
+    const pageSize = Math.min(params.pageSize ?? 20, TETO_READ);
+    const deslocamento = Math.max(0, ((params.page ?? 1) - 1) * pageSize);
+
+    const linhas = await paginaDaLista(params, fases, pageSize, deslocamento);
+    if (!Array.isArray(linhas)) return linhas;
+
+    if (linhas.length > 0) {
+      return ok(
+        linhas.map((linha) => projetarLinha(linha, fases)),
+        linhas[0]?.total_count ?? linhas.length,
+      );
+    }
+
+    if (deslocamento === 0) return ok([], 0);
+
+    const sonda = await paginaDaLista(params, fases, 1, 0);
+    if (!Array.isArray(sonda)) return sonda;
+
+    return ok([], sonda[0]?.total_count ?? 0);
   });
 }
 
@@ -353,29 +494,94 @@ export async function revealPii({
  * deixar a clínica é regra de negócio, e regra de negócio não fica em botão.
  * Nenhuma coluna carrega PII em claro.
  */
+/**
+ * Varredura da listagem inteira, em páginas de 200.
+ *
+ * Existe para a exportação e para os relatórios que contam a base — os dois
+ * casos em que a pergunta é sobre o conjunto, não sobre uma página. **Cada
+ * página é uma leitura registrada em `audit_log`**, e é por isso que nenhuma
+ * tela chama isto: varredura é ato, não render.
+ *
+ * Devolve o que couber até o teto, mais o total real e se ficou parcial — quem
+ * chama decide entre recusar e declarar. Um número parcial apresentado como
+ * total é o modo de errar que este projeto mais evita.
+ */
+export interface Varredura {
+  itens: PacienteListItem[];
+  total: number;
+  parcial: boolean;
+}
+
+export async function varrerLista(
+  params: ListParams,
+  teto: number,
+): Promise<Varredura | ReturnType<typeof falhaDe>> {
+  const fases = await carregarFases();
+  if (!("porId" in fases)) return fases;
+
+  const itens: PacienteListItem[] = [];
+  let total = 0;
+
+  for (let deslocamento = 0; deslocamento < teto; deslocamento += TETO_READ) {
+    const pagina = await paginaDaLista(params, fases, TETO_READ, deslocamento);
+    if (!Array.isArray(pagina)) return pagina;
+
+    total = pagina[0]?.total_count ?? total;
+    itens.push(...pagina.map((linha) => projetarLinha(linha, fases)));
+
+    if (pagina.length < TETO_READ) break;
+  }
+
+  return { itens, total, parcial: total > itens.length };
+}
+
+/**
+ * Teto da exportação.
+ *
+ * A função do banco devolve no máximo 200 linhas por chamada, então exportar a
+ * base é um laço de chamadas — e **cada chamada grava uma leitura em
+ * `audit_log`**. Dez é o limite em que a trilha ainda descreve o ato ("exportou
+ * a base filtrada") em vez de virar ruído.
+ *
+ * Acima disso a exportação é **recusada com o motivo**, em vez de entregar um
+ * arquivo truncado: uma planilha com 2.000 das 5.000 fichas, sem nada no arquivo
+ * dizendo que faltam 3.000, é o tipo de recorte que vira decisão errada — e
+ * ninguém confere a contagem de um CSV que abriu certo.
+ */
+const TETO_EXPORTACAO = TETO_READ * 10;
+
 export async function exportar(
   params: ListParams = {},
 ): Promise<ListResult<Record<string, string>>> {
   return executar(async () => {
-    const itens = await carregarItens();
-    if (!Array.isArray(itens)) return itens;
+    const varredura = await varrerLista(params, TETO_EXPORTACAO);
+    if (!("itens" in varredura)) return varredura;
 
-    const filtrados = recortar(itens, { ...params, page: 1, pageSize: Math.max(1, itens.length) });
+    // Recusar é mais honesto do que truncar: uma planilha com 2.000 das 5.000
+    // fichas, sem nada NO ARQUIVO dizendo que faltam 3.000, vira decisão errada
+    // — e ninguém confere a contagem de um CSV que abriu certo.
+    if (varredura.parcial) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        `O recorte tem ${varredura.total} fichas e a exportação vai até ${TETO_EXPORTACAO}. Estreite a busca ou os filtros antes de exportar.`,
+      );
+    }
 
-    const linhas = filtrados.data.map((item) => ({
+    // Sexo, risco e data de cadastro NÃO viram coluna: a projeção da listagem
+    // não os traz. Uma coluna inteira em branco numa planilha se lê como
+    // cadastro incompleto e manda a equipe procurar um dado que nunca esteve
+    // ali — o mesmo motivo pelo qual a tela omite indicador sem fonte.
+    const linhas = varredura.itens.map((item) => ({
       Código: item.codigo,
       Paciente: item.nome,
       CPF: item.cpf_mascarado,
       Idade: String(ageInYears(item.nascimento) ?? ""),
-      Sexo: item.sexo ?? "",
       CID: item.cid,
       Diagnóstico: item.cid_descricao,
       Protocolo: item.protocolo_nome,
       Fase: item.fase ? FASE_TRATAMENTO_LABEL[item.fase] : "",
-      Risco: item.risco ? RISCO_LABEL[item.risco] : "",
       Status: STATUS_PACIENTE_LABEL[item.status],
-      Convite: STATUS_CONVITE_LABEL[item.convite_status],
-      "Cadastrado em": formatDate(item.criado_em),
+      "Acesso ao app": STATUS_CONVITE_LABEL[item.convite_status],
     }));
 
     return ok(linhas, linhas.length);

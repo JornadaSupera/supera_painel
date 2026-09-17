@@ -64,8 +64,22 @@ const FASE_POR_CODIGO: Record<string, FaseTratamento> = {
   finalizacao: FASE_TRATAMENTO.FINALIZACAO,
 };
 
+/** Código do painel → código no banco. Derivado, para não sair de sincronia. */
+const CODIGO_POR_FASE = Object.fromEntries(
+  Object.entries(FASE_POR_CODIGO).map(([codigo, fase]) => [fase, codigo]),
+) as Record<FaseTratamento, string>;
+
 export function paraFase(codigo: string | null | undefined): FaseTratamento | null {
   return codigo ? (FASE_POR_CODIGO[codigo] ?? null) : null;
+}
+
+/**
+ * `"manutencao"` não tem código no banco e devolve `null` — ver o cabeçalho.
+ * Um filtro por fase inexistente precisa virar "sem filtro reconhecido", e não
+ * uma string que a função do banco recusaria.
+ */
+export function paraCodigoDeFase(fase: string | null | undefined): string | null {
+  return fase ? (CODIGO_POR_FASE[fase as FaseTratamento] ?? null) : null;
 }
 
 /* -------------------------------------------------------------------------

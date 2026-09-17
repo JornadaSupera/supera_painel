@@ -56,13 +56,21 @@ export function PacientesPage() {
   const filtrada = hasActiveFilters(busca, filtros);
 
   /*
-   * CID e protocolo dependem de uma leitura por paciente, auditada uma a uma.
-   * Onde a origem dos dados não os entrega na listagem, a coluna sai inteira:
-   * uma coluna sempre vazia se lê como cadastro incompleto, e manda a equipe
-   * procurar um dado que nunca esteve ali.
+   * Onde a origem dos dados não entrega o campo na listagem, a coluna sai
+   * inteira: uma coluna sempre vazia se lê como cadastro incompleto, e manda a
+   * equipe procurar um dado que nunca esteve ali.
    */
   const semCid = motivoIndisponivel("pacientes.list.cid") !== null;
   const semProtocolo = motivoIndisponivel("pacientes.list.protocolo") !== null;
+
+  /**
+   * Ordenação que a origem não sabe fazer no servidor.
+   *
+   * O cabeçalho fica sem o controle em vez de oferecer um clique que ordenaria
+   * só a página visível — vinte linhas reordenadas, e a página seguinte
+   * começando do começo, o que se lê como tabela quebrada.
+   */
+  const ordenavelPor = (campo: string) => motivoIndisponivel(`pacientes.sort.${campo}`) === null;
 
   const colunas: (Column<PacienteListItem> | false)[] = [
     {
@@ -95,7 +103,7 @@ export function PacientesPage() {
     !semCid && {
       key: "cid",
       header: "CID",
-      sortable: true,
+      sortable: ordenavelPor("cid"),
       width: "12%",
       render: (paciente) => (
         // O código sozinho não diz nada a quem não é da equipe clínica — a
@@ -118,7 +126,7 @@ export function PacientesPage() {
     {
       key: "fase",
       header: "Fase",
-      sortable: true,
+      sortable: ordenavelPor("fase"),
       width: "14%",
       // Texto simples, como no protótipo: a fase é atributo do tratamento, não
       // um alerta. Transformar em badge daria a ela o mesmo peso do status.
@@ -131,7 +139,7 @@ export function PacientesPage() {
     {
       key: "status",
       header: "Status",
-      sortable: true,
+      sortable: ordenavelPor("status"),
       width: 110,
       render: (paciente) => (
         <StatusBadge tone={TONE_PATIENT_STATUS[paciente.status]} size="sm" dot>

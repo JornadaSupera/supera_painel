@@ -48,7 +48,13 @@ export interface PacienteListItem {
   /** `null` quando não há classificação de risco na origem dos dados. */
   risco: Risco | null;
   convite_status: StatusConvite;
-  criado_em: string;
+  /**
+   * `null` quando a projeção da listagem não traz a data de cadastro.
+   *
+   * A listagem do backend ordena por data de cadastro e **não devolve a coluna**
+   * — são coisas diferentes, e a ficha, que lê a linha inteira, tem o valor.
+   */
+  criado_em: string | null;
 }
 
 /** Ficha completa. Tudo que a listagem tem, mais o que só ela mostra. */
