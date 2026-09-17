@@ -1,6 +1,5 @@
 import { z } from "zod";
 
-import { FASE_TRATAMENTO, RISCO } from "@/lib/enums";
 import { digitsOnly } from "@/lib/mask";
 import { isValidCpf, isValidBirthDate, isValidPhone } from "@/lib/validation";
 import type { PacienteEntrada } from "@/types/paciente";
@@ -12,6 +11,12 @@ import type { PacienteEntrada } from "@/types/paciente";
  * a lista está em `ETAPAS`, então rótulo do passo e campos do passo não ficam
  * em arquivos diferentes.
  *
+ * > [!] O formulário coleta o que o backend sabe gravar, e nada além.
+ * Campo que não tem coluna do outro lado não aparece aqui: quem preenche na
+ * recepção não tem como saber que aquele valor se perde no envio, e um cadastro
+ * que parece completo e chega pela metade é pior do que um cadastro curto.
+ * Ver `PacienteEntrada` para a lista do que ficou de fora e por quê.
+ *
  * > [!] Sem `transform` no schema, de propósito.
  * O valor validado tem exatamente a forma do valor digitado, o que mantém o
  * tipo do `useForm` simples e previsível. A normalização — dígitos do CPF,
@@ -20,16 +25,6 @@ import type { PacienteEntrada } from "@/types/paciente";
  */
 
 const CAMPO_OBRIGATORIO = "Campo obrigatório.";
-
-const FASES = [
-  FASE_TRATAMENTO.ATIVO,
-  FASE_TRATAMENTO.SEGUIMENTO,
-  FASE_TRATAMENTO.MANUTENCAO,
-  FASE_TRATAMENTO.REMISSAO,
-  FASE_TRATAMENTO.FINALIZACAO,
-] as const;
-
-const RISCOS = [RISCO.BAIXO, RISCO.MEDIO, RISCO.ALTO] as const;
 
 export const pacienteSchema = z.object({
   /* ------------------------------------------------------- identificação */
@@ -42,26 +37,9 @@ export const pacienteSchema = z.object({
     .min(1, CAMPO_OBRIGATORIO)
     .refine(isValidBirthDate, "Data de nascimento inválida."),
 
-  sexo: z.enum(["feminino", "masculino"], { required_error: CAMPO_OBRIGATORIO }),
-
-  /* --------------------------------------------------------- diagnóstico */
-  cid: z.string().min(1, "Selecione o CID-10."),
-  protocolo_id: z.string().min(1, "Selecione o protocolo terapêutico."),
-  fase: z.enum(FASES, { required_error: CAMPO_OBRIGATORIO }),
-
-  /**
-   * Classificação de risco feita pela equipe assistencial e registrada no
-   * cadastro. O painel não calcula risco: inferência clínica no front-end está
-   * fora do escopo contratado.
-   */
-  risco: z.enum(RISCOS, { required_error: CAMPO_OBRIGATORIO }),
-
-  estadiamento: z.string().max(12, "Use a notação curta, como IIIA."),
-  diagnostico_em: z.string(),
-  medico_responsavel_id: z.string(),
+  /* ---------------------------------------------------- histórico clínico */
   alergias: z.array(z.string()),
   reacoes_previas: z.array(z.string()),
-  observacoes: z.string().max(1000, "Máximo de 1000 caracteres."),
 
   /* ------------------------------------------------------------- contato */
   telefone: z
@@ -71,7 +49,9 @@ export const pacienteSchema = z.object({
 
   email: z.string().min(1, CAMPO_OBRIGATORIO).email("E-mail inválido."),
 
-  /** Dispara o SMS de acesso ao app logo após salvar. */
+  convenio: z.string().max(80, "Nome do convênio muito longo."),
+
+  /** Emite o convite de acesso ao app logo após salvar. */
   enviar_convite: z.boolean(),
 });
 
@@ -102,19 +82,11 @@ export const VALORES_INICIAIS: PacienteForm = {
   nome: "",
   cpf: "",
   nascimento: "",
-  sexo: "feminino",
-  cid: "",
-  protocolo_id: "",
-  fase: FASE_TRATAMENTO.ATIVO,
-  risco: RISCO.BAIXO,
-  estadiamento: "",
-  diagnostico_em: "",
-  medico_responsavel_id: "",
   alergias: [],
   reacoes_previas: [],
-  observacoes: "",
   telefone: "",
   email: "",
+  convenio: "",
   enviar_convite: true,
 };
 
@@ -132,19 +104,11 @@ export function paraEntrada(valores: PacienteForm): PacienteEntrada {
     nome: valores.nome.trim().replace(/\s+/g, " "),
     cpf: digitsOnly(valores.cpf),
     nascimento: valores.nascimento,
-    sexo: valores.sexo,
     telefone: digitsOnly(valores.telefone),
     email: valores.email.trim().toLowerCase(),
-    cid: valores.cid,
-    protocolo_id: valores.protocolo_id,
-    fase: valores.fase,
-    risco: valores.risco,
-    estadiamento: vazioComoNulo(valores.estadiamento),
-    diagnostico_em: vazioComoNulo(valores.diagnostico_em),
+    convenio: vazioComoNulo(valores.convenio),
     alergias: valores.alergias,
     reacoes_previas: valores.reacoes_previas,
-    observacoes: vazioComoNulo(valores.observacoes),
-    medico_responsavel_id: vazioComoNulo(valores.medico_responsavel_id),
     enviar_convite: valores.enviar_convite,
   };
 }
@@ -160,30 +124,19 @@ export const ETAPAS = [
     id: "identificacao",
     titulo: "Identificação",
     descricao: "Quem é a pessoa. O CPF é a chave do cadastro e não muda depois.",
-    campos: ["nome", "cpf", "nascimento", "sexo"],
+    campos: ["nome", "cpf", "nascimento"],
   },
   {
-    id: "diagnostico",
-    titulo: "Diagnóstico e tratamento",
-    descricao: "CID-10, protocolo, fase e o histórico que a equipe precisa ver.",
-    campos: [
-      "cid",
-      "protocolo_id",
-      "fase",
-      "risco",
-      "estadiamento",
-      "diagnostico_em",
-      "medico_responsavel_id",
-      "alergias",
-      "reacoes_previas",
-      "observacoes",
-    ],
+    id: "historico",
+    titulo: "Histórico clínico",
+    descricao: "Alergias e reações já apresentadas — o que a equipe precisa ver antes de prescrever.",
+    campos: ["alergias", "reacoes_previas"],
   },
   {
     id: "contato",
     titulo: "Contato e acesso",
     descricao: "Para onde vai o convite do aplicativo.",
-    campos: ["telefone", "email", "enviar_convite"],
+    campos: ["telefone", "email", "convenio", "enviar_convite"],
   },
 ] as const satisfies readonly {
   id: string;

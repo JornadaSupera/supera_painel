@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { BackendPendente, PageHeader } from "@/components/shared";
 import { motivoIndisponivel } from "@/services/apiClient";
+import type { ResultadoConvite } from "@/types/paciente";
+import { ConviteEmitidoDialog } from "../components/ConviteEmitidoDialog";
 import { PacienteForm } from "../components/PacienteForm";
 import { useCriarPaciente } from "../hooks/usePacientes";
 import { paraEntrada, VALORES_INICIAIS, type PacienteForm as Valores } from "../schemas";
@@ -17,6 +20,17 @@ export function PacienteNovoPage() {
   const navigate = useNavigate();
   const criar = useCriarPaciente();
 
+  /*
+   * O código de ativação só existe uma vez, e a navegação para a ficha o
+   * apagaria da tela antes de alguém anotá-lo. Por isso a ida para a ficha
+   * espera o diálogo ser fechado: é o único momento em que dá para saber que a
+   * pessoa viu o código.
+   */
+  const [conviteEmitido, setConviteEmitido] = useState<ResultadoConvite | null>(null);
+  const [pacienteCriado, setPacienteCriado] = useState<string | null>(null);
+
+  const irParaFicha = (id: string | null) => navigate(id ? `/pacientes/${id}` : "/pacientes");
+
   // A rota continua alcançável pela URL mesmo com o botão desabilitado na
   // listagem. Barrar aqui evita o pior caminho: dezesseis campos preenchidos
   // para receber uma recusa no envio.
@@ -24,9 +38,18 @@ export function PacienteNovoPage() {
 
   const salvar = (valores: Valores) => {
     criar.mutate(paraEntrada(valores), {
-      // Vai direto para a ficha recém-criada: é lá que se confere o que foi
-      // cadastrado e se reenvia o convite, se preciso.
-      onSuccess: (paciente) => navigate(paciente ? `/pacientes/${paciente.id}` : "/pacientes"),
+      onSuccess: ({ paciente, convite }) => {
+        // Com código na mão, o diálogo primeiro. Sem ele, vai direto para a
+        // ficha: é lá que se confere o que foi cadastrado e se reemite o
+        // convite, se preciso.
+        if (convite?.token) {
+          setPacienteCriado(paciente?.id ?? null);
+          setConviteEmitido(convite);
+          return;
+        }
+
+        irParaFicha(paciente?.id ?? null);
+      },
     });
   };
 
@@ -53,6 +76,14 @@ export function PacienteNovoPage() {
           onCancelar={() => navigate("/pacientes")}
         />
       )}
+
+      <ConviteEmitidoDialog
+        convite={conviteEmitido}
+        onClose={() => {
+          setConviteEmitido(null);
+          irParaFicha(pacienteCriado);
+        }}
+      />
     </div>
   );
 }

@@ -39,6 +39,8 @@ export interface PacienteMock {
   alergias: string[];
   reacoes_previas: string[];
   observacoes: string | null;
+  /** Convênio declarado na ficha. Sem valor nas 81 linhas semeadas. */
+  convenio?: string | null;
   medico_responsavel_id: string | null;
   convite_status: StatusConvite;
   convite_enviado_em: string | null;

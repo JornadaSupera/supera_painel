@@ -1,9 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ArrowRight, Check, LoaderCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Info, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm, useFormContext } from "react-hook-form";
 
-import { FormSelect, SourceErrorAlert } from "@/components/shared";
+import { SourceErrorAlert } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -17,15 +17,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { useCids, useEfeitosAdversos, useProtocolos } from "@/hooks/useCatalogos";
-import { useProfissionais } from "@/hooks/useEquipe";
-import {
-  ESPECIALIDADE,
-  FASE_TRATAMENTO_LABEL,
-  RISCO_LABEL,
-  toOptions,
-} from "@/lib/enums";
+import { useEfeitosAdversos } from "@/hooks/useCatalogos";
 import { cn } from "@/lib/utils";
 import { applyCpfMask, applyPhoneMask } from "@/lib/validation";
 import {
@@ -39,24 +31,26 @@ import { ListaDeChips, SelecaoDeCatalogo } from "./ListaDeChips";
 /**
  * Cadastro e edição de paciente, em três etapas.
  *
- * Etapas e não uma página longa: são dezesseis campos de naturezas diferentes —
- * quem cadastra na recepção preenche identificação e contato; quem completa o
- * diagnóstico é a equipe clínica. Dividir deixa cada parte revisável sozinha.
+ * Etapas e não uma página longa: identificação, histórico e contato são três
+ * conversas diferentes — quem cadastra na recepção preenche a primeira e a
+ * terceira, e a segunda é o que a enfermagem confere. Dividir deixa cada parte
+ * revisável sozinha.
  *
  * > [!] O rascunho vive em memória, e só.
  * Nada é gravado em `localStorage` nem em `sessionStorage`: o formulário
- * carrega nome, CPF e diagnóstico de uma pessoa real, e o projeto proíbe PHI
+ * carrega nome, CPF e histórico de uma pessoa real, e o projeto proíbe PHI
  * persistida no navegador. Trocar de etapa preserva o preenchimento; fechar a
  * aba, não — e é assim que deve ser.
+ *
+ * > [!] Diagnóstico, estadiamento, protocolo e fase NÃO estão aqui.
+ * Registrá-los é ato clínico, e se o perfil administrativo pode praticá-lo é
+ * pergunta aberta com a clínica. A etapa 2 declara isso em vez de oferecer
+ * campos que talvez sejam retirados — perder uma seção é barato, perder a tela
+ * inteira não.
  */
 
-const OPCOES_SEXO = [
-  { value: "feminino", label: "Feminino" },
-  { value: "masculino", label: "Masculino" },
-];
-
-/** Date input bound to the surrounding form — the two dates of the record. */
-function CampoData({ name, rotulo }: { name: "nascimento" | "diagnostico_em"; rotulo: string }) {
+/** Campo de data ligado ao formulário em volta. */
+function CampoData({ name, rotulo }: { name: "nascimento"; rotulo: string }) {
   const { control } = useFormContext<Valores>();
 
   return (
@@ -73,6 +67,23 @@ function CampoData({ name, rotulo }: { name: "nascimento" | "diagnostico_em"; ro
         </FormItem>
       )}
     />
+  );
+}
+
+/** O aviso da etapa clínica. Diz o que falta e de quem depende. */
+function AvisoAtoClinico() {
+  return (
+    <div className="border-border bg-muted/40 text-muted-foreground flex gap-2.5 rounded-lg border p-3 text-xs sm:col-span-2">
+      <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+      <p>
+        <span className="text-foreground font-medium">
+          Diagnóstico, estadiamento, protocolo e fase não são preenchidos aqui.
+        </span>{" "}
+        Registrá-los é ato clínico, e ainda não está decidido se o perfil
+        administrativo pode praticá-lo. A ficha continua exibindo o que vier do
+        sistema do consultório: ler e escrever são permissões diferentes.
+      </p>
+    </div>
   );
 }
 
@@ -103,27 +114,27 @@ export function PacienteForm({
     mode: "onBlur",
   });
 
-  const cids = useCids();
-  const protocolos = useProtocolos();
   const efeitos = useEfeitosAdversos();
-  const { profissionais } = useProfissionais(ESPECIALIDADE.MEDICO);
 
   /*
-   * Fontes de vocabulário que o cadastro NÃO pode dispensar.
+   * Na edição, o que já está gravado não pode ser retirado: o histórico clínico
+   * é append-only no backend. Os valores iniciais SÃO o que está gravado, então
+   * é deles que sai a lista de itens sem X.
+   */
+  const alergiasGravadas = edicao ? valoresIniciais.alergias : [];
+  const reacoesGravadas = edicao ? valoresIniciais.reacoes_previas : [];
+
+  /*
+   * Fonte de vocabulário que o cadastro NÃO pode dispensar.
    *
    * `data ?? []` transformava falha de backend em lista vazia, e lista vazia se
-   * lê como resposta legítima: "não há CID cadastrado". Ninguém repete uma
+   * lê como resposta legítima: "não há efeito cadastrado". Ninguém repete uma
    * requisição que parece ter dado certo, e uma ficha preenchida contra um
    * vocabulário que não carregou fica errada, não incompleta.
-   *
-   * Protocolo fica de fora da lista de obrigatórias porque, no Supabase, ele
-   * legitimamente vem vazio: `protocol_name` é texto livre, sem catálogo. Erro
-   * ali é erro de rede, e é tratado pelo próprio seletor.
    */
-  const fontesObrigatorias = [
-    { label: "a lista de CIDs", query: cids },
-    { label: "a lista de efeitos adversos", query: efeitos },
-  ].filter((fonte) => fonte.query.isError);
+  const fontesObrigatorias = [{ label: "a lista de efeitos adversos", query: efeitos }].filter(
+    (fonte) => fonte.query.isError,
+  );
 
   const fonteFaltando = fontesObrigatorias.length > 0;
 
@@ -206,7 +217,11 @@ export function PacienteForm({
                     <FormItem className="sm:col-span-2">
                       <FormLabel>Nome completo</FormLabel>
                       <FormControl>
-                        <Input {...field} autoComplete="off" placeholder="Como consta no documento" />
+                        <Input
+                          {...field}
+                          autoComplete="off"
+                          placeholder="Como consta no documento"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -239,138 +254,12 @@ export function PacienteForm({
                 />
 
                 <CampoData name="nascimento" rotulo="Data de nascimento" />
-
-                <FormField
-                  control={form.control}
-                  name="sexo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Sexo</FormLabel>
-                      <FormSelect
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        options={OPCOES_SEXO}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
             )}
 
-            {/* --------------------------------------------- 2 · diagnóstico */}
+            {/* ---------------------------------------- 2 · histórico clínico */}
             {etapa === 1 && (
               <div className="grid gap-4 sm:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="cid"
-                  render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
-                      <FormLabel>CID-10</FormLabel>
-                      <FormSelect
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Selecione o diagnóstico"
-                        options={(cids.data ?? []).map((cid) => ({
-                          value: cid.codigo,
-                          label: `${cid.codigo} · ${cid.descricao}`,
-                        }))}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="protocolo_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Protocolo terapêutico</FormLabel>
-                      <FormSelect
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Selecione o protocolo"
-                        options={(protocolos.data ?? []).map((protocolo) => ({
-                          value: protocolo.id,
-                          label: protocolo.nome,
-                        }))}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="medico_responsavel_id"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Médico responsável</FormLabel>
-                      <FormSelect
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        placeholder="Selecione"
-                        options={profissionais.map((profissional) => ({
-                          value: profissional.id,
-                          label: profissional.nome,
-                        }))}
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="fase"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Fase do tratamento</FormLabel>
-                      <FormSelect
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        options={toOptions(FASE_TRATAMENTO_LABEL)}
-                        className="capitalize"
-                      />
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="risco"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Classificação de risco</FormLabel>
-                      <FormSelect
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        options={toOptions(RISCO_LABEL)}
-                      />
-                      <FormDescription>Definida pela equipe assistencial.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="estadiamento"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Estadiamento</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="IIIA" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <CampoData name="diagnostico_em" rotulo="Data do diagnóstico" />
-
                 <FormField
                   control={form.control}
                   name="alergias"
@@ -381,10 +270,17 @@ export function PacienteForm({
                         <ListaDeChips
                           valores={field.value}
                           onChange={field.onChange}
+                          fixos={alergiasGravadas}
                           label="Adicionar alergia"
                           placeholder="Digite e pressione Enter"
                         />
                       </FormControl>
+                      {edicao && (
+                        <FormDescription>
+                          O que já está registrado não se apaga: o histórico clínico é
+                          imutável, e aqui só se acrescenta.
+                        </FormDescription>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -401,6 +297,7 @@ export function PacienteForm({
                           opcoes={efeitos.data ?? []}
                           selecionadas={field.value}
                           onChange={field.onChange}
+                          fixos={reacoesGravadas}
                           legenda="Reações adversas já apresentadas"
                         />
                       </FormControl>
@@ -412,19 +309,7 @@ export function PacienteForm({
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="observacoes"
-                  render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
-                      <FormLabel>Observações</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} rows={3} maxLength={1000} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <AvisoAtoClinico />
               </div>
             )}
 
@@ -442,15 +327,13 @@ export function PacienteForm({
                           {...field}
                           inputMode="tel"
                           placeholder={edicao ? contatoAtual?.telefone : "(48) 99999-9999"}
-                          onChange={(evento) =>
-                            field.onChange(applyPhoneMask(evento.target.value))
-                          }
+                          onChange={(evento) => field.onChange(applyPhoneMask(evento.target.value))}
                         />
                       </FormControl>
                       <FormDescription>
                         {edicao
                           ? "Deixe em branco para manter o número atual."
-                          : "É para cá que vai o convite por SMS."}
+                          : "É para cá que vai o convite de acesso."}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -481,6 +364,23 @@ export function PacienteForm({
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="convenio"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Convênio</FormLabel>
+                      <FormControl>
+                        <Input {...field} autoComplete="off" placeholder="Particular, Unimed…" />
+                      </FormControl>
+                      <FormDescription>
+                        Opcional. Em branco significa não informado.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 {!edicao && (
                   <FormField
                     control={form.control}
@@ -488,9 +388,10 @@ export function PacienteForm({
                     render={({ field }) => (
                       <FormItem className="border-border flex items-center justify-between gap-4 rounded-lg border p-3 sm:col-span-2">
                         <div className="flex flex-col gap-0.5">
-                          <FormLabel>Enviar convite por SMS agora</FormLabel>
+                          <FormLabel>Emitir convite de acesso agora</FormLabel>
                           <FormDescription>
-                            O paciente recebe o link de primeiro acesso ao aplicativo.
+                            Enquanto não houver envio automático, o código aparece uma vez na
+                            tela para ser passado ao paciente.
                           </FormDescription>
                         </div>
                         <FormControl>

@@ -1,4 +1,11 @@
-import { FASE_TRATAMENTO_LABEL, RISCO_LABEL, STATUS_PACIENTE, STATUS_PACIENTE_LABEL } from "@/lib/enums";
+import {
+  FASE_TRATAMENTO,
+  FASE_TRATAMENTO_LABEL,
+  RISCO,
+  RISCO_LABEL,
+  STATUS_PACIENTE,
+  STATUS_PACIENTE_LABEL,
+} from "@/lib/enums";
 import { formatDate, ageInYears } from "@/lib/format";
 import { maskCpf, maskEmail, maskPhone, digitsOnly } from "@/lib/mask";
 import { cids } from "@/mocks/cids";
@@ -92,6 +99,7 @@ function toDetalhe(row: PacienteMock): PacienteDetalhe {
     alergias: row.alergias,
     reacoes_previas: row.reacoes_previas,
     observacoes: row.observacoes,
+    convenio: row.convenio ?? null,
     protocolo: protocoloPorId(row.protocolo_id),
     medico_responsavel_id: row.medico_responsavel_id,
     medico_responsavel_nome: nomeDoMedico(row.medico_responsavel_id),
@@ -197,22 +205,30 @@ export async function create(entrada: PacienteEntrada): Promise<SingleResult<Pac
       nome: entrada.nome.trim(),
       cpf,
       nascimento: entrada.nascimento,
-      sexo: entrada.sexo,
+      // Os campos clínicos não vêm do formulário: registrá-los é ato clínico, e
+      // o cadastro administrativo não os coleta. A ficha nasce sem diagnóstico,
+      // exatamente como nasce no backend — quem os preenche é o sistema do
+      // consultório. `sexo` e `risco` não têm coluna em lugar nenhum.
+      sexo: "feminino",
       telefone: digitsOnly(entrada.telefone),
       email: entrada.email.trim().toLowerCase(),
-      cid: entrada.cid,
-      protocolo_id: entrada.protocolo_id,
-      fase: entrada.fase,
+      cid: "",
+      protocolo_id: "",
+      fase: FASE_TRATAMENTO.ATIVO,
       status: STATUS_PACIENTE.ATIVO,
-      risco: entrada.risco,
-      estadiamento: entrada.estadiamento ?? null,
-      diagnostico_em: entrada.diagnostico_em ?? null,
+      risco: RISCO.BAIXO,
+      estadiamento: null,
+      diagnostico_em: null,
       alergias: entrada.alergias ?? [],
       reacoes_previas: entrada.reacoes_previas ?? [],
-      observacoes: entrada.observacoes ?? null,
-      medico_responsavel_id: entrada.medico_responsavel_id ?? null,
-      convite_status: entrada.enviar_convite ? "enviado" : "nao_enviado",
-      convite_enviado_em: entrada.enviar_convite ? agora : null,
+      observacoes: null,
+      convenio: entrada.convenio ?? null,
+      medico_responsavel_id: null,
+      // O convite é ato separado, mesmo quando o formulário o marca: ele
+      // devolve um código de uso único que precisa chegar à tela, e quem
+      // encadeia as duas chamadas é o hook. Ver `create` no adapter Supabase.
+      convite_status: "nao_enviado",
+      convite_enviado_em: null,
       ultimo_acesso_app_em: null,
       desativado_em: null,
       motivo_desativacao: null,
@@ -235,22 +251,20 @@ export async function update({
   return comPaciente(id, (row) => {
     // CPF não entra na edição de propósito: é a chave natural do registro, e
     // trocá-la é uma correção de cadastro, não uma edição de rotina.
+    // Histórico clínico SÓ CRESCE, como no backend: a linha salva é imutável e
+    // a única operação é acrescentar. O que sair da lista não é apagado — o
+    // mock reproduz a regra para que a tela se comporte igual nos dois modos.
+    const acrescentar = (atuais: string[], enviados: string[] | undefined) =>
+      enviados ? [...atuais, ...enviados.filter((termo) => !atuais.includes(termo))] : atuais;
+
     Object.assign(row, {
       nome: dados.nome?.trim() ?? row.nome,
       nascimento: dados.nascimento ?? row.nascimento,
-      sexo: dados.sexo ?? row.sexo,
       telefone: dados.telefone ? digitsOnly(dados.telefone) : row.telefone,
       email: dados.email?.trim().toLowerCase() ?? row.email,
-      cid: dados.cid ?? row.cid,
-      protocolo_id: dados.protocolo_id ?? row.protocolo_id,
-      fase: dados.fase ?? row.fase,
-      risco: dados.risco ?? row.risco,
-      estadiamento: dados.estadiamento ?? row.estadiamento,
-      diagnostico_em: dados.diagnostico_em ?? row.diagnostico_em,
-      alergias: dados.alergias ?? row.alergias,
-      reacoes_previas: dados.reacoes_previas ?? row.reacoes_previas,
-      observacoes: dados.observacoes ?? row.observacoes,
-      medico_responsavel_id: dados.medico_responsavel_id ?? row.medico_responsavel_id,
+      convenio: dados.convenio ?? row.convenio ?? null,
+      alergias: acrescentar(row.alergias, dados.alergias),
+      reacoes_previas: acrescentar(row.reacoes_previas, dados.reacoes_previas),
       atualizado_em: now(),
     } satisfies Partial<PacienteMock>);
 
@@ -306,6 +320,11 @@ export async function sendInvite({ id }: { id: string }): Promise<SingleResult<R
       paciente_id: row.id,
       destino: maskPhone(row.telefone),
       enviado_em: enviado,
+      // O mock não emite token: quem o gera é o banco, com CSPRNG, e inventar
+      // um aqui daria a impressão de que o código da tela serve para ativar o
+      // app. `null` é a resposta honesta desta origem.
+      token: null,
+      expira_em: null,
     });
   });
 }

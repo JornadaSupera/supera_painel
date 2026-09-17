@@ -35,8 +35,13 @@ import {
 } from "@/lib/enums";
 import { formatDate, formatDateTime, ageInYears, relativeTime } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
-import { STATUS_CONVITE_LABEL, type PacienteDetalhe } from "@/types/paciente";
+import {
+  STATUS_CONVITE_LABEL,
+  type PacienteDetalhe,
+  type ResultadoConvite,
+} from "@/types/paciente";
 import { CampoSensivel } from "../components/CampoSensivel";
+import { ConviteEmitidoDialog } from "../components/ConviteEmitidoDialog";
 import { DeactivatePatientDialog } from "../components/DeactivatePatientDialog";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { PacienteForm } from "../components/PacienteForm";
@@ -70,17 +75,9 @@ function paraFormulario(paciente: PacienteDetalhe): Valores {
     // mascarado que a camada de dados enviou.
     cpf: paciente.cpf_mascarado,
     nascimento: paciente.nascimento,
-    sexo: paciente.sexo ?? "feminino",
-    cid: paciente.cid,
-    protocolo_id: paciente.protocolo_id,
-    fase: paciente.fase ?? "ativo",
-    risco: paciente.risco ?? "baixo",
-    estadiamento: paciente.estadiamento ?? "",
-    diagnostico_em: paciente.diagnostico_em?.slice(0, 10) ?? "",
-    medico_responsavel_id: paciente.medico_responsavel_id ?? "",
     alergias: paciente.alergias,
     reacoes_previas: paciente.reacoes_previas,
-    observacoes: paciente.observacoes ?? "",
+    convenio: paciente.convenio ?? "",
     // Contato começa vazio: vazio significa "manter o atual". Ver
     // `pacienteEdicaoSchema`.
     telefone: "",
@@ -100,6 +97,7 @@ export function PacienteFichaPage() {
   const { data: paciente, isLoading, isError, error, refetch } = usePaciente(id);
   const atualizar = useAtualizarPaciente(id ?? "");
   const convite = useEnviarConvite();
+  const [conviteEmitido, setConviteEmitido] = useState<ResultadoConvite | null>(null);
 
   const editando = searchParams.get("editar") === "1";
 
@@ -163,17 +161,11 @@ export function PacienteFichaPage() {
               {
                 nome: entrada.nome,
                 nascimento: entrada.nascimento,
-                sexo: entrada.sexo,
-                cid: entrada.cid,
-                protocolo_id: entrada.protocolo_id,
-                fase: entrada.fase,
-                risco: entrada.risco,
-                estadiamento: entrada.estadiamento,
-                diagnostico_em: entrada.diagnostico_em,
+                convenio: entrada.convenio,
+                // Só cresce: o que saiu da lista não é apagado, porque o
+                // histórico clínico é imutável do lado do banco.
                 alergias: entrada.alergias,
                 reacoes_previas: entrada.reacoes_previas,
-                observacoes: entrada.observacoes,
-                medico_responsavel_id: entrada.medico_responsavel_id,
                 // Contato só entra no payload quando foi realmente digitado.
                 ...(valores.telefone ? { telefone: entrada.telefone } : {}),
                 ...(valores.email ? { email: entrada.email } : {}),
@@ -224,10 +216,16 @@ export function PacienteFichaPage() {
                 variant="outline"
                 disabled={inativo || convite.isPending || semConvite !== null}
                 title={semConvite ?? undefined}
-                onClick={() => convite.mutate(paciente.id)}
+                onClick={() =>
+                  convite.mutate(paciente.id, {
+                    // O código sai uma vez só. O diálogo é o que dá a quem
+                    // emitiu a chance de anotá-lo antes de ele sumir.
+                    onSuccess: (resultado) => setConviteEmitido(resultado ?? null),
+                  })
+                }
               >
                 <MessageSquareShare />
-                {paciente.convite_status === "nao_enviado" ? "Enviar convite" : "Reenviar convite"}
+                {paciente.convite_status === "nao_enviado" ? "Emitir convite" : "Reemitir convite"}
               </Button>
 
               <Button
@@ -430,6 +428,8 @@ export function PacienteFichaPage() {
         onOpenChange={setConfirmando}
         onDeactivated={() => navigate("/pacientes")}
       />
+
+      <ConviteEmitidoDialog convite={conviteEmitido} onClose={() => setConviteEmitido(null)} />
     </div>
   );
 }

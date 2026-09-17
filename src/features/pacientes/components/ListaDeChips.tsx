@@ -13,6 +13,11 @@ import { cn } from "@/lib/utils";
  * anotar no campo de observações, que é onde a informação se perde.
  *
  * Enter adiciona. É o gesto que a pessoa já tenta.
+ *
+ * > [!] `fixos` são os termos JÁ GRAVADOS, e eles não têm X.
+ * O histórico clínico do backend é append-only: existe função de acrescentar e
+ * não existe de apagar. Um X que some da tela e volta no recarregamento é pior
+ * do que um item sem X — quem removeu acredita ter removido.
  */
 export interface ListaDeChipsProps {
   valores: string[];
@@ -20,6 +25,8 @@ export interface ListaDeChipsProps {
   placeholder?: string;
   /** Nome acessível do campo de entrada. */
   label: string;
+  /** Termos já registrados: aparecem, e não podem ser retirados. */
+  fixos?: string[];
   className?: string;
 }
 
@@ -28,9 +35,13 @@ export function ListaDeChips({
   onChange,
   placeholder,
   label,
+  fixos = [],
   className,
 }: ListaDeChipsProps) {
   const [rascunho, setRascunho] = useState("");
+
+  const ehFixo = (termo: string) =>
+    fixos.some((valor) => valor.toLowerCase() === termo.toLowerCase());
 
   const adicionar = () => {
     const termo = rascunho.trim();
@@ -70,21 +81,33 @@ export function ListaDeChips({
 
       {valores.length > 0 && (
         <ul className="flex flex-wrap gap-1.5">
-          {valores.map((valor) => (
-            <li key={valor}>
-              <span className="bg-muted text-foreground inline-flex items-center gap-1 rounded-full py-0.5 pr-1 pl-2.5 text-xs">
-                {valor}
-                <button
-                  type="button"
-                  onClick={() => remover(valor)}
-                  aria-label={`Remover ${valor}`}
-                  className="text-muted-foreground hover:bg-background hover:text-foreground flex size-4 items-center justify-center rounded-full transition-colors"
+          {valores.map((valor) => {
+            const gravado = ehFixo(valor);
+
+            return (
+              <li key={valor}>
+                <span
+                  className={cn(
+                    "bg-muted text-foreground inline-flex items-center gap-1 rounded-full py-0.5 text-xs",
+                    gravado ? "px-2.5" : "pr-1 pl-2.5",
+                  )}
+                  title={gravado ? "Já registrado — o histórico clínico não se apaga." : undefined}
                 >
-                  <X size={11} aria-hidden="true" />
-                </button>
-              </span>
-            </li>
-          ))}
+                  {valor}
+                  {!gravado && (
+                    <button
+                      type="button"
+                      onClick={() => remover(valor)}
+                      aria-label={`Remover ${valor}`}
+                      className="text-muted-foreground hover:bg-background hover:text-foreground flex size-4 items-center justify-center rounded-full transition-colors"
+                    >
+                      <X size={11} aria-hidden="true" />
+                    </button>
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -97,17 +120,22 @@ export function ListaDeChips({
  *
  * Catálogo fechado aqui porque o mesmo termo precisa cruzar com o dado do app
  * na Fase 12: "náusea" digitada à mão nunca casaria com "Náusea" do Diário.
+ *
+ * `fixos` tem o mesmo sentido de `ListaDeChips`: o que já está no histórico
+ * aparece marcado e não desmarca.
  */
 export function SelecaoDeCatalogo({
   opcoes,
   selecionadas,
   onChange,
   legenda,
+  fixos = [],
 }: {
   opcoes: { id: string; nome: string }[];
   selecionadas: string[];
   onChange: (valores: string[]) => void;
   legenda: string;
+  fixos?: string[];
 }) {
   const alternar = (nome: string) =>
     onChange(
@@ -122,6 +150,7 @@ export function SelecaoDeCatalogo({
 
       {opcoes.map((opcao) => {
         const ativa = selecionadas.includes(opcao.nome);
+        const gravada = fixos.includes(opcao.nome);
 
         return (
           <button
@@ -129,11 +158,14 @@ export function SelecaoDeCatalogo({
             type="button"
             onClick={() => alternar(opcao.nome)}
             aria-pressed={ativa}
+            disabled={gravada}
+            title={gravada ? "Já registrado — o histórico clínico não se apaga." : undefined}
             className={cn(
               "focus-visible:ring-ring/50 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none",
               ativa
                 ? "border-primary/30 bg-primary/10 text-primary font-medium"
                 : "text-muted-foreground hover:bg-muted border-border",
+              gravada && "cursor-default opacity-90",
             )}
           >
             {opcao.nome}

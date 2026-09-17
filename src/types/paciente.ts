@@ -66,6 +66,8 @@ export interface PacienteDetalhe extends PacienteListItem {
   alergias: string[];
   reacoes_previas: string[];
   observacoes: string | null;
+  /** `insurance_name` — o convênio declarado na ficha. */
+  convenio: string | null;
   protocolo: Protocolo | null;
   medico_responsavel_id: string | null;
   medico_responsavel_nome: string | null;
@@ -81,32 +83,56 @@ export type CampoPii = "cpf" | "telefone" | "email";
 
 export type PiiRevelada = Partial<Record<CampoPii, string>>;
 
-/** Corpo de criação e edição — o que o formulário envia. */
+/**
+ * Corpo de criação e edição — o que o formulário envia.
+ *
+ * > [!] São só os campos que o backend sabe gravar.
+ * O cadastro recebe nome, CPF, nascimento, telefone, e-mail e convênio.
+ * Diagnóstico, estadiamento, protocolo e fase são ato clínico, e se o painel
+ * administrativo pode praticá-lo é pergunta aberta com a clínica — construir a
+ * seção antes da resposta arrisca a tela, não a seção. Sexo, classificação de
+ * risco, médico responsável e observações não têm coluna em lugar nenhum:
+ * coletá-los seria gravar no vazio.
+ *
+ * A ficha continua LENDO tudo isso, porque quem escreve é o sistema do
+ * consultório. Ler e escrever são permissões diferentes.
+ */
 export interface PacienteEntrada {
   nome: string;
   cpf: string;
   nascimento: string;
-  sexo: Sexo;
   telefone: string;
   email: string;
-  cid: string;
-  protocolo_id: string;
-  fase: FaseTratamento;
-  risco: Risco;
-  estadiamento?: string | null;
-  diagnostico_em?: string | null;
+  /** Nome do convênio, quando houver. */
+  convenio?: string | null;
+  /**
+   * Alergias e reações prévias só CRESCEM.
+   *
+   * O histórico clínico é imutável no backend e a única operação é acrescentar.
+   * Na edição, o termo que sair desta lista não é apagado — apenas não é
+   * acrescentado de novo. A tela diz isso em vez de oferecer um X que mente.
+   */
   alergias?: string[];
   reacoes_previas?: string[];
-  observacoes?: string | null;
-  medico_responsavel_id?: string | null;
-  /** Dispara o SMS de convite logo após o cadastro. */
+  /** Emite o convite de acesso ao app logo após o cadastro. */
   enviar_convite?: boolean;
 }
 
-/** Retorno de `sendInvite` — o protótipo anuncia "convite por SMS no cadastro". */
+/**
+ * Retorno de `sendInvite`.
+ *
+ * > [!] O token vem em texto puro UMA vez, e não há como reemiti-lo.
+ * O backend guarda apenas o hash. Enquanto não houver provedor de SMS é o
+ * painel que exibe o token para alguém digitar no app — e é isso que torna a
+ * ativação testável. Reenviar cancela o convite pendente anterior e emite
+ * outro token, porque o antigo costuma ser o que foi para o número errado.
+ */
 export interface ResultadoConvite {
   paciente_id: string;
-  /** Telefone mascarado para onde o SMS foi enviado. */
+  /** Destino mascarado — o telefone da ficha, ou o informado no reenvio. */
   destino: string;
   enviado_em: string;
+  /** `null` quando a origem dos dados não expõe o token. */
+  token: string | null;
+  expira_em: string | null;
 }

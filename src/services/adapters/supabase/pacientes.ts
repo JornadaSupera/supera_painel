@@ -15,12 +15,14 @@ import { STATUS_CONVITE_LABEL } from "@/types/paciente";
 import type {
   CampoPii,
   PacienteDetalhe,
+  PacienteEntrada,
   PacienteListItem,
   PiiRevelada,
+  ResultadoConvite,
   StatusConvite,
 } from "@/types/paciente";
 import { PATIENT_DEFAULT_SORT, normalizePatientSearch } from "../_people";
-import { TETO_READ, executar, falhaDe } from "./_helpers";
+import { TETO_READ, executar, falhaDe, paraIso } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { codigoExibidoDoPaciente, paraCodigoDeFase, paraFase } from "./mapping";
 
@@ -69,9 +71,26 @@ interface LinhaPaciente {
   is_active: boolean;
   email: string | null;
   phone: string | null;
+  insurance_name: string | null;
   treatment_phase_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Uma linha de `patient_invitations`.
+ *
+ * O administrador tem política de `SELECT` nesta tabela — é a fila que o painel
+ * lê para saber se o convite está de pé. O token não está aqui: a coluna guarda
+ * o hash, e o valor em claro sai uma única vez de `invite_patient`.
+ */
+interface LinhaConvite {
+  id: string;
+  destination: string;
+  status: "pending" | "accepted" | "cancelled";
+  expires_at: string;
+  created_at: string;
+  accepted_at: string | null;
 }
 
 interface LinhaDiagnostico {
@@ -155,14 +174,22 @@ async function carregarCatalogos(): Promise<Catalogos | ReturnType<typeof falhaD
    ------------------------------------------------------------------------- */
 
 /**
- * Situação do convite, derivada do vínculo com a conta.
+ * Situação do convite.
  *
- * O banco não guarda o envio: não há RPC que ligue `patients.account_id` a uma
- * conta, e a ativação do app depende exatamente dela. O que dá para afirmar é
- * se a pessoa já tem conta ou não — "enviado" é estado que ninguém observa.
+ * `account_id` preenchido é o fato definitivo: o app foi ativado, e nenhum
+ * convite pendente muda isso. Sem conta, quem responde é `patient_invitations`
+ * — um convite pendente e dentro da validade é "enviado"; cancelado, expirado
+ * ou inexistente é "não enviado", porque nenhum deles ativa nada.
+ *
+ * Convite expirado cai em "não enviado" de propósito: o estado que interessa a
+ * quem opera é "precisa emitir de novo", e um rótulo próprio para expirado
+ * exigiria uma quarta coluna na lista para dizer a mesma coisa.
  */
-function statusDoConvite(linha: LinhaPaciente): StatusConvite {
-  return linha.account_id ? "aceito" : "nao_enviado";
+function statusDoConvite(linha: LinhaPaciente, convite?: LinhaConvite | null): StatusConvite {
+  if (linha.account_id) return "aceito";
+  if (!convite || convite.status !== "pending") return "nao_enviado";
+
+  return new Date(convite.expires_at).getTime() > Date.now() ? "enviado" : "nao_enviado";
 }
 
 interface ContextoProjecao {
@@ -170,6 +197,7 @@ interface ContextoProjecao {
   diagnostico?: LinhaDiagnostico | null;
   plano?: LinhaPlano | null;
   historico?: LinhaHistorico[];
+  convite?: LinhaConvite | null;
 }
 
 function projetar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteListItem {
@@ -199,7 +227,7 @@ function projetar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteLis
     // regra de criticidade. Calcular no painel seria inferência clínica no
     // front-end, que é justamente o que o projeto proíbe.
     risco: null,
-    convite_status: statusDoConvite(linha),
+    convite_status: statusDoConvite(linha, contexto.convite),
     criado_em: linha.created_at,
   };
 }
@@ -218,6 +246,7 @@ function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDet
       .filter((linha) => linha.kind === "prior_reaction")
       .map((linha) => linha.description),
     observacoes: null,
+    convenio: linha.insurance_name,
     protocolo: contexto.plano
       ? {
           id: contexto.plano.protocol_name,
@@ -231,7 +260,7 @@ function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDet
     // Não há coluna de médico responsável em `patients`.
     medico_responsavel_id: null,
     medico_responsavel_nome: null,
-    convite_enviado_em: null,
+    convite_enviado_em: paraIso(contexto.convite?.created_at),
     ultimo_acesso_app_em: null,
     desativado_em: null,
     motivo_desativacao: null,
@@ -351,16 +380,30 @@ async function paginaDaLista(
   const filtros = params.filters ?? {};
   const ordem = params.sort ?? PATIENT_DEFAULT_SORT;
 
-  // A tela filtra por código de fase; a função recebe o id. `manutencao` não
-  // existe em `treatment_phases`, então cai em `null` — sem filtro, e não um
-  // filtro que o servidor recusaria.
-  const codigoDaFase = paraCodigoDeFase(primeiro(filtros.fase));
+  /*
+   * A tela filtra por CÓDIGO de fase; a função recebe o ID.
+   *
+   * > [!] Fase que o catálogo não tem devolve lista vazia, e não a base inteira.
+   * `manutencao` é fase do painel e não existe em `treatment_phases`; outras
+   * estão na tabela desativadas. Nos dois casos o id sai `null` — e `null` é o
+   * argumento de "sem filtro nenhum". Deixar assim fazia a tela responder
+   * "todos os pacientes" a uma pergunta sobre uma fase específica, sem erro e
+   * sem aviso, que é a pior forma de errar uma listagem.
+   *
+   * Zero é a resposta correta: se a fase não existe no catálogo, ninguém está
+   * nela.
+   */
+  const fasePedida = primeiro(filtros.fase);
+  const codigoDaFase = paraCodigoDeFase(fasePedida);
+  const idDaFase = codigoDaFase ? (fases.idPorCodigo.get(codigoDaFase) ?? null) : null;
+
+  if (fasePedida && !idDaFase) return [];
 
   const { data, error } = await getSupabaseClient().rpc("read_patient_list", {
     p_search: normalizePatientSearch(params.search) || null,
     p_protocol: primeiro(filtros.protocolo_id),
     p_cid10_code: primeiro(filtros.cid),
-    p_treatment_phase_id: codigoDaFase ? (fases.idPorCodigo.get(codigoDaFase) ?? null) : null,
+    p_treatment_phase_id: idDaFase,
     p_is_active: situacaoFiltrada(filtros.status),
     // Coluna que a tela ordena e o servidor não conhece cai no padrão da tela,
     // em vez de virar `undefined` — que faria o PostgREST usar o DEFAULT da
@@ -412,7 +455,28 @@ export async function list(params: ListParams = {}): Promise<ListResult<Paciente
   });
 }
 
-/** Ficha completa. Três chamadas auditadas: paciente, diagnósticos e plano. */
+/**
+ * O convite mais recente da ficha.
+ *
+ * Leitura direta, sem pedágio: `patient_invitations` não é tabela clínica e o
+ * administrador tem política de `SELECT` nela. O "mais recente" basta porque
+ * emitir um convite cancela o pendente anterior — só existe um de pé por vez.
+ */
+async function carregarConvite(id: string): Promise<LinhaConvite | null | ReturnType<typeof falhaDe>> {
+  const { data, error } = await getSupabaseClient()
+    .from("patient_invitations")
+    .select("id, destination, status, expires_at, created_at, accepted_at")
+    .eq("patient_id", id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) return falhaDe(error);
+
+  return (data as unknown as LinhaConvite | null) ?? null;
+}
+
+/** Ficha completa. Quatro chamadas auditadas, mais a fila de convites. */
 export async function getById({ id }: { id: string }): Promise<SingleResult<PacienteDetalhe>> {
   return executar(async () => {
     const supabase = getSupabaseClient();
@@ -420,17 +484,19 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Paci
     const catalogos = await carregarCatalogos();
     if (!("cidPorId" in catalogos)) return catalogos;
 
-    const [paciente, diagnosticos, planos, historico] = await Promise.all([
+    const [paciente, diagnosticos, planos, historico, convite] = await Promise.all([
       supabase.rpc("read_patient", { p_patient_id: id }),
       supabase.rpc("read_patient_diagnoses", { p_patient_id: id }),
       supabase.rpc("read_treatment_plans", { p_patient_id: id }),
       supabase.rpc("read_patient_clinical_history", { p_patient_id: id }),
+      carregarConvite(id),
     ]);
 
     if (paciente.error) return falhaDe(paciente.error);
     if (diagnosticos.error) return falhaDe(diagnosticos.error);
     if (planos.error) return falhaDe(planos.error);
     if (historico.error) return falhaDe(historico.error);
+    if (convite && "error" in convite) return convite;
 
     const linha = ((paciente.data ?? []) as LinhaPaciente[])[0];
     if (!linha) return fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
@@ -445,6 +511,7 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Paci
         // Plano vigente é a linha com `ended_on` nulo.
         plano: listaPlanos.find((item) => !item.ended_on) ?? listaPlanos[0] ?? null,
         historico: (historico.data ?? []) as LinhaHistorico[],
+        convite,
       }),
     );
   });
@@ -593,35 +660,258 @@ export async function exportar(
 export { exportar as export };
 
 /* -------------------------------------------------------------------------
-   O QUE O BACKEND AINDA NÃO OFERECE
+   ESCRITA
    -------------------------------------------------------------------------
-   `patients` tem apenas política de SELECT. Não há INSERT para `authenticated`
-   e não há RPC de cadastro, de desativação nem de convite — a própria ativação
-   do app do paciente depende de um vínculo `patients.account_id` que ainda não
-   tem função no banco.
+   Toda escrita de ficha é RPC. `patients` não tem política de INSERT nem de
+   UPDATE para `authenticated`: as funções são `SECURITY DEFINER`, exigem
+   administrador ativo e deixam a autoria em `audit_log` por gatilho — não há
+   coluna `created_by`, e não deve haver.
 
-   Estas recusas são explícitas, e não stubs genéricos, porque a tela usa a
-   mensagem para desabilitar a ação antes do formulário.
+   Três regras do banco que moldam o que está abaixo:
+
+   1. **Argumento nulo em `update_patient` significa "não mexer".** A função
+      usa `coalesce`, então ela troca valor e não apaga contato. Mandar `null`
+      para limpar um telefone não limpa nada — e é por isso que o formulário de
+      edição trata campo vazio como "manter", e não como "apagar".
+   2. **Histórico clínico só cresce.** `add_patient_clinical_history` é a única
+      operação que existe sobre `patient_clinical_history`: não há editar nem
+      apagar, porque registro clínico é imutável. A edição acrescenta o que é
+      novo e ignora o resto.
+   3. **O token do convite sai uma vez.** A tabela guarda o hash. Se a resposta
+      se perder, não há como reemitir o mesmo código — só emitir outro, o que
+      cancela o anterior.
    ------------------------------------------------------------------------- */
 
-const EM_DESENVOLVIMENTO =
-  "Ainda em desenvolvimento: o backend não expõe esta operação. Fale com o responsável pelo banco.";
+/** Um termo do histórico, na forma que a RPC recebe. */
+type TipoHistorico = "allergy" | "prior_reaction";
 
-export async function create(): Promise<SingleResult<PacienteDetalhe>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, `Cadastro de paciente. ${EM_DESENVOLVIMENTO}`);
+/**
+ * Acrescenta ao histórico clínico o que ainda não está lá.
+ *
+ * Sequencial, e não `Promise.all`: são escritas auditadas na mesma ficha, e um
+ * lote paralelo embaralharia a ordem das linhas na trilha sem ganhar nada
+ * perceptível — a lista tem unidades, não centenas.
+ *
+ * A primeira falha interrompe e é devolvida. Seguir adiante deixaria a ficha
+ * com metade das alergias gravadas e a tela dizendo que salvou.
+ */
+async function acrescentarHistorico(
+  id: string,
+  termos: string[] | undefined,
+  tipo: TipoHistorico,
+  jaRegistrados: Set<string>,
+): Promise<ReturnType<typeof falhaDe> | null> {
+  const supabase = getSupabaseClient();
+
+  for (const termo of termos ?? []) {
+    const limpo = termo.trim();
+    if (!limpo || jaRegistrados.has(limpo.toLowerCase())) continue;
+
+    const { error } = await supabase.rpc("add_patient_clinical_history", {
+      p_patient_id: id,
+      p_kind: tipo,
+      p_description: limpo,
+    });
+
+    if (error) return falhaDe(error);
+    jaRegistrados.add(limpo.toLowerCase());
+  }
+
+  return null;
 }
 
-export async function update(): Promise<SingleResult<PacienteDetalhe>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, `Edição de ficha. ${EM_DESENVOLVIMENTO}`);
-}
+/** O que a ficha já tem de histórico, em minúsculas, para não duplicar linha. */
+async function historicoRegistrado(
+  id: string,
+  tipo: TipoHistorico,
+): Promise<Set<string> | ReturnType<typeof falhaDe>> {
+  const { data, error } = await getSupabaseClient().rpc("read_patient_clinical_history", {
+    p_patient_id: id,
+  });
 
-export async function deactivate(): Promise<SingleResult<PacienteDetalhe>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, `Desativação de paciente. ${EM_DESENVOLVIMENTO}`);
-}
+  if (error) return falhaDe(error);
 
-export async function sendInvite(): Promise<SingleResult<never>> {
-  return fail(
-    ERROR_CODE.NOT_IMPLEMENTED,
-    `Convite de acesso ao app. ${EM_DESENVOLVIMENTO}`,
+  return new Set(
+    ((data ?? []) as LinhaHistorico[])
+      .filter((linha) => linha.kind === tipo)
+      .map((linha) => linha.description.trim().toLowerCase()),
   );
+}
+
+/**
+ * Cadastro da ficha.
+ *
+ * A ficha nasce SEM CONTA: `create_patient` não cria acesso, e a ativação do
+ * app é outro ato — o convite. Isso é do desenho, não uma etapa que faltou:
+ * quem cria a conta é a própria pessoa, no aplicativo, e o convite é o que liga
+ * uma coisa à outra.
+ *
+ * Diagnóstico, estadiamento, protocolo e fase não entram aqui. Ver
+ * `PacienteEntrada`.
+ */
+export async function create(entrada: PacienteEntrada): Promise<SingleResult<PacienteDetalhe>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const { data, error } = await supabase.rpc("create_patient", {
+      p_full_name: entrada.nome,
+      // A RPC normaliza a máscara, mas mandar os dígitos economiza a dúvida.
+      p_cpf: entrada.cpf,
+      p_birth_date: entrada.nascimento,
+      p_phone: entrada.telefone || null,
+      p_email: entrada.email || null,
+      p_insurance_name: entrada.convenio ?? null,
+    });
+
+    if (error) return falhaDe(error);
+
+    const id = data as string | null;
+    if (!id) return fail(ERROR_CODE.UNKNOWN, "O cadastro não devolveu o identificador da ficha.");
+
+    // A ficha já existe. Daqui para a frente, uma falha não desfaz o cadastro —
+    // devolvê-la como erro do cadastro faria alguém tentar de novo e esbarrar
+    // em "já existe ficha com este CPF". Por isso o que falha aqui é reportado
+    // com a ficha JÁ CRIADA: a tela abre a ficha e mostra o que faltou.
+    const vazio = new Set<string>();
+    const erroAlergia = await acrescentarHistorico(id, entrada.alergias, "allergy", vazio);
+    if (erroAlergia) return erroAlergia;
+
+    const erroReacao = await acrescentarHistorico(
+      id,
+      entrada.reacoes_previas,
+      "prior_reaction",
+      new Set<string>(),
+    );
+    if (erroReacao) return erroReacao;
+
+    // `enviar_convite` NÃO é tratado aqui, de propósito: o convite devolve um
+    // código que só existe uma vez, e ele precisa chegar à tela. Emiti-lo aqui
+    // dentro o descartaria — quem encadeia cadastro e convite é o hook, que
+    // sabe para onde levar a resposta.
+
+    return getById({ id });
+  });
+}
+
+/**
+ * Correção da ficha.
+ *
+ * Só vai ao banco o que veio no payload: `update_patient` entende ausente como
+ * "manter", e a tela de edição manda contato apenas quando ele foi digitado —
+ * o campo chega mascarado, e reenviá-lo gravaria a máscara por cima do número.
+ */
+export async function update({
+  id,
+  dados,
+}: {
+  id: string;
+  dados: Partial<PacienteEntrada>;
+}): Promise<SingleResult<PacienteDetalhe>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const { error } = await supabase.rpc("update_patient", {
+      p_patient_id: id,
+      p_full_name: dados.nome ?? null,
+      // CPF não entra na edição: é a chave do cadastro, e o banco o congela
+      // assim que a ficha tem conta vinculada.
+      p_birth_date: dados.nascimento ?? null,
+      p_phone: dados.telefone ?? null,
+      p_email: dados.email ?? null,
+      p_insurance_name: dados.convenio ?? null,
+    });
+
+    if (error) return falhaDe(error);
+
+    if (dados.alergias?.length) {
+      const registradas = await historicoRegistrado(id, "allergy");
+      if (!(registradas instanceof Set)) return registradas;
+
+      const erro = await acrescentarHistorico(id, dados.alergias, "allergy", registradas);
+      if (erro) return erro;
+    }
+
+    if (dados.reacoes_previas?.length) {
+      const registradas = await historicoRegistrado(id, "prior_reaction");
+      if (!(registradas instanceof Set)) return registradas;
+
+      const erro = await acrescentarHistorico(id, dados.reacoes_previas, "prior_reaction", registradas);
+      if (erro) return erro;
+    }
+
+    return getById({ id });
+  });
+}
+
+/**
+ * Desativação lógica.
+ *
+ * `set_patient_active(false)` nunca apaga: dado clínico é imutável, e o
+ * histórico precisa continuar auditável depois do desligamento.
+ *
+ * > [!] O motivo NÃO chega ao banco.
+ * `audit_log` guarda o ato e o ator, e não tem coluna de justificativa. O
+ * motivo digitado fica na trilha do painel — a tela continua exigindo-o porque
+ * é ele que dá sentido à linha, mas quem reler o banco verá a desativação sem
+ * ele. Pedido registrado com o responsável pelo banco.
+ */
+export async function deactivate({
+  id,
+  motivo,
+}: {
+  id: string;
+  motivo: string;
+}): Promise<SingleResult<PacienteDetalhe>> {
+  return executar(async () => {
+    if (!motivo.trim()) {
+      return fail(ERROR_CODE.VALIDATION, "Informe o motivo da desativação.");
+    }
+
+    const { error } = await getSupabaseClient().rpc("set_patient_active", {
+      p_patient_id: id,
+      p_is_active: false,
+    });
+
+    if (error) return falhaDe(error);
+
+    return getById({ id });
+  });
+}
+
+/**
+ * Emite o convite de acesso ao app.
+ *
+ * Devolve o token em texto puro — **uma vez**, e não há como reemiti-lo: o
+ * banco guarda só o hash. Enquanto não houver provedor de envio, é o painel que
+ * o exibe para alguém passar ao paciente, e é isso que torna a ativação
+ * testável em vez de bloqueada por uma credencial de terceiro.
+ *
+ * Emitir cancela o convite pendente anterior. Não é cortesia: quem reemite
+ * costuma estar corrigindo o telefone, e manter o token antigo vivo manteria
+ * válido exatamente o convite que foi para o número errado.
+ */
+export async function sendInvite({ id }: { id: string }): Promise<SingleResult<ResultadoConvite>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const { data, error } = await supabase.rpc("invite_patient", { p_patient_id: id });
+    if (error) return falhaDe(error);
+
+    const emitido = ((data ?? []) as { invitation_id: string; token: string }[])[0];
+    if (!emitido) return fail(ERROR_CODE.UNKNOWN, "O convite não devolveu o código de ativação.");
+
+    // Destino e validade saem da fila, não da RPC: `invite_patient` devolve só
+    // o par (id, token). Se esta leitura falhar, o convite continua emitido —
+    // por isso ela não derruba a resposta, apenas deixa os dois campos vazios.
+    const convite = await carregarConvite(id);
+    const linha = convite && !("error" in convite) ? convite : null;
+
+    return okOne<ResultadoConvite>({
+      paciente_id: id,
+      destino: maskPhone(linha?.destination ?? null),
+      enviado_em: paraIso(linha?.created_at) ?? new Date().toISOString(),
+      token: emitido.token,
+      expira_em: paraIso(linha?.expires_at),
+    });
+  });
 }

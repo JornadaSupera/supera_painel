@@ -91,20 +91,54 @@ function useInvalidarPacientes() {
   return () => queryClient.invalidateQueries({ queryKey: queryKeys.patients.all });
 }
 
+/**
+ * Cadastro, e — quando o formulário pede — o convite logo em seguida.
+ *
+ * As duas chamadas ficam aqui, e não dentro do adapter, por causa do código de
+ * ativação: ele existe uma única vez e precisa chegar à tela. Emitido lá
+ * dentro, seria descartado antes de alguém o ver.
+ *
+ * > [!] Falha no convite NÃO derruba o cadastro.
+ * A ficha já existe neste ponto. Propagar o erro faria a tela dizer "não foi
+ * possível cadastrar" sobre um paciente que está no banco, e a tentativa
+ * seguinte esbarraria em "já existe ficha com este CPF". O convite falho vira
+ * aviso, e o botão da ficha reemite.
+ */
 export function useCriarPaciente() {
   const invalidar = useInvalidarPacientes();
 
   return useMutation({
     mutationFn: async (entrada: PacienteEntrada) => {
-      const { data } = await call(() => pacientesApi.create(entrada));
-      return data;
+      const { data: paciente } = await call(() => pacientesApi.create(entrada));
+      if (!paciente || !entrada.enviar_convite) {
+        return { paciente, convite: null, erroConvite: null };
+      }
+
+      try {
+        const { data: convite } = await call(() => pacientesApi.sendInvite({ id: paciente.id }));
+        audit.update(RECURSO, paciente.id, { operacao: "convite" });
+        return { paciente, convite, erroConvite: null };
+      } catch (erro) {
+        return {
+          paciente,
+          convite: null,
+          erroConvite: erro instanceof Error ? erro.message : "Falha ao emitir o convite.",
+        };
+      }
     },
-    onSuccess: async (paciente) => {
+    onSuccess: async ({ paciente, erroConvite }) => {
       if (paciente) audit.update(RECURSO, paciente.id, { operacao: "criacao" });
       await invalidar();
+
       toast.success("Paciente cadastrado", {
         description: paciente ? `${paciente.nome} · ${paciente.codigo}` : undefined,
       });
+
+      if (erroConvite) {
+        toast.warning("A ficha foi criada, mas o convite não saiu", {
+          description: `${erroConvite} Reemita pela ficha.`,
+        });
+      }
     },
     onError: (erro) => toast.error("Não foi possível cadastrar", { description: erro.message }),
   });
@@ -158,11 +192,14 @@ export function useEnviarConvite() {
     },
     onSuccess: async (resultado) => {
       await invalidar();
-      toast.success("Convite enviado por SMS", {
-        description: resultado ? `Enviado para ${resultado.destino}` : undefined,
+      // O texto não promete envio: não há provedor contratado, e o que acontece
+      // de fato é a emissão do código. Prometer "enviado por SMS" faria a
+      // recepção esperar uma mensagem que ninguém despacha.
+      toast.success("Convite emitido", {
+        description: resultado?.destino ? `Registrado para ${resultado.destino}` : undefined,
       });
     },
-    onError: (erro) => toast.error("Não foi possível enviar o convite", { description: erro.message }),
+    onError: (erro) => toast.error("Não foi possível emitir o convite", { description: erro.message }),
   });
 }
 
