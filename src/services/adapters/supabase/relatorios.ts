@@ -1,3 +1,4 @@
+import { FASE_TRATAMENTO_LABEL } from "@/lib/enums";
 import { ERROR_CODE, fail, okOne, type ListResult, type SingleResult } from "@/services/contracts";
 import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
 import {
@@ -5,154 +6,112 @@ import {
   chatResponseReport,
   createReportOperations,
   effectsByProtocolReport,
-  engagementRows,
   isReportFailure,
   listDefinitionsWithout,
   type ReportOutcome,
   type ReportParams,
 } from "../_reports";
-import { TETO_READ, executar, falhaDe, umDe } from "./_helpers";
+import { TETO_READ, executar, falhaDe } from "./_helpers";
+import {
+  SITUACAO,
+  falhou,
+  janelaDeDias,
+  resumirAgenda,
+  rotuloDoMes,
+} from "./_summaries";
 import { getSupabaseClient } from "./client";
 import { crossTab } from "./estatisticasClinicas";
 import { getIndicadores } from "./estatisticasOperacionais";
+import { varrerLista } from "./pacientes";
 
 /**
  * Relatórios — o motor dos doze.
  *
- * Um motor, doze definições. A alternativa seria doze páginas parecidas, e
- * então doze lugares para corrigir a mesma coluna mal formatada.
+ * Um motor, doze definições. A alternativa seria doze páginas parecidas, e então
+ * doze lugares para corrigir a mesma coluna mal formatada.
  *
  * Cada relatório é uma função que devolve colunas descritas e linhas achatadas.
- * A tela não sabe de qual tabela o número veio — desenha o que recebe —, o que
- * é o que permite um relatório trocar de origem sem a tela mudar.
+ * A tela não sabe de qual tabela o número veio — desenha o que recebe —, o que é
+ * o que permite um relatório trocar de origem sem a tela mudar. Foi o que
+ * aconteceu nesta rodada: **oito dos doze passaram a rodar** e nenhuma linha da
+ * tela mudou junto.
  *
- * > [!] Três dos doze não rodam, e a lista diz quais.
- * Alertas de IA, NPS e conteúdo mais acessado não têm origem no banco. Eles
- * continuam no catálogo, marcados como indisponíveis com o motivo: o conjunto
- * de doze é contratado, e sumir com o cartão esconderia o que falta entregar.
+ * > [!] O que destravou, e o que continua fora
+ * A família `summarize_*` deu ao painel a leitura em conjunto que faltava —
+ * contagem somada no banco, sem linha de prontuário no navegador —, e
+ * `read_patient_list` deu busca, filtro e total à listagem. Com as duas, agenda,
+ * chat, diário, protocolo, fase e CID passaram a ter fonte.
+ *
+ * Os quatro que sobram não esperam leitura nenhuma: esperam **definição**. Cada
+ * um diz o seu motivo no próprio cartão, porque o conjunto de doze é contratado
+ * e sumir com o cartão esconderia o que falta entregar.
  */
 
-const TETO = 5000;
+/** Teto de varredura da base para os relatórios que contam pacientes. */
+const TETO_VARREDURA = TETO_READ * 10;
 
 /**
- * O TETO NÃO É A ÚNICA TRAVA — leia antes de tirar um slug desta lista.
+ * O QUE CONTINUA SEM ORIGEM — e por quê.
  * =============================================================================
- * As políticas de leitura clínica da equipe (`patients_select_admin`,
- * `appointments_select_admin`, `treatment_plans_select_*`, `diary_*_select_*`,
- * `conversations_select_admin`) estão declaradas `TO clinical_reader`, e
- * `authenticated` **não é membro desse papel**. Quem alcança aquelas linhas são
- * as funções `read_*`, que são `SECURITY DEFINER` com owner `clinical_reader`.
- *
- * Consequência: um `.from("appointments")` feito pelo painel devolve **zero
- * linhas e nenhum erro**. Um relatório que soma em cima disso não fica vazio —
- * ele publica `0` com cara de medição. "0 sessões de quimioterapia no mês" é
- * afirmação falsa, e a tela não tem como saber que é falsa.
- *
- * Por isso os relatórios abaixo estão retidos AQUI, e não corrigidos lá dentro:
- * a função existe, está certa, e continua sem fonte. **Tirar o slug desta lista
- * não conserta nada** — só volta a publicar zero. O que os libera é a camada de
- * agregação no banco (uma função de resumo que devolva contagem, nunca linha);
- * quando ela existir, cada função destas troca o `.from()` por `.rpc()` e sai
- * da lista junto.
- *
- * Enquanto isso, o critério é o do Dashboard: **indicador sem fonte é omitido,
- * nunca zerado.**
+ * Nenhum dos quatro é limitação de leitura. Tirar um slug desta lista sem que a
+ * definição exista publica um número calculado sobre critério inventado, que é
+ * pior do que um cartão que diz o que falta.
  */
 const SEM_ORIGEM: Record<string, string> = {
-  /* ---------------------------- sem fonte: a tabela não existe no backend */
   "alertas-ia":
-    "Não existe tabela de alerta nem regra de criticidade no backend. Derivar alerta a partir do grau do sintoma seria inferência clínica feita pelo painel, que o escopo não permite.",
-  nps: "Não existe pesquisa de satisfação no backend: nenhuma tabela de resposta, nota ou marco de envio.",
+    "A fila de alertas existe no backend, mas nenhum gatilho de criticidade foi cadastrado: sem regra, nenhum alerta dispara. O limiar é decisão clínica, e cadastrá-lo é ato da administração. Fila priorizada por IA, além disso, é do nível Completo — fora do escopo contratado.",
+  nps: "As tabelas e a função da pesquisa existem, mas nenhuma pesquisa é aberta: a rotina agendada que dispara o NPS não foi criada, e dois dos três marcos dependem do plano terapêutico, que só a integração com o Gemed preenche. Sem pesquisa aberta não há resposta para contar.",
   "conteudo-mais-acessado":
-    "A contagem de acessos vive na biblioteca do paciente, e nem a equipe nem a administração têm política de leitura ali. Sem ela não há ranking.",
-
-  /* ------------- sem fonte: a leitura em conjunto não alcança a tabela */
-  "pacientes-ativos":
-    "O plano terapêutico só se lê paciente a paciente, e este relatório precisa de todos ao mesmo tempo — inclusive para quebrar por protocolo e fase. Falta no backend uma leitura de conjunto que devolva a contagem já somada.",
-  "distribuicao-cid":
-    "O diagnóstico só se lê paciente a paciente. Varrer a base para montar o mapa de CID registraria um acesso ao prontuário por paciente a cada abertura da tela — que é exatamente o que a trilha de auditoria existe para sinalizar. Falta a leitura agregada no backend.",
-  "efeitos-por-protocolo":
-    "O cruzamento depende de ler diário e plano de toda a base ao mesmo tempo, e essa leitura em conjunto não existe no backend. É a mesma origem do mapa de calor das estatísticas clínicas.",
-  "sessoes-quimioterapia":
-    "Não há leitura da agenda da clínica inteira: a agenda só se lê por paciente, e a do profissional logado não serve ao administrador. Sem isso não dá para contar sessões do mês.",
-  "faltas-cancelamentos":
-    "Depende da mesma leitura de agenda da clínica inteira, que o backend ainda não oferece. O catálogo de motivos de falta também está vazio, então nem o 'por quê' teria origem.",
-  "volume-por-especialidade":
-    "Depende da leitura da agenda da clínica inteira por área de origem, que o backend ainda não oferece.",
+    "A contagem de acessos vive na biblioteca do paciente, e nem a equipe nem a administração têm política de leitura ali. Sem ela não há ranking — e a leitura existe para o titular do dado, não para quem publica.",
   "engajamento-app":
-    "O diário só se lê paciente a paciente. Medir engajamento exigiria varrer a base inteira a cada abertura, gerando um registro de acesso ao prontuário por paciente. Falta a contagem agregada no backend.",
-  "tempo-resposta-chat":
-    "A leitura das mensagens em conjunto não alcança o painel: a conversa se lê uma a uma. Medir o tempo médio hoje custaria uma leitura por conversa, cada uma registrando acesso a conteúdo clínico.",
+    "“Engajamento” não tem definição em fonte nenhuma: sessões abertas, dias com registro no diário, orientações lidas e mensagens enviadas dariam quatro números diferentes, e o escopo não diz qual deles é o indicador. A pergunta está aberta com a clínica. Número calculado sobre definição inventada é pior que indicador ausente.",
 };
 
 export async function listDefinitions(): Promise<ListResult<DefinicaoRelatorio>> {
   return listDefinitionsWithout(SEM_ORIGEM);
 }
 
-function inicioDeDiasAtras(dias: number): string {
-  return new Date(Date.now() - dias * 86_400_000).toISOString();
-}
-
-/** "2026-03" → "mar/26". */
-function rotuloDoMes(chave: string): string {
-  const [ano, mes] = chave.split("-");
-  const data = new Date(Date.UTC(Number(ano), Number(mes) - 1, 1));
-
-  return data
-    .toLocaleDateString("pt-BR", { month: "short", year: "2-digit", timeZone: "UTC" })
-    .replace(".", "");
-}
-
-/** Agrupa por mês e devolve a série ordenada. */
-function serieMensal(datas: string[]): { mes: string; total: number }[] {
-  const porMes = new Map<string, number>();
-  for (const data of datas) {
-    const chave = data.slice(0, 7);
-    porMes.set(chave, (porMes.get(chave) ?? 0) + 1);
-  }
-
-  return [...porMes.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([chave, total]) => ({ mes: rotuloDoMes(chave), total }));
-}
-
 /* -------------------------------------------------------------------------
-   OS RELATÓRIOS
+   RELATÓRIOS SOBRE A LISTAGEM DE PACIENTES
    ------------------------------------------------------------------------- */
 
+/** O aviso de recorte parcial, para o resumo do relatório. */
+function avisoDeParcial(total: number, lidos: number): string {
+  return ` · CONTAGEM PARCIAL: a varredura leu ${lidos} das ${total} fichas do recorte, e os números abaixo cobrem só essa parte`;
+}
+
+/**
+ * Pacientes ativos por protocolo e fase.
+ *
+ * A listagem devolve protocolo vigente e fase na mesma resposta, sem uma segunda
+ * chamada por paciente — que é exatamente o que antes tornava este relatório
+ * impossível sem sujar a trilha de auditoria com um acesso por ficha.
+ */
 async function pacientesAtivos(): Promise<ReportOutcome> {
-  const { data, error } = await getSupabaseClient()
-    .from("treatment_plans")
-    .select("protocol_name, ended_on, patients ( is_active, treatment_phases ( label ) )")
-    .is("ended_on", null)
-    .limit(TETO);
+  const varredura = await varrerLista(
+    { filters: { status: "ativo" }, sort: { field: "nome", direction: "asc" } },
+    TETO_VARREDURA,
+  );
 
-  if (error) return falhaDe(error);
-
-  const linhas = data as unknown as {
-    protocol_name: string;
-    patients: {
-      is_active: boolean;
-      treatment_phases: { label: string } | { label: string }[] | null;
-    } | { is_active: boolean; treatment_phases: { label: string } | { label: string }[] | null }[] | null;
-  }[];
+  if (!("itens" in varredura)) return varredura;
 
   const porChave = new Map<string, { protocolo: string; fase: string; total: number }>();
 
-  for (const linha of linhas) {
-    const paciente = umDe(linha.patients);
-    if (!paciente?.is_active) continue;
+  for (const paciente of varredura.itens) {
+    // "Sem plano terapêutico" é resultado, não resíduo: enquanto o Gemed
+    // estiver desligado o plano só entra por RPC manual, e saber de quantos
+    // pacientes ele falta é o que permite ler o resto do relatório.
+    const protocolo = paciente.protocolo_nome === "—" ? "Sem plano terapêutico" : paciente.protocolo_nome;
+    const fase = paciente.fase ? FASE_TRATAMENTO_LABEL[paciente.fase] : "Sem fase registrada";
 
-    const fase = umDe(paciente.treatment_phases)?.label ?? "Sem fase registrada";
-    const chave = `${linha.protocol_name}\u0000${fase}`;
-    const atual = porChave.get(chave) ?? { protocolo: linha.protocol_name, fase, total: 0 };
+    const chave = `${protocolo}\u0000${fase}`;
+    const atual = porChave.get(chave) ?? { protocolo, fase, total: 0 };
 
     atual.total += 1;
     porChave.set(chave, atual);
   }
 
-  const resultado = [...porChave.values()].sort((a, b) => b.total - a.total);
-  const total = resultado.reduce((soma, linha) => soma + linha.total, 0);
+  const linhas = [...porChave.values()].sort((a, b) => b.total - a.total);
 
   return {
     slug: "pacientes-ativos",
@@ -162,91 +121,44 @@ async function pacientesAtivos(): Promise<ReportOutcome> {
       { key: "fase", label: "Fase do tratamento" },
       { key: "total", label: "Pacientes", numerica: true },
     ],
-    linhas: resultado,
-    resumo: `${total} pacientes ativos com plano terapêutico vigente`,
+    linhas,
+    resumo:
+      `${varredura.itens.length} pacientes ativos` +
+      (varredura.parcial ? avisoDeParcial(varredura.total, varredura.itens.length) : ""),
     eixo: "protocolo",
     medida: "total",
   };
 }
 
 /**
- * Único dos doze que roda hoje.
+ * Distribuição por CID.
  *
- * Lê por `read_patients`, e não por `.from("patients")`, porque é a função que
- * alcança a tabela — ver o bloco de `SEM_ORIGEM`. A contrapartida é o teto de
- * 200 linhas do servidor, que a tela precisa dizer em voz alta: com a base
- * acima disso o número passa a ser um piso, não o total, e um piso apresentado
- * como total é a mesma falha que este arquivo existe para evitar.
+ * Conta o **diagnóstico principal**, que é o que a listagem devolve. Paciente
+ * com mais de um CID registrado entra uma vez, pelo principal — e o cabeçalho
+ * diz isso, porque "distribuição por CID" contando todos os diagnósticos daria
+ * um total maior que a base e ninguém notaria.
  */
-async function novosPacientes(dias: number): Promise<ReportOutcome> {
-  const { data, error } = await getSupabaseClient().rpc("read_patients", {
-    p_limit: TETO_READ,
-    p_offset: 0,
-  });
-
-  if (error) return falhaDe(error);
-
-  const desde = inicioDeDiasAtras(dias);
-  const todos = (data ?? []) as { created_at: string }[];
-  const noPeriodo = todos.filter((linha) => linha.created_at >= desde);
-
-  const serie = serieMensal(noPeriodo.map((linha) => linha.created_at));
-  const total = serie.reduce((soma, ponto) => soma + ponto.total, 0);
-
-  // `read_patients` para em 200 no servidor. Se voltou no teto, a base é maior
-  // do que a janela e a contagem é parcial — dizer isso é obrigação, não zelo.
-  const truncado = todos.length >= TETO_READ;
-
-  return {
-    slug: "novos-pacientes",
-    titulo: "Novos pacientes no período",
-    colunas: [
-      { key: "mes", label: "Mês" },
-      { key: "total", label: "Novos pacientes", numerica: true },
-    ],
-    linhas: serie,
-    resumo: truncado
-      ? `${total} cadastros nos últimos ${dias} dias · CONTAGEM PARCIAL: a leitura atingiu o teto de ${TETO_READ} pacientes do backend e não cobre a base inteira`
-      : `${total} cadastros nos últimos ${dias} dias`,
-    eixo: "mes",
-    medida: "total",
-  };
-}
-
 async function distribuicaoCid(): Promise<ReportOutcome> {
-  const { data, error } = await getSupabaseClient()
-    .from("patient_diagnoses")
-    .select("patient_id, is_primary, cid10 ( code, label )")
-    .limit(TETO);
+  const varredura = await varrerLista({}, TETO_VARREDURA);
+  if (!("itens" in varredura)) return varredura;
 
-  if (error) return falhaDe(error);
+  const porCid = new Map<string, { codigo: string; label: string; total: number }>();
 
-  const linhas = data as unknown as {
-    patient_id: string;
-    is_primary: boolean;
-    cid10: { code: string; label: string } | { code: string; label: string }[] | null;
-  }[];
+  for (const paciente of varredura.itens) {
+    if (!paciente.cid) continue;
 
-  // Conta PACIENTES distintos por CID: quem tem dois diagnósticos do mesmo
-  // código não pode pesar dois na prevalência.
-  const pacientesPorCid = new Map<string, { codigo: string; label: string; pacientes: Set<string> }>();
-
-  for (const linha of linhas) {
-    const cid = umDe(linha.cid10);
-    if (!cid) continue;
-
-    const atual = pacientesPorCid.get(cid.code) ?? {
-      codigo: cid.code,
-      label: cid.label,
-      pacientes: new Set<string>(),
+    const atual = porCid.get(paciente.cid) ?? {
+      codigo: paciente.cid,
+      label: paciente.cid_descricao,
+      total: 0,
     };
-    atual.pacientes.add(linha.patient_id);
-    pacientesPorCid.set(cid.code, atual);
+
+    atual.total += 1;
+    porCid.set(paciente.cid, atual);
   }
 
-  const resultado = [...pacientesPorCid.values()]
-    .map((item) => ({ codigo: item.codigo, label: item.label, total: item.pacientes.size }))
-    .sort((a, b) => b.total - a.total);
+  const linhas = [...porCid.values()].sort((a, b) => b.total - a.total);
+  const comCid = linhas.reduce((soma, linha) => soma + linha.total, 0);
 
   return {
     slug: "distribuicao-cid",
@@ -256,32 +168,110 @@ async function distribuicaoCid(): Promise<ReportOutcome> {
       { key: "label", label: "Diagnóstico" },
       { key: "total", label: "Pacientes", numerica: true },
     ],
-    linhas: resultado,
-    resumo: `${resultado.length} códigos com pacientes registrados`,
+    linhas,
+    resumo:
+      `${linhas.length} códigos · ${comCid} de ${varredura.itens.length} fichas com diagnóstico principal registrado` +
+      (varredura.parcial ? avisoDeParcial(varredura.total, varredura.itens.length) : ""),
     eixo: "codigo",
     medida: "total",
   };
 }
 
-async function sessoesQuimioterapia(
-  dias: number,
-): Promise<ReportOutcome> {
-  const { data, error } = await getSupabaseClient()
-    .from("appointments")
-    .select("starts_at, appointment_types!inner ( code ), appointment_statuses ( code )")
-    .eq("appointment_types.code", "infusion")
-    .gte("starts_at", inicioDeDiasAtras(dias))
-    .limit(TETO);
+/**
+ * Novos pacientes por mês.
+ *
+ * É o **último uso de `read_patients`** no painel, e não por preferência:
+ * `read_patient_list` ordena por data de cadastro e **não devolve a coluna**,
+ * então a série mensal não tem de onde sair. Enquanto a data não entrar na
+ * projeção da listagem, este relatório carrega o teto de 200 do servidor — e
+ * avisa quando bate nele, porque um piso apresentado como total é a mesma falha
+ * que este arquivo existe para evitar.
+ */
+async function novosPacientes(dias: number): Promise<ReportOutcome> {
+  const { data, error } = await getSupabaseClient().rpc("read_patients", {
+    p_limit: TETO_READ,
+    p_offset: 0,
+  });
 
   if (error) return falhaDe(error);
 
-  const linhas = data as unknown as {
-    starts_at: string;
-    appointment_statuses: { code: string } | { code: string }[] | null;
-  }[];
+  const desde = janelaDeDias(dias).from;
+  const todos = (data ?? []) as { created_at: string }[];
+  const noPeriodo = todos.filter((linha) => linha.created_at >= desde);
 
-  const realizadas = linhas.filter((linha) => umDe(linha.appointment_statuses)?.code === "completed");
-  const serie = serieMensal(realizadas.map((linha) => linha.starts_at));
+  const porMes = new Map<string, number>();
+  for (const linha of noPeriodo) {
+    const chave = `${linha.created_at.slice(0, 7)}-01`;
+    porMes.set(chave, (porMes.get(chave) ?? 0) + 1);
+  }
+
+  const linhas = [...porMes.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([chave, total]) => ({ mes: rotuloDoMes(chave), total }));
+
+  const total = linhas.reduce((soma, ponto) => soma + ponto.total, 0);
+  const truncado = todos.length >= TETO_READ;
+
+  return {
+    slug: "novos-pacientes",
+    titulo: "Novos pacientes no período",
+    colunas: [
+      { key: "mes", label: "Mês" },
+      { key: "total", label: "Novos pacientes", numerica: true },
+    ],
+    linhas,
+    resumo: truncado
+      ? `${total} cadastros nos últimos ${dias} dias · CONTAGEM PARCIAL: a leitura atingiu o teto de ${TETO_READ} fichas do backend e não cobre a base inteira`
+      : `${total} cadastros nos últimos ${dias} dias`,
+    eixo: "mes",
+    medida: "total",
+  };
+}
+
+/* -------------------------------------------------------------------------
+   RELATÓRIOS SOBRE A AGENDA
+   ------------------------------------------------------------------------- */
+
+/**
+ * Sessões de quimioterapia realizadas.
+ *
+ * O recorte é do tipo de compromisso, e o id vem de `appointment_types` — que é
+ * catálogo, de leitura direta e sem pedágio. Filtrar por `code` no cliente
+ * depois do resumo daria o mesmo número; filtrar no servidor deixa a trilha
+ * dizendo que a varredura foi do tipo, não da agenda inteira.
+ */
+async function sessoesQuimioterapia(dias: number): Promise<ReportOutcome> {
+  const tipos = await getSupabaseClient()
+    .from("appointment_types")
+    .select("id, label")
+    .eq("code", "infusion")
+    .limit(1);
+
+  if (tipos.error) return falhaDe(tipos.error);
+
+  const tipo = (tipos.data as { id: string; label: string }[])[0];
+  if (!tipo) {
+    return fail(
+      ERROR_CODE.NOT_FOUND,
+      "O catálogo de tipos de compromisso não tem o tipo de infusão, que é o recorte deste relatório.",
+    );
+  }
+
+  const resumo = await resumirAgenda({ janela: janelaDeDias(dias), tipoId: tipo.id });
+  if (falhou(resumo)) return resumo;
+
+  const realizados = resumo.linhas.filter((linha) => linha.status_code === SITUACAO.REALIZADO);
+
+  const porMes = new Map<string, number>();
+  for (const linha of realizados) {
+    porMes.set(linha.bucket_start, (porMes.get(linha.bucket_start) ?? 0) + linha.appointment_count);
+  }
+
+  const linhas = [...porMes.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([balde, total]) => ({ mes: rotuloDoMes(balde), total }));
+
+  const total = linhas.reduce((soma, ponto) => soma + ponto.total, 0);
 
   return {
     slug: "sessoes-quimioterapia",
@@ -290,52 +280,12 @@ async function sessoesQuimioterapia(
       { key: "mes", label: "Mês" },
       { key: "total", label: "Sessões realizadas", numerica: true },
     ],
-    linhas: serie,
+    linhas,
     // A taxa de ocupação da sala de infusão exigiria capacidade instalada, que
     // não é dado do banco. O relatório traz o volume e não finge a taxa.
-    resumo: `${realizadas.length} sessões realizadas nos últimos ${dias} dias · taxa de ocupação da sala indisponível (capacidade não é dado do backend)`,
+    resumo: `${total} sessões realizadas nos últimos ${dias} dias · taxa de ocupação da sala indisponível: a capacidade instalada não é dado do backend`,
     eixo: "mes",
     medida: "total",
-  };
-}
-
-async function engajamentoApp(dias: number): Promise<ReportOutcome> {
-  const supabase = getSupabaseClient();
-
-  const [diarios, planos] = await Promise.all([
-    supabase
-      .from("diary_entries")
-      .select("patient_id, entry_date")
-      .gte("entry_date", inicioDeDiasAtras(dias).slice(0, 10))
-      .limit(TETO),
-    supabase.from("treatment_plans").select("patient_id, ended_on").is("ended_on", null).limit(TETO),
-  ]);
-
-  const erro = diarios.error ?? planos.error;
-  if (erro) return falhaDe(erro);
-
-  const emTratamento = new Set(
-    (planos.data as unknown as { patient_id: string }[]).map((linha) => linha.patient_id),
-  );
-
-  const registraram = new Set(
-    (diarios.data as unknown as { patient_id: string }[]).map((linha) => linha.patient_id),
-  );
-
-  const ativos = [...registraram].filter((id) => emTratamento.has(id)).length;
-  const total = emTratamento.size;
-
-  return {
-    slug: "engajamento-app",
-    titulo: "Engajamento dos pacientes no app",
-    colunas: [
-      { key: "indicador", label: "Indicador" },
-      { key: "valor", label: "Valor", numerica: true },
-    ],
-    linhas: engagementRows(total, ativos, `Registraram no diário (${dias} dias)`),
-    resumo: `${ativos} de ${total} pacientes em tratamento registraram algo no diário`,
-    eixo: "indicador",
-    medida: "valor",
   };
 }
 
@@ -343,9 +293,7 @@ async function engajamentoApp(dias: number): Promise<ReportOutcome> {
    EXECUÇÃO
    ------------------------------------------------------------------------- */
 
-export async function run(
-  params: ReportParams,
-): Promise<SingleResult<ResultadoRelatorio>> {
+export async function run(params: ReportParams): Promise<SingleResult<ResultadoRelatorio>> {
   return executar(async () => {
     const dias = params.dias ?? 30;
     const motivo = SEM_ORIGEM[params.slug];
@@ -369,11 +317,9 @@ export async function run(
           return sessoesQuimioterapia(dias);
         case "faltas-cancelamentos":
         case "volume-por-especialidade":
-          return bySpecialtyReport(params.slug, await getIndicadores());
-        case "engajamento-app":
-          return engajamentoApp(dias);
+          return bySpecialtyReport(params.slug, await getIndicadores({ dias }));
         case "tempo-resposta-chat":
-          return chatResponseReport(await getIndicadores());
+          return chatResponseReport(await getIndicadores({ dias }));
         default:
           return fail(ERROR_CODE.NOT_FOUND, `Relatório "${params.slug}" não existe no catálogo.`);
       }
