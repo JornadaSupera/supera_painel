@@ -4,14 +4,9 @@ import {
   SearchInput,
   SourceErrorChip,
 } from "@/components/shared";
-import { useCids, useProtocolos } from "@/hooks/useCatalogos";
+import { useCids, useFasesTratamento, useProtocolos } from "@/hooks/useCatalogos";
 import { motivoIndisponivel } from "@/services/apiClient";
-import {
-  FASE_TRATAMENTO_LABEL,
-  RISCO_LABEL,
-  STATUS_PACIENTE_LABEL,
-  toOptions,
-} from "@/lib/enums";
+import { RISCO_LABEL, STATUS_PACIENTE_LABEL, toOptions } from "@/lib/enums";
 import { hasActiveFilters } from "@/stores/listStore";
 import { usePacientesStore, type FiltrosPacientes as Filtros } from "@/stores/pacientes";
 
@@ -44,6 +39,7 @@ export function FiltrosPacientes() {
 
   const cids = useCids();
   const protocolos = useProtocolos();
+  const fases = useFasesTratamento();
 
   const opcoesCid = (cids.data ?? []).map((cid) => ({
     value: cid.codigo,
@@ -102,13 +98,21 @@ export function FiltrosPacientes() {
           />
         ))}
 
-      <FilterSelect
-        label="Fase"
-        value={filtros.fase}
-        onChange={aplicar("fase")}
-        options={toOptions(FASE_TRATAMENTO_LABEL)}
-        className="w-36"
-      />
+      {/* As fases vêm do cadastro, não do vocabulário do painel: oferecer uma
+          fase que o catálogo não tem é um filtro que só devolve lista vazia, e
+          quem filtra entende "não há paciente nessa fase" em vez de "essa fase
+          não existe aqui". */}
+      {fases.isError ? (
+        <SourceErrorChip label="A lista de fases" onRetry={() => void fases.refetch()} />
+      ) : (
+        <FilterSelect
+          label="Fase"
+          value={filtros.fase}
+          onChange={aplicar("fase")}
+          options={fases.data ?? []}
+          className="w-36"
+        />
+      )}
 
       {!semRisco && (
         <FilterSelect
