@@ -122,6 +122,7 @@ export const queryKeys = {
     protocols: () => ["catalogs", "protocols"] as const,
     specialties: () => ["catalogs", "specialties"] as const,
     effects: () => ["catalogs", "effects"] as const,
+    phases: () => ["catalogs", "phases"] as const,
   },
 } as const;
 

@@ -1,4 +1,9 @@
-import { ESPECIALIDADE_LABEL, toOptions } from "@/lib/enums";
+import {
+  ESPECIALIDADE_LABEL,
+  FASE_TRATAMENTO_LABEL,
+  toOptions,
+  type FaseTratamento,
+} from "@/lib/enums";
 import { cids } from "@/mocks/cids";
 import { efeitosAdversos, protocolos } from "@/mocks/protocolos";
 import { ok, type ListResult } from "@/services/contracts";
@@ -34,4 +39,23 @@ export async function listEspecialidades(): Promise<ListResult<{ value: string; 
 
 export async function listEfeitos(): Promise<ListResult<EfeitoAdverso>> {
   return simulate(() => ok(efeitosAdversos));
+}
+
+/**
+ * As fases que o cadastro reconhece.
+ *
+ * O mock devolve as cinco do protótipo — é a base fictícia, e nela todas
+ * existem. No Supabase a lista é a tabela `treatment_phases`, que costuma ser
+ * menor; é justamente por isso que o seletor pergunta à camada de dados em vez
+ * de ler o enum direto.
+ */
+export async function listFases(): Promise<ListResult<{ value: FaseTratamento; label: string }>> {
+  return simulate(() =>
+    ok(
+      toOptions(FASE_TRATAMENTO_LABEL).map((opcao) => ({
+        value: opcao.value as FaseTratamento,
+        label: opcao.label,
+      })),
+    ),
+  );
 }

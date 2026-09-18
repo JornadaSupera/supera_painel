@@ -1,9 +1,14 @@
-import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
+import {
+  ESPECIALIDADE_LABEL,
+  FASE_TRATAMENTO_LABEL,
+  type Especialidade,
+  type FaseTratamento,
+} from "@/lib/enums";
 import { ok, type ListResult } from "@/services/contracts";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import { executar, falhaDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
-import { paraEspecialidade } from "./mapping";
+import { paraEspecialidade, paraFase } from "./mapping";
 
 /**
  * Catálogos de apoio.
@@ -75,6 +80,47 @@ export async function listEspecialidades(): Promise<ListResult<{ value: string; 
           : null;
       })
       .filter((opcao): opcao is { value: Especialidade; label: string } => opcao !== null);
+
+    return ok(opcoes);
+  });
+}
+
+/**
+ * Fases de tratamento.
+ *
+ * > [!] O catálogo é mais curto do que o vocabulário do painel.
+ * `lib/enums` nomeia cinco fases porque o protótipo as desenha; `treatment_phases`
+ * tem as que a clínica de fato usa, e aposenta uma com `is_active = false` em
+ * vez de apagá-la. Filtrar por uma fase que o cadastro não tem devolve sempre
+ * zero — um controle que parece funcionar e nunca acha ninguém.
+ *
+ * Fase do banco sem correspondente aqui também fica de fora: a tela não teria
+ * como escrever o nome dela na coluna.
+ */
+export async function listFases(): Promise<ListResult<{ value: FaseTratamento; label: string }>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("treatment_phases")
+      .select("code")
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+
+    if (error) return falhaDe(error);
+
+    // `treatment_phases` também guarda os marcos do NPS (`primeiro_acesso`,
+    // `ultimo_ciclo`), que não são fase de tratamento e não têm nome no painel:
+    // `paraFase` os descarta. O Set protege contra a mesma fase aparecer duas
+    // vezes, que o `sort_order` repetido da tabela deixa acontecer.
+    const vistas = new Set<FaseTratamento>();
+    const opcoes: { value: FaseTratamento; label: string }[] = [];
+
+    for (const linha of data as { code: string }[]) {
+      const fase = paraFase(linha.code);
+      if (!fase || vistas.has(fase)) continue;
+
+      vistas.add(fase);
+      opcoes.push({ value: fase, label: FASE_TRATAMENTO_LABEL[fase] });
+    }
 
     return ok(opcoes);
   });

@@ -40,6 +40,21 @@ export function useEspecialidades() {
   });
 }
 
+/**
+ * Fases de tratamento ativas no cadastro.
+ *
+ * Vem da camada de dados e não de `lib/enums` porque o vocabulário do painel é
+ * maior do que o catálogo do banco: oferecer uma fase que o cadastro não tem
+ * dá um filtro que nunca acha ninguém.
+ */
+export function useFasesTratamento() {
+  return useQuery({
+    queryKey: queryKeys.catalogs.phases(),
+    queryFn: async () => (await call(() => catalogosApi.listFases())).data,
+    staleTime: UMA_HORA,
+  });
+}
+
 export function useEfeitosAdversos() {
   return useQuery({
     queryKey: queryKeys.catalogs.effects(),
