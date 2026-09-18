@@ -6,6 +6,7 @@ import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts
 import type {
   PasswordRecoveryInput,
   PasswordResetRequest,
+  RecoveryCredential,
 } from "@/services/contracts/operations";
 import type { DesafioMfa, ResultadoLogin, Sessao, UsuarioAutenticado } from "@/types/auth";
 import { maskDestination } from "../_people";
@@ -242,12 +243,24 @@ const MOCK_PREVIOUS_PASSWORD = "Anterior@2026";
 /** Links already used. A recovery link works once, as it does in Supabase. */
 const spentRecoveryLinks = new Set<string>();
 
+/** Identifies the link, whichever shape the template produced. */
+function recoveryKey(credential: RecoveryCredential): string {
+  switch (credential.kind) {
+    case "token_hash":
+      return credential.token_hash;
+    case "otp":
+      return `${credential.email}:${credential.token}`;
+    case "session":
+      return credential.access_token;
+  }
+}
+
 export async function completePasswordRecovery({
   credential,
   password,
 }: PasswordRecoveryInput): Promise<SingleResult<{ changed: true }>> {
   return simulate(() => {
-    const key = credential.kind === "token_hash" ? credential.token_hash : credential.access_token;
+    const key = recoveryKey(credential);
 
     if (key === MOCK_EXPIRED_TOKEN || spentRecoveryLinks.has(key)) {
       return fail(ERROR_CODE.UNAUTHORIZED, "Este link expirou ou já foi usado.");

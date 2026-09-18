@@ -6,7 +6,8 @@ import type { RecoveryCredential } from "@/services/contracts/operations";
  * The same screen has to accept every shape the e-mail template can produce:
  *
  *   ?token_hash=…&type=recovery        custom template (recommended)
- *   ?token=…                           the panel's own template
+ *   ?token=…&email=…                   custom template carrying the bare code
+ *   ?token=…                           legacy, read as a hash for lack of an e-mail
  *   #access_token=…&refresh_token=…    default template, implicit flow
  *   #error_code=otp_expired&…          Supabase rejected the link upstream
  *
@@ -69,9 +70,27 @@ export function readRecoveryLink({ search, hash }: { search: string; hash: strin
   const type = params.get("type");
   if (type && type !== "recovery") return { status: "invalid" };
 
-  const tokenHash = params.get("token_hash") ?? params.get("token");
+  const tokenHash = params.get("token_hash");
   if (tokenHash) {
     return { status: "ready", credential: { kind: "token_hash", token_hash: tokenHash } };
+  }
+
+  /* `token` is the bare code from `{{ .Token }}`, and the server can only look
+     it up next to the address it was issued for — hence the e-mail travelling
+     with it. Reading this as a `token_hash` is what made every link from such a
+     template fail: the hash is derived from the code, so the code itself never
+     matches the stored hash. */
+  const token = params.get("token");
+  const email = params.get("email");
+  if (token && email) {
+    return { status: "ready", credential: { kind: "otp", email, token } };
+  }
+
+  /* A `token` with no e-mail beside it. Older templates wrote the hash under
+     this name, so it is still worth one attempt — as a hash, the only shape
+     that can be verified without an address. */
+  if (token) {
+    return { status: "ready", credential: { kind: "token_hash", token_hash: token } };
   }
 
   const accessToken = params.get("access_token");

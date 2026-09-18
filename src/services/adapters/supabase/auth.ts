@@ -1,4 +1,4 @@
-import type { User } from "@supabase/supabase-js";
+import type { AuthError, User } from "@supabase/supabase-js";
 
 import { MFA_REQUIRED } from "@/lib/env";
 import { PAPEL, type Papel } from "@/lib/enums";
@@ -371,7 +371,44 @@ const PASSWORD_REFUSALS: Record<string, string> = {
 let exchangedCredential: string | null = null;
 
 function credentialKey(credential: RecoveryCredential): string {
-  return credential.kind === "token_hash" ? credential.token_hash : credential.access_token;
+  switch (credential.kind) {
+    case "token_hash":
+      return credential.token_hash;
+    // The code repeats across accounts; only the pair identifies this link.
+    case "otp":
+      return `${credential.email}:${credential.token}`;
+    case "session":
+      return credential.access_token;
+  }
+}
+
+/**
+ * Turns the proof from the link into a recovery session on this tab.
+ *
+ * Each shape has exactly one call that verifies it — see `RecoveryCredential`.
+ * Handing the bare code to `token_hash` is the defect this replaced: it fails
+ * for every link, and the failure looks identical to an expired one.
+ */
+async function exchangeCredential(
+  credential: RecoveryCredential,
+): Promise<{ error: AuthError | null }> {
+  const supabase = getSupabaseClient();
+
+  switch (credential.kind) {
+    case "token_hash":
+      return supabase.auth.verifyOtp({ token_hash: credential.token_hash, type: "recovery" });
+    case "otp":
+      return supabase.auth.verifyOtp({
+        email: credential.email,
+        token: credential.token,
+        type: "recovery",
+      });
+    case "session":
+      return supabase.auth.setSession({
+        access_token: credential.access_token,
+        refresh_token: credential.refresh_token,
+      });
+  }
 }
 
 async function discardRecoverySession(): Promise<void> {
@@ -396,13 +433,7 @@ export async function completePasswordRecovery({
     const key = credentialKey(credential);
 
     if (exchangedCredential !== key) {
-      const { error } =
-        credential.kind === "token_hash"
-          ? await supabase.auth.verifyOtp({ token_hash: credential.token_hash, type: "recovery" })
-          : await supabase.auth.setSession({
-              access_token: credential.access_token,
-              refresh_token: credential.refresh_token,
-            });
+      const { error } = await exchangeCredential(credential);
 
       if (error) {
         await discardRecoverySession();

@@ -59,14 +59,24 @@ export interface PasswordResetRequest {
 }
 
 /**
- * Proof carried by a recovery link opened from the patient app's e-mail.
+ * Proof carried by a recovery link opened from a recovery e-mail.
  *
- * Supabase delivers it in one of two shapes, depending on the e-mail template:
- * a `token_hash` still to be exchanged, or a recovery session already issued
- * (implicit flow, in the URL fragment).
+ * Supabase delivers it in one of three shapes, and which one arrives depends on
+ * the e-mail template configured for the project — not on the screen reading it:
+ *
+ *   token_hash  the hash behind `{{ .TokenHash }}`, still to be exchanged
+ *   otp         the bare code behind `{{ .Token }}`, valid only next to its e-mail
+ *   session     a recovery session already issued (implicit flow, in the fragment)
+ *
+ * > [!] `token_hash` and `otp` are NOT interchangeable.
+ * The hash is what the server stores; the code is what the person receives.
+ * Sending one where the other is expected fails verification every time, and the
+ * screen reports it as a spent link — which sends people to request another link
+ * that fails in exactly the same way.
  */
 export type RecoveryCredential =
   | { kind: "token_hash"; token_hash: string }
+  | { kind: "otp"; email: string; token: string }
   | { kind: "session"; access_token: string; refresh_token: string };
 
 export interface PasswordRecoveryInput {
