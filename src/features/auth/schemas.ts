@@ -41,29 +41,41 @@ export type RecuperarSenhaForm = z.infer<typeof recuperarSenhaSchema>;
 /**
  * Política de senha do painel.
  *
- * 10 caracteres com as quatro classes: é acesso a prontuário oncológico, não a
- * um fórum. As regras aparecem na tela como lista viva, marcando o que já foi
- * cumprido — assim a pessoa não descobre o requisito só ao errar.
+ * Comprimento apenas: nenhuma classe de caractere é exigida, e uma senha só de
+ * dígitos passa. Quem sustenta o acesso é o segundo fator, obrigatório no
+ * login — composição obrigatória empurra para o padrão previsível que a pessoa
+ * consegue lembrar e para a senha anotada ao lado da estação de trabalho, sem
+ * entregar a entropia que promete.
+ *
+ * > [!] O servidor tem a palavra final.
+ * O provedor de autenticação aplica o mínimo configurado no projeto e recusa o
+ * que estiver abaixo dele, ainda que esta validação aceite. Afrouxar aqui sem
+ * afrouxar lá apenas move a recusa do formulário para o servidor, onde ela
+ * chega como "senha fraca" depois do envio.
+ *
+ * A regra aparece na tela como lista viva, marcando o que já foi cumprido —
+ * assim a pessoa não descobre o requisito só ao errar.
  */
+export const PANEL_PASSWORD_MIN_LENGTH = 6;
+
 export const REGRAS_SENHA = [
-  { id: "tamanho", label: "Pelo menos 10 caracteres", teste: (s: string) => s.length >= 10 },
-  { id: "maiuscula", label: "Uma letra maiúscula", teste: (s: string) => /[A-Z]/.test(s) },
-  { id: "minuscula", label: "Uma letra minúscula", teste: (s: string) => /[a-z]/.test(s) },
-  { id: "numero", label: "Um número", teste: (s: string) => /\d/.test(s) },
-  { id: "simbolo", label: "Um símbolo", teste: (s: string) => /[^A-Za-z0-9]/.test(s) },
+  {
+    id: "tamanho",
+    label: `Pelo menos ${PANEL_PASSWORD_MIN_LENGTH} caracteres`,
+    teste: (s: string) => s.length >= PANEL_PASSWORD_MIN_LENGTH,
+  },
 ] as const;
 
-const senhaForte = z
+const senhaDoPainel = z
   .string()
-  .min(10, "A senha precisa ter pelo menos 10 caracteres.")
-  .regex(/[A-Z]/, "Inclua uma letra maiúscula.")
-  .regex(/[a-z]/, "Inclua uma letra minúscula.")
-  .regex(/\d/, "Inclua um número.")
-  .regex(/[^A-Za-z0-9]/, "Inclua um símbolo.");
+  .min(
+    PANEL_PASSWORD_MIN_LENGTH,
+    `A senha precisa ter pelo menos ${PANEL_PASSWORD_MIN_LENGTH} caracteres.`,
+  );
 
 export const novaSenhaSchema = z
   .object({
-    senha: senhaForte,
+    senha: senhaDoPainel,
     confirmacao: z.string().min(1, "Repita a nova senha."),
   })
   .refine((dados) => dados.senha === dados.confirmacao, {
