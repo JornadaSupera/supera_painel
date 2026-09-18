@@ -181,7 +181,6 @@ export function UsuariosPage() {
       <PageHeader
         eyebrow="Gestão"
         title="Usuários"
-        level="MVP"
         subtitle={
           isLoading && total === 0
             ? "Carregando equipe…"

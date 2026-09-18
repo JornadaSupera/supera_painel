@@ -123,7 +123,6 @@ export function ConfiguracoesPage() {
       <PageHeader
         eyebrow="Sistema"
         title="Configurações"
-        level="MVP"
         subtitle="Vocabulário do sistema, notificações e documentos legais em vigor"
       />
 

@@ -119,7 +119,6 @@ export function DashboardPage() {
       <PageHeader
         eyebrow="Painel executivo"
         title="Visão geral"
-        level="MVP"
         subtitle={
           <>
             {formatLongDate(new Date().toISOString())} ·{" "}

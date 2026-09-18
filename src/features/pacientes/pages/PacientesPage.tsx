@@ -163,7 +163,6 @@ export function PacientesPage() {
       <PageHeader
         eyebrow="Gestão"
         title="Pacientes"
-        level="MVP"
         subtitle={
           isLoading && total === 0
             ? "Carregando cadastro…"

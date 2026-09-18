@@ -196,7 +196,6 @@ export function ConteudoPage() {
       <PageHeader
         eyebrow="Conteúdo"
         title="Aprovação de conteúdo"
-        level="MVP"
         subtitle="Workflow editorial · orientações esperam aprovação antes de chegar aos pacientes"
       />
 

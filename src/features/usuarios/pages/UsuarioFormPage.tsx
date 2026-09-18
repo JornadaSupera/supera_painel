@@ -149,7 +149,6 @@ export function UsuarioFormPage() {
     <PageHeader
       eyebrow="Gestão"
       title={edicao ? `Editar ${usuario?.nome}` : "Conceder perfil"}
-      level="MVP"
       breadcrumb={[
         { label: "Usuários", to: "/usuarios" },
         { label: edicao ? (usuario?.nome ?? "Editar") : "Conceder perfil" },

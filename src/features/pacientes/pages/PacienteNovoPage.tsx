@@ -60,7 +60,6 @@ export function PacienteNovoPage() {
         title="Novo paciente"
         backTo="/pacientes"
         backLabel="Pacientes"
-        level="MVP"
         breadcrumb={[{ label: "Pacientes", to: "/pacientes" }, { label: "Novo paciente" }]}
         subtitle="O convite de acesso ao aplicativo é enviado por SMS ao final do cadastro."
       />

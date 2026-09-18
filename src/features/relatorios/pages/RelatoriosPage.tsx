@@ -81,7 +81,6 @@ export function RelatoriosPage() {
       <PageHeader
         eyebrow="Relatórios"
         title="Relatórios"
-        level="MVP"
         subtitle="Conjunto fechado de 12 · filtros próprios por relatório · exportação em CSV"
         actions={
           <Select value={dias} onValueChange={setDias}>
