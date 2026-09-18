@@ -1,8 +1,9 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { Loading } from "@/components/shared";
 import { AvisoSessao } from "@/features/auth/components/AvisoSessao";
+import { carriesRecoveryLink } from "@/features/auth/recovery-link";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { MfaPage } from "@/features/auth/pages/MfaPage";
 import { NovaSenhaPage } from "@/features/auth/pages/NovaSenhaPage";
@@ -50,10 +51,57 @@ const ConfiguracoesPage = lazy(() => import("@/features/configuracoes/pages/Conf
 const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
 const DesignSystemPreview = lazy(() => import("@/app/DesignSystemPreview"));
 
+/**
+ * Routes that CONSUME a recovery link. The gate below leaves them alone.
+ *
+ * Two of them, because they serve two audiences: `/nova-senha` belongs to the
+ * panel's staff and its link is issued from here, with a destination we choose;
+ * `/redefinir-senha` belongs to patients and caregivers, and its link comes
+ * from the app.
+ */
+const ROUTES_THAT_CONSUME_A_LINK = ["/redefinir-senha", "/nova-senha"];
+
+/**
+ * Rescues a recovery link that landed outside a recovery screen.
+ *
+ * The link does not necessarily arrive where it should: the destination is the
+ * `redirect_to` of the e-mail template, and when that address is missing from
+ * the project's allow-list Supabase silently falls back to the Site URL, which
+ * is the panel's root.
+ *
+ * And the root redirects to the dashboard. **A redirect discards the query and
+ * the fragment**, so the credential was destroyed on the way and the person
+ * ended up on a sign-in screen that explained nothing.
+ *
+ * Here the link is forwarded whole, before any route can lose it — which keeps
+ * the flow working whatever the template is set to. It does not excuse leaving
+ * the template unconfigured; it stops a configuration mistake from surfacing as
+ * an invalid token.
+ *
+ * It forwards to the PANEL's page. A stray link can no longer say who it was
+ * for, and the only flow in this codebase that targets this origin is the
+ * panel's own `requestPasswordReset`. The app's link names
+ * `/redefinir-senha` explicitly and lands there without passing through here.
+ */
+function RecoveryLinkGate() {
+  const location = useLocation();
+
+  if (ROUTES_THAT_CONSUME_A_LINK.includes(location.pathname)) return null;
+  if (!carriesRecoveryLink(location)) return null;
+
+  return (
+    <Navigate
+      to={{ pathname: "/nova-senha", search: location.search, hash: location.hash }}
+      replace
+    />
+  );
+}
+
 export function AppRoutes() {
   return (
     <>
       <AvisoSessao />
+      <RecoveryLinkGate />
 
       <Suspense fallback={<Loading />}>
         <Routes>

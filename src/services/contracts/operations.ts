@@ -1,4 +1,4 @@
-import type { Papel, Periodo, StatusUsuario } from "@/lib/enums";
+import type { FaseTratamento, Papel, Periodo, StatusUsuario } from "@/lib/enums";
 import type { Permissao } from "@/lib/rbac";
 import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
 import type { DesafioMfa, ResultadoLogin, Sessao } from "@/types/auth";
@@ -58,11 +58,6 @@ export interface PasswordResetRequest {
   email: string;
 }
 
-export interface PasswordResetInput {
-  token: string;
-  senha: string;
-}
-
 /**
  * Proof carried by a recovery link opened from the patient app's e-mail.
  *
@@ -92,8 +87,6 @@ export interface AuthOperations {
 
   /** Responde sucesso mesmo para e-mail inexistente, por design. */
   requestPasswordReset(params: PasswordResetRequest): Promise<SingleResult<{ enviado: true }>>;
-
-  resetPassword(params: PasswordResetInput): Promise<SingleResult<{ alterada: true }>>;
 
   /**
    * Public password change for app accounts (patients and caregivers).
@@ -155,6 +148,14 @@ export interface CatalogosOperations {
   listProtocolos(): Promise<ListResult<Protocolo>>;
   listEspecialidades(): Promise<ListResult<{ value: string; label: string }>>;
   listEfeitos(): Promise<ListResult<EfeitoAdverso>>;
+
+  /**
+   * Fases de tratamento ATIVAS no cadastro, na ordem do catálogo.
+   *
+   * Só as que o painel sabe nomear: uma fase do banco sem correspondente aqui
+   * não entra, porque a listagem não saberia exibi-la na coluna.
+   */
+  listFases(): Promise<ListResult<{ value: FaseTratamento; label: string }>>;
 }
 
 /* ---------------------------------------------------------------- Fase 6 */

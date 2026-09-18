@@ -1,8 +1,8 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Check, LoaderCircle, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -16,23 +16,51 @@ import {
 import { Input } from "@/components/ui/input";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { cn } from "@/lib/utils";
-import { authApi, call } from "@/services/apiClient";
+import { ApiException, ERROR_CODE } from "@/services/contracts";
+import type { RecoveryCredential } from "@/services/contracts/operations";
 import { AuthErrorAlert } from "../components/AuthErrorAlert";
+import { usePasswordRecovery } from "../hooks/usePasswordRecovery";
+import { readRecoveryLink } from "../recovery-link";
 import { novaSenhaSchema, REGRAS_SENHA, type NovaSenhaForm } from "../schemas";
 
 /**
- * Definição de nova senha, a partir do link enviado por e-mail.
+ * Definição de nova senha da equipe do painel, a partir do link do e-mail.
+ *
+ * > [!] O link NÃO chega como `?token=`.
+ * Supabase entrega a prova em uma de três formas, e qual delas depende do
+ * modelo de e-mail configurado no projeto — não do painel:
+ *
+ *   #access_token=…&refresh_token=…   modelo padrão (fluxo implícito)
+ *   ?token_hash=…&type=recovery       modelo personalizado
+ *   #error=…&error_code=otp_expired   o próprio Supabase já recusou o link
+ *
+ * Ler só `?token` fazia a tela recusar TODO link válido: o parâmetro nunca
+ * existe, e a pessoa via "link inválido" logo depois de pedir o link. Quem lê
+ * as três formas é `readRecoveryLink`, a mesma função que atende os pacientes
+ * em `/redefinir-senha`.
  *
  * A lista de requisitos é viva: marca o que já foi cumprido enquanto a pessoa
  * digita. Descobrir a regra só ao errar produz tentativa e erro — e senhas
  * piores, porque a pessoa acaba escolhendo o mínimo que passou.
  */
 export function NovaSenhaPage() {
-  const [searchParams] = useSearchParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const [erro, setErro] = useState<string | null>(null);
 
-  const token = searchParams.get("token") ?? "";
+  // Lido uma vez: a URL é limpa logo em seguida, e a credencial fica só na
+  // memória deste componente.
+  const [link] = useState(() => readRecoveryLink(location));
+  const [gasto, setGasto] = useState(false);
+
+  useEffect(() => {
+    // O token não pode ficar na barra de endereços nem no histórico.
+    if (location.search || location.hash) {
+      navigate({ pathname: location.pathname }, { replace: true });
+    }
+  }, [location.search, location.hash, location.pathname, navigate]);
+
+  const recuperacao = usePasswordRecovery();
 
   const form = useForm<NovaSenhaForm>({
     resolver: zodResolver(novaSenhaSchema),
@@ -43,35 +71,69 @@ export function NovaSenhaPage() {
   const senhaAtual = form.watch("senha");
 
   const enviar = async (dados: NovaSenhaForm) => {
+    if (link.status !== "ready") return;
+
     setErro(null);
+
     try {
-      await call(() => authApi.resetPassword({ token, senha: dados.senha }));
+      await recuperacao.mutateAsync({
+        credential: link.credential satisfies RecoveryCredential,
+        password: dados.senha,
+      });
+
+      form.reset();
       navigate("/login", { replace: true, state: { senhaAlterada: true } });
-    } catch (e) {
-      setErro((e as Error).message ?? "Não foi possível alterar a senha.");
+    } catch (capturado) {
+      const codigo = capturado instanceof ApiException ? capturado.code : null;
+
+      // Link gasto ou expirado não é erro de formulário: nenhuma tentativa
+      // nesta tela resolve, e insistir no campo só esconde o que fazer.
+      if (codigo === ERROR_CODE.UNAUTHORIZED) {
+        form.reset();
+        setGasto(true);
+        return;
+      }
+
+      setErro(
+        codigo === ERROR_CODE.VALIDATION || codigo === ERROR_CODE.RATE_LIMITED
+          ? (capturado as Error).message
+          : "Não foi possível salvar agora. Verifique sua conexão e tente de novo.",
+      );
     }
   };
 
-  if (!token) {
+  if (gasto || link.status !== "ready") {
+    const expirado = gasto || link.status === "expired";
+
     return (
       <AuthLayout
-        title="Link inválido"
-        description="Este link de redefinição não é válido ou já foi usado."
+        title={expirado ? "Este link expirou" : "Link inválido"}
+        description={
+          expirado
+            ? "Por segurança, o link de troca de senha vale por pouco tempo e só pode ser usado uma vez."
+            : "O endereço está incompleto ou já foi usado."
+        }
         footer={
-          <Link to="/recuperar-senha" className="text-primary font-medium underline underline-offset-4">
+          <Link
+            to="/recuperar-senha"
+            className="text-primary font-medium underline underline-offset-4"
+          >
             Solicitar um novo link
           </Link>
         }
       >
-        <AuthErrorAlert message="Por segurança, cada link vale por 30 minutos e só pode ser usado uma vez." />
+        <AuthErrorAlert message="Peça um link novo e abra-o pelo próprio e-mail, sem copiar e colar o endereço." />
       </AuthLayout>
     );
   }
 
-  const enviando = form.formState.isSubmitting;
+  const enviando = recuperacao.isPending;
 
   return (
-    <AuthLayout title="Criar nova senha" description="Escolha uma senha que você não use em outro serviço.">
+    <AuthLayout
+      title="Criar nova senha"
+      description="Escolha uma senha que você não use em outro serviço."
+    >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(enviar)} className="flex flex-col gap-5" noValidate>
           <AuthErrorAlert message={erro} />
@@ -83,7 +145,13 @@ export function NovaSenhaPage() {
               <FormItem>
                 <FormLabel>Nova senha</FormLabel>
                 <FormControl>
-                  <Input {...field} type="password" autoComplete="new-password" autoFocus />
+                  <Input
+                    {...field}
+                    type="password"
+                    autoComplete="new-password"
+                    autoFocus
+                    disabled={enviando}
+                  />
                 </FormControl>
               </FormItem>
             )}
@@ -122,7 +190,12 @@ export function NovaSenhaPage() {
               <FormItem>
                 <FormLabel>Repita a nova senha</FormLabel>
                 <FormControl>
-                  <Input {...field} type="password" autoComplete="new-password" />
+                  <Input
+                    {...field}
+                    type="password"
+                    autoComplete="new-password"
+                    disabled={enviando}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>

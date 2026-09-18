@@ -5,7 +5,6 @@ import type { UsuarioMock } from "@/mocks/usuarios";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
 import type {
   PasswordRecoveryInput,
-  PasswordResetInput,
   PasswordResetRequest,
 } from "@/services/contracts/operations";
 import type { DesafioMfa, ResultadoLogin, Sessao, UsuarioAutenticado } from "@/types/auth";
@@ -222,18 +221,6 @@ export async function requestPasswordReset({
   return simulate(() => {
     void email;
     return okOne({ enviado: true as const });
-  });
-}
-
-export async function resetPassword({
-  token,
-  senha,
-}: PasswordResetInput): Promise<SingleResult<{ alterada: true }>> {
-  return simulate(() => {
-    if (!token) return fail(ERROR_CODE.VALIDATION, "Link inválido ou expirado.");
-    if (senha.length < 10) return fail(ERROR_CODE.VALIDATION, "A senha não atende aos requisitos.");
-
-    return okOne({ alterada: true as const });
   });
 }
 

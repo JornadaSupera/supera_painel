@@ -5,7 +5,6 @@ import { PAPEL, type Papel } from "@/lib/enums";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
 import type {
   PasswordRecoveryInput,
-  PasswordResetInput,
   PasswordResetRequest,
   RecoveryCredential,
 } from "@/services/contracts/operations";
@@ -344,39 +343,6 @@ export async function requestPasswordReset({
     });
 
     return okOne({ enviado: true as const });
-  });
-}
-
-/**
- * O `token` é o `token_hash` que veio no link do e-mail. Como o cliente é
- * criado com `detectSessionInUrl: false`, ele não é consumido sozinho: a troca
- * por sessão de recuperação é explícita, e só então a senha pode mudar.
- */
-export async function resetPassword({
-  token,
-  senha,
-}: PasswordResetInput): Promise<SingleResult<{ alterada: true }>> {
-  return executar(async () => {
-    if (!token) return fail(ERROR_CODE.VALIDATION, "Link inválido ou expirado.");
-
-    const supabase = getSupabaseClient();
-
-    const { error: erroToken } = await supabase.auth.verifyOtp({
-      token_hash: token,
-      type: "recovery",
-    });
-    if (erroToken) return fail(ERROR_CODE.VALIDATION, "Link inválido ou expirado.");
-
-    const { error } = await supabase.auth.updateUser({ password: senha });
-
-    // The recovery session only existed to change the password. Left open, it
-    // would outlive the screen in this tab's client — the login screen is
-    // where a session should start.
-    await supabase.auth.signOut({ scope: "local" });
-
-    if (error) return falhaDe(error);
-
-    return okOne({ alterada: true as const });
   });
 }
 

@@ -31,7 +31,6 @@ export const RESOURCES = {
       "signOut",
       "getSession",
       "requestPasswordReset",
-      "resetPassword",
       "completePasswordRecovery",
     ],
   },
@@ -156,7 +155,15 @@ export const RESOURCES = {
   catalogos: {
     table: "catalogos",
     fase: 5,
-    operations: ["listCids", "listProtocolos", "listEspecialidades", "listEfeitos"],
+    /**
+     * `listFases` devolve as fases que o cadastro tem ATIVAS.
+     *
+     * O painel conhece cinco fases e o catálogo do banco raramente tem as
+     * cinco. Oferecer as que faltam produz um filtro que só sabe devolver
+     * lista vazia, e quem filtra conclui que a clínica não tem paciente
+     * naquela fase — em vez de saber que a fase não existe no cadastro.
+     */
+    operations: ["listCids", "listProtocolos", "listEspecialidades", "listEfeitos", "listFases"],
   },
 } as const satisfies Record<string, ResourceDefinition>;
 
