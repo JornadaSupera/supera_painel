@@ -83,25 +83,34 @@ const ROUTES_THAT_CONSUME_A_LINK = ["/redefinir-senha", "/nova-senha"];
  * panel's own `requestPasswordReset`. The app's link names
  * `/redefinir-senha` explicitly and lands there without passing through here.
  */
-function RecoveryLinkGate() {
-  const location = useLocation();
-
-  if (ROUTES_THAT_CONSUME_A_LINK.includes(location.pathname)) return null;
-  if (!carriesRecoveryLink(location)) return null;
-
-  return (
-    <Navigate
-      to={{ pathname: "/nova-senha", search: location.search, hash: location.hash }}
-      replace
-    />
-  );
+function needsRecoveryRescue(location: { pathname: string; search: string; hash: string }) {
+  if (ROUTES_THAT_CONSUME_A_LINK.includes(location.pathname)) return false;
+  return carriesRecoveryLink(location);
 }
 
 export function AppRoutes() {
+  const location = useLocation();
+
+  /* Returning here, instead of rendering the redirect beside `<Routes>`.
+     `<Navigate>` navigates from an effect, and a rescue rendered as a sibling
+     mounts in the same commit as the route that matched the address the link
+     arrived at — `/`, which answers with its own `<Navigate to="/dashboard">`.
+     Both effects fire, the later one in tree order wins, and that was the
+     dashboard: the link reached the sign-in screen anyway, which is the exact
+     failure this gate exists to prevent. Leaving early keeps the competing
+     route from ever mounting. */
+  if (needsRecoveryRescue(location)) {
+    return (
+      <Navigate
+        to={{ pathname: "/nova-senha", search: location.search, hash: location.hash }}
+        replace
+      />
+    );
+  }
+
   return (
     <>
       <AvisoSessao />
-      <RecoveryLinkGate />
 
       <Suspense fallback={<Loading />}>
         <Routes>
