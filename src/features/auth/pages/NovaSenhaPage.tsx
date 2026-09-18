@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, LoaderCircle, X } from "lucide-react";
+import { Check, CircleCheck, LoaderCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -52,6 +52,7 @@ export function NovaSenhaPage() {
   // memória deste componente.
   const [link] = useState(() => readRecoveryLink(location));
   const [gasto, setGasto] = useState(false);
+  const [concluido, setConcluido] = useState(false);
 
   useEffect(() => {
     // O token não pode ficar na barra de endereços nem no histórico.
@@ -82,7 +83,7 @@ export function NovaSenhaPage() {
       });
 
       form.reset();
-      navigate("/login", { replace: true, state: { senhaAlterada: true } });
+      setConcluido(true);
     } catch (capturado) {
       const codigo = capturado instanceof ApiException ? capturado.code : null;
 
@@ -101,6 +102,42 @@ export function NovaSenhaPage() {
       );
     }
   };
+
+  /* Confirmação em tela, e não um retorno à entrada do painel.
+     Trocar a senha e cair no formulário de login não distingue "deu certo" de
+     "falhou e voltou ao começo" — a pessoa reabre o e-mail, clica no link de
+     novo e aí sim encontra um link gasto. Quem chega aqui muitas vezes só
+     precisava recuperar o acesso, não entrar agora: a tela diz que acabou e
+     libera fechar a página. Entrar continua a um clique, no rodapé. */
+  if (concluido) {
+    return (
+      <AuthLayout
+        title="Senha alterada!"
+        description="Sua nova senha já está valendo."
+        footer={
+          <Link to="/login" className="text-primary font-medium underline underline-offset-4">
+            Entrar no painel agora
+          </Link>
+        }
+      >
+        <div className="flex flex-col items-center gap-4 text-center" role="status">
+          <span className="bg-success-bg text-success flex size-12 items-center justify-center rounded-full">
+            <CircleCheck size={26} aria-hidden="true" />
+          </span>
+
+          <p className="text-muted-foreground text-sm leading-relaxed">
+            Você já pode fechar esta página. Da próxima vez que entrar no painel, use a senha
+            que acabou de criar.
+          </p>
+
+          <p className="border-border text-muted-foreground w-full border-t pt-5 text-xs leading-relaxed">
+            Não foi você quem pediu esta troca? Fale com a equipe do Centro de Oncologia o quanto
+            antes.
+          </p>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   if (gasto || link.status !== "ready") {
     const expirado = gasto || link.status === "expired";
