@@ -14,6 +14,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { PublicLayout } from "@/layouts/PublicLayout";
 import { cn } from "@/lib/utils";
 import { ApiException, ERROR_CODE } from "@/services/contracts";
@@ -54,13 +55,7 @@ export function PasswordRecoveryPage() {
     }
   }, [location.search, location.hash, location.pathname, navigate]);
 
-  useEffect(() => {
-    const previous = document.title;
-    document.title = PAGE_TITLE;
-    return () => {
-      document.title = previous;
-    };
-  }, []);
+  useDocumentTitle(PAGE_TITLE);
 
   return (
     <PublicLayout>
