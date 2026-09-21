@@ -1,15 +1,7 @@
 import { Activity, ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
-/** The six brand values, in the order the identity presents them. */
-const BRAND_RIBBON = [
-  "bg-supera-uniao",
-  "bg-supera-empatia",
-  "bg-supera-seguranca",
-  "bg-supera-respeito",
-  "bg-supera-perfeicao",
-  "bg-supera-amor",
-] as const;
+import { BrandRibbon } from "./BrandRibbon";
 
 /**
  * Frame for public pages reached by people who are not panel users — patients
@@ -22,11 +14,7 @@ const BRAND_RIBBON = [
 export function PublicLayout({ children }: { children: ReactNode }) {
   return (
     <div className="bg-background relative isolate flex min-h-dvh flex-col overflow-hidden">
-      <div className="flex h-1.5 w-full" aria-hidden="true">
-        {BRAND_RIBBON.map((color) => (
-          <span key={color} className={`${color} flex-1`} />
-        ))}
-      </div>
+      <BrandRibbon />
 
       {/* Ambient light in brand colours. Decorative only. */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
