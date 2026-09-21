@@ -71,12 +71,25 @@ export function LoginPage() {
       title="Entrar no painel"
       description="Use seu e-mail corporativo. Depois da senha, pediremos o código de verificação."
       footer={
-        <p>
-          Problemas para acessar?{" "}
-          <Link to="/recuperar-senha" className="text-primary font-medium underline underline-offset-4">
-            Recuperar senha
-          </Link>
-        </p>
+        <>
+          <p>
+            Problemas para acessar?{" "}
+            <Link to="/recuperar-senha" className="text-primary font-medium underline underline-offset-4">
+              Recuperar senha
+            </Link>
+          </p>
+          <p className="mt-6 text-xs">
+            Ao entrar, você concorda com os{" "}
+            <Link to="/termos" className="hover:text-foreground underline underline-offset-4">
+              Termos de Uso
+            </Link>{" "}
+            e a{" "}
+            <Link to="/privacidade" className="hover:text-foreground underline underline-offset-4">
+              Política de Privacidade
+            </Link>
+            .
+          </p>
+        </>
       }
     >
       <Form {...form}>
