@@ -49,6 +49,10 @@ const ConfiguracoesPage = lazy(() => import("@/features/configuracoes/pages/Conf
 /* Not a panel screen: its audience is app users, so it stays out of the bundle
    that panel staff load first. */
 const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
+/* Public legal documents. Same reasoning: their readers are app users, store
+   reviewers and anyone following a link, not the panel's staff. */
+const TermsOfUsePage = lazy(() => import("@/features/legal/pages/TermsOfUsePage"));
+const PrivacyPolicyPage = lazy(() => import("@/features/legal/pages/PrivacyPolicyPage"));
 const DesignSystemPreview = lazy(() => import("@/app/DesignSystemPreview"));
 
 /**
@@ -124,6 +128,14 @@ export function AppRoutes() {
               recovery e-mail. Outside every guard and layout of the panel:
               the page changes the password and leads nowhere else. */}
           <Route path="/redefinir-senha" element={<PasswordRecoveryPage />} />
+
+          {/* Terms of use and privacy policy — the addresses the app, the
+              stores and the sign-in footer link to. Outside every guard: a
+              document someone must accept is readable before any account. */}
+          <Route path="/termos" element={<TermsOfUsePage />} />
+          <Route path="/privacidade" element={<PrivacyPolicyPage />} />
+          <Route path="/termos-de-uso" element={<Navigate to="/termos" replace />} />
+          <Route path="/politica-de-privacidade" element={<Navigate to="/privacidade" replace />} />
 
           {/* ---------------------------------------------------- protected */}
           <Route element={<ProtectedRoute />}>
