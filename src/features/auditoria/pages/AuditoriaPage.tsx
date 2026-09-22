@@ -25,7 +25,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ACAO_AUDITORIA_LABEL, toOptions, type Option } from "@/lib/enums";
+import {
+  ACAO_AUDITORIA_LABEL,
+  ORIGEM_AUDITORIA_LABEL,
+  toOptions,
+  type Option,
+} from "@/lib/enums";
 import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { JANELAS, useAuditoriaStore } from "@/stores/auditoria";
@@ -47,12 +52,13 @@ import { DetalheAcesso } from "../components/DetalheAcesso";
  *
  * Onde nos afastamos do protótipo, e por quê:
  *
- *  - **Cartões "Sigiloso" e "Exportação"**: o protótipo mostra cinco
- *    contadores; a trilha só sabe separar três. Os dois que faltam não são
- *    zerados — um zero afirmaria que ninguém acessou dado sigiloso, e a
- *    verdade é que a trilha não distingue. O motivo aparece embaixo da faixa.
- *  - **Coluna de IP**: o protótipo mostra o endereço de cada acesso. A trilha é
- *    escrita por gatilho, dentro do banco, que não enxerga o IP do navegador.
+ *  - **Cartão "Exportação"**: o protótipo mostra cinco contadores; a trilha
+ *    sabe separar quatro. O que falta não é zerado — um zero afirmaria que
+ *    ninguém exportou nada, e a verdade é que baixar um arquivo acontece no
+ *    navegador e não chega ao banco. O motivo aparece embaixo da faixa.
+ *  - **Coluna "De onde"**: o protótipo mostra só o endereço. Aqui ele vem
+ *    acompanhado da qualidade em que a pessoa agiu — titular, acompanhante,
+ *    equipe —, que é o que distingue duas ações feitas sobre a mesma ficha.
  *  - **Seletor de janela**: o protótipo fixa "24h". Aqui a janela é escolhida,
  *    porque a mesma tela responde "o que aconteceu hoje" e "quem abriu a ficha
  *    desta pessoa nos últimos 90 dias" — a segunda é a pergunta de uma apuração.
@@ -91,7 +97,6 @@ export function AuditoriaPage() {
   const detalhe = useRegistroAuditoria(registroAberto);
 
   const filtrada = hasActiveFilters(busca, filtros);
-  const semIp = motivoIndisponivel("auditoria.list.ip");
 
   const semOrigem = resumo.data?.sem_origem ?? [];
   const motivoSemOrigem = semOrigem
@@ -104,7 +109,7 @@ export function AuditoriaPage() {
       key: "usuario_nome",
       header: "Quem",
       sortable: true,
-      width: "24%",
+      width: "22%",
       render: (registro) => (
         <div className="flex items-center gap-2.5">
           <UserAvatar name={registro.usuario_nome} size="sm" colorful className="shrink-0" />
@@ -129,10 +134,21 @@ export function AuditoriaPage() {
       key: "recurso_label",
       header: "O quê",
       sortable: true,
-      width: "30%",
+      width: "26%",
       render: (registro) => (
         <div className="min-w-0">
-          <p className="text-foreground truncate text-xs">{registro.recurso_label}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-foreground truncate text-xs">{registro.recurso_label}</p>
+
+            {/* Diz QUE houve acesso a material sob sigilo, nunca de quem nem
+                qual — ver `AuditoriaListItem.material_restrito`. */}
+            {registro.material_restrito && (
+              <StatusBadge tone="warning" size="sm" className="shrink-0">
+                Sigiloso
+              </StatusBadge>
+            )}
+          </div>
+
           {registro.paciente_nome && (
             <p className="text-muted-foreground truncate text-[11px]">
               paciente · {registro.paciente_nome}
@@ -154,10 +170,28 @@ export function AuditoriaPage() {
       ),
     },
     {
+      key: "origem",
+      header: "De onde",
+      width: 150,
+      render: (registro) => (
+        <div className="min-w-0">
+          <p className="text-foreground truncate text-xs">
+            {ORIGEM_AUDITORIA_LABEL[registro.origem]}
+          </p>
+          {/* Sem endereço é resposta legítima: chamada fora da web não tem um.
+              O traço diz isso sem ocupar a linha com explicação — o detalhe do
+              acesso tem espaço para ela. */}
+          <p className="text-muted-foreground truncate font-mono text-[11px]">
+            {registro.ip ?? "—"}
+          </p>
+        </div>
+      ),
+    },
+    {
       key: "criado_em",
       header: "Quando",
       sortable: true,
-      width: 180,
+      width: 170,
       render: (registro) => (
         <div className="min-w-0">
           <time className="text-xs tabular-nums" dateTime={registro.criado_em}>
@@ -329,15 +363,13 @@ export function AuditoriaPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        {semIp && <BackendPendente titulo="Endereço de IP" motivo={semIp} />}
-
         <p className="text-muted-foreground text-[11px] leading-relaxed">
           <StatusBadge tone="neutral" size="sm" className="mr-1.5">
             Imutável
           </StatusBadge>
           Registros de auditoria não são alterados nem apagados por nenhuma tela deste painel. A
-          exportação em CSV ou JSON atende ao relatório do encarregado de dados — e ela própria fica
-          registrada na trilha.
+          exportação em CSV ou JSON atende ao relatório do encarregado de dados, e leva as colunas
+          de origem e de material restrito junto.
         </p>
       </div>
 
@@ -346,7 +378,6 @@ export function AuditoriaPage() {
         carregando={detalhe.isLoading}
         aberto={registroAberto !== null}
         onFechar={() => setRegistroAberto(null)}
-        semIp={semIp}
       />
     </div>
   );

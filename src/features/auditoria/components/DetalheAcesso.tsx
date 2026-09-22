@@ -31,9 +31,18 @@ export interface DetalheAcessoProps {
   carregando: boolean;
   aberto: boolean;
   onFechar: () => void;
-  /** Motivo da ausência de IP, quando o backend não o registra. */
-  semIp: string | null;
 }
+
+/**
+ * O que dizer quando não há endereço.
+ *
+ * Não é falha de coleta: a trilha só enxerga o endereço quando a chamada chega
+ * pela web. Rotina agendada, gatilho interno e acesso técnico direto ao banco
+ * não têm um — e registro anterior à coluna existir também não. Campo em
+ * branco sem explicação faz quem apura suspeitar de perda de dado.
+ */
+const SEM_ENDERECO =
+  "Sem endereço: a chamada não veio pela web, ou é anterior à trilha passar a registrá-lo.";
 
 /** Uma linha do detalhe. `valor` nulo vira travessão, nunca campo em branco. */
 function Campo({
@@ -66,13 +75,7 @@ function Campo({
   );
 }
 
-export function DetalheAcesso({
-  registro,
-  carregando,
-  aberto,
-  onFechar,
-  semIp,
-}: DetalheAcessoProps) {
+export function DetalheAcesso({ registro, carregando, aberto, onFechar }: DetalheAcessoProps) {
   return (
     <Dialog open={aberto} onOpenChange={(estado) => !estado && onFechar()}>
       <DialogContent className="sm:max-w-lg">
@@ -151,13 +154,37 @@ export function DetalheAcesso({
                 }
               />
 
-              <Campo rotulo="Origem" valor={ORIGEM_AUDITORIA_LABEL[registro.origem]} />
+              <Campo
+                rotulo="Origem"
+                valor={ORIGEM_AUDITORIA_LABEL[registro.origem]}
+                ajuda="Em que qualidade a pessoa agiu — não o aplicativo que usou."
+              />
 
               <Campo
                 rotulo="Endereço"
                 valor={registro.ip}
                 mono={Boolean(registro.ip)}
-                ajuda={registro.ip ? undefined : (semIp ?? undefined)}
+                // É indício operacional, não prova: quem controla o cliente
+                // pode declarar o começo da cadeia de encaminhamento.
+                ajuda={
+                  registro.ip
+                    ? "Indício de procedência, não prova de autoria."
+                    : SEM_ENDERECO
+                }
+              />
+
+              <Campo
+                rotulo="Sigilo"
+                valor={
+                  registro.material_restrito
+                    ? "Material sob sigilo profissional"
+                    : "Sem marca de sigilo"
+                }
+                ajuda={
+                  registro.material_restrito
+                    ? "A trilha registra QUE houve o acesso. De quem e a qual sessão, não — isso faria do próprio log a indiscrição que ele denuncia."
+                    : undefined
+                }
               />
             </dl>
           </>

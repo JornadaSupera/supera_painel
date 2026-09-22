@@ -13,14 +13,15 @@ import { janelaComoRange, useAuditoriaStore } from "@/stores/auditoria";
 /**
  * Leitura da trilha de auditoria.
  *
- * > [!] Consultar a trilha também deixa rastro.
- * Quem audita é auditado — é o que impede que a tela de auditoria seja o ponto
- * cego do sistema. Por isso a exportação registra o próprio evento antes de
- * baixar o arquivo.
+ * > [!] O ato de exportar ainda NÃO chega ao backend.
+ * `audit_log` é append-only e as linhas nascem de gatilho dentro do banco. A
+ * leitura que antecede a exportação fica registrada; o download em si acontece
+ * no navegador, sobre o que já estava na tela, e não passa por lá. O que
+ * `lib/audit.ts` guarda é o evento do cliente, que se perde ao recarregar.
  *
- * Nada aqui escreve na trilha do backend: `audit_log` é append-only e as linhas
- * nascem de gatilho no banco. O que `lib/audit.ts` registra é o evento do
- * cliente, que a Fase 15 passa a enviar junto.
+ * Na prática, a trilha distingue quem consultou — não distingue quem levou o
+ * arquivo embora. Fechar essa distinção depende de um caminho no backend para
+ * a aplicação declarar a exportação.
  */
 
 const RECURSO = "auditoria";
@@ -110,7 +111,13 @@ export function useExportarTrilha() {
     mutationFn: async (formato: FormatoExportacao) => {
       const { data, count } = await call(() => auditoriaApi.export(params));
 
-      audit.export(RECURSO, { formato, linhas: count });
+      // O número que interessa é o que ENTROU no arquivo, não o tamanho do
+      // recorte: o backend devolve a página até o teto dele, e o recorte pode
+      // ser maior. Anunciar o total e entregar menos faz quem conferir a
+      // planilha concluir que faltou dado no banco.
+      const linhas = data.length;
+
+      audit.export(RECURSO, { formato, linhas });
 
       if (formato === "json") {
         downloadFile(
@@ -122,11 +129,13 @@ export function useExportarTrilha() {
         downloadFile(toCsv(data), nameWithDate("auditoria", "csv"));
       }
 
-      return { formato, linhas: count };
+      return { formato, linhas, restantes: Math.max(0, count - linhas) };
     },
-    onSuccess: ({ formato, linhas }) =>
+    onSuccess: ({ formato, linhas, restantes }) =>
       toast.success(`Trilha exportada em ${formato.toUpperCase()}`, {
-        description: `${linhas} registros do recorte atual. A exportação foi registrada na auditoria.`,
+        description: restantes
+          ? `${linhas} registros no arquivo — os mais recentes do recorte. Outros ${restantes} ficaram de fora: estreite o período para levá-los.`
+          : `${linhas} registros do recorte atual.`,
       }),
     onError: (erro) => toast.error("Não foi possível exportar", { description: erro.message }),
   });
