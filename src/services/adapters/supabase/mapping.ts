@@ -2,9 +2,11 @@ import {
   ACAO_AUDITORIA,
   ESPECIALIDADE,
   FASE_TRATAMENTO,
+  ORIGEM_AUDITORIA,
   type AcaoAuditoria,
   type Especialidade,
   type FaseTratamento,
+  type OrigemAuditoria,
 } from "@/lib/enums";
 
 /**
@@ -87,10 +89,13 @@ export function paraCodigoDeFase(fase: string | null | undefined): string | null
    ------------------------------------------------------------------------- */
 
 /**
- * O banco registra quatro verbos; o painel exibe sete categorias. As três que
- * sobram — `sigiloso`, `login`, `logout` — não têm origem em `audit_log`:
- * sigilo é decidido por `clinical_visibility` na própria linha lida, e o ciclo
- * de sessão é do GoTrue, que não escreve nesta tabela.
+ * O banco registra quatro verbos; o painel exibe sete categorias.
+ *
+ * `sigiloso` não é verbo: é a marca `is_restricted_material` sobre uma leitura,
+ * e por isso se filtra por coluna própria, não por este mapa. `login` e
+ * `logout` continuam sem origem — o ciclo de sessão é do GoTrue, que não
+ * escreve nesta tabela. `exportacao` acontece no navegador e não chega ao
+ * banco.
  */
 const ACAO_POR_VERBO: Record<string, AcaoAuditoria> = {
   read: ACAO_AUDITORIA.LEITURA,
@@ -101,6 +106,60 @@ const ACAO_POR_VERBO: Record<string, AcaoAuditoria> = {
 
 export function paraAcaoAuditoria(verbo: string | null | undefined): AcaoAuditoria {
   return (verbo ? ACAO_POR_VERBO[verbo] : undefined) ?? ACAO_AUDITORIA.LEITURA;
+}
+
+/**
+ * Categoria do painel → verbos do banco, para filtrar no SERVIDOR.
+ *
+ * Derivado do mapa acima, e não escrito à mão: `edicao` cobre `create` e
+ * `update`, e é justamente esse tipo de relação um-para-muitos que uma segunda
+ * cópia erra primeiro.
+ *
+ * `null` = a categoria não se expressa no vocabulário do banco. Quem chama
+ * precisa tratar isso como **recorte impossível** — devolver a lista inteira
+ * responderia "todos os acessos" a uma pergunta sobre exportações.
+ */
+const VERBOS_POR_ACAO = Object.entries(ACAO_POR_VERBO).reduce<Partial<Record<AcaoAuditoria, string[]>>>(
+  (mapa, [verbo, acao]) => ({ ...mapa, [acao]: [...(mapa[acao] ?? []), verbo] }),
+  {},
+);
+
+export function paraVerbosDeAuditoria(acao: string | null | undefined): string[] | null {
+  if (!acao) return null;
+  return VERBOS_POR_ACAO[acao as AcaoAuditoria] ?? null;
+}
+
+/* -------------------------------------------------------------------------
+   PROCEDÊNCIA DO REGISTRO — enum `audit_actor_capacity`
+   ------------------------------------------------------------------------- */
+
+/**
+ * Em que qualidade a pessoa agiu → de onde o painel diz que o acesso veio.
+ *
+ * O banco guarda a **qualidade do ator** (titular, acompanhante, profissional,
+ * administração, rotina), não o aplicativo de origem. A tradução é uma
+ * aproximação declarada: quem age como paciente está no app do paciente, quem
+ * age como acompanhante está no app do cuidador, e quem age como profissional
+ * ou administrador está em um painel.
+ *
+ * A distinção que importa numa apuração — **o titular preencheu isto ou quem o
+ * acompanha?** — é exatamente a que o banco passou a guardar, e é a que esta
+ * tradução preserva. Qual das duas telas profissionais originou a chamada é
+ * informação que ninguém pediu.
+ *
+ * `null` (registro anterior à coluna, ou escrita fora de requisição) cai em
+ * `sistema`, que é o que um registro sem ator sempre significou nesta tela.
+ */
+const ORIGEM_POR_QUALIDADE: Record<string, OrigemAuditoria> = {
+  patient: ORIGEM_AUDITORIA.APP_PACIENTE,
+  caregiver: ORIGEM_AUDITORIA.APP_CUIDADOR,
+  professional: ORIGEM_AUDITORIA.PAINEL,
+  admin: ORIGEM_AUDITORIA.PAINEL,
+  system: ORIGEM_AUDITORIA.SISTEMA,
+};
+
+export function paraOrigemDoAtor(qualidade: string | null | undefined): OrigemAuditoria {
+  return (qualidade ? ORIGEM_POR_QUALIDADE[qualidade] : undefined) ?? ORIGEM_AUDITORIA.SISTEMA;
 }
 
 /* -------------------------------------------------------------------------
