@@ -1,5 +1,6 @@
-import { FileText, Lock } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+
+import { FileText, Lock, Plus } from "lucide-react";
 
 import {
   BackendPendente,
@@ -9,27 +10,33 @@ import {
   SkeletonCards,
   StatusBadge,
 } from "@/components/shared";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/format";
-import { queryKeys } from "@/lib/queryKeys";
-import { call, configuracoesApi } from "@/services/apiClient";
-import type { ItemCatalogo } from "@/types/configuracao";
+import type { ItemCatalogo, VersaoLegal } from "@/types/configuracao";
+import { DialogPublicarTermo } from "../components/DialogPublicarTermo";
+import { GatilhosAlerta } from "../components/GatilhosAlerta";
+import { MotivosSituacao } from "../components/MotivosSituacao";
+import { useConfiguracoes, useTermos } from "../hooks/useConfiguracoes";
 
 /**
  * Configurações — o que está valendo no sistema.
  *
  * Protótipo: https://strawti.com.br/prototipos/jornada-supera/admin/configuracoes/
  *
- * > [!] Esta tela LÊ; ela não salva.
- * Nenhum catálogo do banco tem política de escrita para o painel, e a decisão
- * é deliberada: o mesmo vocabulário alimenta o diário do paciente, os eixos dos
- * relatórios e os gatilhos de alerta. Trocar um código por formulário quebraria
+ * > [!] A tela tem duas metades, e elas seguem regras opostas de propósito.
+ * O **vocabulário** (sintomas, notificações, categorias, assuntos) é somente
+ * leitura: o mesmo código alimenta o diário do paciente, os eixos dos
+ * relatórios e o alvo do gatilho de alerta, e trocá-lo por formulário quebraria
  * os três de uma vez, sem revisão e sem migração para reverter.
  *
- * O protótipo mostra campos editáveis de identidade visual, gatilhos de alerta
- * e horário de atendimento. Nenhum tem tabela no banco. Em vez de desenhar
- * campos que não salvam — que é a pior forma de mentir numa interface —, a tela
- * mostra o que existe e nomeia o que falta.
+ * A **operação** — documento legal em vigor, grau que dispara alerta, motivos
+ * de falta — é da clínica e muda com a rotina dela. Esperar uma migração para
+ * cadastrar "paciente não tinha transporte" seria burocracia sem finalidade.
+ *
+ * O que o protótipo oferece e o backend não guarda — identidade visual, horário
+ * de atendimento, textos de onboarding — continua nomeado item a item. Desenhar
+ * campo que não salva é a pior forma de mentir numa interface.
  *
  * A tela detalhada de permissões vive em `/usuarios`, na aba "Permissões por
  * papel", como o próprio protótipo antecipa ao dizer que ela viria depois.
@@ -40,8 +47,6 @@ const MOTIVOS_SEM_ORIGEM: Record<string, string> = {
     "Logo da clínica: não há tabela de parâmetro nem bucket de marca no Storage. O logo usado hoje pelo aplicativo vem do pacote da build.",
   cor_primaria:
     "Cor primária: a paleta é token de tema no código, versionada junto com a interface. Ainda não é dado configurável.",
-  gatilhos_de_alerta:
-    "Gatilhos de alerta (febre ≥ 37,8 °C, vômito grau 3+ e os demais): não existe tabela de limiar. O catálogo de sintomas está aqui, mas o grau que dispara notificação ainda não é dado.",
   horario_atendimento_chat:
     "Horário de atendimento no chat: não há tabela de janela de atendimento. As conversas hoje não distinguem dentro e fora do expediente.",
   resposta_automatica:
@@ -50,19 +55,11 @@ const MOTIVOS_SEM_ORIGEM: Record<string, string> = {
     "Textos de onboarding e mensagens automáticas: ainda não são dado do backend; hoje vivem no pacote do aplicativo.",
 };
 
-function useConfiguracoes() {
-  return useQuery({
-    queryKey: queryKeys.settings.get(),
-    queryFn: async () => (await call(() => configuracoesApi.get())).data,
-  });
-}
-
-function useTermos() {
-  return useQuery({
-    queryKey: queryKeys.settings.terms(),
-    queryFn: async () => (await call(() => configuracoesApi.getTermos())).data,
-  });
-}
+/** As duas espécies de documento, na ordem em que o aplicativo as pede. */
+const ESPECIES_LEGAIS: { tipo: VersaoLegal["tipo"]; label: string }[] = [
+  { tipo: "termos_de_uso", label: "Termos de uso" },
+  { tipo: "politica_de_privacidade", label: "Política de privacidade" },
+];
 
 /** Uma lista de catálogo, em cartão. Somente leitura, e isso fica dito. */
 function Catalogo({
@@ -118,12 +115,18 @@ export function ConfiguracoesPage() {
 
   const dados = configuracoes.data;
 
+  // Qual espécie está com o diálogo de publicação aberto. `null` = nenhuma.
+  const [publicando, setPublicando] = useState<VersaoLegal["tipo"] | null>(null);
+
+  const vigenteDe = (tipo: VersaoLegal["tipo"]) =>
+    (termos.data ?? []).find((versao) => versao.tipo === tipo && versao.vigente) ?? null;
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow="Sistema"
         title="Configurações"
-        subtitle="Vocabulário do sistema, notificações e documentos legais em vigor"
+        subtitle="Vocabulário do sistema, gatilhos de alerta, motivos de situação e documentos legais"
       />
 
       {configuracoes.isError && (
@@ -133,6 +136,8 @@ export function ConfiguracoesPage() {
       <Tabs defaultValue="catalogos" className="flex flex-col gap-5">
         <TabsList>
           <TabsTrigger value="catalogos">Catálogos do sistema</TabsTrigger>
+          <TabsTrigger value="alertas">Gatilhos de alerta</TabsTrigger>
+          <TabsTrigger value="motivos">Motivos de situação</TabsTrigger>
           <TabsTrigger value="legais">Termos & privacidade</TabsTrigger>
         </TabsList>
 
@@ -191,7 +196,38 @@ export function ConfiguracoesPage() {
           </p>
         </TabsContent>
 
+        <TabsContent value="alertas">
+          <GatilhosAlerta />
+        </TabsContent>
+
+        <TabsContent value="motivos">
+          <MotivosSituacao />
+        </TabsContent>
+
         <TabsContent value="legais" className="flex flex-col gap-4">
+          {/* Uma ação por espécie: termos e política evoluem em ritmos
+              diferentes, e a numeração do backend é separada. */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-muted-foreground max-w-[64ch] text-xs leading-relaxed">
+              O documento em vigor é o que o aplicativo exibe no aceite. Publicar uma versão nova
+              aposenta a anterior e exige que todos os pacientes aceitem de novo.
+            </p>
+
+            <div className="flex shrink-0 gap-2">
+              {ESPECIES_LEGAIS.map((especie) => (
+                <Button
+                  key={especie.tipo}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPublicando(especie.tipo)}
+                >
+                  <Plus />
+                  {especie.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           {termos.isLoading && <SkeletonCards count={2} />}
 
           {termos.isError && (
@@ -201,7 +237,7 @@ export function ConfiguracoesPage() {
           {!termos.isLoading && (termos.data?.length ?? 0) === 0 && (
             <EmptyState
               title="Nenhuma versão publicada"
-              description="Não há termos de uso nem política de privacidade registrados no banco. Enquanto não houver, o aplicativo não tem texto para exibir no aceite."
+              description="Não há termos de uso nem política de privacidade registrados. Enquanto não houver, o aplicativo não tem texto para exibir no aceite — e nenhum paciente deveria entrar antes disso."
             />
           )}
 
@@ -239,12 +275,24 @@ export function ConfiguracoesPage() {
             </article>
           ))}
 
-          <BackendPendente
-            titulo="Publicar nova versão"
-            motivo="Publicar uma nova versão dos termos cria obrigação de novo aceite para todos os pacientes. A tabela só permite leitura pelo painel — a publicação vem pela migração que traz o texto revisado."
-          />
+          <p className="text-muted-foreground text-[11px] leading-relaxed">
+            O aceite é versionado: quem aceitou a versão anterior não aceitou a atual. É por isso
+            que não existe "editar o texto vigente" — editar apagaria a prova do que cada pessoa
+            aceitou, e o histórico acima é essa prova.
+          </p>
         </TabsContent>
       </Tabs>
+
+      {ESPECIES_LEGAIS.map((especie) => (
+        <DialogPublicarTermo
+          key={especie.tipo}
+          tipo={especie.tipo}
+          tipoLabel={especie.label}
+          vigente={vigenteDe(especie.tipo)}
+          aberto={publicando === especie.tipo}
+          onFechar={() => setPublicando(null)}
+        />
+      ))}
     </div>
   );
 }
