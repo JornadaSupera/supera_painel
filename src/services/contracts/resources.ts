@@ -150,7 +150,26 @@ export const RESOURCES = {
   configuracoes: {
     table: "configuracoes",
     fase: 9,
-    operations: ["get", "update", "uploadLogo", "getTermos", "publishTermos"],
+    /**
+     * `get` e `update` são o VOCABULÁRIO — somente leitura, por decisão de
+     * produto. O resto é a OPERAÇÃO da clínica, que ela mesma mantém: o
+     * documento legal em vigor, o grau que dispara alerta e os motivos de
+     * falta. Ver `types/configuracao.ts` para por que a linha passa aí.
+     */
+    operations: [
+      "get",
+      "update",
+      "uploadLogo",
+      "getTermos",
+      "publishTermos",
+      "getRegrasAlerta",
+      "setRegraAlerta",
+      "removerRegraAlerta",
+      "getMotivos",
+      "criarMotivo",
+      "atualizarMotivo",
+      "setMotivoAtivo",
+    ],
   },
   catalogos: {
     table: "catalogos",

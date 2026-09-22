@@ -114,6 +114,9 @@ export const queryKeys = {
     all: ["settings"] as const,
     get: () => ["settings", "get"] as const,
     terms: () => ["settings", "terms"] as const,
+    /** Um limiar por sintoma. Publicar termo não invalida isto, nem o contrário. */
+    alertRules: () => ["settings", "alert-rules"] as const,
+    reasons: () => ["settings", "reasons"] as const,
   },
 
   catalogs: {

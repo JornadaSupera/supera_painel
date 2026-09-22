@@ -1,15 +1,17 @@
 /**
  * Domínio de Configurações.
  *
- * O painel administrativo de hoje LÊ a configuração e não a escreve: nenhum dos
- * catálogos do banco (`symptoms`, `notification_types`, `content_categories`,
- * `conversation_subjects`, `legal_document_versions`) tem política de INSERT ou
- * UPDATE para quem opera o painel — todos são semeados por migração.
+ * A tela tem duas metades, e a diferença entre elas não é técnica:
  *
- * Isso é decisão de arquitetura, não lacuna acidental: o vocabulário que
- * atravessa aplicativo, relatório e gatilho de alerta muda por migração
- * versionada, com revisão, e não por um formulário que alguém abre numa tarde.
- * A tela mostra o que está valendo e diz por que não se edita ali.
+ *  - **Vocabulário** — `symptoms`, `notification_types`, `content_categories`,
+ *    `conversation_subjects`. Continua somente leitura, de propósito: o mesmo
+ *    código alimenta o diário do paciente, o eixo dos relatórios e o gatilho de
+ *    alerta, e renomeá-lo por formulário quebraria os três de uma vez. Muda por
+ *    migração versionada, com revisão.
+ *  - **Operação** — o documento legal em vigor, o grau que dispara alerta, os
+ *    motivos de falta. Isso é decisão da clínica, muda com a rotina dela, e o
+ *    banco expõe escrita para cada um. Esperar migração para cadastrar "paciente
+ *    não tinha transporte" seria burocracia sem finalidade.
  */
 
 /** Um item de catálogo — sintoma, tipo de notificação, categoria, assunto. */
@@ -31,6 +33,55 @@ export interface VersaoLegal {
   vigente: boolean;
   publicado_em: string | null;
   corpo: string;
+}
+
+/**
+ * O grau a partir do qual um sintoma vira alerta para a equipe.
+ *
+ * Uma regra vigente por sintoma. Trocar o limiar **encerra** a regra anterior e
+ * abre outra — o histórico fica, porque um alerta disparado em março foi
+ * disparado sob a regra de março, e um relatório que leia a regra de hoje
+ * explicaria o passado errado.
+ *
+ * > [!] Quem define o limiar é a clínica, não o software.
+ * Qual sintoma, em qual grau, dispara conduta é decisão assistencial. O painel
+ * oferece o cadastro e não sugere valor: sugerir seria o software opinando
+ * sobre gravidade, que é exatamente o que o contrato veda a este produto.
+ */
+export interface RegraAlerta {
+  /** `null` enquanto o sintoma não tem regra — a linha existe para ser criada. */
+  id: string | null;
+  sintoma_id: string;
+  sintoma_label: string;
+  /** Grau de 1 a 5. `null` quando não há regra vigente para o sintoma. */
+  grau_minimo: number | null;
+  /** Desde quando o limiar atual vale. `null` sem regra. */
+  vigente_desde: string | null;
+}
+
+/**
+ * Por que um compromisso não aconteceu — o recorte que o relatório de faltas
+ * precisa para ser acionável.
+ *
+ * Só estado **terminal** tem motivo: "agendado" não se explica por um motivo, e
+ * o banco recusa o par. A lista nasce vazia porque ninguém a escreveu ainda —
+ * não é limitação, é uma conversa de dez minutos com a recepção.
+ */
+export interface MotivoSituacao {
+  id: string;
+  /** `completed`, `cancelled`, `no_show`, `rescheduled`. */
+  situacao_codigo: string;
+  situacao_label: string;
+  codigo: string;
+  label: string;
+  ordem: number;
+  ativo: boolean;
+}
+
+/** Uma situação de compromisso que aceita motivos. */
+export interface SituacaoComMotivo {
+  codigo: string;
+  label: string;
 }
 
 export interface Configuracoes {

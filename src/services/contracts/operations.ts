@@ -4,7 +4,12 @@ import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
 import type { DesafioMfa, ResultadoLogin, Sessao } from "@/types/auth";
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
-import type { Configuracoes, VersaoLegal } from "@/types/configuracao";
+import type {
+  Configuracoes,
+  MotivoSituacao,
+  RegraAlerta,
+  VersaoLegal,
+} from "@/types/configuracao";
 import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
 import type {
   ComparacaoProtocolo,
@@ -330,10 +335,66 @@ export interface ConfiguracoesOperations {
   /** Termos e política, todas as versões — o histórico é exigência de aceite. */
   getTermos(): Promise<ListResult<VersaoLegal>>;
 
-  /** As três recusam: catálogo do sistema muda por migração, não por formulário. */
+  /**
+   * Publica uma versão nova e aposenta a anterior, no mesmo ato.
+   *
+   * Recebe o TEXTO, não o id de uma versão existente: publicar é registrar um
+   * documento novo, e a numeração é do backend — por espécie, porque termos e
+   * política evoluem em ritmos diferentes.
+   *
+   * > [!] Cria obrigação de novo aceite para todos os pacientes.
+   * O aceite é versionado: quem aceitou a anterior não aceitou esta. Não é
+   * edição do texto vigente — editar apagaria a prova do que a pessoa aceitou.
+   */
+  publishTermos(params: {
+    tipo: VersaoLegal["tipo"];
+    corpo: string;
+  }): Promise<SingleResult<VersaoLegal>>;
+
+  /** As duas recusam: catálogo do sistema muda por migração, não por formulário. */
   update(params: Partial<Configuracoes>): Promise<SingleResult<Configuracoes>>;
   uploadLogo(params: { arquivo: File }): Promise<SingleResult<{ url: string }>>;
-  publishTermos(params: { id: string }): Promise<SingleResult<VersaoLegal>>;
+
+  /**
+   * Uma linha por sintoma ATIVO, com ou sem regra.
+   *
+   * Sintoma sem limiar aparece com `grau_minimo` nulo, e não é omitido: a tela
+   * precisa mostrar o que está desprotegido tanto quanto o que está coberto.
+   */
+  getRegrasAlerta(): Promise<ListResult<RegraAlerta>>;
+
+  /** Define ou troca o limiar. Trocar encerra a regra anterior e abre outra. */
+  setRegraAlerta(params: {
+    sintoma_id: string;
+    grau_minimo: number;
+  }): Promise<SingleResult<RegraAlerta>>;
+
+  /** Encerra a regra vigente: o sintoma deixa de disparar alerta. */
+  removerRegraAlerta(params: { sintoma_id: string }): Promise<SingleResult<RegraAlerta>>;
+
+  /** Motivos de falta, cancelamento, remarcação e realização. */
+  getMotivos(): Promise<ListResult<MotivoSituacao>>;
+
+  criarMotivo(params: {
+    situacao_codigo: string;
+    codigo: string;
+    label: string;
+    ordem?: number;
+  }): Promise<SingleResult<MotivoSituacao>>;
+
+  atualizarMotivo(params: {
+    id: string;
+    label?: string;
+    ordem?: number;
+  }): Promise<SingleResult<MotivoSituacao>>;
+
+  /**
+   * Aposenta um motivo, ou o traz de volta.
+   *
+   * Aposentar, nunca apagar: um compromisso de março aponta para o motivo de
+   * março, e apagar a linha falsificaria o relatório daquele mês.
+   */
+  setMotivoAtivo(params: { id: string; ativo: boolean }): Promise<SingleResult<MotivoSituacao>>;
 }
 
 /* ---------------------------------------------------------------- Fase 8 */
