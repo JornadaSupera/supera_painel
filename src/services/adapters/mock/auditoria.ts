@@ -29,10 +29,13 @@ import { paginate, simulate } from "./_helpers";
  * daria dois históricos que discordam sobre o mesmo acesso, que é exatamente o
  * defeito que uma auditoria não pode ter.
  *
- * Ao contrário do Supabase, o mock TEM as sete categorias e tem IP — porque
- * `mocks/acessos` os inventa para exercitar a tela. A diferença é real e está
- * declarada nos dois adapters: no backend, `sigiloso`, `exportacao` e o IP não
- * têm origem.
+ * Ao contrário do Supabase, o mock TEM as sete categorias — porque
+ * `mocks/acessos` as inventa para exercitar a tela. A diferença que resta é
+ * uma só, e está declarada nos dois adapters: no backend, `exportacao` não tem
+ * origem, porque baixar um arquivo acontece no navegador.
+ *
+ * `sigiloso` é categoria aqui e marca de linha lá. Os dois caminhos preenchem
+ * `material_restrito`, então a tela não precisa saber em qual backend está.
  */
 
 const NOME_POR_USUARIO = new Map(usuarios.map((usuario) => [usuario.id, usuario.nome]));
@@ -66,6 +69,7 @@ const semente: AuditoriaListItem[] = acessos.map((acesso, indice) => {
     linhas: acesso.acao === ACAO_AUDITORIA.EXPORTACAO ? 80 + (indice % 40) : 1,
     origem: acesso.origem ?? ORIGEM_AUDITORIA.PAINEL,
     ip: acesso.ip || null,
+    material_restrito: acesso.acao === ACAO_AUDITORIA.SIGILOSO,
   };
 });
 
@@ -100,6 +104,7 @@ function paraLinha(evento: RecordedEvent): AuditoriaListItem {
     linhas: typeof evento.details?.linhas === "number" ? evento.details.linhas : 1,
     origem: evento.origin,
     ip: null,
+    material_restrito: evento.action === ACAO_AUDITORIA.SIGILOSO,
   };
 }
 

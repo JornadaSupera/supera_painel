@@ -1,4 +1,4 @@
-import { ACAO_AUDITORIA_LABEL, type AcaoAuditoria } from "@/lib/enums";
+import { ACAO_AUDITORIA_LABEL, ORIGEM_AUDITORIA_LABEL, type AcaoAuditoria } from "@/lib/enums";
 import { failWith, ok, type ListResult } from "@/services/contracts";
 import type {
   AuditoriaListItem,
@@ -76,6 +76,12 @@ export function summarizeAudit({
  *
  * The columns are decided here, not on the screen, so the export does not
  * depend on who clicked or which columns were visible.
+ *
+ * The last three answer what an investigation asks and a row on screen only
+ * hints at: in what capacity the person acted, where the call came from, and
+ * whether the material was under professional confidentiality. Restricted
+ * access ships as "Sim"/"" rather than `true`/`false` because the file is read
+ * in a spreadsheet, and a column of `false` reads as a failed export.
  */
 export function toAuditExport(
   result: ListResult<AuditoriaListItem>,
@@ -91,6 +97,9 @@ export function toAuditExport(
       registro_id: registro.recurso_id ?? "",
       paciente: registro.paciente_nome ?? "",
       linhas_alcancadas: registro.linhas === null ? "" : String(registro.linhas),
+      origem: ORIGEM_AUDITORIA_LABEL[registro.origem],
+      endereco_de_origem: registro.ip ?? "",
+      material_restrito: registro.material_restrito ? "Sim" : "",
     })),
     result.count,
   );

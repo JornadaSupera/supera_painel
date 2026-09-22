@@ -1,24 +1,22 @@
-import {
-  ACAO_AUDITORIA,
-  ORIGEM_AUDITORIA,
-  RECURSO_AUDITORIA_LABEL,
-  type AcaoAuditoria,
-} from "@/lib/enums";
+import { ACAO_AUDITORIA, RECURSO_AUDITORIA_LABEL, type AcaoAuditoria } from "@/lib/enums";
 import {
   ERROR_CODE,
   fail,
+  normalizeListParams,
+  ok,
   okOne,
   type DateRange,
   type ListParams,
   type ListResult,
   type SingleResult,
+  type Sort,
 } from "@/services/contracts";
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import { AUDIT_DEFAULT_SORT, buildFacetOptions, summarizeAudit, toAuditExport } from "../_audit";
 import { paginate } from "../_list";
 import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
-import { paraAcaoAuditoria } from "./mapping";
+import { paraAcaoAuditoria, paraOrigemDoAtor, paraVerbosDeAuditoria } from "./mapping";
 
 /**
  * Auditoria & logs — a trilha de acesso a dado sensível.
@@ -33,10 +31,11 @@ import { paraAcaoAuditoria } from "./mapping";
  *
  * > [!] Dois vocabulários não coincidem, e a diferença é informação.
  * O banco registra quatro verbos (`read`, `create`, `update`, `delete`); o
- * protótipo mostra sete categorias. "Sigiloso" e "exportação" NÃO são deriváveis
- * de `audit_log` — a primeira depende da visibilidade da linha lida, a segunda
- * de um evento que acontece no cliente. Elas são declaradas em `sem_origem`,
- * não zeradas.
+ * protótipo mostra sete categorias. "Sigiloso" deixou de ser uma delas: virou
+ * marca da própria linha (`is_restricted_material`), então é contável e
+ * filtrável. "Exportação" continua sem origem — é um evento que acontece no
+ * navegador e nunca chega ao banco. Ela é declarada em `sem_origem`, não
+ * zerada.
  */
 
 /* -------------------------------------------------------------------------
@@ -52,6 +51,9 @@ const SELECT_LOG = `
   row_count,
   actor_account_id,
   patient_id,
+  origin,
+  actor_capacity,
+  is_restricted_material,
   accounts:actor_account_id ( full_name, email )
 `;
 
@@ -131,6 +133,9 @@ interface LinhaLog {
   row_count: number | null;
   actor_account_id: string | null;
   patient_id: string | null;
+  origin: string | null;
+  actor_capacity: string | null;
+  is_restricted_material: boolean | null;
   accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
 }
 
@@ -152,6 +157,60 @@ function consultarJanela(colunas: string, range: DateRange | null | undefined) {
   return consulta;
 }
 
+/* -------------------------------------------------------------------------
+   RECORTE NO SERVIDOR
+   -------------------------------------------------------------------------
+   Três dos quatro filtros que o escopo pede são COLUNA de `audit_log`, e
+   portanto se aplicam antes de a linha viajar. Enquanto eles eram resolvidos
+   em memória, "quem abriu a ficha desta pessoa" só encontrava rastro dentro
+   das últimas mil linhas — e a tela não tinha como dizer que parou ali.
+
+   Nem tudo sobe junto, e o que fica é o que depende do vínculo com `accounts`
+   ou do nome do paciente, que vem de outra chamada:
+
+     busca textual  → varre nome de pessoa e rótulo em português
+     ordenar por    → `usuario_nome`, `paciente_nome`
+
+   Por isso existem dois caminhos, e a escolha é automática. O de baixo é o
+   antigo, com o mesmo teto de sempre; o de cima é exato e não tem teto.
+   ------------------------------------------------------------------------- */
+
+/**
+ * Colunas do painel que o servidor sabe ordenar, e o nome delas lá.
+ *
+ * São duas, e a lista é curta de propósito. `acao` e `recurso_label` PARECEM
+ * ordenáveis — as colunas existem — mas a tela mostra o rótulo traduzido e o
+ * banco ordenaria o valor cru: `read`, `create`, `update`, `delete` sai em
+ * ordem alfabética como Edição, Exclusão, Leitura, Edição, com a mesma
+ * categoria em dois pedaços da lista. Ordenação que embaralha a coluna que
+ * ordena é pior do que ordenação feita em memória.
+ */
+const ORDENAVEL_NO_SERVIDOR: Record<string, string> = {
+  criado_em: "occurred_at",
+  linhas: "row_count",
+};
+
+/** Um filtro da tela que o servidor não sabe responder. */
+const RECORTE_IMPOSSIVEL = Symbol("recorte sem correspondência no banco");
+
+type FiltroDeAcao = { verbos: string[] } | { restrito: true } | null | typeof RECORTE_IMPOSSIVEL;
+
+/**
+ * A categoria escolhida na tela, traduzida para o que o banco guarda.
+ *
+ * `sigiloso` não é verbo: é a marca da linha. `exportacao`, `login` e `logout`
+ * não existem em `audit_log`, e para eles a resposta correta é **lista
+ * vazia** — devolver tudo responderia "todos os acessos" a uma pergunta sobre
+ * exportações, que é o tipo de erro que passa por resultado.
+ */
+function filtroDeAcao(valor: unknown): FiltroDeAcao {
+  if (valor === undefined || valor === null || valor === "" || valor === "todos") return null;
+  if (valor === ACAO_AUDITORIA.SIGILOSO) return { restrito: true };
+
+  const verbos = paraVerbosDeAuditoria(String(valor));
+  return verbos ? { verbos } : RECORTE_IMPOSSIVEL;
+}
+
 function projetar(linha: LinhaLog, nomes: Map<string, string>): AuditoriaListItem {
   const ator = umDe(linha.accounts);
 
@@ -169,13 +228,14 @@ function projetar(linha: LinhaLog, nomes: Map<string, string>): AuditoriaListIte
     paciente_id: linha.patient_id,
     paciente_nome: rotuloDePaciente(linha.patient_id, nomes),
     linhas: linha.row_count === null ? null : Number(linha.row_count),
-    // Toda linha de `audit_log` nasce dentro do banco, a partir de uma chamada
-    // do painel ou dos aplicativos. A tabela não distingue a procedência, e
-    // inventar a distinção aqui seria dado falso.
-    origem: ORIGEM_AUDITORIA.PAINEL,
-    // Ver `AuditoriaListItem.ip`: o gatilho roda no Postgres, que não enxerga
-    // o endereço do navegador.
-    ip: null,
+    // A qualidade em que a pessoa agiu, não o aplicativo — ver
+    // `paraOrigemDoAtor`, que explica por que a aproximação é aceitável e o
+    // que ela preserva.
+    origem: paraOrigemDoAtor(linha.actor_capacity),
+    // Vazio é resposta legítima: chamada fora da web não tem endereço, e
+    // preencher com o do servidor pareceria informação sem ser.
+    ip: linha.origin?.trim() || null,
+    material_restrito: linha.is_restricted_material === true,
   };
 }
 
@@ -189,10 +249,89 @@ const CAMPOS_BUSCA = ["usuario_nome", "recurso_label", "paciente_nome", "recurso
  * Linhas da trilha, do mais recente para o mais antigo.
  *
  * Filtros aceitos: `acao`, `usuario_id`, `paciente_id`. O recorte por período
- * vai em `range`, e esse SIM é aplicado no servidor — é o único que corta
- * volume antes de a linha viajar.
+ * vai em `range`. Período, ação, usuário e paciente são aplicados no servidor
+ * sempre que a pergunta couber lá — ver `ORDENAVEL_NO_SERVIDOR` e
+ * `filtroDeAcao` para saber quando não cabe.
  */
 export async function list(params: ListParams = {}): Promise<ListResult<AuditoriaListItem>> {
+  const sort = params.sort ?? AUDIT_DEFAULT_SORT;
+  const busca = params.search?.trim() ?? "";
+  const acao = filtroDeAcao(params.filters?.acao);
+
+  // Pergunta que o banco não responde: nenhuma linha corresponde, e é isso que
+  // a tela precisa mostrar.
+  if (acao === RECORTE_IMPOSSIVEL) return ok([], 0);
+
+  const noServidor = !busca && Boolean(ORDENAVEL_NO_SERVIDOR[sort.field]);
+
+  return noServidor ? listaNoServidor(params, sort, acao) : listaNaJanela(params, sort);
+}
+
+/**
+ * O caminho exato: filtro, ordenação, contagem e página no banco.
+ *
+ * O total é o do CONJUNTO FILTRADO, não o da janela trazida — é a diferença
+ * entre uma paginação que sabe quantas páginas tem e uma que afirma saber.
+ */
+async function listaNoServidor(
+  params: ListParams,
+  sort: Sort,
+  acao: Exclude<FiltroDeAcao, typeof RECORTE_IMPOSSIVEL>,
+): Promise<ListResult<AuditoriaListItem>> {
+  return executar(async () => {
+    const { from, to } = normalizeListParams(params);
+
+    let consulta = getSupabaseClient()
+      .from("audit_log")
+      .select(SELECT_LOG, { count: "exact" })
+      .order(ORDENAVEL_NO_SERVIDOR[sort.field] ?? "occurred_at", {
+        ascending: sort.direction !== "desc",
+      })
+      .range(from, to);
+
+    if (params.range?.from) consulta = consulta.gte("occurred_at", params.range.from);
+    if (params.range?.to) consulta = consulta.lte("occurred_at", params.range.to);
+
+    if (acao && "verbos" in acao) consulta = consulta.in("action", acao.verbos);
+    if (acao && "restrito" in acao) consulta = consulta.is("is_restricted_material", true);
+
+    const usuarioId = params.filters?.usuario_id;
+    if (typeof usuarioId === "string" && usuarioId) {
+      consulta = consulta.eq("actor_account_id", usuarioId);
+    }
+
+    const pacienteId = params.filters?.paciente_id;
+    if (typeof pacienteId === "string" && pacienteId) {
+      consulta = consulta.eq("patient_id", pacienteId);
+    }
+
+    const { data, error, count } = await consulta;
+    if (error) return falhaDe(error);
+
+    const brutas = (data ?? []) as unknown as LinhaLog[];
+    const nomes = await nomesSeHouverPaciente(brutas);
+
+    return ok(
+      brutas.map((linha) => projetar(linha, nomes)),
+      // `count` nulo só acontece se o servidor recusar a contagem; cair no
+      // tamanho da página é melhor que cair em zero, que esconderia a página.
+      count ?? brutas.length,
+    );
+  });
+}
+
+/**
+ * O caminho antigo, para o que o servidor não responde: busca textual e
+ * ordenação por nome de pessoa.
+ *
+ * Traz a janela e resolve o resto em memória, com o teto de sempre. Continua
+ * existindo porque o nome do ator vem de um vínculo e o do paciente de outra
+ * chamada — nenhum dos dois é coluna que dê para filtrar ou ordenar lá.
+ */
+async function listaNaJanela(
+  params: ListParams,
+  sort: Sort,
+): Promise<ListResult<AuditoriaListItem>> {
   return executar(async () => {
     const { data, error } = await consultarJanela(SELECT_LOG, params.range);
     if (error) return falhaDe(error);
@@ -208,11 +347,26 @@ export async function list(params: ListParams = {}): Promise<ListResult<Auditori
         // O período já foi aplicado no servidor; repeti-lo em memória não muda
         // o resultado e só dá chance de os dois critérios divergirem.
         range: null,
-        sort: params.sort ?? AUDIT_DEFAULT_SORT,
+        sort,
+        filters: filtrosEmMemoria(params.filters),
       },
       { searchFields: CAMPOS_BUSCA, rangeField: "criado_em" },
     );
   });
+}
+
+/**
+ * Os mesmos filtros da tela, sobre os campos que a linha projetada tem.
+ *
+ * Um só precisa de tradução: nenhuma linha vem com `acao: "sigiloso"` — o
+ * sigilo é marca da linha, não categoria do verbo. Sem esta troca, escolher
+ * "Sigiloso" e digitar uma busca devolveria lista vazia em vez dos acessos
+ * marcados, e o vazio pareceria ausência de acesso restrito.
+ */
+function filtrosEmMemoria(filtros: ListParams["filters"]): ListParams["filters"] {
+  if (filtros?.acao !== ACAO_AUDITORIA.SIGILOSO) return filtros;
+
+  return { ...filtros, acao: undefined, material_restrito: true };
 }
 
 export async function getById({ id }: { id: string }): Promise<SingleResult<AuditoriaListItem>> {
@@ -241,17 +395,17 @@ const CONTAVEIS: AcaoAuditoria[] = [
   ACAO_AUDITORIA.LEITURA,
   ACAO_AUDITORIA.EDICAO,
   ACAO_AUDITORIA.EXCLUSAO,
+  ACAO_AUDITORIA.SIGILOSO,
 ];
 
 /**
  * Categorias do protótipo sem origem na trilha.
  *
- * `sigiloso` depende da visibilidade da linha lida (`clinical_visibility`), que
- * `audit_log` não copia — a trilha guarda qual tabela, não qual linha nem sob
- * que sigilo. `exportacao` é um evento do cliente: nada é gravado no banco
- * quando alguém baixa um CSV do que já estava na tela.
+ * Sobrou uma. `exportacao` é um evento do cliente: nada é gravado no banco
+ * quando alguém baixa um CSV do que já estava na tela, então o contador
+ * continua declarado ausente em vez de zerado.
  */
-const SEM_ORIGEM: AcaoAuditoria[] = [ACAO_AUDITORIA.SIGILOSO, ACAO_AUDITORIA.EXPORTACAO];
+const SEM_ORIGEM: AcaoAuditoria[] = [ACAO_AUDITORIA.EXPORTACAO];
 
 export async function getSummary(params: {
   janelaHoras?: number;
@@ -260,22 +414,32 @@ export async function getSummary(params: {
     const janela_horas = params.janelaHoras ?? 24;
     const desde = new Date(Date.now() - janela_horas * 3_600_000).toISOString();
 
-    // Só a coluna `action`: a contagem não precisa de nome de pessoa nem de
-    // paciente, e trazer os vínculos aqui seria puxar dado pessoal para
-    // desenhar cinco números.
+    // Duas colunas: a contagem não precisa de nome de pessoa nem de paciente,
+    // e trazer os vínculos aqui seria puxar dado pessoal para desenhar quatro
+    // números.
     const { data, error } = await getSupabaseClient()
       .from("audit_log")
-      .select("action")
+      .select("action, is_restricted_material")
       .gte("occurred_at", desde)
       .limit(10_000);
 
     if (error) return falhaDe(error);
 
+    const linhas = data as unknown as { action: string; is_restricted_material: boolean | null }[];
+
     return okOne(
       summarizeAudit({
-        actions: (data as unknown as { action: string }[]).map((linha) =>
+        /**
+         * Uma leitura de material restrito conta nos DOIS cartões, e é o
+         * comportamento certo: ela é uma leitura, e é uma leitura sob sigilo.
+         * Descontá-la de "Leitura" faria o total de leituras da janela não
+         * bater com o número de linhas lidas, e quem confere uma trilha
+         * confere exatamente isso.
+         */
+        actions: linhas.flatMap((linha) => [
           paraAcaoAuditoria(linha.action),
-        ),
+          ...(linha.is_restricted_material ? [ACAO_AUDITORIA.SIGILOSO] : []),
+        ]),
         countable: CONTAVEIS,
         windowHours: janela_horas,
         withoutSource: SEM_ORIGEM,

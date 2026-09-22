@@ -115,10 +115,6 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
     "A edição do texto é do autor, e só enquanto a versão está em rascunho ou devolvida. Para pedir mudança, devolva a versão com um comentário.",
   "conteudos.submitForReview":
     "Enviar para revisão é o ato de quem escreveu — é assim que o texto entra nesta fila.",
-  "auditoria.list.ip":
-    "A trilha não registra endereço de IP: ela é escrita dentro do banco, por gatilho, e o Postgres não enxerga o endereço do navegador que originou a chamada.",
-  "auditoria.summary.sigiloso":
-    "A trilha não separa acesso sigiloso: ela guarda qual tabela foi lida, não qual linha nem sob que visibilidade. Contar exigiria copiar o recorte de sigilo para dentro do log.",
   "auditoria.summary.exportacao":
     "Exportação não gera linha na trilha: baixar um CSV do que já está na tela acontece no navegador, sem passar pelo banco.",
   "conteudos.list.visualizacoes":
