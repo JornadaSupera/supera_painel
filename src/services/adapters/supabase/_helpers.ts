@@ -38,7 +38,34 @@ const CODIGO_EXTRA: Record<string, ErrorCode> = {
   // linha caía em UNKNOWN, e a tela dizia "erro inesperado" para um campo
   // digitado errado.
   "22023": ERROR_CODE.VALIDATION,
+  // `no_data_found`. As RPCs de configuração o usam para "a linha que você
+  // apontou não existe" — sintoma desativado, motivo já removido. É NOT_FOUND,
+  // e não falha de validação: o dado enviado estava bem formado.
+  P0002: ERROR_CODE.NOT_FOUND,
 };
+
+/**
+ * Códigos cuja `message` já é texto de tela.
+ *
+ * As RPCs de paciente e de profissional levantam **sentinela** — um
+ * identificador estável que o mapa abaixo traduz. As de configuração levantam
+ * **frase**, em português e escrita para quem opera ("motivo só se cadastra
+ * para estado terminal"). Descartá-la para exibir "Verifique os dados
+ * informados" troca a explicação exata por uma genérica.
+ *
+ * A lista é fechada de propósito. Fora dela ficam os erros que o Postgres
+ * escreve sozinho — violação de chave estrangeira, de unicidade —, cuja
+ * mensagem cita o nome de uma constraint. Nome de objeto do banco na tela da
+ * recepção não informa nada e assusta.
+ */
+const MENSAGEM_LEGIVEL: ReadonlySet<string> = new Set([
+  "P0001", // raise exception sem SQLSTATE próprio
+  "22023", // invalid_parameter_value
+  "P0002", // no_data_found
+]);
+
+/** Sentinela é um token só (`invalid_cpf`); frase tem espaço. */
+const PARECE_SENTINELA = /^[a-z0-9_]+$/;
 
 /**
  * Sentinelas das RPCs, em português.
@@ -100,14 +127,25 @@ export function traduzirErro(erro: ErroPostgrest | null | undefined): ErrorCode 
  *    existe, é melhor do que qualquer texto genérico nosso.
  * 2. Sem `HINT`, a sentinela traduzida: `message` traz um identificador estável
  *    (`invalid_cpf`), que é preciso para o código e ilegível na tela.
- * 3. Sem as duas, o contrato usa a mensagem padrão do código de erro.
+ * 3. Sem as duas, a própria `message` — mas só quando ela é frase e vem de um
+ *    código cuja mensagem é escrita para ser lida. Ver `MENSAGEM_LEGIVEL`.
+ * 4. Sem nenhuma das três, o contrato usa a mensagem padrão do código de erro.
  */
 export function mensagemDoErro(erro: ErroPostgrest | null | undefined): string | undefined {
   const hint = erro?.hint?.trim();
   if (hint) return hint;
 
-  const sentinela = erro?.message?.trim();
-  return (sentinela && MENSAGEM_POR_SENTINELA[sentinela]) || undefined;
+  const mensagem = erro?.message?.trim();
+  if (!mensagem) return undefined;
+
+  const traduzida = MENSAGEM_POR_SENTINELA[mensagem];
+  if (traduzida) return traduzida;
+
+  // Sentinela ainda sem tradução não vai para a tela: `invalid_cpf` não é
+  // frase, e exibi-lo cru seria mostrar o identificador do código.
+  if (PARECE_SENTINELA.test(mensagem)) return undefined;
+
+  return erro?.code && MENSAGEM_LEGIVEL.has(erro.code) ? mensagem : undefined;
 }
 
 /** Converte um erro do PostgREST em resposta de falha do contrato. */
