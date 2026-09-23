@@ -20,7 +20,10 @@ import {
   type LinhaResumoAgenda,
   type LinhaResumoChat,
 } from "./_summaries";
-import { executar } from "./_helpers";
+import type { Especialidade } from "@/lib/enums";
+import { executar, falhaDe } from "./_helpers";
+import { getSupabaseClient } from "./client";
+import { paraCodigoDeEspecialidade } from "./mapping";
 
 /**
  * Estatísticas operacionais — a operação da clínica.
@@ -86,8 +89,55 @@ const SEM_VOLUME_DE_MENSAGEM = "mensagens_dia";
  * sem ocorrência", diria "o gatilho ainda não foi configurado" — e as duas
  * leituras levam a decisões opostas.
  */
+/**
+ * Por que o volume, o tempo até conduta e o desfecho ainda não aparecem.
+ *
+ * São DUAS ausências empilhadas, e só a primeira é de configuração:
+ *
+ *  1. Nenhum gatilho de criticidade foi cadastrado, então nenhum alerta
+ *     dispara. A fila está vazia por configuração, não por ausência de
+ *     ocorrência — e "zero alertas" seria lido como tranquilidade.
+ *  2. Não existe resumo agregado de alertas. A leitura que existe devolve os
+ *     alertas LINHA A LINHA, com o paciente em cada uma. Calcular a média aqui
+ *     traria prontuário para o navegador para virar estatística, numa tela cujo
+ *     compromisso é justamente não identificar ninguém — é o que as funções de
+ *     resumo vieram substituir nas outras duas telas.
+ *
+ * Por isso o painel não estima: o número sai quando houver regra cadastrada e
+ * um resumo do lado do banco. Pedido registrado com o responsável pelo banco.
+ */
 const ALERTAS_SEM_REGRA =
-  "A fila de alertas existe no backend, mas nenhum gatilho de criticidade foi cadastrado: sem regra, nenhum alerta dispara e a fila fica vazia por configuração, não por ausência de ocorrência. O limiar é decisão clínica, e quem o cadastra é a administração. Enquanto não houver regra, o painel não exibe o número — 'zero alertas' seria lido como tranquilidade.";
+  "Dois passos faltam, e nenhum é de tela: nenhum gatilho de criticidade foi cadastrado, então nenhum alerta dispara — cadastre em Configurações → Gatilhos de alerta; e o backend ainda não resume os alertas em volume, tempo até conduta e desfecho. A leitura disponível devolve alerta por alerta, com o paciente em cada linha, e somar isso aqui traria prontuário para uma tela que não identifica ninguém.";
+
+/**
+ * A chave da especialidade, a partir do código do painel.
+ *
+ * O painel fala `medico_oncologista`; a tabela guarda `oncology` e responde
+ * por um UUID. A tradução acontece aqui, na fronteira, pela mesma razão que a
+ * do CID: qual id o banco usa para "Oncologia" é detalhe do banco, e uma tela
+ * que o carregasse passaria a depender dele.
+ *
+ * Código desconhecido devolve `null` — recorte nenhum, a leitura inteira. É o
+ * comportamento certo: o seletor só oferece códigos do próprio catálogo, então
+ * um valor fora dele é defeito de chamada, não escolha de quem usa.
+ */
+async function idDaEspecialidade(
+  codigoDoPainel: string | null | undefined,
+): Promise<string | null | ReturnType<typeof fail>> {
+  if (!codigoDoPainel) return null;
+
+  const codigo = paraCodigoDeEspecialidade(codigoDoPainel as Especialidade);
+  if (!codigo) return null;
+
+  const { data, error } = await getSupabaseClient()
+    .from("specialties")
+    .select("id")
+    .eq("code", codigo)
+    .limit(1);
+
+  if (error) return falhaDe(error);
+  return (data as { id: string }[])[0]?.id ?? null;
+}
 
 /* -------------------------------------------------------------------------
    AGREGAÇÃO DOS BALDES
@@ -241,9 +291,12 @@ interface Consolidado {
 async function consolidar(params?: JanelaOperacional): Promise<Consolidado | ReturnType<typeof fail>> {
   const janela = params?.dias ? janelaDeDias(params.dias) : janelaDeMeses(MESES);
 
+  const especialidadeId = await idDaEspecialidade(params?.especialidade);
+  if (especialidadeId && typeof especialidadeId !== "string") return especialidadeId;
+
   const [agenda, chat] = await Promise.all([
-    resumirAgenda({ janela }),
-    resumirChat({ janela }),
+    resumirAgenda({ janela, especialidadeId }),
+    resumirChat({ janela, especialidadeId }),
   ]);
 
   if (falhou(agenda)) return agenda;
