@@ -58,6 +58,26 @@ export function isValidBirthDate(iso: string | null | undefined): boolean {
   return date <= today && date >= limit;
 }
 
+/**
+ * A date that has already happened.
+ *
+ * Used by the clinical record, where every date describes something that was
+ * observed: a diagnosis and the start of a treatment plan are facts with a
+ * past, and a future one is a typo — most often a wrong year.
+ */
+export function isValidPastDate(iso: string | null | undefined): boolean {
+  if (!iso) return false;
+
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return false;
+
+  // End of today, so a date entered today is not refused by the clock.
+  const limit = new Date();
+  limit.setHours(23, 59, 59, 999);
+
+  return date <= limit && date.getFullYear() >= 1900;
+}
+
 /** "12345678909" → "123.456.789-09", applied as the person types. */
 export function applyCpfMask(value: string): string {
   const d = digitsOnly(value).slice(0, 11);

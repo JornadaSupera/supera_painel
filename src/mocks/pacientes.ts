@@ -35,7 +35,13 @@ export interface PacienteMock {
   status: StatusPaciente;
   risco: Risco;
   estadiamento: string | null;
+  /** Classificação TNM do diagnóstico principal. */
+  tnm: string | null;
   diagnostico_em: string | null;
+  /** Intenção do plano vigente — curativa, paliativa, adjuvante. */
+  intencao_terapeutica: string | null;
+  /** Início do plano vigente. */
+  plano_iniciado_em: string | null;
   alergias: string[];
   reacoes_previas: string[];
   observacoes: string | null;
@@ -170,6 +176,8 @@ const MEDICOS = usuarios
   .map((usuario) => usuario.id);
 
 const ESTADIAMENTOS = ["I", "IIA", "IIB", "IIIA", "IIIB", "IV"];
+/** Intenção terapêutica. Texto livre no banco, como aqui. */
+const INTENCOES = ["Curativa", "Adjuvante", "Neoadjuvante", "Paliativa"];
 const DOMINIOS = ["gmail.com", "hotmail.com", "outlook.com", "yahoo.com.br"];
 const ALERGIAS = [["Dipirona"], ["Penicilina"], ["Iodo", "Frutos do mar"], ["Sulfa"]];
 const REACOES = [
@@ -239,7 +247,10 @@ export const pacientes: PacienteMock[] = LINHAS.map((linha, i) => {
     status: inativo ? STATUS_PACIENTE.INATIVO : STATUS_PACIENTE.ATIVO,
     risco: riscoDe(fase, i),
     estadiamento: ESTADIAMENTOS[i % ESTADIAMENTOS.length] ?? null,
+    tnm: null,
     diagnostico_em: iso(criado - (30 + i * 3) * DIA),
+    intencao_terapeutica: INTENCOES[i % INTENCOES.length] ?? null,
+    plano_iniciado_em: iso(criado - 15 * DIA),
     alergias: i % 3 === 0 ? (ALERGIAS[i % ALERGIAS.length] ?? []) : [],
     reacoes_previas: fase === ATIVO ? (REACOES[i % REACOES.length] ?? []) : [],
     observacoes: null,

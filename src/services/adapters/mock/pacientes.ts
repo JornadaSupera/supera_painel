@@ -25,6 +25,7 @@ import { STATUS_CONVITE_LABEL } from "@/types/paciente";
 import type {
   CampoPii,
   CuidadorVinculado,
+  PacienteClinicaEntrada,
   PacienteDetalhe,
   PacienteEntrada,
   PacienteListItem,
@@ -96,7 +97,10 @@ function toDetalhe(row: PacienteMock): PacienteDetalhe {
     telefone_mascarado: maskPhone(row.telefone),
     email_mascarado: maskEmail(row.email),
     estadiamento: row.estadiamento,
+    tnm: row.tnm,
     diagnostico_em: row.diagnostico_em,
+    intencao_terapeutica: row.intencao_terapeutica,
+    plano_iniciado_em: row.plano_iniciado_em,
     alergias: row.alergias,
     reacoes_previas: row.reacoes_previas,
     observacoes: row.observacoes,
@@ -215,10 +219,10 @@ export async function create(entrada: PacienteEntrada): Promise<SingleResult<Pac
       nome: entrada.nome.trim(),
       cpf,
       nascimento: entrada.nascimento,
-      // Os campos clínicos não vêm do formulário: registrá-los é ato clínico, e
-      // o cadastro administrativo não os coleta. A ficha nasce sem diagnóstico,
-      // exatamente como nasce no backend — quem os preenche é o sistema do
-      // consultório. `sexo` e `risco` não têm coluna em lugar nenhum.
+      // A ficha nasce sem quadro clínico, exatamente como nasce no backend:
+      // `create_patient` grava identificação e contato, e o diagnóstico é uma
+      // escrita à parte — que o cadastro faz em seguida, quando o formulário o
+      // traz. `sexo` e `risco` não têm coluna em lugar nenhum.
       sexo: "feminino",
       telefone: digitsOnly(entrada.telefone),
       email: entrada.email.trim().toLowerCase(),
@@ -228,7 +232,10 @@ export async function create(entrada: PacienteEntrada): Promise<SingleResult<Pac
       status: STATUS_PACIENTE.ATIVO,
       risco: RISCO.BAIXO,
       estadiamento: null,
+      tnm: null,
       diagnostico_em: null,
+      intencao_terapeutica: null,
+      plano_iniciado_em: null,
       alergias: entrada.alergias ?? [],
       reacoes_previas: entrada.reacoes_previas ?? [],
       observacoes: null,
@@ -275,6 +282,49 @@ export async function update({
       convenio: dados.convenio ?? row.convenio ?? null,
       alergias: acrescentar(row.alergias, dados.alergias),
       reacoes_previas: acrescentar(row.reacoes_previas, dados.reacoes_previas),
+      atualizado_em: now(),
+    } satisfies Partial<PacienteMock>);
+
+    return okOne(toDetalhe(row));
+  });
+}
+
+/**
+ * Quadro clínico.
+ *
+ * O mock reproduz a regra que importa do backend: **campo ausente não mexe**.
+ * Lá isso existe porque diagnóstico e plano são registros datados e a escrita
+ * acrescenta; aqui existe para que a tela se comporte igual nos dois modos —
+ * uma edição que só troca o telefone não pode reescrever a data do diagnóstico.
+ */
+export async function updateClinical({
+  id,
+  dados,
+}: {
+  id: string;
+  dados: PacienteClinicaEntrada;
+}): Promise<SingleResult<PacienteDetalhe>> {
+  return comPaciente(id, (row) => {
+    const manter = <T,>(novo: T | undefined, atual: T): T => (novo === undefined ? atual : novo);
+
+    if (dados.protocolo_nome !== undefined && dados.protocolo_nome) {
+      const encontrado = protocolos.find(
+        (item) => item.nome.toLowerCase() === dados.protocolo_nome!.trim().toLowerCase(),
+      );
+      // Protocolo que não está no catálogo do mock mantém o vigente: inventar
+      // um id aqui faria a ficha exibir um protocolo sem medicamentos, que é
+      // um estado que o banco real não produz.
+      row.protocolo_id = encontrado?.id ?? row.protocolo_id;
+    }
+
+    Object.assign(row, {
+      cid: manter(dados.cid ?? undefined, row.cid),
+      estadiamento: manter(dados.estadiamento, row.estadiamento),
+      tnm: manter(dados.tnm, row.tnm),
+      diagnostico_em: manter(dados.diagnostico_em, row.diagnostico_em),
+      intencao_terapeutica: manter(dados.intencao, row.intencao_terapeutica),
+      plano_iniciado_em: manter(dados.plano_iniciado_em, row.plano_iniciado_em),
+      fase: dados.fase ?? row.fase,
       atualizado_em: now(),
     } satisfies Partial<PacienteMock>);
 

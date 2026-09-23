@@ -15,6 +15,7 @@ import { STATUS_CONVITE_LABEL } from "@/types/paciente";
 import type {
   CampoPii,
   CuidadorVinculado,
+  PacienteClinicaEntrada,
   PacienteDetalhe,
   PacienteEntrada,
   PacienteListItem,
@@ -109,6 +110,7 @@ interface LinhaDiagnostico {
   patient_id: string;
   cid10_id: string;
   staging: string | null;
+  tnm: string | null;
   diagnosed_on: string | null;
   is_primary: boolean;
 }
@@ -123,6 +125,8 @@ interface LinhaPlano {
   patient_id: string;
   protocol_name: string;
   cycles_planned: number | null;
+  intent: string | null;
+  started_on: string | null;
   ended_on: string | null;
   source: "local" | "gemed";
   synced_at: string | null;
@@ -252,7 +256,10 @@ function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDet
     telefone_mascarado: maskPhone(linha.phone),
     email_mascarado: maskEmail(linha.email),
     estadiamento: contexto.diagnostico?.staging ?? null,
+    tnm: contexto.diagnostico?.tnm ?? null,
     diagnostico_em: contexto.diagnostico?.diagnosed_on ?? null,
+    intencao_terapeutica: contexto.plano?.intent ?? null,
+    plano_iniciado_em: contexto.plano?.started_on ?? null,
     alergias: (contexto.historico ?? [])
       .filter((linha) => linha.kind === "allergy")
       .map((linha) => linha.description),
@@ -862,6 +869,155 @@ export async function update({
 
       const erro = await acrescentarHistorico(id, dados.reacoes_previas, "prior_reaction", registradas);
       if (erro) return erro;
+    }
+
+    return getById({ id });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   QUADRO CLÍNICO — diagnóstico, protocolo e fase
+   -------------------------------------------------------------------------
+   Três escritas, três regras diferentes, e duas delas mordem quem as chamar
+   duas vezes:
+
+   - `upsert_patient_diagnosis` tem "upsert" no nome e **insere**. Chamá-la com
+     o mesmo CID grava um segundo diagnóstico principal idêntico, e o primeiro
+     deixa de ser o principal. A ficha passaria a mostrar dois.
+   - `set_treatment_plan` **encerra o plano vigente** e abre outro, com início
+     em hoje quando nada for informado. Salvar a ficha sem mexer no protocolo
+     apagaria a data real de início do tratamento.
+   - `set_treatment_phase` é `UPDATE` de uma coluna. Regravar não tem efeito.
+
+   Por isso o que vai ao banco é a DIFERENÇA, não o formulário. A comparação
+   acontece aqui, e não na tela, porque é consequência de como o backend grava —
+   e uma tela nova, amanhã, não teria como saber disso.
+
+   O backend autoriza o perfil administrativo nas três: cada função testa
+   `is_active_admin() OR is_active_professional()`.
+   ------------------------------------------------------------------------- */
+
+/** Compara dois valores opcionais tratando `null`, `undefined` e "" como iguais. */
+function mudou(novo: string | number | null | undefined, atual: string | number | null): boolean {
+  if (novo === undefined) return false;
+
+  const normalizar = (valor: string | number | null | undefined) =>
+    valor === null || valor === undefined || valor === "" ? null : String(valor).trim();
+
+  return normalizar(novo) !== normalizar(atual);
+}
+
+export async function updateClinical({
+  id,
+  dados,
+}: {
+  id: string;
+  dados: PacienteClinicaEntrada;
+}): Promise<SingleResult<PacienteDetalhe>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    // O estado atual, que é contra o que a diferença é medida. Uma leitura a
+    // mais por salvamento, e ela paga por si: sem isso, cada salvamento
+    // acrescenta uma linha de diagnóstico.
+    const atual = await getById({ id });
+    if (atual.error) return atual;
+
+    const ficha = atual.data;
+    if (!ficha) return fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
+
+    /* ------------------------------------------------------- diagnóstico */
+
+    const trocouDiagnostico =
+      mudou(dados.cid, ficha.cid || null) ||
+      mudou(dados.estadiamento, ficha.estadiamento) ||
+      mudou(dados.tnm, ficha.tnm) ||
+      mudou(dados.diagnostico_em, ficha.diagnostico_em);
+
+    if (trocouDiagnostico) {
+      const codigo = (dados.cid ?? ficha.cid ?? "").trim();
+
+      if (!codigo) {
+        return fail(
+          ERROR_CODE.VALIDATION,
+          "O estadiamento pertence a um diagnóstico. Informe o CID antes de registrá-lo.",
+        );
+      }
+
+      // O formulário fala em código de CID porque é o que a clínica escreve; a
+      // chave estrangeira é resolvida aqui, na fronteira com o banco.
+      const { data: cid, error: erroCid } = await supabase
+        .from("cid10")
+        .select("id")
+        .eq("code", codigo)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (erroCid) return falhaDe(erroCid);
+      if (!cid) return fail(ERROR_CODE.VALIDATION, `O CID "${codigo}" não está no catálogo.`);
+
+      const { error } = await supabase.rpc("upsert_patient_diagnosis", {
+        p_patient_id: id,
+        p_cid10_id: (cid as { id: string }).id,
+        p_staging: dados.estadiamento ?? ficha.estadiamento,
+        p_tnm: dados.tnm ?? ficha.tnm,
+        p_diagnosed_on: dados.diagnostico_em ?? ficha.diagnostico_em,
+        // Sempre principal: a ficha administrativa registra o diagnóstico que
+        // conduz o tratamento. Diagnóstico secundário é registro clínico, e
+        // entra pelo sistema do consultório.
+        p_is_primary: true,
+      });
+
+      if (error) return falhaDe(error);
+    }
+
+    /* ------------------------------------------------------------ plano */
+
+    const trocouPlano =
+      mudou(dados.protocolo_nome, ficha.protocolo?.nome ?? null) ||
+      mudou(dados.ciclos_previstos, ficha.protocolo?.ciclos ?? null) ||
+      mudou(dados.intencao, ficha.intencao_terapeutica) ||
+      mudou(dados.plano_iniciado_em, ficha.plano_iniciado_em);
+
+    if (trocouPlano) {
+      const protocolo = (dados.protocolo_nome ?? ficha.protocolo?.nome ?? "").trim();
+
+      if (!protocolo) {
+        return fail(
+          ERROR_CODE.VALIDATION,
+          "Ciclos e intenção pertencem a um protocolo. Informe o protocolo antes de registrá-los.",
+        );
+      }
+
+      const { error } = await supabase.rpc("set_treatment_plan", {
+        p_patient_id: id,
+        p_protocol_name: protocolo,
+        p_cycles_planned: dados.ciclos_previstos ?? ficha.protocolo?.ciclos ?? null,
+        p_intent: dados.intencao ?? ficha.intencao_terapeutica,
+        // Preserva o início do plano vigente quando só os ciclos mudaram: sem
+        // isto o backend adotaria hoje, e o tratamento pareceria ter começado
+        // no dia da correção.
+        p_started_on: dados.plano_iniciado_em ?? ficha.plano_iniciado_em,
+      });
+
+      if (error) return falhaDe(error);
+    }
+
+    /* ------------------------------------------------------------- fase */
+
+    if (dados.fase !== undefined && dados.fase !== ficha.fase) {
+      const codigo = dados.fase ? paraCodigoDeFase(dados.fase) : null;
+
+      if (!codigo) {
+        return fail(ERROR_CODE.VALIDATION, "Fase de tratamento desconhecida.");
+      }
+
+      const { error } = await supabase.rpc("set_treatment_phase", {
+        p_patient_id: id,
+        p_phase_code: codigo,
+      });
+
+      if (error) return falhaDe(error);
     }
 
     return getById({ id });

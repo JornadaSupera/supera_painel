@@ -58,7 +58,7 @@ import {
   useEnviarConvite,
   usePaciente,
 } from "../hooks/usePacientes";
-import { paraEntrada, VALORES_INICIAIS, type PacienteForm as Valores } from "../schemas";
+import { paraClinica, paraEntrada, VALORES_INICIAIS, type PacienteForm as Valores } from "../schemas";
 
 /**
  * Ficha do paciente.
@@ -85,6 +85,20 @@ function paraFormulario(paciente: PacienteDetalhe): Valores {
     nascimento: paciente.nascimento,
     alergias: paciente.alergias,
     reacoes_previas: paciente.reacoes_previas,
+    // Quadro clínico: aqui o campo começa PREENCHIDO, ao contrário do contato.
+    // A diferença é o que o vazio significa dos dois lados — contato vazio
+    // mantém o atual porque o valor chega mascarado; quadro clínico vazio
+    // também mantém, mas quem edita precisa VER o que está gravado para saber
+    // que está trocando um protocolo, e não iniciando um.
+    cid: paciente.cid,
+    estadiamento: paciente.estadiamento ?? "",
+    tnm: paciente.tnm ?? "",
+    diagnostico_em: paciente.diagnostico_em?.slice(0, 10) ?? "",
+    protocolo_nome: paciente.protocolo?.nome ?? "",
+    ciclos_previstos: paciente.protocolo?.ciclos ? String(paciente.protocolo.ciclos) : "",
+    intencao: paciente.intencao_terapeutica ?? "",
+    plano_iniciado_em: paciente.plano_iniciado_em?.slice(0, 10) ?? "",
+    fase: paciente.fase ?? "",
     convenio: paciente.convenio ?? "",
     // Contato começa vazio: vazio significa "manter o atual". Ver
     // `pacienteEdicaoSchema`.
@@ -171,16 +185,21 @@ export function PacienteFichaPage() {
 
             atualizar.mutate(
               {
-                nome: entrada.nome,
-                nascimento: entrada.nascimento,
-                convenio: entrada.convenio,
-                // Só cresce: o que saiu da lista não é apagado, porque o
-                // histórico clínico é imutável do lado do banco.
-                alergias: entrada.alergias,
-                reacoes_previas: entrada.reacoes_previas,
-                // Contato só entra no payload quando foi realmente digitado.
-                ...(valores.telefone ? { telefone: entrada.telefone } : {}),
-                ...(valores.email ? { email: entrada.email } : {}),
+                dados: {
+                  nome: entrada.nome,
+                  nascimento: entrada.nascimento,
+                  convenio: entrada.convenio,
+                  // Só cresce: o que saiu da lista não é apagado, porque o
+                  // histórico clínico é imutável do lado do banco.
+                  alergias: entrada.alergias,
+                  reacoes_previas: entrada.reacoes_previas,
+                  // Contato só entra no payload quando foi realmente digitado.
+                  ...(valores.telefone ? { telefone: entrada.telefone } : {}),
+                  ...(valores.email ? { email: entrada.email } : {}),
+                },
+                // O adapter compara com o que está gravado e só escreve a
+                // diferença — mandar a etapa inteira aqui é seguro.
+                clinica: paraClinica(valores),
               },
               { onSuccess: sairDaEdicao },
             );
@@ -330,7 +349,12 @@ export function PacienteFichaPage() {
               <p className="text-muted-foreground text-xs">{paciente.cid_descricao}</p>
             </DetailField>
 
-            <DetailField rotulo="Estadiamento">{paciente.estadiamento ?? "—"}</DetailField>
+            <DetailField rotulo="Estadiamento">
+              {paciente.estadiamento ?? "—"}
+              {paciente.tnm && (
+                <p className="text-muted-foreground font-mono text-xs">{paciente.tnm}</p>
+              )}
+            </DetailField>
 
             <DetailField rotulo="Fase">
               <span className="capitalize">
@@ -360,11 +384,18 @@ export function PacienteFichaPage() {
                   <div className="flex flex-col gap-1.5">
                     <span className="font-medium">{paciente.protocolo.nome}</span>
                     <p className="text-muted-foreground text-xs">
-                      {paciente.protocolo.medicamentos.join(" · ")} · via{" "}
-                      {paciente.protocolo.via} ·{" "}
-                      {paciente.protocolo.ciclos
-                        ? `${paciente.protocolo.ciclos} ciclos`
-                        : "uso contínuo"}
+                      {[
+                        paciente.protocolo.medicamentos.join(" · ") || null,
+                        paciente.protocolo.ciclos
+                          ? `${paciente.protocolo.ciclos} ciclos previstos`
+                          : null,
+                        paciente.intencao_terapeutica,
+                        paciente.plano_iniciado_em
+                          ? `início em ${formatDate(paciente.plano_iniciado_em)}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ") || "sem detalhamento registrado"}
                     </p>
                   </div>
                 ) : (

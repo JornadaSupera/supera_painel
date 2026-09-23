@@ -7,13 +7,13 @@ import type { ResultadoConvite } from "@/types/paciente";
 import { ConviteEmitidoDialog } from "../components/ConviteEmitidoDialog";
 import { PacienteForm } from "../components/PacienteForm";
 import { useCriarPaciente } from "../hooks/usePacientes";
-import { paraEntrada, VALORES_INICIAIS, type PacienteForm as Valores } from "../schemas";
+import { paraClinica, paraEntrada, VALORES_INICIAIS, type PacienteForm as Valores } from "../schemas";
 
 /**
  * Cadastro de paciente.
  *
- * Rota separada da listagem, e não um modal: são três etapas com dezesseis
- * campos — um diálogo desse tamanho não sobrevive a uma interrupção, e
+ * Rota separada da listagem, e não um modal: são quatro etapas com vinte e
+ * cinco campos — um diálogo desse tamanho não sobrevive a uma interrupção, e
  * interrupção é a regra em recepção de clínica.
  */
 export function PacienteNovoPage() {
@@ -32,12 +32,12 @@ export function PacienteNovoPage() {
   const irParaFicha = (id: string | null) => navigate(id ? `/pacientes/${id}` : "/pacientes");
 
   // A rota continua alcançável pela URL mesmo com o botão desabilitado na
-  // listagem. Barrar aqui evita o pior caminho: dezesseis campos preenchidos
+  // listagem. Barrar aqui evita o pior caminho: o formulário inteiro preenchido
   // para receber uma recusa no envio.
   const indisponivel = motivoIndisponivel("pacientes.create");
 
   const salvar = (valores: Valores) => {
-    criar.mutate(paraEntrada(valores), {
+    criar.mutate({ entrada: paraEntrada(valores), clinica: paraClinica(valores) }, {
       onSuccess: ({ paciente, convite }) => {
         // Com código na mão, o diálogo primeiro. Sem ele, vai direto para a
         // ficha: é lá que se confere o que foi cadastrado e se reemite o

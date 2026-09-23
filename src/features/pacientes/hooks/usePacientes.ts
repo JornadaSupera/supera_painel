@@ -9,7 +9,12 @@ import { queryKeys } from "@/lib/queryKeys";
 import { call, pacientesApi } from "@/services/apiClient";
 import type { ListParams } from "@/services/contracts";
 import { usePacientesStore } from "@/stores/pacientes";
-import type { CampoPii, PacienteEntrada, PiiRevelada } from "@/types/paciente";
+import type {
+  CampoPii,
+  PacienteClinicaEntrada,
+  PacienteEntrada,
+  PiiRevelada,
+} from "@/types/paciente";
 
 /**
  * Acesso a Pacientes.
@@ -108,31 +113,68 @@ export function useCriarPaciente() {
   const invalidar = useInvalidarPacientes();
 
   return useMutation({
-    mutationFn: async (entrada: PacienteEntrada) => {
-      const { data: paciente } = await call(() => pacientesApi.create(entrada));
+    mutationFn: async ({
+      entrada,
+      clinica,
+    }: {
+      entrada: PacienteEntrada;
+      clinica?: PacienteClinicaEntrada | null;
+    }) => {
+      const { data: criado } = await call(() => pacientesApi.create(entrada));
+
+      /*
+       * O quadro clínico é uma segunda escrita, e ela não pode derrubar a
+       * primeira: a ficha já existe neste ponto, e reportar "não foi possível
+       * cadastrar" faria alguém tentar de novo e esbarrar em "já existe ficha
+       * com este CPF". O que falha aqui vira aviso, e a ficha abre para
+       * correção — o mesmo tratamento que o convite recebe logo abaixo.
+       */
+      let paciente = criado;
+      let erroClinica: string | null = null;
+
+      if (criado && clinica) {
+        try {
+          const { data } = await call(() =>
+            pacientesApi.updateClinical({ id: criado.id, dados: clinica }),
+          );
+          paciente = data ?? criado;
+          audit.update(RECURSO, criado.id, { operacao: "quadro_clinico" });
+        } catch (erro) {
+          erroClinica =
+            erro instanceof Error ? erro.message : "Falha ao registrar o quadro clínico.";
+        }
+      }
+
       if (!paciente || !entrada.enviar_convite) {
-        return { paciente, convite: null, erroConvite: null };
+        return { paciente, convite: null, erroConvite: null, erroClinica };
       }
 
       try {
         const { data: convite } = await call(() => pacientesApi.sendInvite({ id: paciente.id }));
         audit.update(RECURSO, paciente.id, { operacao: "convite" });
-        return { paciente, convite, erroConvite: null };
+        return { paciente, convite, erroConvite: null, erroClinica };
       } catch (erro) {
         return {
           paciente,
           convite: null,
           erroConvite: erro instanceof Error ? erro.message : "Falha ao emitir o convite.",
+          erroClinica,
         };
       }
     },
-    onSuccess: async ({ paciente, erroConvite }) => {
+    onSuccess: async ({ paciente, erroConvite, erroClinica }) => {
       if (paciente) audit.update(RECURSO, paciente.id, { operacao: "criacao" });
       await invalidar();
 
       toast.success("Paciente cadastrado", {
         description: paciente ? `${paciente.nome} · ${paciente.codigo}` : undefined,
       });
+
+      if (erroClinica) {
+        toast.warning("A ficha foi criada sem o quadro clínico", {
+          description: `${erroClinica} Registre pela edição da ficha.`,
+        });
+      }
 
       if (erroConvite) {
         toast.warning("A ficha foi criada, mas o convite não saiu", {
@@ -144,13 +186,38 @@ export function useCriarPaciente() {
   });
 }
 
+/**
+ * Edição da ficha — cadastro e quadro clínico no mesmo salvamento.
+ *
+ * As duas escritas ficam aqui, e não no adapter, porque são operações com
+ * permissões diferentes: um dia a segunda pode ser negada a quem pode a
+ * primeira, e nesse dia a tela precisa continuar salvando o que pode.
+ *
+ * Ordem importa. O cadastro primeiro: se o quadro clínico falhar, a correção
+ * de nome e telefone já está gravada, e repetir o salvamento é inofensivo —
+ * `update_patient` sobrescreve. O inverso não seria verdade.
+ */
 export function useAtualizarPaciente(id: string) {
   const invalidar = useInvalidarPacientes();
 
   return useMutation({
-    mutationFn: async (dados: Partial<PacienteEntrada>) => {
+    mutationFn: async ({
+      dados,
+      clinica,
+    }: {
+      dados: Partial<PacienteEntrada>;
+      clinica?: PacienteClinicaEntrada | null;
+    }) => {
       const { data } = await call(() => pacientesApi.update({ id, dados }));
-      return data;
+
+      if (!clinica) return data;
+
+      const { data: comQuadro } = await call(() =>
+        pacientesApi.updateClinical({ id, dados: clinica }),
+      );
+      audit.update(RECURSO, id, { operacao: "quadro_clinico" });
+
+      return comQuadro ?? data;
     },
     onSuccess: async (paciente) => {
       audit.update(RECURSO, id, { campos: paciente ? Object.keys(paciente).length : 0 });

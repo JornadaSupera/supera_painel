@@ -16,8 +16,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { useEfeitosAdversos } from "@/hooks/useCatalogos";
+import { useCids, useEfeitosAdversos, useFasesTratamento } from "@/hooks/useCatalogos";
 import { cn } from "@/lib/utils";
 import { applyCpfMask, applyPhoneMask } from "@/lib/validation";
 import {
@@ -29,12 +36,12 @@ import {
 import { ListaDeChips, SelecaoDeCatalogo } from "./ListaDeChips";
 
 /**
- * Cadastro e edição de paciente, em três etapas.
+ * Cadastro e edição de paciente, em quatro etapas.
  *
- * Etapas e não uma página longa: identificação, histórico e contato são três
- * conversas diferentes — quem cadastra na recepção preenche a primeira e a
- * terceira, e a segunda é o que a enfermagem confere. Dividir deixa cada parte
- * revisável sozinha.
+ * Etapas e não uma página longa: identificação, histórico, quadro clínico e
+ * contato são conversas diferentes, e cada uma tem o seu dono — a recepção
+ * preenche a primeira e a última, a enfermagem confere a segunda, e a terceira
+ * vem do laudo. Dividir deixa cada parte revisável sozinha.
  *
  * > [!] O rascunho vive em memória, e só.
  * Nada é gravado em `localStorage` nem em `sessionStorage`: o formulário
@@ -42,15 +49,24 @@ import { ListaDeChips, SelecaoDeCatalogo } from "./ListaDeChips";
  * persistida no navegador. Trocar de etapa preserva o preenchimento; fechar a
  * aba, não — e é assim que deve ser.
  *
- * > [!] Diagnóstico, estadiamento, protocolo e fase NÃO estão aqui.
- * Registrá-los é ato clínico, e se o perfil administrativo pode praticá-lo é
- * pergunta aberta com a clínica. A etapa 2 declara isso em vez de oferecer
- * campos que talvez sejam retirados — perder uma seção é barato, perder a tela
- * inteira não.
+ * > [!] A etapa 3 grava por uma porta diferente das outras três.
+ * Identificação, histórico e contato saem em `paraEntrada`; o quadro clínico
+ * sai em `paraClinica` e vira uma operação própria. A diferença não é
+ * organizacional: do lado do banco são escritas distintas, e duas delas
+ * ACRESCENTAM um registro datado em vez de sobrescrever. Por isso o vazio ali
+ * significa "não mexer".
  */
 
 /** Campo de data ligado ao formulário em volta. */
-function CampoData({ name, rotulo }: { name: "nascimento"; rotulo: string }) {
+function CampoData({
+  name,
+  rotulo,
+  descricao,
+}: {
+  name: "nascimento" | "diagnostico_em" | "plano_iniciado_em";
+  rotulo: string;
+  descricao?: string;
+}) {
   const { control } = useFormContext<Valores>();
 
   return (
@@ -63,6 +79,7 @@ function CampoData({ name, rotulo }: { name: "nascimento"; rotulo: string }) {
           <FormControl>
             <Input {...field} type="date" />
           </FormControl>
+          {descricao && <FormDescription>{descricao}</FormDescription>}
           <FormMessage />
         </FormItem>
       )}
@@ -70,18 +87,20 @@ function CampoData({ name, rotulo }: { name: "nascimento"; rotulo: string }) {
   );
 }
 
-/** O aviso da etapa clínica. Diz o que falta e de quem depende. */
-function AvisoAtoClinico() {
+/** O aviso da etapa clínica. Diz o peso do que está sendo registrado. */
+function AvisoAtoClinico({ edicao }: { edicao: boolean }) {
   return (
     <div className="border-border bg-muted/40 text-muted-foreground flex gap-2.5 rounded-lg border p-3 text-xs sm:col-span-2">
       <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
       <p>
         <span className="text-foreground font-medium">
-          Diagnóstico, estadiamento, protocolo e fase não são preenchidos aqui.
+          Registrar diagnóstico e protocolo é ato clínico.
         </span>{" "}
-        Registrá-los é ato clínico, e ainda não está decidido se o perfil
-        administrativo pode praticá-lo. A ficha continua exibindo o que vier do
-        sistema do consultório: ler e escrever são permissões diferentes.
+        Cada campo desta etapa fica na trilha de auditoria com o seu nome e o
+        horário.{" "}
+        {edicao
+          ? "Trocar o protocolo encerra o plano vigente e abre um novo — o anterior continua no histórico, com as datas que teve."
+          : "Todos são opcionais: a ficha pode nascer sem eles e recebê-los depois, quando o diagnóstico sair."}
       </p>
     </div>
   );
@@ -115,6 +134,8 @@ export function PacienteForm({
   });
 
   const efeitos = useEfeitosAdversos();
+  const cids = useCids();
+  const fases = useFasesTratamento();
 
   /*
    * Na edição, o que já está gravado não pode ser retirado: o histórico clínico
@@ -132,9 +153,11 @@ export function PacienteForm({
    * requisição que parece ter dado certo, e uma ficha preenchida contra um
    * vocabulário que não carregou fica errada, não incompleta.
    */
-  const fontesObrigatorias = [{ label: "a lista de efeitos adversos", query: efeitos }].filter(
-    (fonte) => fonte.query.isError,
-  );
+  const fontesObrigatorias = [
+    { label: "a lista de efeitos adversos", query: efeitos },
+    { label: "o catálogo de CID-10", query: cids },
+    { label: "as fases de tratamento", query: fases },
+  ].filter((fonte) => fonte.query.isError);
 
   const fonteFaltando = fontesObrigatorias.length > 0;
 
@@ -309,12 +332,164 @@ export function PacienteForm({
                   )}
                 />
 
-                <AvisoAtoClinico />
               </div>
             )}
 
-            {/* ------------------------------------------------- 3 · contato */}
+            {/* ------------------------------------------ 3 · quadro clínico */}
             {etapa === 2 && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="cid"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Diagnóstico (CID-10)</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecione o código" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(cids.data ?? []).map((cid) => (
+                            <SelectItem key={cid.codigo} value={cid.codigo}>
+                              <span className="font-mono text-xs">{cid.codigo}</span>
+                              {" · "}
+                              {cid.descricao}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Estadiamento e TNM pertencem a este diagnóstico — sem o código, não
+                        há onde gravá-los.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="estadiamento"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Estadiamento</FormLabel>
+                      <FormControl>
+                        <Input {...field} autoComplete="off" placeholder="IIIA" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="tnm"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>TNM</FormLabel>
+                      <FormControl>
+                        <Input {...field} autoComplete="off" placeholder="T2 N1 M0" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <CampoData
+                  name="diagnostico_em"
+                  rotulo="Data do diagnóstico"
+                  descricao="Quando o laudo saiu, não quando a ficha foi aberta."
+                />
+
+                <FormField
+                  control={form.control}
+                  name="fase"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Fase do tratamento</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Selecione a fase" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(fases.data ?? []).map((opcao) => (
+                            <SelectItem key={opcao.value} value={opcao.value}>
+                              <span className="capitalize">{opcao.label}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="protocolo_nome"
+                  render={({ field }) => (
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>Protocolo terapêutico</FormLabel>
+                      <FormControl>
+                        <Input {...field} autoComplete="off" placeholder="FOLFOX, AC-T, Carbo-Taxol…" />
+                      </FormControl>
+                      <FormDescription>
+                        Texto livre: não há catálogo de protocolos no sistema. Escreva como a
+                        equipe escreve, para o relatório agrupar certo.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="ciclos_previstos"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ciclos previstos</FormLabel>
+                      <FormControl>
+                        <Input {...field} inputMode="numeric" placeholder="6" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="intencao"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Intenção terapêutica</FormLabel>
+                      <FormControl>
+                        <Input {...field} autoComplete="off" placeholder="Curativa, adjuvante…" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <CampoData
+                  name="plano_iniciado_em"
+                  rotulo="Início do tratamento"
+                  descricao={
+                    edicao
+                      ? "Em branco mantém a data do plano vigente."
+                      : "Em branco assume a data de hoje."
+                  }
+                />
+
+                <AvisoAtoClinico edicao={edicao} />
+              </div>
+            )}
+
+            {/* ------------------------------------------------- 4 · contato */}
+            {etapa === 3 && (
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}

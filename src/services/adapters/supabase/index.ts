@@ -85,8 +85,6 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "pacientes.sort.cid": SEM_ORDENACAO_NO_SERVIDOR,
   "pacientes.sort.fase": SEM_ORDENACAO_NO_SERVIDOR,
   "pacientes.sort.status": SEM_ORDENACAO_NO_SERVIDOR,
-  "pacientes.form.diagnostico":
-    "Diagnóstico, estadiamento, protocolo e fase não são preenchidos no painel administrativo: registrá-los é ato clínico, e ainda não está decidido se este perfil pode praticá-lo. A ficha continua exibindo o que vier do sistema do consultório.",
   "pacientes.form.sexo":
     "Não há coluna de sexo no cadastro, e nenhuma tela do escopo a exibe. Coletar o campo gravaria no vazio.",
   "pacientes.deactivate.motivo":
