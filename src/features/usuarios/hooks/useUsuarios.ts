@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { toListQuery } from "@/hooks/listQuery";
 import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
-import { STATUS_USUARIO_LABEL, type StatusUsuario } from "@/lib/enums";
+import { STATUS_USUARIO, STATUS_USUARIO_LABEL, type StatusUsuario } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, permissoesApi, usuariosApi } from "@/services/apiClient";
 import { useUsuariosStore } from "@/stores/usuarios";
@@ -128,6 +128,13 @@ export function useAtualizarUsuario(id: string) {
   });
 }
 
+/**
+ * Revoga ou devolve o acesso ao PAINEL.
+ *
+ * É a revogação oficial: o perfil desliga e a conta fica. O aplicativo, os
+ * outros perfis e os aparelhos registrados continuam valendo — para derrubar
+ * tudo existe `useDesativarConta`, que tem nome próprio por ser ato maior.
+ */
 export function useAlterarStatus() {
   const invalidar = useInvalidarUsuarios();
 
@@ -141,9 +148,51 @@ export function useAlterarStatus() {
       await invalidar();
       toast.success(
         usuario ? `${usuario.nome}: ${STATUS_USUARIO_LABEL[usuario.status]}` : "Status alterado",
+        {
+          description:
+            usuario?.status === STATUS_USUARIO.ATIVO
+              ? undefined
+              : "O acesso ao painel foi revogado. A conta e o aplicativo continuam valendo.",
+        },
       );
     },
     onError: (erro) => toast.error("Não foi possível alterar o status", { description: erro.message }),
+  });
+}
+
+/**
+ * Desativa a CONTA — todos os perfis, o aplicativo e o push de uma vez.
+ *
+ * Separada de `useAlterarStatus` porque as duas perguntas têm respostas
+ * diferentes: "esta pessoa ainda opera o painel?" não é "esta pessoa ainda usa
+ * a plataforma?". Um botão só para as duas escolhe a errada metade das vezes.
+ */
+export function useDesativarConta() {
+  const invalidar = useInvalidarUsuarios();
+
+  return useMutation({
+    mutationFn: async ({ id, ativa, motivo }: { id: string; ativa: boolean; motivo?: string }) => {
+      const { data } = await call(() => usuariosApi.setAccountActive({ id, ativa }));
+
+      // O motivo fica no registro do painel: `audit_log` não tem coluna de
+      // justificativa, e o texto não chega ao backend. Ver a lista de
+      // operações indisponíveis.
+      audit.update(RECURSO, id, { operacao: "conta", ativa, motivo });
+
+      return data;
+    },
+    onSuccess: async (usuario) => {
+      await invalidar();
+
+      toast.success(usuario?.status === STATUS_USUARIO.ATIVO ? "Conta reativada" : "Conta desativada", {
+        description:
+          usuario?.status === STATUS_USUARIO.ATIVO
+            ? "A pessoa volta a acessar a plataforma com os perfis que tinha."
+            : "A pessoa perdeu o acesso a todos os perfis e ao aplicativo, e os aparelhos registrados foram invalidados.",
+      });
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível alterar a conta", { description: erro.message }),
   });
 }
 
@@ -218,5 +267,67 @@ export function useSalvarMatriz() {
       });
     },
     onError: (erro) => toast.error("Não foi possível salvar", { description: erro.message }),
+  });
+}
+
+/* -------------------------------------------------------------------------
+   PERMISSÕES RESTRITAS
+   ------------------------------------------------------------------------- */
+
+/**
+ * As permissões que o backend restringe, com a concessão vigente da pessoa.
+ *
+ * Só busca quando há id: a ficha carrega antes de a aba ser aberta, e pedir a
+ * lista de quem ninguém está olhando é leitura sem pergunta.
+ */
+export function usePermissoesRestritas(id: string | undefined) {
+  const query = useQuery({
+    queryKey: queryKeys.users.restrictedPermissions(id ?? ""),
+    enabled: Boolean(id),
+    queryFn: () => call(() => usuariosApi.listPermissions({ id: id as string })),
+  });
+
+  const { items, ...status } = toListQuery(query);
+  return { ...status, permissoes: items };
+}
+
+/**
+ * Concede ou revoga uma permissão restrita.
+ *
+ * Uma mutation para os dois atos: a diferença é o verbo enviado, e o resto —
+ * auditoria, invalidação, tratamento de erro — é idêntico.
+ *
+ * O aviso descreve o EFEITO e não o clique, porque o efeito não é óbvio com um
+ * catálogo de semântica invertida: conceder devolve a alguém uma ação que o
+ * catálogo tirou de todos.
+ */
+export function useAlterarPermissaoRestrita(id: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ codigo, conceder }: { codigo: string; conceder: boolean }) => {
+      const { data } = await call(() =>
+        conceder
+          ? usuariosApi.grantPermission({ id, codigo })
+          : usuariosApi.revokePermission({ id, codigo }),
+      );
+
+      audit.update(RECURSO, id, { operacao: "permissao_restrita", codigo, conceder });
+
+      return data;
+    },
+    onSuccess: async (permissao) => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.users.restrictedPermissions(id),
+      });
+
+      toast.success(permissao?.concedida ? "Permissão concedida" : "Permissão revogada", {
+        description: permissao?.concedida
+          ? `Passa a poder: ${permissao.label.toLowerCase()}.`
+          : "A concessão foi encerrada, e a linha fica registrada com data e autor.",
+      });
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível alterar a permissão", { description: erro.message }),
   });
 }

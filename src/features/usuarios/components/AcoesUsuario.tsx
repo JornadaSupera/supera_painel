@@ -1,4 +1,15 @@
-import { IdCard, Ellipsis, History, KeyRound, Pause, Play, ShieldCheck, ShieldOff, SquarePen } from "lucide-react";
+import {
+  Ellipsis,
+  History,
+  IdCard,
+  KeyRound,
+  Pause,
+  Play,
+  ShieldCheck,
+  ShieldOff,
+  SquarePen,
+  UserX,
+} from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -15,14 +26,24 @@ import { STATUS_USUARIO } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
 import type { UsuarioListItem } from "@/types/usuario";
-import { useAlterarMfa, useAlterarStatus, useResetarSenha } from "../hooks/useUsuarios";
+import {
+  useAlterarMfa,
+  useAlterarStatus,
+  useDesativarConta,
+  useResetarSenha,
+} from "../hooks/useUsuarios";
 
 /**
  * Ações de uma linha da lista de profissionais.
  *
- * "Pausar" em vez de excluir: o vínculo com a clínica continua, o acesso é que
- * suspende — e o histórico de atendimento precisa seguir apontando para alguém.
+ * Suspender em vez de excluir: o vínculo com a clínica continua, o acesso é que
+ * para — e o histórico de atendimento precisa seguir apontando para alguém.
  * Exclusão de conta com trilha de auditoria apontando para ela é registro órfão.
+ *
+ * > [!] Revogar o acesso ao painel e desativar a conta são atos diferentes.
+ * O primeiro desliga o perfil e deixa a pessoa com a conta, o aplicativo e os
+ * aparelhos dela. O segundo derruba tudo. Eram um item só até aqui, e o item
+ * fazia o segundo enquanto a tela dizia o primeiro.
  */
 export function AcoesUsuario({
   usuario,
@@ -33,10 +54,12 @@ export function AcoesUsuario({
 }) {
   const navigate = useNavigate();
   const [confirmandoMfa, setConfirmandoMfa] = useState(false);
+  const [confirmandoConta, setConfirmandoConta] = useState(false);
 
   const alterarStatus = useAlterarStatus();
   const resetarSenha = useResetarSenha();
   const alterarMfa = useAlterarMfa();
+  const desativarConta = useDesativarConta();
 
   // Acesso suspenso é pausado ou inativo: qual dos dois o backend usa depende
   // de ele ter estado de pausa. Para a tela, os dois significam "não entra".
@@ -109,11 +132,15 @@ export function AcoesUsuario({
             <DropdownMenuSeparator />
 
             {/*
-              Suspender acesso tem duas formas, e qual delas existe depende do
-              backend. Onde há pausa, ela mantém o vínculo e suspende o acesso;
-              onde não há, resta desativar — que é a revogação completa, vale
-              para todos os perfis da pessoa de uma vez e por isso é dita com
-              essa palavra, não disfarçada de "pausar".
+              DOIS ATOS DE TAMANHOS DIFERENTES, e por isso dois itens.
+
+              Revogar o acesso ao painel desliga o PERFIL: a pessoa para de
+              operar o painel e continua com a conta, o aplicativo e os
+              aparelhos registrados. É a revogação oficial.
+
+              Desativar a conta derruba tudo de uma vez — todos os perfis, o
+              aplicativo e o push. Um item só para os dois escolheria o errado
+              metade das vezes, e o errado aqui é grande nos dois sentidos.
             */}
             <DropdownMenuItem
               variant={suspenso ? "default" : "destructive"}
@@ -130,8 +157,23 @@ export function AcoesUsuario({
               }
             >
               {suspenso ? <Play /> : <Pause />}
-              {suspenso ? "Reativar acesso" : semPausa ? "Desativar acesso" : "Pausar acesso"}
+              {suspenso
+                ? "Devolver acesso ao painel"
+                : semPausa
+                  ? "Revogar acesso ao painel"
+                  : "Pausar acesso"}
             </DropdownMenuItem>
+
+            {!suspenso && (
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={desativarConta.isPending}
+                onSelect={() => setConfirmandoConta(true)}
+              >
+                <UserX />
+                Desativar a conta inteira
+              </DropdownMenuItem>
+            )}
           </Can>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -147,6 +189,21 @@ export function AcoesUsuario({
         onConfirm={({ reason }) => {
           alterarMfa.mutate({ id: usuario.id, ativo: false, motivo: reason });
           setConfirmandoMfa(false);
+        }}
+      />
+
+      {/* O alcance é o que precisa ficar claro antes do clique: não é sair do
+          painel, é sair da plataforma. */}
+      <ConfirmDialog
+        open={confirmandoConta}
+        onOpenChange={setConfirmandoConta}
+        title="Desativar a conta inteira?"
+        description={`${usuario.nome} perde o acesso a todos os perfis e ao aplicativo, e os aparelhos registrados deixam de receber notificação. Para tirar só o acesso ao painel, use "Revogar acesso ao painel".`}
+        confirmLabel="Desativar a conta"
+        loading={desativarConta.isPending}
+        onConfirm={({ reason }) => {
+          desativarConta.mutate({ id: usuario.id, ativa: false, motivo: reason });
+          setConfirmandoConta(false);
         }}
       />
     </div>

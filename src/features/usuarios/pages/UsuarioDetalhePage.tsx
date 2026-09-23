@@ -1,4 +1,4 @@
-import { History, KeyRound, IdCard, ShieldCheck, SquarePen } from "lucide-react";
+import { History, IdCard, KeyRound, ShieldCheck, SquarePen } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -25,6 +25,7 @@ import { formatDateTime } from "@/lib/format";
 import { PERMISSAO, PERMISSAO_LABEL } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { HistoricoAcessos } from "../components/HistoricoAcessos";
+import { PermissoesRestritas } from "../components/PermissoesRestritas";
 import { useResetarSenha, useUsuario } from "../hooks/useUsuarios";
 
 /**
@@ -181,8 +182,8 @@ export function UsuarioDetalhePage() {
 
         <DetailSection titulo="Permissões efetivas" icone={<ShieldCheck size={15} />}>
           <p className="text-muted-foreground text-xs leading-relaxed">
-            Conjunto já resolvido pelo backend: papel, depois especialidade, depois concessões
-            individuais.
+            O que esta pessoa alcança nas telas do painel, já resolvido: papel, depois
+            especialidade.
           </p>
 
           {usuario.permissoes_efetivas.length === 0 ? (
@@ -199,6 +200,15 @@ export function UsuarioDetalhePage() {
             </ul>
           )}
         </DetailSection>
+
+        {/* Outro eixo, e por isso outra seção: acima é o que o PAINEL concede
+            pelo papel; aqui é o que o backend restringe por pessoa. Juntar as
+            duas numa lista só faria parecer que saem da mesma regra. */}
+        <Can permission={PERMISSAO.USUARIOS_MANAGE}>
+          <DetailSection titulo="Permissões restritas" icone={<KeyRound size={15} />}>
+            <PermissoesRestritas usuarioId={usuario.id} />
+          </DetailSection>
+        </Can>
       </div>
 
       <HistoricoAcessos
