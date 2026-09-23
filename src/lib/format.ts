@@ -14,9 +14,36 @@ type IsoDate = string | null | undefined;
 
 /* ------------------------------------------------------------------- dates */
 
-/** "25/08/2026" */
+/**
+ * A date with no time at all — `2026-09-04`, the shape a Postgres `date` takes.
+ *
+ * It matters because such a value is a CALENDAR date, not an instant: a birth
+ * date, the day a diagnosis was issued, the day a treatment began. Nothing
+ * about it happened at a time of day.
+ */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * "25/08/2026"
+ *
+ * > [!] A date-only value is NOT converted between time zones.
+ * `new Date("2026-09-04")` is parsed as midnight UTC, and rendering that in
+ * São Paulo lands on the evening of the 3rd — so the panel displayed every
+ * `date` column one day early. A patient born on the 10th read as the 9th, and
+ * a treatment that began on the 4th read as the 3rd.
+ *
+ * Shifting is correct for an instant, which is why the fall-through keeps it:
+ * an audit entry stamped at 02:00 UTC did happen on the previous evening here.
+ * A calendar date has no instant to shift, so it is split and reassembled.
+ */
 export function formatDate(iso: IsoDate): string {
   if (!iso) return EMPTY;
+
+  if (DATE_ONLY.test(iso)) {
+    const [ano, mes, dia] = iso.split("-");
+    return `${dia}/${mes}/${ano}`;
+  }
+
   return new Date(iso).toLocaleDateString(LOCALE, { timeZone: TIME_ZONE });
 }
 
@@ -33,10 +60,15 @@ export function formatDateTime(iso: IsoDate): string {
   });
 }
 
-/** "25 de agosto de 2026" */
+/** "25 de agosto de 2026". Mesma regra de `formatDate` para data sem hora. */
 export function formatLongDate(iso: IsoDate): string {
   if (!iso) return EMPTY;
-  return new Date(iso).toLocaleDateString(LOCALE, {
+
+  // Meio-dia UTC: longe o bastante das duas bordas para que nenhum fuso mova o
+  // dia, e é só o dia que este formato usa.
+  const instante = DATE_ONLY.test(iso) ? new Date(`${iso}T12:00:00Z`) : new Date(iso);
+
+  return instante.toLocaleDateString(LOCALE, {
     timeZone: TIME_ZONE,
     day: "numeric",
     month: "long",
@@ -71,7 +103,14 @@ export function relativeTime(iso: IsoDate): string {
 export function ageInYears(isoBirthDate: IsoDate): number | null {
   if (!isoBirthDate) return null;
 
-  const birthDate = new Date(isoBirthDate);
+  /*
+   * Meio-dia, pela mesma razão de `formatLongDate`: `new Date("1999-10-10")`
+   * é meia-noite UTC, e `getDate()` no fuso local devolve 9. Quem faz
+   * aniversário hoje aparecia com um ano a menos.
+   */
+  const birthDate = DATE_ONLY.test(isoBirthDate)
+    ? new Date(`${isoBirthDate}T12:00:00Z`)
+    : new Date(isoBirthDate);
   const today = new Date();
 
   let years = today.getFullYear() - birthDate.getFullYear();
