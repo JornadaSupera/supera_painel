@@ -1,5 +1,4 @@
-import { Activity } from "lucide-react";
-
+import simbolo from "@/assets/images/logo-supera-simbolo.png";
 import wordmark from "@/assets/images/logo-supera.png";
 import { cn } from "@/lib/utils";
 
@@ -12,12 +11,16 @@ import { cn } from "@/lib/utils";
  * quadrado com um ícone de pulso do catálogo de ícones. Aquele símbolo nunca
  * foi a marca: era um marcador que ficou.
  *
- * > [!] O arquivo é um LETTERING, não um símbolo.
- * `logo-supera.png` é horizontal (720×209) e escreve "supera oncologia". Ele
- * resolve todo lugar que tem largura, e não resolve o único que não tem: a
- * barra lateral recolhida, com cerca de 44 px úteis, onde o lettering sairia
- * com 13 px de altura e ninguém leria. Lá continua um selo quadrado — e é a
- * peça que falta no material da marca, não uma escolha de tela.
+ * > [!] São dois arquivos, e o segundo foi recortado do primeiro.
+ * `logo-supera.png` é o lettering horizontal (720×209) e resolve todo lugar
+ * que tem largura. Onde não tem — a barra lateral recolhida, com cerca de
+ * 44 px úteis — ele sairia com 13 px de altura e ninguém leria.
+ *
+ * O material da marca não traz uma versão quadrada, então `logo-supera-simbolo.png`
+ * é o "s" extraído do próprio lettering, pelo corte medido onde a letra encosta
+ * no "u". É o mais perto da marca que dá para chegar sem desenhar letra nova —
+ * e continua valendo pedir o símbolo oficial, que substituiria este arquivo sem
+ * tocar em nenhuma tela.
  *
  * > [!] Fundo escuro não é o mesmo que tema escuro.
  * O verde-água da marca foi desenhado para fundo claro, e sobre o verde
@@ -54,14 +57,15 @@ export function Logo({
 }: LogoProps) {
   if (variant === "selo") {
     return (
-      <span
+      <img
+        src={simbolo}
+        alt="Supera Oncologia"
         className={cn(
-          "bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg",
+          "size-8 shrink-0 select-none object-contain",
+          surface === "escura" ? "brightness-125" : "dark:brightness-125",
           className,
         )}
-      >
-        <Activity size={18} aria-hidden="true" />
-      </span>
+      />
     );
   }
 
