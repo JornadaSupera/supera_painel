@@ -14,12 +14,12 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { ERROR_CODE } from "@/services/contracts";
 import { AuthErrorAlert } from "../components/AuthErrorAlert";
 import { CorporateEmailField } from "../components/CorporateEmailField";
+import { PasswordInput } from "../components/PasswordInput";
 import { loginSchema, type LoginForm } from "../schemas";
 
 /**
@@ -113,9 +113,19 @@ export function LoginPage() {
                   </Link>
                 </div>
                 <FormControl>
-                  {/* `current-password` faz o gerenciador de senhas do
+                  {/* `PasswordInput`, e não um `<Input type="password">`: o
+                      botão de revelar é NOSSO, e fica sempre na tela.
+
+                      O campo cru só tinha o olho que o próprio navegador
+                      desenha, e esse aparece e some conforme regra do
+                      navegador — o Edge o esconde com o campo vazio, e é
+                      exatamente o que acontece depois de uma tentativa
+                      recusada. Quem errou a senha é justamente quem mais
+                      precisa conferir o que está digitando.
+
+                      `current-password` faz o gerenciador de senhas do
                       navegador se comportar corretamente. */}
-                  <Input {...field} type="password" autoComplete="current-password" />
+                  <PasswordInput {...field} autoComplete="current-password" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
