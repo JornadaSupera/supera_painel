@@ -7,6 +7,7 @@ import {
   type SingleResult,
 } from "@/services/contracts";
 import type {
+  ConfiguracaoSeguranca,
   Configuracoes,
   ItemCatalogo,
   MotivoSituacao,
@@ -425,6 +426,76 @@ export async function setMotivoAtivo({
     if (!ativo) return okOne<MotivoSituacao>(null);
 
     return motivoPorId(id);
+  });
+}
+
+/* -------------------------------------------------------------------------
+   SEGUNDO FATOR OBRIGATÓRIO
+   ------------------------------------------------------------------------- */
+
+/**
+ * O estado do interruptor.
+ *
+ * A tabela tem uma linha só, e a política de leitura é a do administrador
+ * ativo. Linha ausente **não** significa "desligado": significa que esta sessão
+ * não consegue perguntar — ou porque o perfil não é administrativo, ou porque a
+ * própria exigência já está barrando a leitura. Devolver `false` aqui faria a
+ * tela afirmar o contrário do que está valendo.
+ */
+export async function getSeguranca(): Promise<SingleResult<ConfiguracaoSeguranca>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("security_settings")
+      .select("require_admin_mfa, updated_at, accounts:updated_by ( full_name, email )")
+      .maybeSingle();
+
+    if (error) return falhaDe(error);
+
+    if (!data) {
+      return okOne<ConfiguracaoSeguranca>({
+        exige_mfa: null,
+        atualizado_em: null,
+        atualizado_por: null,
+      });
+    }
+
+    const linha = data as unknown as {
+      require_admin_mfa: boolean;
+      updated_at: string | null;
+      accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
+    };
+
+    const autor = umDe(linha.accounts);
+
+    return okOne<ConfiguracaoSeguranca>({
+      exige_mfa: linha.require_admin_mfa,
+      atualizado_em: paraIso(linha.updated_at),
+      // Nulo é o valor de nascimento da linha: ninguém mexeu ainda.
+      atualizado_por: autor?.full_name?.trim() || autor?.email || null,
+    });
+  });
+}
+
+/**
+ * Liga e desliga a exigência.
+ *
+ * O backend recusa ligar a partir de uma sessão que ainda não passou pelo
+ * segundo fator, e a recusa vem com a frase pronta para a tela. A checagem
+ * acontece lá, e não aqui, porque uma guarda que mora só no cliente protege
+ * apenas quem usa o cliente.
+ */
+export async function setExigirMfa({
+  exigir,
+}: {
+  exigir: boolean;
+}): Promise<SingleResult<ConfiguracaoSeguranca>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("set_require_admin_mfa", {
+      p_required: exigir,
+    });
+
+    if (error) return falhaDe(error);
+    return getSeguranca();
   });
 }
 

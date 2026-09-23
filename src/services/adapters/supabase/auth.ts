@@ -8,7 +8,13 @@ import type {
   PasswordResetRequest,
   RecoveryCredential,
 } from "@/services/contracts/operations";
-import type { DesafioMfa, ResultadoLogin, Sessao, UsuarioAutenticado } from "@/types/auth";
+import type {
+  DesafioMfa,
+  GarantiaDaSessao,
+  ResultadoLogin,
+  Sessao,
+  UsuarioAutenticado,
+} from "@/types/auth";
 import { maskDestination } from "../_people";
 import { executar, falhaDe, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
@@ -323,6 +329,109 @@ export async function getSession(): Promise<SingleResult<Sessao>> {
     if ("error" in perfil) return okOne<Sessao>(null);
 
     return okOne(montarSessao(data.session, perfil));
+  });
+}
+
+/* -------------------------------------------------------------------------
+   GARANTIA DA SESSÃO
+   -------------------------------------------------------------------------
+   O MODO DE FALHA QUE ESTA FUNÇÃO EXISTE PARA DENUNCIAR.
+
+   Com `require_admin_mfa` ligado no backend, `is_active_admin()` passa a exigir
+   `aal2` no JWT. Uma sessão que entrou só com senha continua **válida** — ela
+   simplesmente deixa de ser reconhecida como administrador. E o efeito disso
+   não é `permission denied`: as políticas de RLS não casam, então a resposta é
+   **zero linhas, sem erro**, em toda tela ao mesmo tempo. Pacientes vazio,
+   trilha vazia, catálogos vazios.
+
+   Quem operasse o painel nesse estado concluiria que a clínica perdeu os dados.
+
+   COMO DESCOBRIR QUE É ISSO, e não uma base realmente vazia:
+
+     nível da sessão  → `auth.mfa.getAuthenticatorAssuranceLevel()`, do GoTrue,
+                        que lê o próprio JWT e não depende do banco
+     exigência        → `security_settings`, que só o administrador lê
+
+   E aqui há uma circularidade que precisa ser dita: **quando a exigência está
+   ligada e a sessão não a cumpre, a leitura de `security_settings` também volta
+   vazia** — é a mesma política. Ou seja, no exato caso que interessa, não dá
+   para perguntar "está exigindo?".
+
+   A saída é inferir, e a inferência é sólida: se o perfil diz administrador, a
+   conta está ativa e mesmo assim a configuração de segurança não vem, então
+   `is_active_admin()` devolveu falso — e a única condição dela que não depende
+   de conta ativa é justamente o segundo fator.
+   ------------------------------------------------------------------------- */
+
+export async function getGarantia(): Promise<SingleResult<GarantiaDaSessao>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const { data: sessao } = await supabase.auth.getSession();
+    if (!sessao.session) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
+
+    const { data: niveis, error: erroNivel } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (erroNivel) return falhaDe(erroNivel);
+
+    // `currentLevel` nulo só acontece sem sessão, que já foi descartado acima.
+    const nivel = niveis?.currentLevel === "aal2" ? "aal2" : "aal1";
+
+    /*
+     * `nextLevel` é o nível que a conta PODE alcançar. Ele vira `aal2` quando
+     * há fator verificado — é a forma que o GoTrue tem de dizer "esta pessoa
+     * tem autenticador". Com a sessão já em `aal2`, os dois são iguais, e o
+     * fator existe por construção.
+     */
+    const fator_cadastrado = niveis?.nextLevel === "aal2";
+
+    const perfil = await carregarPerfil(sessao.session.user);
+    if ("error" in perfil) return perfil;
+
+    // Só o administrador lê a configuração de segurança. Para o profissional a
+    // exigência não se aplica, e não saber dela é a resposta correta.
+    if (perfil.papel !== PAPEL.ADMIN) {
+      return okOne<GarantiaDaSessao>({
+        nivel,
+        exigido: null,
+        suficiente: true,
+        fator_cadastrado,
+      });
+    }
+
+    const { data, error } = await supabase
+      .from("security_settings")
+      .select("require_admin_mfa")
+      .maybeSingle();
+
+    // Erro de verdade (rede, servidor) não vira "está tudo bem": sem saber, o
+    // painel não pode afirmar que a sessão basta.
+    if (error) return falhaDe(error);
+
+    if (data) {
+      const exigido = (data as { require_admin_mfa: boolean }).require_admin_mfa;
+
+      return okOne<GarantiaDaSessao>({
+        nivel,
+        exigido,
+        suficiente: !exigido || nivel === "aal2",
+        fator_cadastrado,
+      });
+    }
+
+    /*
+     * Administrador ativo que NÃO lê a configuração de segurança.
+     *
+     * É a circularidade descrita no cabeçalho, e ela só tem uma explicação: a
+     * exigência está ligada e esta sessão não a cumpre. Vale reparar que o
+     * caminho é inalcançável em `aal2` — se fosse, a política teria deixado
+     * passar.
+     */
+    return okOne<GarantiaDaSessao>({
+      nivel,
+      exigido: true,
+      suficiente: false,
+      fator_cadastrado,
+    });
   });
 }
 

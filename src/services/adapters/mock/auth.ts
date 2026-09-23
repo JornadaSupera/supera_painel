@@ -8,8 +8,15 @@ import type {
   PasswordResetRequest,
   RecoveryCredential,
 } from "@/services/contracts/operations";
-import type { DesafioMfa, ResultadoLogin, Sessao, UsuarioAutenticado } from "@/types/auth";
+import type {
+  DesafioMfa,
+  GarantiaDaSessao,
+  ResultadoLogin,
+  Sessao,
+  UsuarioAutenticado,
+} from "@/types/auth";
 import { maskDestination } from "../_people";
+import { exigenciaDeMfa, nivelAtual, registrarNivel } from "./_security";
 import { now, simulate, uuid } from "./_helpers";
 
 /**
@@ -125,7 +132,12 @@ export async function signIn({
 
     // Segundo fator desligado por configuração: o mock entrega a sessão de uma
     // vez, para que os dois adapters respondam a mesma coisa à mesma chave.
+    //
+    // A sessão nasce em `aal1`, e é justamente esse o caso que interessa
+    // exercitar: painel com o fator desligado contra um backend que o exige
+    // é a combinação que produz telas vazias sem erro nenhum.
     if (!MFA_REQUIRED) {
+      registrarNivel("aal1");
       return okOne<ResultadoLogin>({ sessao: criarSessao(usuario) });
     }
 
@@ -185,7 +197,36 @@ export async function verifyMfa({
     // Desafio é de uso único: consumido, deixa de existir.
     desafios.delete(desafio_id);
 
+    // O segundo fator verificado é o que eleva a sessão — o equivalente ao
+    // `aal2` que o GoTrue carimba no JWT depois de `mfa.verify`.
+    registrarNivel("aal2");
+
     return okOne(criarSessao(usuario));
+  });
+}
+
+/**
+ * O nível da sessão contra a exigência do backend.
+ *
+ * Reproduz a assimetria que importa: a exigência só se aplica ao perfil
+ * administrativo, e quem não é administrador não tem como consultá-la — daí o
+ * `null`, que a tela lê como "não se aplica" e não como "não exige".
+ *
+ * Todo usuário do mock tem autenticador, então `fator_cadastrado` é sempre
+ * verdadeiro: o caminho de "não tem fator" é exercitado pelo adapter real, que
+ * recusa o login antes da tela do código.
+ */
+export async function getGarantia(): Promise<SingleResult<GarantiaDaSessao>> {
+  return simulate(() => {
+    const nivel = nivelAtual();
+    const exigido = exigenciaDeMfa();
+
+    return okOne<GarantiaDaSessao>({
+      nivel,
+      exigido,
+      suficiente: !exigido || nivel === "aal2",
+      fator_cadastrado: true,
+    });
   });
 }
 

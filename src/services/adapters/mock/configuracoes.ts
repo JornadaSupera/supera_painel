@@ -8,6 +8,7 @@ import {
   type SingleResult,
 } from "@/services/contracts";
 import type {
+  ConfiguracaoSeguranca,
   Configuracoes,
   ItemCatalogo,
   MotivoSituacao,
@@ -15,6 +16,7 @@ import type {
   VersaoLegal,
 } from "@/types/configuracao";
 import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
+import { definirExigenciaDeMfa, estadoDaSeguranca, nivelAtual } from "./_security";
 import { simulate } from "./_helpers";
 
 /**
@@ -329,6 +331,40 @@ export async function setMotivoAtivo({
     // Aposentado sai da leitura, como no banco: devolver a linha aqui daria à
     // tela um dado que o backend real não devolveria.
     return okOne(ativo ? motivo : null);
+  });
+}
+
+/* -------------------------------------------------------------------------
+   SEGUNDO FATOR OBRIGATÓRIO
+   ------------------------------------------------------------------------- */
+
+export async function getSeguranca(): Promise<SingleResult<ConfiguracaoSeguranca>> {
+  return simulate(() => okOne(estadoDaSeguranca()));
+}
+
+/**
+ * Liga e desliga a exigência, com a MESMA guarda do backend.
+ *
+ * Ligar a partir de uma sessão de um fator é recusado, e a recusa é o ponto:
+ * quem liga prova, no ato, que consegue voltar a entrar. Um mock permissivo
+ * aqui deixaria a tela parecer pronta e falhar só contra o banco — justamente
+ * na operação cujo erro tranca a clínica do lado de fora.
+ */
+export async function setExigirMfa({
+  exigir,
+}: {
+  exigir: boolean;
+}): Promise<SingleResult<ConfiguracaoSeguranca>> {
+  return simulate(() => {
+    if (exigir && nivelAtual() !== "aal2") {
+      return fail(
+        ERROR_CODE.FORBIDDEN,
+        "Ligue a exigência a partir de uma sessão que já passou pelo segundo fator: caso contrário você se tranca do lado de fora.",
+      );
+    }
+
+    definirExigenciaDeMfa(exigir, null);
+    return okOne(estadoDaSeguranca());
   });
 }
 
