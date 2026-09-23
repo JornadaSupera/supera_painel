@@ -80,6 +80,15 @@ export const RESOURCES = {
       "cancelInvite",
       /** Desfaz o vínculo entre a ficha e a conta do aplicativo. */
       "unlinkAccount",
+      /**
+       * Diagnóstico, estadiamento, protocolo e fase.
+       *
+       * Operação própria, e não campos de `update`, porque do outro lado são
+       * três escritas independentes sobre três tabelas — e duas delas
+       * ACRESCENTAM em vez de sobrescrever. Misturá-las à correção de nome e
+       * telefone faria uma troca de endereço registrar um diagnóstico novo.
+       */
+      "updateClinical",
     ],
   },
   usuarios: {

@@ -32,6 +32,7 @@ import type {
 import type {
   CampoPii,
   CuidadorVinculado,
+  PacienteClinicaEntrada,
   PacienteDetalhe,
   PacienteEntrada,
   PacienteListItem,
@@ -202,6 +203,23 @@ export interface PacientesOperations {
    * e é pré-requisito para trocar o CPF de quem já ativou.
    */
   unlinkAccount(params: { id: string }): Promise<SingleResult<PacienteDetalhe>>;
+
+  /**
+   * Registra o quadro clínico da ficha.
+   *
+   * > [!] Só vai ao banco o que MUDOU.
+   * O adapter compara com o que já está gravado antes de escrever, e a razão é
+   * a semântica do backend: diagnóstico e plano terapêutico são registros
+   * datados — a escrita acrescenta uma linha e, no caso do plano, encerra a
+   * anterior. Reenviar o valor vigente não seria inócuo: duplicaria o
+   * diagnóstico e trocaria a data de início do tratamento por hoje.
+   *
+   * A fase é a exceção: é uma coluna da ficha, e regravá-la não tem efeito.
+   */
+  updateClinical(params: {
+    id: string;
+    dados: PacienteClinicaEntrada;
+  }): Promise<SingleResult<PacienteDetalhe>>;
 }
 
 export interface CatalogosOperations {
@@ -378,6 +396,16 @@ export interface FiltroClinico {
   grauMinimo?: number;
   dias?: number;
   apenasAtivos?: boolean;
+  /**
+   * Nome do protocolo, exatamente como está no plano terapêutico.
+   *
+   * Recorte do SERVIDOR: filtrar depois daria o mesmo desenho, mas a trilha
+   * passaria a dizer que a varredura foi da base inteira. O escopo do nível
+   * Médio pede este filtro com todas as letras.
+   */
+  protocolo?: string | null;
+  /** Id do sintoma. O escopo chama de "efeito adverso"; o catálogo, de sintoma. */
+  sintomaId?: string | null;
 }
 
 export interface EstatisticasClinicasOperations {
@@ -400,6 +428,15 @@ export interface EstatisticasClinicasOperations {
 export interface JanelaOperacional {
   /** Dias corridos até agora. Ausente usa o padrão da tela. */
   dias?: number;
+  /**
+   * Recorte por área de origem, aplicado no SERVIDOR.
+   *
+   * É o CÓDIGO do painel (`medico_oncologista`), o mesmo que o catálogo de
+   * especialidades oferece — não a chave da tabela. O adapter resolve a chave,
+   * como faz com o CID: qual id o banco usa para "Oncologia" é detalhe do
+   * banco, e uma tela que o carregasse passaria a depender dele.
+   */
+  especialidade?: string | null;
 }
 
 export interface EstatisticasOperacionaisOperations {
@@ -554,10 +591,25 @@ export interface RelatoriosOperations {
   /** O catálogo dos doze, cada um sabendo se consegue rodar e por que não. */
   listDefinitions(): Promise<ListResult<DefinicaoRelatorio>>;
 
-  /** Roda um relatório: devolve colunas descritas e linhas achatadas. */
-  run(params: { slug: string; dias?: number }): Promise<SingleResult<ResultadoRelatorio>>;
+  /**
+   * Roda um relatório: devolve colunas descritas e linhas achatadas.
+   *
+   * `especialidade` só tem efeito nos relatórios cuja definição declara o
+   * filtro `especialidade` — nos demais é ignorado, porque a origem deles não
+   * tem essa dimensão. A tela lê a mesma declaração para decidir se oferece o
+   * seletor, então as duas pontas não divergem.
+   */
+  run(params: {
+    slug: string;
+    dias?: number;
+    especialidade?: string | null;
+  }): Promise<SingleResult<ResultadoRelatorio>>;
 
-  export(params: { slug: string; dias?: number }): Promise<ListResult<Record<string, string>>>;
+  export(params: {
+    slug: string;
+    dias?: number;
+    especialidade?: string | null;
+  }): Promise<ListResult<Record<string, string>>>;
 
   /** As três dependem de rotina agendada e tabela de token — ainda não existem. */
   schedule(params: { slug: string; email: string }): Promise<SingleResult<never>>;

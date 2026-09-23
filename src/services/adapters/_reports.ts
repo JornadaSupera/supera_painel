@@ -236,6 +236,8 @@ const NO_DELIVERY =
 export interface ReportParams {
   slug: string;
   dias?: number;
+  /** Panel-side specialty code. Ignored by reports that do not declare the filter. */
+  especialidade?: string | null;
 }
 
 /**

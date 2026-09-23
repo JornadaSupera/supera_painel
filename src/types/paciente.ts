@@ -62,7 +62,13 @@ export interface PacienteDetalhe extends PacienteListItem {
   telefone_mascarado: string;
   email_mascarado: string;
   estadiamento: string | null;
+  /** Classificação TNM do diagnóstico principal. */
+  tnm: string | null;
   diagnostico_em: string | null;
+  /** Intenção do plano vigente — curativa, paliativa, adjuvante. */
+  intencao_terapeutica: string | null;
+  /** Início do plano vigente. `null` quando não há plano. */
+  plano_iniciado_em: string | null;
   alergias: string[];
   reacoes_previas: string[];
   observacoes: string | null;
@@ -133,15 +139,12 @@ export type PiiRevelada = Partial<Record<CampoPii, string>>;
  * Corpo de criação e edição — o que o formulário envia.
  *
  * > [!] São só os campos que o backend sabe gravar.
- * O cadastro recebe nome, CPF, nascimento, telefone, e-mail e convênio.
- * Diagnóstico, estadiamento, protocolo e fase são ato clínico, e se o painel
- * administrativo pode praticá-lo é pergunta aberta com a clínica — construir a
- * seção antes da resposta arrisca a tela, não a seção. Sexo, classificação de
- * risco, médico responsável e observações não têm coluna em lugar nenhum:
- * coletá-los seria gravar no vazio.
+ * O cadastro recebe nome, CPF, nascimento, telefone, e-mail e convênio. Sexo,
+ * classificação de risco, médico responsável e observações não têm coluna em
+ * lugar nenhum: coletá-los seria gravar no vazio.
  *
- * A ficha continua LENDO tudo isso, porque quem escreve é o sistema do
- * consultório. Ler e escrever são permissões diferentes.
+ * O quadro clínico — diagnóstico, estadiamento, protocolo e fase — é ato de
+ * outra natureza e tem corpo próprio: ver `PacienteClinicaEntrada`.
  */
 export interface PacienteEntrada {
   nome: string;
@@ -162,6 +165,40 @@ export interface PacienteEntrada {
   reacoes_previas?: string[];
   /** Emite o convite de acesso ao app logo após o cadastro. */
   enviar_convite?: boolean;
+}
+
+/**
+ * O quadro clínico da ficha — o que o escopo nomeia como "diagnóstico,
+ * estadiamento e protocolo".
+ *
+ * Corpo separado de `PacienteEntrada` porque do outro lado são atos separados:
+ * o cadastro é uma escrita, e isto são três, cada uma com a sua regra. Manter a
+ * divisão aqui deixa a tela decidir o que envia sem descobrir a diferença por
+ * um erro do banco.
+ *
+ * > [!] Campo ausente significa "não mexer", nunca "apagar".
+ * Não há operação de remoção do outro lado: diagnóstico e plano são registros
+ * datados, e corrigir um é registrar o seguinte. Enviar apenas o que mudou não
+ * é otimização — é a única forma de a ficha não ganhar uma linha repetida a
+ * cada vez que alguém abre a edição e salva sem alterar nada.
+ */
+export interface PacienteClinicaEntrada {
+  /** Código do CID-10, como a clínica o escreve: "C50.9". */
+  cid?: string | null;
+  estadiamento?: string | null;
+  /** Classificação TNM, quando houver. Texto livre por decisão do backend. */
+  tnm?: string | null;
+  diagnostico_em?: string | null;
+  /**
+   * Nome do protocolo. Texto livre: não existe tabela de domínio por trás, e
+   * inventar um catálogo no painel criaria dois vocabulários para a mesma coisa.
+   */
+  protocolo_nome?: string | null;
+  ciclos_previstos?: number | null;
+  /** Intenção terapêutica — curativa, paliativa, adjuvante. */
+  intencao?: string | null;
+  plano_iniciado_em?: string | null;
+  fase?: FaseTratamento | null;
 }
 
 /**
