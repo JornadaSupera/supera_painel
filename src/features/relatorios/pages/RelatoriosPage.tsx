@@ -1,5 +1,6 @@
-import { BarChart3, Download, Lock, Play, Table2 } from "lucide-react";
+import { BarChart3, Download, Lock, Play, Table2, TriangleAlert } from "lucide-react";
 import { useState } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   BarChart,
@@ -12,6 +13,7 @@ import {
   StatusBadge,
   type Column,
 } from "@/components/shared";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -67,14 +69,48 @@ const PERIODOS = [
   { value: "365", label: "Último ano" },
 ];
 
+/**
+ * O relatório aberto e o período vivem na URL.
+ *
+ * É o que o escopo chama de **link interno**: `/relatorios/faltas?dias=90` abre
+ * o mesmo resultado para quem receber o endereço, em vez de "abra Relatórios,
+ * role até Operacional, clique em Faltas e troque o período". Um estado que
+ * existe só em memória não se manda para ninguém.
+ *
+ * A rota é a MESMA tela — `/relatorios` e `/relatorios/:slug` renderizam este
+ * componente. Sem remontagem, a janela abre sobre a lista já carregada, e
+ * fechar volta para onde a pessoa estava.
+ */
 export function RelatoriosPage() {
-  const [dias, setDias] = useState("30");
-  const [aberto, setAberto] = useState<DefinicaoRelatorio | null>(null);
+  const { slug } = useParams<{ slug: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
+  const dias = searchParams.get("dias") ?? "30";
   const definicoes = useDefinicoes();
 
   const porCategoria = (categoria: CategoriaRelatorio) =>
     (definicoes.data ?? []).filter((definicao) => definicao.categoria === categoria);
+
+  const aberto = slug
+    ? ((definicoes.data ?? []).find((definicao) => definicao.slug === slug) ?? null)
+    : null;
+
+  /*
+   * Slug que não existe no catálogo não abre janela nenhuma, e a lista atrás
+   * dela ficaria com cara de página certa. O aviso diz o que aconteceu — um
+   * link antigo, um relatório renomeado — em vez de deixar a pessoa procurando
+   * o que ela veio abrir.
+   */
+  const slugDesconhecido = Boolean(slug) && !definicoes.isLoading && !aberto;
+
+  const abrir = (definicao: DefinicaoRelatorio) =>
+    navigate(`/relatorios/${definicao.slug}?dias=${dias}`);
+
+  const fechar = () => navigate(`/relatorios?dias=${dias}`);
+
+  const trocarPeriodo = (valor: string) =>
+    setSearchParams(valor === "30" ? {} : { dias: valor }, { replace: true });
 
   return (
     <div className="flex flex-col gap-5">
@@ -83,7 +119,7 @@ export function RelatoriosPage() {
         title="Relatórios"
         subtitle="Conjunto fechado de 12 · filtros próprios por relatório · exportação em CSV"
         actions={
-          <Select value={dias} onValueChange={setDias}>
+          <Select value={dias} onValueChange={trocarPeriodo}>
             <SelectTrigger size="sm" aria-label="Período padrão" className="w-44">
               <SelectValue />
             </SelectTrigger>
@@ -104,6 +140,17 @@ export function RelatoriosPage() {
 
       {definicoes.isLoading && <SkeletonCards count={6} />}
 
+      {slugDesconhecido && (
+        <Alert role="status">
+          <TriangleAlert />
+          <AlertTitle>Relatório não encontrado</AlertTitle>
+          <AlertDescription>
+            Não existe relatório com o endereço <code className="font-mono">{slug}</code>. O link
+            pode ser antigo — os doze do conjunto estão abaixo.
+          </AlertDescription>
+        </Alert>
+      )}
+
       {ORDEM.map((categoria) => {
         const lista = porCategoria(categoria);
         if (lista.length === 0) return null;
@@ -120,7 +167,7 @@ export function RelatoriosPage() {
                 <CartaoRelatorio
                   key={definicao.slug}
                   definicao={definicao}
-                  onAbrir={() => setAberto(definicao)}
+                  onAbrir={() => abrir(definicao)}
                 />
               ))}
             </div>
@@ -138,7 +185,7 @@ export function RelatoriosPage() {
       <JanelaRelatorio
         definicao={aberto}
         dias={Number(dias)}
-        onOpenChange={(estaAberta) => !estaAberta && setAberto(null)}
+        onOpenChange={(estaAberta) => !estaAberta && fechar()}
       />
     </div>
   );

@@ -181,6 +181,11 @@ export function AppRoutes() {
 
               <Route element={<PermissionRoute permission={PERMISSAO.RELATORIOS_READ} />}>
                 <Route path="/relatorios" element={<RelatoriosPage />} />
+                {/* A MESMA tela, e não uma rota de detalhe: o relatório abre
+                    numa janela sobre a lista. O que a rota acrescenta é o
+                    endereço — é o "link interno" do escopo, que transforma um
+                    resultado em algo que se manda para alguém. */}
+                <Route path="/relatorios/:slug" element={<RelatoriosPage />} />
               </Route>
 
               <Route
