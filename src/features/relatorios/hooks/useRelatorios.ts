@@ -24,20 +24,31 @@ export function useDefinicoes() {
 }
 
 /** Roda um relatório. Só busca quando há um slug escolhido. */
-export function useRelatorio(slug: string | undefined, dias: number) {
+export function useRelatorio(slug: string | undefined, dias: number, especialidade?: string | null) {
   return useQuery({
-    queryKey: queryKeys.reports.run(slug ?? "", { dias }),
+    queryKey: queryKeys.reports.run(slug ?? "", { dias, especialidade: especialidade ?? null }),
     enabled: Boolean(slug),
-    queryFn: async () => (await call(() => relatoriosApi.run({ slug: slug as string, dias }))).data,
+    queryFn: async () =>
+      (await call(() => relatoriosApi.run({ slug: slug as string, dias, especialidade }))).data,
   });
 }
 
 export function useExportarRelatorio() {
   return useMutation({
-    mutationFn: async ({ slug, dias }: { slug: string; dias: number }) => {
-      const { data, count } = await call(() => relatoriosApi.export({ slug, dias }));
+    mutationFn: async ({
+      slug,
+      dias,
+      especialidade,
+    }: {
+      slug: string;
+      dias: number;
+      especialidade?: string | null;
+    }) => {
+      const { data, count } = await call(() =>
+        relatoriosApi.export({ slug, dias, especialidade }),
+      );
 
-      audit.export(RECURSO, { relatorio: slug, dias, linhas: count });
+      audit.export(RECURSO, { relatorio: slug, dias, especialidade, linhas: count });
       downloadFile(toCsv(data), nameWithDate(`relatorio-${slug}`, "csv"));
 
       return count;

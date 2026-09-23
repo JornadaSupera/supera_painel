@@ -315,11 +315,18 @@ export async function run(params: ReportParams): Promise<SingleResult<ResultadoR
           );
         case "sessoes-quimioterapia":
           return sessoesQuimioterapia(dias);
+        /* Os três que aceitam o recorte por área — é o que a definição deles
+           declara em `filtros`, e é de lá que a tela sabe oferecer o seletor. */
         case "faltas-cancelamentos":
         case "volume-por-especialidade":
-          return bySpecialtyReport(params.slug, await getIndicadores({ dias }));
+          return bySpecialtyReport(
+            params.slug,
+            await getIndicadores({ dias, especialidade: params.especialidade }),
+          );
         case "tempo-resposta-chat":
-          return chatResponseReport(await getIndicadores({ dias }));
+          return chatResponseReport(
+            await getIndicadores({ dias, especialidade: params.especialidade }),
+          );
         default:
           return fail(ERROR_CODE.NOT_FOUND, `Relatório "${params.slug}" não existe no catálogo.`);
       }

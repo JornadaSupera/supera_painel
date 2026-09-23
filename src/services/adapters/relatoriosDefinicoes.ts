@@ -111,7 +111,7 @@ export const DEFINICOES: DefinicaoRelatorio[] = [
     titulo: "Tempo médio de resposta no chat",
     descricao:
       "Tempo entre a mensagem do paciente e a primeira resposta da equipe, por assunto.",
-    filtros: ["periodo"],
+    filtros: ["periodo", "especialidade"],
     disponivel: true,
   },
   {

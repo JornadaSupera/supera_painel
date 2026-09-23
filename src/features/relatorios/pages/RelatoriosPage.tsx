@@ -29,6 +29,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useEspecialidades } from "@/hooks/useCatalogos";
 import { formatNumber } from "@/lib/format";
 import {
   CATEGORIA_RELATORIO_LABEL,
@@ -61,6 +62,9 @@ import { useDefinicoes, useExportarRelatorio, useRelatorio } from "../hooks/useR
  */
 
 const ORDEM: CategoriaRelatorio[] = ["pacientes", "clinico", "operacional", "qualidade"];
+
+/** Valor do seletor quando nenhuma área está recortada. Ver `TODOS` na tela de Estatísticas. */
+const TODAS = "todas";
 
 const PERIODOS = [
   { value: "30", label: "Últimos 30 dias" },
@@ -256,8 +260,20 @@ function JanelaRelatorio({
   onOpenChange: (aberto: boolean) => void;
 }) {
   const [visao, setVisao] = useState<"tabela" | "grafico">("tabela");
+  const [especialidade, setEspecialidade] = useState(TODAS);
 
-  const relatorio = useRelatorio(definicao?.slug, dias);
+  /*
+   * O seletor só aparece onde a definição do relatório declara o filtro. É a
+   * mesma lista que o adapter consulta para decidir se o recorte tem efeito —
+   * oferecer o controle onde ele não muda nada faria quem o usa acreditar num
+   * recorte que não houve.
+   */
+  const aceitaEspecialidade = definicao?.filtros.includes("especialidade") ?? false;
+  const especialidades = useEspecialidades();
+
+  const recorte = aceitaEspecialidade && especialidade !== TODAS ? especialidade : null;
+
+  const relatorio = useRelatorio(definicao?.slug, dias, recorte);
   const exportar = useExportarRelatorio();
 
   const dados = relatorio.data;
@@ -310,6 +326,22 @@ function JanelaRelatorio({
               <BarChart3 />
               Gráfico
             </Button>
+
+            {aceitaEspecialidade && (
+              <Select value={especialidade} onValueChange={setEspecialidade}>
+                <SelectTrigger size="sm" aria-label="Especialidade" className="ml-1.5 w-48">
+                  <SelectValue placeholder="Todas as especialidades" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={TODAS}>Todas as especialidades</SelectItem>
+                  {(especialidades.data ?? []).map((area) => (
+                    <SelectItem key={area.value} value={area.value}>
+                      {area.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <Button
@@ -317,7 +349,7 @@ function JanelaRelatorio({
             variant="outline"
             disabled={exportar.isPending || (dados?.linhas.length ?? 0) === 0}
             onClick={() =>
-              definicao && exportar.mutate({ slug: definicao.slug, dias })
+              definicao && exportar.mutate({ slug: definicao.slug, dias, especialidade: recorte })
             }
           >
             <Download />
