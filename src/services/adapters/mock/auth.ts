@@ -244,6 +244,16 @@ export async function signOut(): Promise<SingleResult<null>> {
  * nesta fase. Na Fase 15 o Supabase restaura a sessão a partir de um cookie
  * `httpOnly`, que o JavaScript da página não consegue ler.
  */
+/**
+ * No mock nada muda a sessão por fora: não há token para renovar nem outra aba
+ * compartilhando armazenamento. A assinatura existe para que as duas fontes
+ * tenham a mesma superfície — o `AuthContext` assina sem perguntar em qual
+ * modo está rodando, e é isso que mantém a troca de backend numa linha.
+ */
+export function subscribe(): () => void {
+  return () => {};
+}
+
 export async function getSession(): Promise<SingleResult<Sessao>> {
   return simulate(() => okOne<Sessao>(null));
 }

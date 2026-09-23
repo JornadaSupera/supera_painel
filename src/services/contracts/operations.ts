@@ -130,7 +130,23 @@ export interface AuthOperations {
    *   anything else → transient; the same link can retry
    */
   completePasswordRecovery(params: PasswordRecoveryInput): Promise<SingleResult<{ changed: true }>>;
+
+  /**
+   * Ouve o que muda na sessão sem que nenhuma tela tenha pedido: a renovação
+   * automática do token e o encerramento vindo de outra aba.
+   *
+   * Devolve a função que cancela a assinatura. Síncrona de propósito — é a
+   * única operação do contrato que não vai ao servidor, e transformá-la em
+   * promessa obrigaria o `AuthContext` a cancelar no desmonte uma assinatura
+   * que talvez ainda não existisse.
+   */
+  subscribe(listener: (evento: EventoDeSessao) => void): () => void;
 }
+
+/** O que o `AuthContext` precisa saber quando a sessão muda por fora. */
+export type EventoDeSessao =
+  | { tipo: "encerrada" }
+  | { tipo: "renovada"; token: string; expira_em: string };
 
 /* ---------------------------------------------------------------- Fase 4 */
 

@@ -12,12 +12,18 @@ import { SessionClockContext, type SessionClockValue } from "./session-clock";
 /**
  * Authentication provider.
  *
- * The session lives **in memory only**. Neither `localStorage` nor
- * `sessionStorage`: any script on the page can read those, including an XSS
- * coming through the content editor. The price is that reloading the page
- * drops the session — intended behaviour at this stage. Once Supabase is in
- * place it restores the session from an `httpOnly` cookie, which JavaScript
- * cannot read.
+ * The session SURVIVES a reload: the adapter keeps the GoTrue token in browser
+ * storage and this provider restores it on mount. Only the token is kept —
+ * nothing about a patient is ever written to the browser.
+ *
+ * Restoring is not the same as signing in. `getSession` refuses a token that
+ * stopped at the password when a second factor is enrolled, so reloading can
+ * never be a way around the second factor. See `adapters/supabase/auth.ts`.
+ *
+ * The definitive answer is refresh through an `httpOnly` cookie, which
+ * JavaScript cannot read — and which needs a server the static host does not
+ * provide. Until then, this is the trade that was chosen, and it is recorded
+ * as a decision rather than left implicit here.
  */
 
 const ONE_MINUTE = 60_000;
@@ -87,6 +93,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
     }
   }, [queryClient]);
+
+  /* ---------------------------------------------- changes from elsewhere */
+
+  /*
+   * Duas coisas mudam a sessão sem que nenhuma tela peça, e as duas quebram
+   * algo se não chegarem até aqui.
+   *
+   * A renovação é a mais traiçoeira: `expira_em` é o prazo do token NO
+   * INSTANTE do login, o cliente do Supabase o renova sozinho, e o relógio
+   * abaixo compara aquele retrato com a hora atual. Sem ouvir a renovação, o
+   * painel encerraria sozinho uma sessão que o servidor considera válida —
+   * com a pessoa usando, depois de uma hora.
+   *
+   * O encerramento vem de outra aba. Sair em uma tem que sair em todas: com o
+   * token compartilhado no armazenamento, a aba esquecida continuaria
+   * desenhando uma tela que já não tem sessão por trás.
+   */
+  useEffect(() => {
+    return authApi.subscribe((evento) => {
+      if (evento.tipo === "encerrada") {
+        // Sem chamar `signOut`: quem encerrou já encerrou, e pedir de novo
+        // dispararia outro evento. Aqui só se acompanha o que já aconteceu.
+        setSession(null);
+        setAuditActor(null);
+        void discardCachedIdentity();
+        return;
+      }
+
+      setSession((atual) =>
+        atual ? { ...atual, token: evento.token, expira_em: evento.expira_em } : atual,
+      );
+    });
+  }, [discardCachedIdentity]);
 
   const signOut = useCallback(
     async (reason: LogoutReason = "user") => {

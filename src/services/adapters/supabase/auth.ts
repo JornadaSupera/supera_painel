@@ -313,23 +313,98 @@ export async function signOut(): Promise<SingleResult<null>> {
 }
 
 /**
- * O cliente é criado com `persistSession: false` — a sessão não vai para
- * `localStorage`, onde qualquer script da página a leria. O preço é que
- * recarregar encerra a sessão, e é o comportamento pretendido nesta fase.
- * Enquanto a aba viver, esta função devolve a sessão em curso.
+ * A sessão restaurada de um recarregamento, ou `null`.
+ *
+ * > [!] Restaurar NÃO é o mesmo que entrar, e a diferença é o segundo fator.
+ * O GoTrue guarda uma sessão de um fator com a mesma validade de uma de dois:
+ * quem digitou a senha e fechou a aba antes do código tem um token gravado, e
+ * ele volta inteiro no recarregamento. Enquanto a sessão morria junto com a
+ * aba, esse estado não sobrevivia para ser restaurado; agora sobrevive, e
+ * devolvê-lo como sessão completa transformaria o segundo fator em uma tela
+ * que se pula fechando o navegador.
+ *
+ * Por isso a restauração confere o nível do JWT, e não só a existência do
+ * token. Sessão parada em `aal1` com autenticador cadastrado é descartada
+ * aqui — quem recarregar volta para o login, que é onde o fluxo recomeça.
+ *
+ * Conta SEM autenticador cadastrado passa: a exigência não é dela, e barrá-la
+ * trancaria do lado de fora justamente quem ainda não tem como cumprir.
+ * `getGarantia` é quem trata esse caso, na tela.
  */
 export async function getSession(): Promise<SingleResult<Sessao>> {
   return executar(async () => {
-    const { data, error } = await getSupabaseClient().auth.getSession();
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase.auth.getSession();
 
     if (error) return falhaDe(error);
     if (!data.session) return okOne<Sessao>(null);
+
+    if (MFA_REQUIRED) {
+      const { data: niveis } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+      // `nextLevel === "aal2"` é como o GoTrue diz que há fator verificado.
+      const temFator = niveis?.nextLevel === "aal2";
+      const cumpriu = niveis?.currentLevel === "aal2";
+
+      if (temFator && !cumpriu) return okOne<Sessao>(null);
+    }
 
     const perfil = await carregarPerfil(data.session.user);
     if ("error" in perfil) return okOne<Sessao>(null);
 
     return okOne(montarSessao(data.session, perfil));
   });
+}
+
+/* -------------------------------------------------------------------------
+   MUDANÇAS DE SESSÃO VINDAS DE FORA DA TELA
+   -------------------------------------------------------------------------
+   Duas coisas acontecem sem que nenhuma tela tenha pedido, e as duas precisam
+   chegar ao `AuthContext`:
+
+   1. **O token é renovado sozinho.** `autoRefreshToken` troca o access token
+      antes de ele vencer, e o prazo que a tela guarda é o do instante do
+      login. Sem ouvir a renovação, o relógio do contexto compara um retrato
+      velho com a hora atual e encerra uma sessão que o servidor considera
+      válida — o painel deslogaria sozinho depois de uma hora, com a pessoa
+      usando.
+
+   2. **A sessão acaba em outra aba.** Sair em uma aba tem que sair em todas;
+      com o token compartilhado no armazenamento, a aba que ficou aberta
+      continuaria desenhando uma tela que já não tem sessão por trás.
+   ------------------------------------------------------------------------- */
+
+export type EventoDeSessao =
+  | { tipo: "encerrada" }
+  | { tipo: "renovada"; token: string; expira_em: string };
+
+/**
+ * Ouve as mudanças e devolve a função que cancela a assinatura.
+ *
+ * Só os dois eventos acima atravessam. `SIGNED_IN` fica de fora de propósito:
+ * ele também dispara na restauração inicial, e o contexto já trata isso em
+ * `getSession` — deixá-lo passar faria a entrada acontecer duas vezes, uma
+ * delas sem ter conferido o segundo fator.
+ */
+export function subscribe(listener: (evento: EventoDeSessao) => void): () => void {
+  const { data } = getSupabaseClient().auth.onAuthStateChange((evento, sessao) => {
+    if (evento === "SIGNED_OUT") {
+      listener({ tipo: "encerrada" });
+      return;
+    }
+
+    if (evento === "TOKEN_REFRESHED" && sessao) {
+      listener({
+        tipo: "renovada",
+        token: sessao.access_token,
+        expira_em: new Date(
+          sessao.expires_at != null ? sessao.expires_at * 1000 : Date.now() + VALIDADE_PADRAO_MS,
+        ).toISOString(),
+      });
+    }
+  });
+
+  return () => data.subscription.unsubscribe();
 }
 
 /* -------------------------------------------------------------------------

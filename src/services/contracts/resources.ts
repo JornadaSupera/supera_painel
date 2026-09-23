@@ -41,6 +41,8 @@ export const RESOURCES = {
       "getGarantia",
       "requestPasswordReset",
       "completePasswordRecovery",
+      /** Renovação do token e encerramento vindo de outra aba. Ver `AuthOperations`. */
+      "subscribe",
     ],
   },
   dashboard: {

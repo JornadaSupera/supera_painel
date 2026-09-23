@@ -12,6 +12,17 @@ import { ERROR_CODE, type ErrorCode } from "@/services/contracts";
 
 let client: SupabaseClient | null = null;
 
+/**
+ * A referência do projeto, a partir da URL — `https://abc123.supabase.co` → `abc123`.
+ *
+ * Usada só para compor a chave de armazenamento da sessão. URL fora do formato
+ * esperado devolve um rótulo neutro em vez de lançar: a aplicação não deve
+ * deixar de subir por causa do nome de uma chave.
+ */
+function refDoProjeto(url: string): string {
+  return new URL(url).hostname.split(".")[0] || "projeto";
+}
+
 export function getSupabaseClient(): SupabaseClient {
   if (client) return client;
 
@@ -23,11 +34,41 @@ export function getSupabaseClient(): SupabaseClient {
 
   client = createClient(SUPABASE.url, SUPABASE.anonKey, {
     auth: {
-      // Painel com dado de saúde: a sessão NÃO fica em localStorage.
-      // A Fase 15 injeta storage em memória + refresh via cookie httpOnly.
-      persistSession: false,
+      /*
+       * A SESSÃO SOBREVIVE A UM RECARREGAMENTO — e isso é uma troca, não um
+       * descuido.
+       *
+       * Até aqui era `false`: nada ia para o armazenamento do navegador, e o
+       * preço declarado era que recarregar encerrava a sessão. O preço não se
+       * pagou como o previsto — quem opera o painel recarrega a página,
+       * responde a um link colado e abre uma ficha em outra aba dezenas de
+       * vezes por dia, e cada uma dessas coisas exigia digitar senha e código
+       * do autenticador de novo. O caminho que isso produz não é mais seguro:
+       * é a pessoa deixando de sair do painel, e a senha em papel ao lado do
+       * monitor.
+       *
+       * O que fica guardado é o token do GoTrue, e nada além dele: nenhum dado
+       * de paciente é persistido aqui nem em lugar nenhum do navegador. A
+       * exposição que isso abre é a de um script hostil na própria página, que
+       * com a sessão em memória teria a mesma janela — só mais curta.
+       *
+       * A saída definitiva é o refresh por cookie httpOnly, e ela exige um
+       * servidor que o Firebase Hosting estático não dá. Enquanto não houver,
+       * esta é a troca escolhida, e ela está registrada como decisão.
+       */
+      persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: false,
+      /*
+       * A chave é fixada no projeto em uso, em vez de deixar o padrão.
+       *
+       * O navegador de quem desenvolve acumula token de mais de um projeto
+       * Supabase, e o padrão da biblioteca deriva a chave da URL — o que
+       * funciona até alguém trocar a URL no `.env` e o app passar a ler, em
+       * silêncio, a sessão do projeto errado. Fixar aqui torna isso impossível
+       * de acontecer sem que a chave mude junto.
+       */
+      storageKey: `supera-painel.${refDoProjeto(SUPABASE.url)}.auth`,
     },
     global: {
       headers: { "x-application-name": "supera-painel-admin" },
