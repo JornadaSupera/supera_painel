@@ -22,7 +22,11 @@ import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { FiltroClinico } from "@/services/contracts/operations";
 import { MapaDeCalor } from "../components/MapaDeCalor";
-import { useComparacaoProtocolos, useCruzamentoClinico } from "../hooks/useEstatisticas";
+import {
+  useComparacaoProtocolos,
+  useCruzamentoClinico,
+  useOpcoesDoCruzamento,
+} from "../hooks/useEstatisticas";
 
 /**
  * Estatísticas clínicas — Protocolo × Efeito × Grau.
@@ -51,19 +55,36 @@ const GRAUS = [
   { value: "4", label: "Grau 4 ou mais" },
 ];
 
+/**
+ * Valor do seletor quando nada está recortado.
+ *
+ * Um `<SelectItem value="">` é recusado pelo Radix — string vazia é como ele
+ * representa "sem seleção", e usá-la como valor de opção quebra o componente.
+ */
+const TODOS = "todos";
+
 export function EstatisticasClinicasPage() {
   const [dias, setDias] = useState("90");
   const [grauMinimo, setGrauMinimo] = useState("2");
   const [apenasAtivos, setApenasAtivos] = useState(true);
+  const [protocolo, setProtocolo] = useState(TODOS);
+  const [sintomaId, setSintomaId] = useState(TODOS);
 
   const filtro: FiltroClinico = {
     dias: Number(dias),
     grauMinimo: Number(grauMinimo),
     apenasAtivos,
+    protocolo: protocolo === TODOS ? null : protocolo,
+    sintomaId: sintomaId === TODOS ? null : sintomaId,
   };
 
   const cruzamento = useCruzamentoClinico(filtro);
   const comparacao = useComparacaoProtocolos(filtro);
+
+  /* As opções descrevem a JANELA, não o recorte — ver `useOpcoesDoCruzamento`. */
+  const opcoes = useOpcoesDoCruzamento(Number(dias));
+  const protocolosDisponiveis = opcoes.data?.protocolos ?? [];
+  const sintomasDisponiveis = opcoes.data?.sintomas ?? [];
 
   const dados = cruzamento.data;
   const porPercentual = dados?.prevalencia_disponivel ?? true;
@@ -110,6 +131,42 @@ export function EstatisticasClinicasPage() {
             {GRAUS.map((grau) => (
               <SelectItem key={grau.value} value={grau.value}>
                 {grau.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={protocolo}
+          onValueChange={setProtocolo}
+          disabled={opcoes.isLoading || protocolosDisponiveis.length === 0}
+        >
+          <SelectTrigger size="sm" aria-label="Protocolo" className="w-52">
+            <SelectValue placeholder="Todos os protocolos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os protocolos</SelectItem>
+            {protocolosDisponiveis.map((nome) => (
+              <SelectItem key={nome} value={nome}>
+                {nome}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={sintomaId}
+          onValueChange={setSintomaId}
+          disabled={opcoes.isLoading || sintomasDisponiveis.length === 0}
+        >
+          <SelectTrigger size="sm" aria-label="Efeito adverso" className="w-52">
+            <SelectValue placeholder="Todos os efeitos" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os efeitos</SelectItem>
+            {sintomasDisponiveis.map((sintoma) => (
+              <SelectItem key={sintoma.id} value={sintoma.id}>
+                {sintoma.label}
               </SelectItem>
             ))}
           </SelectContent>

@@ -1,4 +1,5 @@
 import { failWith, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
+import type { FiltroClinico } from "@/services/contracts/operations";
 import type {
   CelulaCruzamento,
   ComparacaoProtocolo,
@@ -66,22 +67,19 @@ const SEM_DENOMINADOR =
 const PACIENTES_SAO_PISO =
   "Com mais de um grau no recorte, a contagem de pacientes é um piso: o resumo conta pessoas distintas dentro de cada grau, e quem relatou dois graus diferentes no período apareceria duas vezes se os baldes fossem somados.";
 
-interface Parametros {
-  /** Grau mínimo considerado presença do sintoma. O protótipo usa 2. */
-  grauMinimo?: number;
-  /** Recorte temporal do diário. O protótipo usa os últimos 90 dias. */
-  dias?: number;
-  /**
-   * Só pacientes ativos — a caixa de seleção do protótipo.
-   *
-   * O resumo do banco não recorta por situação do paciente: ele agrega sobre os
-   * registros de diário do período, e diário de paciente arquivado continua
-   * sendo registro daquele período. O parâmetro fica na assinatura porque é o
-   * recorte que a função vai receber quando aceitá-lo, e `apenasAtivos_ignorado`
-   * na resposta é o que impede a tela de afirmar um filtro que não houve.
-   */
-  apenasAtivos?: boolean;
-}
+/**
+ * O recorte da tela. É o tipo do CONTRATO, não uma cópia dele: os dois adapters
+ * precisam aceitar exatamente os mesmos filtros, e uma cópia local diverge no
+ * dia em que um filtro novo entra em um só dos lados.
+ *
+ * > [!] `apenasAtivos` não chega ao resumo.
+ * O banco não recorta por situação do paciente: ele agrega sobre os registros
+ * de diário do período, e diário de paciente arquivado continua sendo registro
+ * daquele período. O filtro segue na assinatura porque é o recorte que a função
+ * vai receber quando aceitá-lo, e `filtros_ignorados` na resposta é o que
+ * impede a tela de afirmar um filtro que não houve.
+ */
+type Parametros = FiltroClinico;
 
 /* -------------------------------------------------------------------------
    MONTAGEM DO CRUZAMENTO
@@ -178,7 +176,11 @@ function montar(linhas: LinhaResumoSintoma[], grauMinimo: number): CruzamentoCli
 
 async function cruzar(params: Parametros): Promise<SingleResult<CruzamentoClinico>> {
   return executar(async () => {
-    const resumo = await resumirSintomas({ janela: janelaDeDias(params.dias ?? 90) });
+    const resumo = await resumirSintomas({
+      janela: janelaDeDias(params.dias ?? 90),
+      protocolo: params.protocolo ?? null,
+      sintomaId: params.sintomaId ?? null,
+    });
     if (falhou(resumo)) return resumo;
 
     return okOne(montar(resumo.linhas, params.grauMinimo ?? 2));

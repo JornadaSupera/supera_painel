@@ -1,6 +1,7 @@
 import { pacientes } from "@/mocks/pacientes";
 import { efeitosAdversos, protocolos } from "@/mocks/protocolos";
 import { ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
+import type { FiltroClinico } from "@/services/contracts/operations";
 import type {
   CelulaCruzamento,
   ComparacaoProtocolo,
@@ -20,11 +21,8 @@ import { simulate } from "./_helpers";
  * filtrar por "apenas ativos" muda a conta de verdade.
  */
 
-interface Parametros {
-  grauMinimo?: number;
-  dias?: number;
-  apenasAtivos?: boolean;
-}
+/** O mesmo recorte do contrato — ver o adapter Supabase. */
+type Parametros = FiltroClinico;
 
 /**
  * Prevalência estável para um par protocolo × efeito.
@@ -63,8 +61,19 @@ function montar(params: Parametros): CruzamentoClinico {
     totalPorProtocolo.set(nome, (totalPorProtocolo.get(nome) ?? 0) + 1);
   }
 
-  const nomes = [...totalPorProtocolo.keys()].sort((a, b) => a.localeCompare(b, "pt-BR"));
-  const sintomas = efeitosAdversos.map((efeito) => ({ id: efeito.id, label: efeito.nome }));
+  /*
+   * Protocolo e sintoma recortam o mapa, como no backend — onde o recorte
+   * acontece ANTES da agregação, dentro da função de resumo. Aqui o efeito
+   * visível é o mesmo: quem escolhe um protocolo vê uma linha, não a base
+   * inteira com uma linha destacada.
+   */
+  const nomes = [...totalPorProtocolo.keys()]
+    .filter((nome) => !params.protocolo || nome === params.protocolo)
+    .sort((a, b) => a.localeCompare(b, "pt-BR"));
+
+  const sintomas = efeitosAdversos
+    .filter((efeito) => !params.sintomaId || efeito.id === params.sintomaId)
+    .map((efeito) => ({ id: efeito.id, label: efeito.nome }));
 
   const celulas: CelulaCruzamento[] = [];
 

@@ -28,6 +28,25 @@ export function useCruzamentoClinico(filtro: FiltroClinico) {
   });
 }
 
+/**
+ * As opções dos seletores de protocolo e de sintoma.
+ *
+ * Saem do cruzamento SEM filtro da mesma janela — não do cruzamento exibido.
+ * Se dependessem dos filtros aplicados, escolher um protocolo apagaria os
+ * outros da lista e não haveria como trocar de escolha. É a mesma razão pela
+ * qual a trilha tem `getFacets`.
+ *
+ * Custa uma leitura por JANELA, não por filtro: a chave de cache só tem os
+ * dias, então mexer nos seletores não volta ao banco.
+ */
+export function useOpcoesDoCruzamento(dias: number) {
+  return useQuery({
+    queryKey: [...queryKeys.statistics.clinical({ dias }), "opcoes"],
+    queryFn: async () => (await call(() => estatisticasClinicasApi.crossTab({ dias }))).data,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useComparacaoProtocolos(filtro: FiltroClinico) {
   return useQuery({
     queryKey: [...queryKeys.statistics.clinical(filtro), "comparacao"],
