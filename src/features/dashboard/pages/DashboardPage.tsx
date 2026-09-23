@@ -67,12 +67,12 @@ const ALTURA_GRAFICO = 220;
  */
 const SEM_FONTE: Record<string, string> = {
   sessoes:
-    "A agenda só se lê paciente a paciente. Enquanto o backend não expuser a agenda agregada, não há série de sessões a mostrar.",
-  cid: "A distribuição por CID exigiria ler o diagnóstico de cada paciente individualmente — o que registraria um acesso a prontuário por linha do gráfico.",
+    "Nenhuma infusão foi registrada como realizada nos últimos sete meses. O gráfico volta assim que a agenda tiver movimento.",
+  cid: "Nenhuma ficha ativa tem diagnóstico registrado. A distribuição volta assim que houver CID nas fichas.",
   efeitos:
-    "O cruzamento entre protocolo e efeito adverso ainda não existe como agregação no backend.",
+    "O cruzamento entre protocolo e efeito adverso tem tela própria, em Estatísticas clínicas, onde os filtros que o recorte exige existem. Aqui ele apareceria sem eles.",
   engajamento:
-    "O engajamento vem do diário do paciente, que só se lê individualmente. Falta a agregação no backend.",
+    "“Engajamento” não tem definição acordada: sessões abertas, dias com registro no diário, orientações lidas e mensagens enviadas dariam quatro números diferentes. A pergunta está aberta com a clínica.",
 };
 
 /**
@@ -183,7 +183,7 @@ export function DashboardPage() {
               {!kpis.isLoading && (kpis.data?.kpis.length ?? 0) < TOTAL_INDICADORES && (
                 <BackendPendente
                   className="sm:col-span-2 lg:col-span-3 xl:col-span-4"
-                  motivo="Sessões de quimioterapia, engajamento no app, NPS e alertas de sintoma crítico ainda não têm agregação no backend. Os indicadores aparecem assim que ela existir."
+                  motivo="Engajamento no app, NPS e alertas de sintoma crítico ainda não têm indicador: o primeiro não tem definição acordada, o segundo depende de pesquisa aberta e o terceiro, de gatilho de criticidade cadastrado em Configurações."
                 />
               )}
             </div>
@@ -197,12 +197,12 @@ export function DashboardPage() {
             title="Sessões de quimioterapia"
             description={
               series.data ? (
-                <>
-                  Últimos 7 meses · meta de{" "}
-                  <span className="tabular-nums">{series.data.meta_sessoes}</span>/mês · taxa de
-                  ocupação{" "}
-                  <span className="tabular-nums">{series.data.ocupacao_percentual}%</span>
-                </>
+                /*
+                 * Sem meta nem taxa de ocupação: a CAPACIDADE INSTALADA da sala
+                 * não é dado de lugar nenhum, e as duas precisam dela. Exibi-las
+                 * zeradas anunciaria uma meta de zero sessões e uma sala ociosa.
+                 */
+                <>Últimos 7 meses · infusões registradas como realizadas</>
               ) : (
                 <Skeleton className="h-2.5 w-64" />
               )

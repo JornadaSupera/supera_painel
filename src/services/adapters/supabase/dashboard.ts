@@ -1,37 +1,47 @@
-import { PERIODO, type Periodo } from "@/lib/enums";
+import { PERIODO, STATUS_PACIENTE, type Periodo } from "@/lib/enums";
 import { okOne, type SingleResult } from "@/services/contracts";
-import type { Kpi, KpisResposta, SeriesResposta } from "@/types/dashboard";
+import type { FatiaCid, Kpi, KpisResposta, PontoSessoes, SeriesResposta } from "@/types/dashboard";
 import { TETO_READ, executar, falhaDe } from "./_helpers";
+import {
+  SITUACAO,
+  falhou,
+  janelaDeDias,
+  janelaDeMeses,
+  resumirAgenda,
+  resumirChat,
+  rotuloDoMes,
+} from "./_summaries";
 import { getSupabaseClient } from "./client";
+import { varrerLista } from "./pacientes";
 
 /**
  * Painel executivo.
  *
- * > [!] O banco não tem camada de agregação.
- * Não existe view nem RPC que some, agrupe ou faça série temporal. O que este
- * adapter entrega é o que dá para afirmar contando linhas que o painel já tem
- * direito de ler — e nada além disso.
- *
- * Dos seis indicadores do protótipo, dois têm fonte:
+ * A família `summarize_*` é a camada de agregação do banco: ela devolve a
+ * contagem já somada, **sem que nenhuma linha de prontuário chegue ao
+ * navegador**. Paga UMA leitura auditada onde varrer paciente a paciente
+ * pagaria uma por pessoa — e é por isso que o gráfico existe sem que a trilha
+ * vire uma lista de "administrador leu o prontuário de fulano".
  *
  * | Indicador           | Situação |
  * |---------------------|----------|
  * | Pacientes ativos    | ✅ `read_patients` |
  * | Novos pacientes     | ✅ `read_patients`, por `created_at` |
- * | Sessões de quimio   | ❌ `read_appointments` é por paciente; não há agenda global |
- * | Engajamento do app  | ❌ o diário só se lê paciente a paciente |
- * | NPS                 | ❌ não existe no banco |
- * | Alertas ativos      | ❌ não há tabela de alerta nem regra de criticidade |
+ * | Sessões de quimio   | ✅ `summarize_appointments`, tipo infusão, situação realizada |
+ * | Tempo de resposta   | ✅ `summarize_chat_response_times` |
+ * | Pacientes por CID   | ✅ `read_patient_list`, que projeta o CID principal |
+ * | Engajamento do app  | ❌ sem definição em fonte nenhuma — não é falta de dado |
+ * | NPS                 | ❌ nenhuma pesquisa é aberta: não há resposta para contar |
+ * | Alertas ativos      | ❌ nenhum gatilho de criticidade cadastrado |
  *
- * Os quatro sem fonte são **omitidos**, não zerados. Um cartão marcando zero
- * afirma que a clínica não teve nenhuma sessão de quimioterapia no mês — que é
- * uma informação falsa, e pior do que a ausência do cartão.
+ * Os sem fonte são **omitidos**, não zerados. Um cartão marcando zero afirma
+ * que a clínica não teve nenhuma sessão no mês — informação falsa, e pior do
+ * que a ausência do cartão.
  *
- * A alternativa seria varrer o diário e a agenda paciente por paciente pelas
- * funções `read_*`. Cada uma dessas chamadas grava uma linha em `audit_log`:
- * desenhar um gráfico produziria centenas de registros de "administrador leu o
- * prontuário de fulano", que é exatamente o evento que a trilha existe para
- * sinalizar. Agregação é trabalho do banco.
+ * > [!] Ocupação da sala continua fora, e não é limitação de leitura.
+ * O volume o banco devolve; a CAPACIDADE INSTALADA não é dado de lugar nenhum,
+ * e uma taxa precisa das duas. Publicar o volume como se fosse taxa seria
+ * inventar o denominador.
  */
 
 /* -------------------------------------------------------------------------
@@ -79,6 +89,54 @@ function historico(
 
     return datas.filter((data) => (cumulativo ? data <= fim : data > inicio && data <= fim)).length;
   });
+}
+
+/* -------------------------------------------------------------------------
+   SESSÕES DE QUIMIOTERAPIA
+   -------------------------------------------------------------------------
+   O recorte é tipo "infusão" × situação "realizada". Filtrar o TIPO no
+   servidor, e não depois, muda o que a trilha registra: fica dito que a
+   varredura foi de um tipo de compromisso, e não da agenda inteira.
+   ------------------------------------------------------------------------- */
+
+/** Id do tipo de compromisso de infusão, ou `null` quando o catálogo não o tem. */
+async function idDaInfusao(): Promise<string | null | ReturnType<typeof falhaDe>> {
+  const { data, error } = await getSupabaseClient()
+    .from("appointment_types")
+    .select("id")
+    .eq("code", "infusion")
+    .limit(1);
+
+  if (error) return falhaDe(error);
+  return (data as { id: string }[])[0]?.id ?? null;
+}
+
+/** Sessões realizadas por balde, na janela pedida. Chave = `bucket_start`. */
+async function sessoesPorBalde(params: {
+  janela: { from: string; to: string };
+  granularidade: "day" | "week" | "month";
+  tipoId: string;
+}): Promise<Map<string, number> | ReturnType<typeof falhaDe>> {
+  const resumo = await resumirAgenda({
+    janela: params.janela,
+    granularidade: params.granularidade,
+    tipoId: params.tipoId,
+  });
+
+  if (falhou(resumo)) return resumo;
+
+  const porBalde = new Map<string, number>();
+
+  for (const linha of resumo.linhas) {
+    if (linha.status_code !== SITUACAO.REALIZADO) continue;
+
+    porBalde.set(
+      linha.bucket_start,
+      (porBalde.get(linha.bucket_start) ?? 0) + linha.appointment_count,
+    );
+  }
+
+  return porBalde;
 }
 
 /* -------------------------------------------------------------------------
@@ -146,6 +204,133 @@ export async function getKpis(
       },
     ];
 
+    /* ------------------------------------------- sessões de quimioterapia */
+
+    const tipoInfusao = await idDaInfusao();
+    if (tipoInfusao && typeof tipoInfusao !== "string") return tipoInfusao;
+
+    if (tipoInfusao) {
+      // Duas janelas de uma leitura só: a janela pedida e a anterior, para a
+      // variação. Baldes diários porque o período pode ser um único dia, e um
+      // balde mensal não saberia separar hoje de ontem.
+      const baldes = await sessoesPorBalde({
+        janela: janelaDeDias(dias * 2),
+        granularidade: "day",
+        tipoId: tipoInfusao,
+      });
+
+      if (!(baldes instanceof Map)) return baldes;
+
+      const somar = (de: number, ate: number) =>
+        [...baldes.entries()]
+          .filter(([balde]) => {
+            const instante = Date.parse(`${balde}T12:00:00Z`);
+            return instante > de && instante <= ate;
+          })
+          .reduce((soma, [, valor]) => soma + valor, 0);
+
+      const noPeriodo = somar(corte, agora);
+
+      /*
+       * Zero neste período é medição; agenda inteiramente vazia é ausência de
+       * fonte — e as duas produzem o mesmo `0`.
+       *
+       * O que separa uma da outra é haver QUALQUER balde na janela dupla: uma
+       * clínica que registra infusões e não teve nenhuma na semana devolve
+       * baldes de outras semanas, e aí o zero é a informação. Uma clínica cuja
+       * agenda ainda não é usada não devolve balde nenhum, e aí publicar "0
+       * sessões" afirmaria que ninguém se tratou.
+       */
+      if (baldes.size > 0) {
+        kpis.push({
+          id: "sessoes_quimio",
+          label: "Sessões de quimioterapia",
+          valor: noPeriodo,
+          variacao: noPeriodo - somar(corteAnterior, corte),
+          variacao_unidade: "",
+          variacao_periodo: rotulo,
+          contexto: "infusões realizadas",
+          historico: Array.from({ length: BALDES_HISTORICO }, (_, indice) => {
+            const fim = agora - (BALDES_HISTORICO - 1 - indice) * dias * UM_DIA;
+            return somar(fim - dias * UM_DIA, fim);
+          }),
+          relatorio_slug: "sessoes-quimioterapia",
+        });
+      }
+    }
+
+    /* ----------------------------------------- tempo de resposta no chat */
+
+    const chat = await resumirChat({ janela: janelaDeDias(dias * 2), granularidade: "day" });
+    if (falhou(chat)) return chat;
+
+    const atendidas = chat.linhas.filter((linha) => linha.answered_count > 0);
+
+    if (atendidas.length > 0) {
+      /*
+       * Média ponderada pelo número de conversas, não média das médias: um
+       * balde com uma conversa e outro com quarenta pesariam igual, e o
+       * indicador passaria a descrever o dia fraco.
+       *
+       * A mediana seria melhor leitura, e o resumo a devolve — mas medianas de
+       * baldes diferentes não se combinam, e combiná-las daria um número que
+       * não é mediana de nada.
+       */
+      /**
+       * Minutos médios até a primeira resposta, na fatia pedida.
+       *
+       * `first_response_avg_seconds` é nulo no balde em que ninguém respondeu.
+       * Somá-lo como zero puxaria a média para baixo e faria a clínica parecer
+       * mais rápida justamente nos dias em que ela não respondeu.
+       *
+       * `null` quando não houve conversa respondida na fatia — que é diferente
+       * de zero minuto, e é o que impede o cartão de anunciar resposta
+       * instantânea num período sem atendimento.
+       */
+      const minutosEntre = (de: number, ate: number): number | null => {
+        const medidos = atendidas.filter((linha) => {
+          if (linha.first_response_avg_seconds === null) return false;
+          const instante = Date.parse(`${linha.bucket_start}T12:00:00Z`);
+          return instante > de && instante <= ate;
+        });
+
+        const conversas = medidos.reduce((soma, linha) => soma + linha.answered_count, 0);
+        if (conversas === 0) return null;
+
+        const segundos = medidos.reduce(
+          (soma, linha) => soma + (linha.first_response_avg_seconds ?? 0) * linha.answered_count,
+          0,
+        );
+
+        return Math.round(segundos / conversas / 60);
+      };
+
+      const minutos = minutosEntre(corte, agora);
+      const anterior = minutosEntre(corteAnterior, corte);
+
+      if (minutos !== null) {
+        kpis.push({
+          id: "tempo_resposta",
+          label: "Tempo de resposta no chat",
+          valor: minutos,
+          unidade: "min",
+          // Sem período anterior medido não há variação: zero seria lido como
+          // "estável", e estável é uma afirmação que ninguém apurou.
+          variacao: anterior === null ? 0 : minutos - anterior,
+          variacao_unidade: "",
+          variacao_periodo: anterior === null ? "sem base anterior" : rotulo,
+          contexto: "até a primeira resposta da equipe",
+          // Cair é bom: o cartão fica verde quando o tempo diminui.
+          inverter_cor: true,
+          historico: Array.from({ length: BALDES_HISTORICO }, (_, indice) => {
+            const fim = agora - (BALDES_HISTORICO - 1 - indice) * dias * UM_DIA;
+            return minutosEntre(fim - dias * UM_DIA, fim) ?? 0;
+          }),
+          relatorio_slug: "tempo-resposta-chat",
+        });
+      }
+    }
+
     return okOne<KpisResposta>({ periodo, kpis, atualizado_em: new Date().toISOString() });
   });
 }
@@ -153,25 +338,80 @@ export async function getKpis(
 /**
  * Séries dos gráficos.
  *
- * Nenhuma tem fonte: sessões e ocupação dependem da agenda agregada, a
- * distribuição por CID dependeria de ler o diagnóstico de cada paciente um a
- * um, e efeitos por protocolo dependem do cruzamento que o nível Médio prevê e
- * o banco ainda não expõe.
+ * Duas têm fonte e duas não, e a diferença entre elas não é de volume de dado:
  *
- * A resposta vem vazia e bem formada, para a tela exibir o aviso de pendência
- * em vez de um gráfico sem eixo.
+ * - **Sessões** sai de `summarize_appointments`, em baldes mensais.
+ * - **Pacientes por CID** sai de `read_patient_list`, que já projeta o CID
+ *   principal em cada linha — uma leitura, não uma por paciente.
+ * - **Efeitos por protocolo** existe no banco, mas na tela de Estatísticas
+ *   clínicas, com os filtros que o recorte exige. Repeti-lo aqui sem os
+ *   filtros mostraria um número que ninguém sabe interpretar.
+ * - **Engajamento** não tem definição em fonte nenhuma. Não é falta de dado: é
+ *   falta de decisão sobre qual dos quatro números possíveis é o indicador.
+ *
+ * As sem fonte vêm vazias e bem formadas, para a tela exibir o motivo em vez de
+ * um gráfico sem eixo.
  */
 export async function getSeries(
   params: { periodo?: Periodo } = {},
 ): Promise<SingleResult<SeriesResposta>> {
-  return okOne<SeriesResposta>({
-    periodo: params.periodo ?? PERIODO.MENSAL,
-    sessoes: [],
-    meta_sessoes: 0,
-    ocupacao_percentual: 0,
-    pacientes_por_cid: [],
-    efeitos_por_protocolo: [],
-    engajamento: [],
-    atualizado_em: new Date().toISOString(),
+  return executar(async () => {
+    const periodo = params.periodo ?? PERIODO.MENSAL;
+
+    const vazio = {
+      periodo,
+      meta_sessoes: 0,
+      ocupacao_percentual: 0,
+      efeitos_por_protocolo: [],
+      engajamento: [],
+      atualizado_em: new Date().toISOString(),
+    };
+
+    /* --------------------------------------------------------- sessões */
+
+    const tipoInfusao = await idDaInfusao();
+    if (tipoInfusao && typeof tipoInfusao !== "string") return tipoInfusao;
+
+    let sessoes: PontoSessoes[] = [];
+
+    if (tipoInfusao) {
+      const baldes = await sessoesPorBalde({
+        janela: janelaDeMeses(BALDES_HISTORICO),
+        granularidade: "month",
+        tipoId: tipoInfusao,
+      });
+
+      if (!(baldes instanceof Map)) return baldes;
+
+      sessoes = [...baldes.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([balde, total]) => ({ periodo: rotuloDoMes(balde), sessoes: total }));
+    }
+
+    /* --------------------------------------------- pacientes por CID */
+
+    const varredura = await varrerLista({ filters: { status: STATUS_PACIENTE.ATIVO } }, TETO_READ);
+    if (!("itens" in varredura)) return varredura;
+
+    const porCid = new Map<string, { valor: number; descricao: string }>();
+
+    for (const paciente of varredura.itens) {
+      // Ficha sem diagnóstico registrado entra no próprio balde: omiti-la faria
+      // a soma das fatias não bater com o total de pacientes ativos, e ninguém
+      // confere a soma de um gráfico de pizza.
+      const chave = paciente.cid || "Sem diagnóstico";
+      const atual = porCid.get(chave) ?? {
+        valor: 0,
+        descricao: paciente.cid_descricao || "Nenhum CID registrado na ficha",
+      };
+
+      porCid.set(chave, { ...atual, valor: atual.valor + 1 });
+    }
+
+    const pacientes_por_cid: FatiaCid[] = [...porCid.entries()]
+      .map(([nome, dados]) => ({ nome, valor: dados.valor, descricao: dados.descricao }))
+      .sort((a, b) => b.valor - a.valor);
+
+    return okOne<SeriesResposta>({ ...vazio, sessoes, pacientes_por_cid });
   });
 }
