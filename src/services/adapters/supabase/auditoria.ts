@@ -16,7 +16,12 @@ import { AUDIT_DEFAULT_SORT, buildFacetOptions, summarizeAudit, toAuditExport } 
 import { paginate } from "../_list";
 import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
-import { paraAcaoAuditoria, paraOrigemDoAtor, paraVerbosDeAuditoria } from "./mapping";
+import {
+  QUALIDADES_POR_ORIGEM,
+  paraAcaoAuditoria,
+  paraOrigemDoAtor,
+  paraVerbosDeAuditoria,
+} from "./mapping";
 
 /**
  * Auditoria & logs — a trilha de acesso a dado sensível.
@@ -248,7 +253,7 @@ const CAMPOS_BUSCA = ["usuario_nome", "recurso_label", "paciente_nome", "recurso
 /**
  * Linhas da trilha, do mais recente para o mais antigo.
  *
- * Filtros aceitos: `acao`, `usuario_id`, `paciente_id`. O recorte por período
+ * Filtros aceitos: `acao`, `usuario_id`, `paciente_id`, `origem`. O recorte por período
  * vai em `range`. Período, ação, usuário e paciente são aplicados no servidor
  * sempre que a pergunta couber lá — ver `ORDENAVEL_NO_SERVIDOR` e
  * `filtroDeAcao` para saber quando não cabe.
@@ -303,6 +308,40 @@ async function listaNoServidor(
     const pacienteId = params.filters?.paciente_id;
     if (typeof pacienteId === "string" && pacienteId) {
       consulta = consulta.eq("patient_id", pacienteId);
+    }
+
+    /*
+     * Recorte por qualidade de quem agiu.
+     *
+     * O escopo pede a identificação das ações do acompanhante, e ela é a razão
+     * deste filtro existir: numa apuração, "o titular preencheu isto" e "quem o
+     * acompanha preencheu isto" levam a leituras diferentes, e sem o recorte a
+     * única forma de separar as duas é percorrer a trilha à mão.
+     *
+     * `painel` cobre DUAS qualidades — profissional e administrador. Não é
+     * imprecisão: a coluna distingue as duas, e a tela não, porque "qual das
+     * telas da equipe originou a chamada" não é pergunta que alguém faça.
+     */
+    const origem = params.filters?.origem;
+    if (typeof origem === "string" && origem) {
+      const qualidades = QUALIDADES_POR_ORIGEM[origem];
+
+      // Origem sem qualidade correspondente é recorte que a trilha não guarda —
+      // `gemed`, hoje. Lista vazia é a resposta exata: não há linha assim.
+      if (!qualidades) return ok([], 0);
+
+      /*
+       * `sistema` leva junto as linhas SEM qualidade, e isso não é detalhe: a
+       * coluna é recente, e todo registro anterior a ela é nulo — hoje, a
+       * maioria da trilha. A projeção já os exibe como "Sistema"; um filtro que
+       * devolvesse só `system` mostraria um punhado de linhas sob um rótulo que
+       * a tela usa para centenas, e quem apura concluiria que o resto sumiu.
+       */
+      const lista = `(${qualidades.join(",")})`;
+
+      consulta = qualidades.includes("system")
+        ? consulta.or(`actor_capacity.in.${lista},actor_capacity.is.null`)
+        : consulta.in("actor_capacity", qualidades);
     }
 
     const { data, error, count } = await consulta;

@@ -315,6 +315,18 @@ export function AuditoriaPage() {
           className="w-52"
         />
 
+        {/* O recorte que separa o titular de quem o acompanha. O escopo pede a
+            identificação das ações do acompanhante, e sem este seletor a única
+            forma de isolá-las é percorrer a trilha à mão. */}
+        <FilterSelect
+          label="Origem"
+          allLabel="Origem: todas"
+          value={filtros.origem}
+          onChange={(valor) => setFiltro("origem", valor)}
+          options={toOptions(ORIGEM_AUDITORIA_LABEL)}
+          className="w-44"
+        />
+
         <ClearFiltersButton visible={filtrada} onClick={limparFiltros} />
       </div>
 

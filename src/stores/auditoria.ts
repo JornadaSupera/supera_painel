@@ -16,12 +16,15 @@ export interface FiltrosAuditoria {
   acao: string;
   usuario_id: string;
   paciente_id: string;
+  /** Em que qualidade quem agiu estava agindo — o recorte do acompanhante. */
+  origem: string;
 }
 
 export const FILTROS_VAZIOS: FiltrosAuditoria = {
   acao: "",
   usuario_id: "",
   paciente_id: "",
+  origem: "",
 };
 
 /** Janelas oferecidas na tela, em dias. */

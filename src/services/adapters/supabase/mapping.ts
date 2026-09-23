@@ -162,6 +162,22 @@ export function paraOrigemDoAtor(qualidade: string | null | undefined): OrigemAu
   return (qualidade ? ORIGEM_POR_QUALIDADE[qualidade] : undefined) ?? ORIGEM_AUDITORIA.SISTEMA;
 }
 
+/**
+ * O caminho inverso: a origem escolhida na tela, nas qualidades que a trilha
+ * guarda. Derivado do mesmo mapa, e não escrito à mão — uma qualidade nova no
+ * banco passa a filtrar sozinha, em vez de silenciosamente nunca aparecer.
+ *
+ * `gemed` não tem qualidade correspondente: a integração está desligada e nada
+ * a registra ainda. Ausente do mapa, e não mapeada para lista vazia, porque a
+ * diferença importa para quem lê o código.
+ */
+export const QUALIDADES_POR_ORIGEM: Record<string, string[] | undefined> = Object.entries(
+  ORIGEM_POR_QUALIDADE,
+).reduce<Record<string, string[]>>((mapa, [qualidade, origem]) => {
+  mapa[origem] = [...(mapa[origem] ?? []), qualidade];
+  return mapa;
+}, {});
+
 /* -------------------------------------------------------------------------
    IDENTIFICADOR EXIBIDO DO PACIENTE
    ------------------------------------------------------------------------- */
