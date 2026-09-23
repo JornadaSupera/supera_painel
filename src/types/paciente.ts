@@ -76,6 +76,52 @@ export interface PacienteDetalhe extends PacienteListItem {
   desativado_em: string | null;
   motivo_desativacao: string | null;
   atualizado_em: string;
+  /** Identificação e contato: o que a recepção digita. */
+  origem_cadastro: OrigemDoDado;
+  /** Diagnóstico, estadiamento e histórico: o que é ato clínico. */
+  origem_clinica: OrigemDoDado;
+  /** O plano terapêutico vigente. `null` quando não há plano. */
+  origem_plano: OrigemDoDado | null;
+}
+
+/**
+ * De onde veio um pedaço da ficha, e quando ele chegou.
+ *
+ * Hoje tudo vale `local` — a integração com o sistema do consultório está
+ * desligada, e por isso o campo parece inerte. Ele deixa de ser no dia em que a
+ * sincronização ligar, e é exatamente aí que alguém precisa distinguir o que
+ * foi digitado na recepção do que veio de fora: corrigir no painel um dado que
+ * a próxima sincronização sobrescreve é trabalho perdido, e não há como saber
+ * disso olhando o valor.
+ */
+export interface OrigemDoDado {
+  origem: "local" | "gemed";
+  /** `null` enquanto o dado nunca foi sincronizado. */
+  sincronizado_em: string | null;
+}
+
+/**
+ * Quem acompanha o paciente no aplicativo.
+ *
+ * > [!] É dado pessoal de TERCEIRO dentro da ficha de outra pessoa.
+ * Nome, e-mail e telefone aqui não são do paciente: são de quem ele convidou.
+ * Chegam mascarados e **não há revelação por esta tela** — o painel precisa
+ * saber que o vínculo existe e quem é, não precisa do contato. Quem tem essa
+ * necessidade é o titular, no aplicativo dele.
+ *
+ * Vínculo revogado continua na lista: o histórico com data de concessão e de
+ * revogação é o que responde "quem podia ver o quê, em que data".
+ */
+export interface CuidadorVinculado {
+  /** Id do VÍNCULO, não da pessoa. */
+  id: string;
+  nome: string;
+  email_mascarado: string;
+  /** `null` quando a conta não informou telefone. */
+  telefone_mascarado: string | null;
+  status: "ativo" | "revogado";
+  vinculado_em: string;
+  revogado_em: string | null;
 }
 
 /** Campos que a operação `revealPii` sabe devolver. */

@@ -69,6 +69,17 @@ export const RESOURCES = {
        * permissão e grava o acesso antes de responder.
        */
       "revealPii",
+      /**
+       * Quem acompanha o paciente no aplicativo, vigentes e revogados.
+       *
+       * O painel LÊ o vínculo e não o cria nem o revoga: quem convida e quem
+       * tira é o titular, no aplicativo dele. Ver `CuidadorVinculado`.
+       */
+      "listCuidadores",
+      /** Cancela o convite pendente sem emitir outro no lugar. */
+      "cancelInvite",
+      /** Desfaz o vínculo entre a ficha e a conta do aplicativo. */
+      "unlinkAccount",
     ],
   },
   usuarios: {

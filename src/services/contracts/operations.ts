@@ -28,6 +28,7 @@ import type {
 } from "@/types/conteudo";
 import type {
   CampoPii,
+  CuidadorVinculado,
   PacienteDetalhe,
   PacienteEntrada,
   PacienteListItem,
@@ -168,6 +169,36 @@ export interface PacientesOperations {
 
   /** Ver `resources.ts`: revelação auditada de um campo pessoal. */
   revealPii(params: { id: string; campos: CampoPii[] }): Promise<SingleResult<PiiRevelada>>;
+
+  /**
+   * Quem acompanha o paciente — vínculos vigentes e revogados.
+   *
+   * Somente leitura por desenho: convidar e revogar são atos do titular, no
+   * aplicativo dele. O painel precisa **enxergar** o vínculo porque é dado
+   * pessoal de terceiro dentro de uma ficha, e o encarregado de dados pergunta
+   * por ele.
+   *
+   * O convite de acompanhante ainda PENDENTE não aparece: a tabela dele é
+   * legível só pelo titular.
+   */
+  listCuidadores(params: { id: string }): Promise<ListResult<CuidadorVinculado>>;
+
+  /**
+   * Cancela o convite pendente, sem emitir outro.
+   *
+   * Reemitir já cancela o anterior, então isto serve ao caso em que o convite
+   * foi para o número errado e **não** se quer um novo código circulando.
+   */
+  cancelInvite(params: { id: string }): Promise<SingleResult<PacienteDetalhe>>;
+
+  /**
+   * Desfaz o vínculo entre a ficha e a conta do aplicativo.
+   *
+   * A ficha fica, o histórico fica, a conta fica — o que se desfaz é a ligação
+   * entre as duas. É o que permite corrigir uma ativação feita na ficha errada,
+   * e é pré-requisito para trocar o CPF de quem já ativou.
+   */
+  unlinkAccount(params: { id: string }): Promise<SingleResult<PacienteDetalhe>>;
 }
 
 export interface CatalogosOperations {

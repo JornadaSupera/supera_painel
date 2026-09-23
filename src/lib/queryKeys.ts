@@ -63,7 +63,11 @@ export const queryKeys = {
       ["dashboard", "series", name, period, range ?? {}] as const,
   },
 
-  patients: entity("patients"),
+  patients: {
+    ...entity("patients"),
+    /** Quem acompanha o paciente — vínculos vigentes e revogados. */
+    caregivers: (id: string) => ["patients", "detail", id, "caregivers"] as const,
+  },
 
   users: {
     ...entity("users"),
