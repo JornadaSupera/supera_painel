@@ -84,6 +84,22 @@ export interface SituacaoComMotivo {
   label: string;
 }
 
+/**
+ * O interruptor de segurança que a clínica opera.
+ *
+ * Com a exigência ligada, o backend deixa de reconhecer como administrador
+ * qualquer sessão que tenha entrado só com senha — e não devolve erro: devolve
+ * vazio. Por isso o estado dele é dado de tela, e não detalhe de infra.
+ */
+export interface ConfiguracaoSeguranca {
+  /** `null` quando a sessão não consegue ler a configuração de segurança. */
+  exige_mfa: boolean | null;
+  /** Quando o interruptor foi mexido pela última vez. `null` = nunca. */
+  atualizado_em: string | null;
+  /** Quem mexeu. `null` no valor de nascimento, ou quando o nome não resolve. */
+  atualizado_por: string | null;
+}
+
 export interface Configuracoes {
   /** Os sintomas marcáveis no diário — a base dos gatilhos de alerta. */
   sintomas: ItemCatalogo[];

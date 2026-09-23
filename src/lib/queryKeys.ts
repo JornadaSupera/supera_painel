@@ -52,6 +52,8 @@ export const queryKeys = {
   auth: {
     all: ["auth"] as const,
     session: () => ["auth", "session"] as const,
+    /** Nível de garantia da sessão contra a exigência do backend. */
+    assurance: () => ["auth", "assurance"] as const,
   },
 
   dashboard: {
@@ -117,6 +119,7 @@ export const queryKeys = {
     /** Um limiar por sintoma. Publicar termo não invalida isto, nem o contrário. */
     alertRules: () => ["settings", "alert-rules"] as const,
     reasons: () => ["settings", "reasons"] as const,
+    security: () => ["settings", "security"] as const,
   },
 
   catalogs: {

@@ -1,10 +1,11 @@
 import type { FaseTratamento, Papel, Periodo, StatusUsuario } from "@/lib/enums";
 import type { Permissao } from "@/lib/rbac";
 import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
-import type { DesafioMfa, ResultadoLogin, Sessao } from "@/types/auth";
+import type { DesafioMfa, GarantiaDaSessao, ResultadoLogin, Sessao } from "@/types/auth";
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type {
+  ConfiguracaoSeguranca,
   Configuracoes,
   MotivoSituacao,
   RegraAlerta,
@@ -99,6 +100,16 @@ export interface AuthOperations {
 
   /** `null` enquanto a sessão viver só em memória — ver `adapters/mock/auth.ts`. */
   getSession(): Promise<SingleResult<Sessao>>;
+
+  /**
+   * O nível de garantia da sessão contra o que o backend exige.
+   *
+   * Chamada depois do login, e não durante: a pergunta não é "esta pessoa
+   * entra?" — é "o que ela vê a partir daqui é real?". Com a exigência ligada e
+   * a sessão em `aal1`, o backend não devolve erro: devolve **vazio**, em todas
+   * as telas de uma vez.
+   */
+  getGarantia(): Promise<SingleResult<GarantiaDaSessao>>;
 
   /** Responde sucesso mesmo para e-mail inexistente, por design. */
   requestPasswordReset(params: PasswordResetRequest): Promise<SingleResult<{ enviado: true }>>;
@@ -395,6 +406,23 @@ export interface ConfiguracoesOperations {
    * março, e apagar a linha falsificaria o relatório daquele mês.
    */
   setMotivoAtivo(params: { id: string; ativo: boolean }): Promise<SingleResult<MotivoSituacao>>;
+
+  /** O estado do interruptor de segundo fator, e quem o mexeu por último. */
+  getSeguranca(): Promise<SingleResult<ConfiguracaoSeguranca>>;
+
+  /**
+   * Liga ou desliga a exigência de segundo fator no perfil administrativo.
+   *
+   * > [!] Ligar a partir de uma sessão de um fator é recusado pelo backend.
+   * A guarda não é conveniência: quem liga prova, no ato, que consegue voltar a
+   * entrar depois. Sem ela, um administrador sem autenticador trancaria a
+   * clínica inteira do lado de fora — e o caminho de volta também é ato de
+   * administrador.
+   *
+   * Desligar não exige o mesmo, pela razão oposta: a saída de emergência não
+   * pode depender da porta que emperrou.
+   */
+  setExigirMfa(params: { exigir: boolean }): Promise<SingleResult<ConfiguracaoSeguranca>>;
 }
 
 /* ---------------------------------------------------------------- Fase 8 */

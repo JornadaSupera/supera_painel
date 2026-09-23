@@ -30,6 +30,15 @@ export const RESOURCES = {
       "verifyMfa",
       "signOut",
       "getSession",
+      /**
+       * O nível de garantia da sessão contra o que o backend exige.
+       *
+       * Não é parte do login: é a pergunta que vem DEPOIS dele. Sessão de um
+       * fator, com a exigência ligada no backend, não recebe erro — recebe
+       * lista vazia em toda tela. Sem esta checagem o painel mostraria uma
+       * clínica em branco e ninguém saberia por quê.
+       */
+      "getGarantia",
       "requestPasswordReset",
       "completePasswordRecovery",
     ],
@@ -169,6 +178,8 @@ export const RESOURCES = {
       "criarMotivo",
       "atualizarMotivo",
       "setMotivoAtivo",
+      "getSeguranca",
+      "setExigirMfa",
     ],
   },
   catalogos: {

@@ -57,3 +57,37 @@ export interface DesafioMfa {
 export type ResultadoLogin =
   | { mfa: DesafioMfa; sessao?: never }
   | { mfa?: never; sessao: Sessao };
+
+/**
+ * O nível de garantia da sessão, confrontado com o que o backend exige.
+ *
+ * Existe por causa de um modo de falha **silencioso**. Quando o backend passa a
+ * exigir segundo fator do perfil administrativo, uma sessão que entrou só com
+ * senha deixa de ser reconhecida como administrador — e o efeito não é uma
+ * mensagem de erro: é **lista vazia em toda tela**, sem aviso nenhum. Pacientes
+ * zero, trilha vazia, catálogos vazios. Uma clínica em branco.
+ *
+ * Sem esta checagem, quem operasse o painel concluiria que perdeu os dados.
+ */
+export interface GarantiaDaSessao {
+  /** `aal1` = só senha. `aal2` = segundo fator verificado nesta sessão. */
+  nivel: "aal1" | "aal2";
+  /**
+   * O backend exige segundo fator do perfil administrativo.
+   *
+   * `null` quando não dá para saber — é o caso de quem não é administrador, que
+   * legitimamente não lê a configuração de segurança. Não confundir com
+   * `false`: "não exige" e "não consegui perguntar" levam a telas diferentes.
+   */
+  exigido: boolean | null;
+  /** A sessão atende ao que o backend exige. É o que decide se o painel abre. */
+  suficiente: boolean;
+  /**
+   * A conta tem autenticador cadastrado e verificado.
+   *
+   * Muda o texto da recusa por inteiro: quem tem fator precisa **entrar de
+   * novo**; quem não tem precisa **cadastrar um**, e hoje isso não acontece
+   * pelo painel.
+   */
+  fator_cadastrado: boolean;
+}
