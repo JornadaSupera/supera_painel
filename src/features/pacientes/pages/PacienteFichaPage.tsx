@@ -1,12 +1,15 @@
 import {
   Ban,
   CalendarDays,
+  MailX,
   MessageSquareShare,
   Smartphone,
   SquarePen,
   Stethoscope,
   TriangleAlert,
+  Unlink,
   User,
+  UsersRound,
 } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -14,6 +17,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   BackendPendente,
   Can,
+  ConfirmDialog,
   DetailField,
   DetailSection,
   ErrorState,
@@ -41,12 +45,16 @@ import {
   type ResultadoConvite,
 } from "@/types/paciente";
 import { CampoSensivel } from "../components/CampoSensivel";
+import { CuidadoresVinculados } from "../components/CuidadoresVinculados";
 import { ConviteEmitidoDialog } from "../components/ConviteEmitidoDialog";
 import { DeactivatePatientDialog } from "../components/DeactivatePatientDialog";
+import { OrigemDosDados } from "../components/OrigemDosDados";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { PacienteForm } from "../components/PacienteForm";
 import {
   useAtualizarPaciente,
+  useCancelarConvite,
+  useDesvincularConta,
   useEnviarConvite,
   usePaciente,
 } from "../hooks/usePacientes";
@@ -94,9 +102,13 @@ export function PacienteFichaPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [confirmando, setConfirmando] = useState(false);
 
+  const [desvinculando, setDesvinculando] = useState(false);
+
   const { data: paciente, isLoading, isError, error, refetch } = usePaciente(id);
   const atualizar = useAtualizarPaciente(id ?? "");
   const convite = useEnviarConvite();
+  const cancelarConvite = useCancelarConvite();
+  const desvincular = useDesvincularConta();
   const [conviteEmitido, setConviteEmitido] = useState<ResultadoConvite | null>(null);
 
   const editando = searchParams.get("editar") === "1";
@@ -265,6 +277,8 @@ export function PacienteFichaPage() {
         </Alert>
       )}
 
+      <OrigemDosDados paciente={paciente} />
+
       <div className="grid max-w-5xl gap-4 lg:grid-cols-2">
         <DetailSection titulo="Identificação" icone={<User size={15} />}>
           <div className="flex items-center gap-3">
@@ -419,6 +433,45 @@ export function PacienteFichaPage() {
               <span className="tabular-nums">{formatDate(paciente.criado_em)}</span>
             </DetailField>
           </dl>
+
+          {/* Os dois atos ficam ao lado do dado sobre o qual agem, e não no
+              cabeçalho: lá eles competiriam com "emitir convite", que é o
+              caminho normal, e estes dois são a correção de um engano. */}
+          <Can permission={PERMISSAO.PACIENTES_WRITE}>
+            <div className="flex flex-wrap gap-2 border-t pt-3">
+              {paciente.convite_status === "enviado" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={cancelarConvite.isPending}
+                  onClick={() => cancelarConvite.mutate(paciente.id)}
+                >
+                  <MailX />
+                  Cancelar convite
+                </Button>
+              )}
+
+              {paciente.convite_status === "aceito" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={desvincular.isPending}
+                  onClick={() => setDesvinculando(true)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Unlink />
+                  Desfazer vínculo com a conta
+                </Button>
+              )}
+            </div>
+          </Can>
+        </DetailSection>
+
+        {/* Dado pessoal de terceiro dentro da ficha: aparece porque o
+            encarregado de dados pergunta por ele, mascarado porque o painel
+            não precisa do contato. */}
+        <DetailSection titulo="Acompanhantes" icone={<UsersRound size={15} />}>
+          <CuidadoresVinculados pacienteId={paciente.id} />
         </DetailSection>
       </div>
 
@@ -427,6 +480,22 @@ export function PacienteFichaPage() {
         open={confirmando}
         onOpenChange={setConfirmando}
         onDeactivated={() => navigate("/pacientes")}
+      />
+
+      {/* O que fica é o que precisa ser dito: a preocupação de quem clica é o
+          que se perde, e aqui não se perde ficha nem histórico. */}
+      <ConfirmDialog
+        open={desvinculando}
+        onOpenChange={setDesvinculando}
+        tone="warning"
+        title="Desfazer o vínculo com a conta?"
+        description={`A ficha de ${paciente.nome}, o histórico e a conta continuam existindo — o que se desfaz é a ligação entre a ficha e o aplicativo. ${paciente.nome} deixa de ver esta ficha no app até aceitar um convite novo.`}
+        confirmLabel="Desfazer vínculo"
+        loading={desvincular.isPending}
+        onConfirm={({ reason }) => {
+          desvincular.mutate({ id: paciente.id, motivo: reason });
+          setDesvinculando(false);
+        }}
       />
 
       <ConviteEmitidoDialog convite={conviteEmitido} onClose={() => setConviteEmitido(null)} />

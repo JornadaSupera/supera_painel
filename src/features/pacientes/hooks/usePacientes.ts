@@ -203,6 +203,79 @@ export function useEnviarConvite() {
   });
 }
 
+/**
+ * Cancela o convite pendente sem emitir outro.
+ *
+ * Existe ao lado de "reemitir", e não no lugar dele: reemitir já cancela o
+ * anterior. Este é o caminho de quando o convite foi para o número errado e
+ * **não** se quer um código novo circulando enquanto ninguém confere o contato.
+ */
+export function useCancelarConvite() {
+  const invalidar = useInvalidarPacientes();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await call(() => pacientesApi.cancelInvite({ id }));
+      audit.update(RECURSO, id, { operacao: "convite_cancelado" });
+      return data;
+    },
+    onSuccess: async () => {
+      await invalidar();
+      toast.success("Convite cancelado", {
+        description: "O código deixou de valer. Emita outro quando o contato estiver conferido.",
+      });
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível cancelar o convite", { description: erro.message }),
+  });
+}
+
+/**
+ * Desfaz o vínculo entre a ficha e a conta do aplicativo.
+ *
+ * O aviso diz o que **fica**, porque a preocupação de quem clica é o que se
+ * perde: a ficha, o histórico e a conta continuam inteiros — o que se desfaz é
+ * a ligação entre a ficha e a conta.
+ */
+export function useDesvincularConta() {
+  const invalidar = useInvalidarPacientes();
+
+  return useMutation({
+    mutationFn: async ({ id, motivo }: { id: string; motivo?: string }) => {
+      const { data } = await call(() => pacientesApi.unlinkAccount({ id }));
+      audit.update(RECURSO, id, { operacao: "vinculo_desfeito", motivo });
+      return data;
+    },
+    onSuccess: async () => {
+      await invalidar();
+      toast.success("Vínculo desfeito", {
+        description:
+          "A ficha, o histórico e a conta continuam. O paciente perde o acesso a esta ficha pelo aplicativo até um convite novo ser aceito.",
+      });
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível desfazer o vínculo", { description: erro.message }),
+  });
+}
+
+/**
+ * Quem acompanha o paciente.
+ *
+ * Leitura própria, e não parte da ficha: é dado pessoal de terceiro, e só é
+ * buscado quando alguém abre a ficha de fato — carregá-lo junto da listagem
+ * traria contato de acompanhante para telas que não o mostram.
+ */
+export function useCuidadores(id: string | undefined) {
+  const query = useQuery({
+    queryKey: queryKeys.patients.caregivers(id ?? ""),
+    enabled: Boolean(id),
+    queryFn: () => call(() => pacientesApi.listCuidadores({ id: id as string })),
+  });
+
+  const { items, ...status } = toListQuery(query);
+  return { ...status, cuidadores: items };
+}
+
 /* -------------------------------------------------------------------------
    EXPORTAÇÃO
    ------------------------------------------------------------------------- */
