@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { audit } from "@/lib/audit";
 import { queryKeys } from "@/lib/queryKeys";
+import { toListQuery } from "@/hooks/listQuery";
 import { call, configuracoesApi } from "@/services/apiClient";
 import type { VersaoLegal } from "@/types/configuracao";
 
@@ -291,5 +292,112 @@ export function useSetMotivoAtivo() {
       });
     },
     onError: (erro) => toast.error("Não foi possível alterar o motivo", { description: erro.message }),
+  });
+}
+
+/* -------------------------------------------------------------------------
+   INTEGRAÇÃO E CONSENTIMENTOS
+   ------------------------------------------------------------------------- */
+
+export function useVinculosExternos() {
+  const query = useQuery({
+    queryKey: queryKeys.settings.externalLinks(),
+    queryFn: () => call(() => configuracoesApi.getVinculosExternos()),
+  });
+
+  const { items, ...status } = toListQuery(query);
+  return { ...status, vinculos: items };
+}
+
+/**
+ * Confirma ou rejeita um vínculo proposto pela integração.
+ *
+ * O aviso diz o que a decisão **faz com o prontuário**, e não "salvo com
+ * sucesso": confirmar libera o sistema de origem a escrever naquela ficha, e é
+ * a única coisa que quem confere precisa ter clara antes de clicar de novo na
+ * linha seguinte.
+ */
+export function useConfirmarVinculo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, confirmar }: { id: string; confirmar: boolean }) => {
+      await call(() => configuracoesApi.confirmarVinculoExterno({ id, confirmar }));
+      audit.update(RECURSO, id, { operacao: "vinculo_externo", confirmar });
+
+      return confirmar;
+    },
+    onSuccess: async (confirmado) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.externalLinks() });
+
+      toast.success(confirmado ? "Vínculo confirmado" : "Vínculo rejeitado", {
+        description: confirmado
+          ? "A partir de agora o sistema de origem passa a preencher esta ficha."
+          : "Nada do sistema de origem entra nesta ficha. A decisão fica registrada.",
+      });
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível registrar a decisão", { description: erro.message }),
+  });
+}
+
+/** Quem aceitou qual versão. Somente leitura: aceitar e revogar são do titular. */
+export function useConsentimentos() {
+  const query = useQuery({
+    queryKey: queryKeys.settings.consents(),
+    queryFn: () => call(() => configuracoesApi.getConsentimentos()),
+  });
+
+  const { items, ...status } = toListQuery(query);
+  return { ...status, consentimentos: items };
+}
+
+/* -------------------------------------------------------------------------
+   PEDIDOS DO TITULAR (LGPD)
+   ------------------------------------------------------------------------- */
+
+export function useSolicitacoesTitular() {
+  const query = useQuery({
+    queryKey: queryKeys.settings.dataSubjectRequests(),
+    queryFn: () => call(() => configuracoesApi.getSolicitacoesTitular()),
+  });
+
+  const { items, ...status } = toListQuery(query);
+  return { ...status, solicitacoes: items };
+}
+
+/**
+ * Defere ou recusa um pedido do titular.
+ *
+ * O aviso lembra que decidir **não é cumprir**: o backend não tem como
+ * registrar a execução, e para a LGPD o que conta é o atendimento. Omitir isso
+ * no momento do sucesso faria quem decidiu dar o assunto por encerrado.
+ */
+export function useDecidirSolicitacao() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { id: string; deferir: boolean; observacao: string }) => {
+      const { data } = await call(() => configuracoesApi.decidirSolicitacaoTitular(params));
+
+      // A justificativa NÃO entra na trilha: ela pode descrever o pedido de uma
+      // pessoa identificada, e a trilha guarda metadado. Ela fica no registro do
+      // backend, junto da decisão, que é onde uma apuração a procura.
+      audit.update(RECURSO, params.id, { operacao: "lgpd", deferir: params.deferir });
+
+      return data;
+    },
+    onSuccess: async (solicitacao) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.dataSubjectRequests() });
+
+      toast.success(solicitacao?.status === "granted" ? "Pedido deferido" : "Pedido recusado", {
+        description:
+          solicitacao?.status === "granted"
+            ? "Falta cumprir o pedido fora do painel — exportar, corrigir ou excluir o dado. O painel ainda não registra o cumprimento."
+            : "A recusa fica registrada com a justificativa.",
+      });
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível registrar a decisão", { description: erro.message }),
   });
 }

@@ -14,10 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/format";
 import type { ItemCatalogo, VersaoLegal } from "@/types/configuracao";
+import { ConsentimentosAceitos } from "../components/ConsentimentosAceitos";
 import { DialogPublicarTermo } from "../components/DialogPublicarTermo";
 import { ExigenciaSegundoFator } from "../components/ExigenciaSegundoFator";
+import { FilaDeConferencia } from "../components/FilaDeConferencia";
 import { GatilhosAlerta } from "../components/GatilhosAlerta";
 import { MotivosSituacao } from "../components/MotivosSituacao";
+import { SolicitacoesTitular } from "../components/SolicitacoesTitular";
 import { useConfiguracoes, useTermos } from "../hooks/useConfiguracoes";
 
 /**
@@ -141,6 +144,8 @@ export function ConfiguracoesPage() {
           <TabsTrigger value="motivos">Motivos de situação</TabsTrigger>
           <TabsTrigger value="legais">Termos & privacidade</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
+          <TabsTrigger value="integracao">Integração</TabsTrigger>
+          <TabsTrigger value="lgpd">Pedidos do titular</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalogos" className="flex flex-col gap-5">
@@ -282,10 +287,22 @@ export function ConfiguracoesPage() {
             que não existe "editar o texto vigente" — editar apagaria a prova do que cada pessoa
             aceitou, e o histórico acima é essa prova.
           </p>
+
+          {/* A contrapartida da publicação: uma cria a obrigação, a outra é a
+              prova de que ela foi cumprida. */}
+          <ConsentimentosAceitos />
         </TabsContent>
 
         <TabsContent value="seguranca">
           <ExigenciaSegundoFator />
+        </TabsContent>
+
+        <TabsContent value="integracao">
+          <FilaDeConferencia />
+        </TabsContent>
+
+        <TabsContent value="lgpd">
+          <SolicitacoesTitular />
         </TabsContent>
       </Tabs>
 
