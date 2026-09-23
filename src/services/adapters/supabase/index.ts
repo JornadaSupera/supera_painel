@@ -108,7 +108,7 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "usuarios.setMfa":
     "O segundo fator é gerenciado pela própria pessoa, no aplicativo autenticador dela.",
   "permissoes.updateMatrix":
-    "A matriz de permissões ainda não é dado do backend: o catálogo está vazio.",
+    "A matriz de papéis não é dado do backend: ela descreve o que cada papel alcança nas telas deste painel, e não há onde gravá-la. O catálogo do backend é outro eixo — ele restringe ações do espaço do profissional, e essas são concedidas pessoa a pessoa na ficha de cada uma.",
   "conteudos.create":
     "Redigir orientação é do profissional da área, no espaço de trabalho dele — o banco exige que o autor seja quem escreve. O painel administrativo revisa, aprova e despublica.",
   "conteudos.update":
@@ -143,7 +143,7 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "estatisticasOperacionais.mensagensPorDia":
     "O resumo do chat conta conversas, não mensagens: a unidade é a conversa aberta e o instante da primeira resposta da equipe. Contar mensagens exigiria ler cada conversa, e cada leitura registra acesso a conteúdo clínico.",
   "estatisticasOperacionais.getFilaAlertas":
-    "A fila de alertas existe no backend, mas nenhum gatilho de criticidade foi cadastrado: sem regra, nenhum alerta dispara, e a fila está vazia por configuração, não por ausência de ocorrência. O limiar é decisão clínica, e cadastrá-lo é ato da administração.",
+    "A fila de alertas depende de duas coisas que ainda não foram feitas, e nenhuma é de backend: cadastrar o grau que dispara cada sintoma, em Configurações → Gatilhos de alerta, e conceder a permissão de triagem a quem vai atender, na ficha de cada profissional. Sem a primeira nenhum alerta nasce; sem a segunda ninguém pode assumi-lo.",
   "estatisticasOperacionais.porProfissional":
     "O recorte dos resumos é por especialidade, e por profissional não existe — no backend nem aqui. Ranquear pessoa por volume ou por tempo de resposta transformaria um painel de operação em avaliação individual de desempenho, e com poucos casos a média re-identifica quem atendeu.",
   "relatorios.agregados":

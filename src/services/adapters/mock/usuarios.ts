@@ -23,6 +23,7 @@ import type {
   LogAcesso,
   UsuarioDetalhe,
   ContaDisponivel,
+  PermissaoRestrita,
   UsuarioEntrada,
   UsuarioListItem,
 } from "@/types/usuario";
@@ -311,4 +312,118 @@ export async function setMfa({
     row.mfa_ativo = ativo;
     return okOne(toDetalhe(row));
   });
+}
+
+/* -------------------------------------------------------------------------
+   PERMISSÕES RESTRITAS
+   -------------------------------------------------------------------------
+   Reproduz o catálogo de semântica INVERTIDA do backend: código presente aqui
+   deixa de valer para todos e passa a exigir concessão por pessoa. Os dois
+   códigos são os mesmos que o banco traz hoje, com os mesmos rótulos, para que
+   a tela exercite o caso real — inclusive o que mais importa, que é a lista
+   começar sem ninguém podendo triar alerta.
+   ------------------------------------------------------------------------- */
+
+const CATALOGO_RESTRITO = [
+  { codigo: "alerts.triage", label: "Assumir, designar e resolver alerta de sintoma crítico" },
+  { codigo: "schedule.manage", label: "Marcar, remarcar e alterar compromisso na agenda" },
+] as const;
+
+/** Concessões vigentes, por usuário. Começa vazio, como o banco. */
+const concessoes = new Map<string, Map<string, string>>();
+
+function permissoesDe(id: string): PermissaoRestrita[] {
+  const doUsuario = concessoes.get(id);
+
+  return CATALOGO_RESTRITO.map((permissao) => {
+    const concedidaEm = doUsuario?.get(permissao.codigo) ?? null;
+
+    return {
+      codigo: permissao.codigo,
+      label: permissao.label,
+      concedida: concedidaEm !== null,
+      concedida_em: concedidaEm,
+      concedida_por: concedidaEm ? "Administração" : null,
+    };
+  });
+}
+
+export async function listPermissions({
+  id,
+}: {
+  id: string;
+}): Promise<ListResult<PermissaoRestrita>> {
+  return comUsuario(id, (row) =>
+    // A concessão é por profissional: administrador não tem o que receber.
+    ok(row.papel === "admin" ? [] : permissoesDe(id)),
+  );
+}
+
+/** Uma linha do catálogo depois de escrever, relida como a tela a verá. */
+function respostaDaPermissao(id: string, codigo: string): SingleResult<PermissaoRestrita> {
+  const permissao = permissoesDe(id).find((linha) => linha.codigo === codigo);
+
+  return permissao
+    ? okOne(permissao)
+    : fail(ERROR_CODE.NOT_FOUND, `Permissão "${codigo}" não está no catálogo.`);
+}
+
+export async function grantPermission({
+  id,
+  codigo,
+}: {
+  id: string;
+  codigo: string;
+}): Promise<SingleResult<PermissaoRestrita>> {
+  return comUsuario(id, (row) => {
+    if (row.papel === "admin") {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "A concessão é por profissional, e esta conta não tem perfil profissional.",
+      );
+    }
+
+    if (!CATALOGO_RESTRITO.some((permissao) => permissao.codigo === codigo)) {
+      return fail(ERROR_CODE.NOT_FOUND, `Permissão inexistente no catálogo: ${codigo}`);
+    }
+
+    const doUsuario = concessoes.get(id) ?? new Map<string, string>();
+
+    // Idempotente, como a RPC: reconceder não reescreve a data da concessão
+    // original, que é o que a auditoria pergunta.
+    if (!doUsuario.has(codigo)) doUsuario.set(codigo, new Date().toISOString());
+    concessoes.set(id, doUsuario);
+
+    return respostaDaPermissao(id, codigo);
+  });
+}
+
+export async function revokePermission({
+  id,
+  codigo,
+}: {
+  id: string;
+  codigo: string;
+}): Promise<SingleResult<PermissaoRestrita>> {
+  return comUsuario(id, () => {
+    concessoes.get(id)?.delete(codigo);
+    return respostaDaPermissao(id, codigo);
+  });
+}
+
+/**
+ * Desativa a CONTA inteira.
+ *
+ * No mock a conta e o perfil são a mesma linha, então o efeito coincide com o
+ * de `setStatus`. A operação existe assim mesmo para que a tela tenha as duas
+ * ações nos dois backends — e a trava do último administrador vale aqui também.
+ */
+export async function setAccountActive({
+  id,
+  ativa,
+}: {
+  id: string;
+  ativa: boolean;
+}): Promise<SingleResult<UsuarioDetalhe>> {
+  return setStatus({ id, status: ativa ? STATUS_USUARIO.ATIVO : STATUS_USUARIO.INATIVO });
 }

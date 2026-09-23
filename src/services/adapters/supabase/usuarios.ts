@@ -23,6 +23,7 @@ import type {
   ContaDisponivel,
   DistribuicaoEspecialidade,
   LogAcesso,
+  PermissaoRestrita,
   UsuarioDetalhe,
   UsuarioEntrada,
   UsuarioListItem,
@@ -159,10 +160,14 @@ function projetar(linha: LinhaConta): UsuarioListItem | null {
 /**
  * As permissões efetivas continuam sendo resolvidas com a matriz do painel.
  *
- * O catálogo `permissions` do banco está vazio e nada concede permissão
- * individual ainda — hoje todo profissional ativo tem o mesmo alcance. Até que
- * a matriz vire dado, a fonte é a mesma que o `<Can>` usa, para que a tela e a
- * checagem não discordem.
+ * `permissoes_extras` fica vazio, e não por falta de dado: as concessões do
+ * banco são **outro eixo**. A matriz descreve o que cada papel alcança nas
+ * telas do painel; o catálogo `permissions` restringe ações que acontecem no
+ * espaço do profissional — assumir um alerta, mexer na agenda — e usa códigos
+ * que não existem nesta união de tipos. Misturar os dois faria o `<Can>` do
+ * painel decidir sobre ação que ele não governa.
+ *
+ * Quem expõe as concessões do banco é `listPermissions`, por pessoa.
  */
 function detalhar(item: UsuarioListItem, linha: LinhaConta): UsuarioDetalhe {
   const efetivas = resolverPermissoes(
@@ -326,6 +331,41 @@ export async function listAccessLogs({
  * administrador ativo não cai (`23514`) — e ambas trazem um `HINT` escrito para
  * ser lido por quem opera o painel, que é o que `falhaDe` aproveita.
  */
+/**
+ * O id do PERFIL profissional a partir do id da conta.
+ *
+ * As escritas de profissional recebem o id do perfil; a listagem inteira do
+ * painel é indexada pelo id da conta, que é o que `auth.uid()` devolve. A
+ * tradução acontece aqui, uma vez por operação, em vez de a tela carregar dois
+ * identificadores e escolher o certo — escolher errado grava na linha de outra
+ * pessoa, sem erro.
+ *
+ * `null` quando a conta não tem perfil profissional: é administrador, ou é uma
+ * conta ainda não concedida.
+ */
+async function idDoPerfilProfissional(accountId: string): Promise<string | null> {
+  const { data } = await getSupabaseClient()
+    .from("professionals")
+    .select("id")
+    .eq("account_id", accountId)
+    .maybeSingle();
+
+  return (data as { id: string } | null)?.id ?? null;
+}
+
+/**
+ * Revoga ou devolve o acesso ao PAINEL.
+ *
+ * Para o profissional isso é `set_professional_active`, que desliga só o
+ * perfil: a conta continua, o aplicativo continua, os aparelhos registrados
+ * continuam. É a revogação oficial de acesso.
+ *
+ * > [!] Para o administrador não existe equivalente.
+ * O backend não expõe `set_admin_active`, então desligar um administrador só
+ * acontece pela conta inteira. A assimetria é real e está dita na tela, em vez
+ * de dois botões iguais fazerem coisas de tamanhos diferentes conforme o
+ * perfil de quem está na linha.
+ */
 export async function setStatus({
   id,
   status,
@@ -341,9 +381,43 @@ export async function setStatus({
       );
     }
 
+    const ativo = status === STATUS_USUARIO.ATIVO;
+    const profissionalId = await idDoPerfilProfissional(id);
+
+    const { error } = profissionalId
+      ? await getSupabaseClient().rpc("set_professional_active", {
+          p_professional_id: profissionalId,
+          p_is_active: ativo,
+        })
+      : await getSupabaseClient().rpc("set_account_active", {
+          p_account_id: id,
+          p_is_active: ativo,
+        });
+
+    if (error) return falhaDe(error);
+
+    return getById({ id });
+  });
+}
+
+/**
+ * Desativa a CONTA — todos os perfis e o aplicativo de uma vez.
+ *
+ * Um gatilho do banco invalida os aparelhos de push junto, e outro impede que o
+ * último administrador ativo caia. Nenhuma das duas proteções é repetida aqui:
+ * uma trava que mora no cliente protege apenas quem usa o cliente.
+ */
+export async function setAccountActive({
+  id,
+  ativa,
+}: {
+  id: string;
+  ativa: boolean;
+}): Promise<SingleResult<UsuarioDetalhe>> {
+  return executar(async () => {
     const { error } = await getSupabaseClient().rpc("set_account_active", {
       p_account_id: id,
-      p_is_active: status === STATUS_USUARIO.ATIVO,
+      p_is_active: ativa,
     });
 
     if (error) return falhaDe(error);
@@ -599,4 +673,153 @@ export async function setMfa(): Promise<SingleResult<UsuarioDetalhe>> {
     ERROR_CODE.NOT_IMPLEMENTED,
     "O segundo fator é gerenciado pela própria pessoa, no aplicativo autenticador dela.",
   );
+}
+
+/* -------------------------------------------------------------------------
+   PERMISSÕES RESTRITAS
+   -------------------------------------------------------------------------
+   O CATÁLOGO TEM SEMÂNTICA INVERTIDA, e é a primeira coisa a saber antes de
+   ler qualquer coisa abaixo.
+
+   Código AUSENTE de `permissions` vale para todo profissional ativo. Código
+   PRESENTE deixa de valer para todos e passa a exigir concessão vigente em
+   `professional_permissions`. Cadastrar um código é ato RESTRITIVO; removê-lo
+   reabriria a ação para a clínica inteira, em silêncio.
+
+   Por isso o painel concede e revoga POR PESSOA, e nunca oferece mexer no
+   catálogo: o botão "remover permissão" teria o efeito oposto ao que o nome
+   promete.
+   ------------------------------------------------------------------------- */
+
+interface LinhaConcessao {
+  granted_at: string;
+  permission_id: string;
+  accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
+}
+
+/**
+ * Uma linha por código do catálogo, concedido ou não.
+ *
+ * Listar só as concedidas esconderia o que a tela existe para mostrar: o que
+ * esta pessoa **ainda não** pode fazer. Administrador devolve lista vazia — a
+ * concessão é por profissional, e o catálogo não alcança o perfil
+ * administrativo.
+ */
+export async function listPermissions({
+  id,
+}: {
+  id: string;
+}): Promise<ListResult<PermissaoRestrita>> {
+  return executar(async () => {
+    const profissionalId = await idDoPerfilProfissional(id);
+    if (!profissionalId) return ok<PermissaoRestrita>([]);
+
+    const supabase = getSupabaseClient();
+
+    const [catalogo, concessoes] = await Promise.all([
+      supabase.from("permissions").select("id, code, label").order("code"),
+      supabase
+        .from("professional_permissions")
+        .select("permission_id, granted_at, accounts:granted_by_account ( full_name, email )")
+        .eq("professional_id", profissionalId)
+        .is("revoked_at", null),
+    ]);
+
+    const erro = catalogo.error ?? concessoes.error;
+    if (erro) return falhaDe(erro);
+
+    const vigentes = new Map(
+      (concessoes.data as unknown as LinhaConcessao[]).map((linha) => [linha.permission_id, linha]),
+    );
+
+    return ok(
+      (catalogo.data as unknown as { id: string; code: string; label: string }[]).map((permissao) => {
+        const concessao = vigentes.get(permissao.id);
+        const autor = umDe(concessao?.accounts);
+
+        return {
+          codigo: permissao.code,
+          label: permissao.label,
+          concedida: Boolean(concessao),
+          concedida_em: concessao ? paraIso(concessao.granted_at) : null,
+          concedida_por: autor?.full_name?.trim() || autor?.email || null,
+        };
+      }),
+    );
+  });
+}
+
+/** A linha de um código depois de escrever, relida da fonte. */
+async function permissaoPorCodigo(
+  id: string,
+  codigo: string,
+): Promise<SingleResult<PermissaoRestrita>> {
+  const { data, error } = await listPermissions({ id });
+  if (error) return fail(error.code, error.message);
+
+  const permissao = data.find((linha) => linha.codigo === codigo);
+  return permissao
+    ? okOne(permissao)
+    : fail(ERROR_CODE.NOT_FOUND, `Permissão "${codigo}" não está no catálogo.`);
+}
+
+export async function grantPermission({
+  id,
+  codigo,
+}: {
+  id: string;
+  codigo: string;
+}): Promise<SingleResult<PermissaoRestrita>> {
+  return executar(async () => {
+    const profissionalId = await idDoPerfilProfissional(id);
+    if (!profissionalId) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "A concessão é por profissional, e esta conta não tem perfil profissional.",
+      );
+    }
+
+    const { error } = await getSupabaseClient().rpc("grant_professional_permission", {
+      p_professional_id: profissionalId,
+      p_code: codigo,
+    });
+
+    if (error) return falhaDe(error);
+
+    return permissaoPorCodigo(id, codigo);
+  });
+}
+
+/**
+ * Encerra a concessão vigente.
+ *
+ * Revogar o que nunca foi concedido é silencioso no backend — o `UPDATE` não
+ * acha linha e não levanta nada. A releitura logo abaixo é o que faz a tela
+ * mostrar o estado real em vez de confiar na intenção do clique.
+ */
+export async function revokePermission({
+  id,
+  codigo,
+}: {
+  id: string;
+  codigo: string;
+}): Promise<SingleResult<PermissaoRestrita>> {
+  return executar(async () => {
+    const profissionalId = await idDoPerfilProfissional(id);
+    if (!profissionalId) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "A concessão é por profissional, e esta conta não tem perfil profissional.",
+      );
+    }
+
+    const { error } = await getSupabaseClient().rpc("revoke_professional_permission", {
+      p_professional_id: profissionalId,
+      p_code: codigo,
+    });
+
+    if (error) return falhaDe(error);
+
+    return permissaoPorCodigo(id, codigo);
+  });
 }
