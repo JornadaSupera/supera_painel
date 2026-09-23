@@ -1,7 +1,9 @@
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 
-import { Breadcrumb } from "@/components/shared";
+import { Breadcrumb, Loading } from "@/components/shared";
+import { SessaoSemSegundoFator } from "@/features/auth/components/SessaoSemSegundoFator";
+import { useGarantiaDaSessao } from "@/hooks/useGarantiaDaSessao";
 import { MobileMenu } from "./MobileMenu";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
@@ -13,10 +15,26 @@ import { navItemByPath, navTrailByPath } from "./navigation";
  * It sits between `ProtectedRoute` and the pages, so only someone with a
  * session sees the navigation — and so the sidebar does not remount on every
  * route change.
+ *
+ * It is also where the panel checks that what the pages are about to show is
+ * real. When the backend requires a second factor and the session only carries
+ * a password, nothing errors: every screen answers with an empty list. The
+ * check lives here, once, instead of in each of the nine screens.
  */
 export function AdminLayout() {
   const location = useLocation();
   const trail = navTrailByPath(location.pathname);
+  const garantia = useGarantiaDaSessao();
+
+  /*
+   * The frame renders either way. Only the content area waits, and only while
+   * the answer is unknown — the sidebar and the sign-out menu stay reachable,
+   * which matters most in exactly the case this check exists for.
+   *
+   * A failed check does NOT block: a diagnostic that takes the panel down when
+   * it cannot run turns a dropped request into an inaccessible panel.
+   */
+  const bloqueado = garantia.data ? !garantia.data.suficiente : false;
 
   /* The tab title follows the screen: with several tabs open, "Jornada
      Supera" repeated helps nobody find their way. */
@@ -59,16 +77,24 @@ export function AdminLayout() {
               white band down the sides of a work monitor is waste, not
               breathing room. */}
           <div className="w-full space-y-6 px-4 py-6 sm:px-6 xl:px-8">
-            {/* Only appears from the second level down. A one-item crumb is
-                noise: it repeats what the title and the sidebar already say. */}
-            {trail.length > 1 && (
-              <Breadcrumb
-                items={trail.map((item) => ({ label: item.label, to: item.to }))}
-                className="mb-4"
-              />
-            )}
+            {garantia.isLoading ? (
+              <Loading message="Verificando o nível de acesso…" />
+            ) : bloqueado && garantia.data ? (
+              <SessaoSemSegundoFator garantia={garantia.data} />
+            ) : (
+              <>
+                {/* Only appears from the second level down. A one-item crumb is
+                    noise: it repeats what the title and the sidebar already say. */}
+                {trail.length > 1 && (
+                  <Breadcrumb
+                    items={trail.map((item) => ({ label: item.label, to: item.to }))}
+                    className="mb-4"
+                  />
+                )}
 
-            <Outlet />
+                <Outlet />
+              </>
+            )}
           </div>
         </main>
       </div>
