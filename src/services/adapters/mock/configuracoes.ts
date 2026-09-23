@@ -9,11 +9,14 @@ import {
 } from "@/services/contracts";
 import type {
   ConfiguracaoSeguranca,
+  Consentimento,
   Configuracoes,
   ItemCatalogo,
   MotivoSituacao,
   RegraAlerta,
+  SolicitacaoTitular,
   VersaoLegal,
+  VinculoExterno,
 } from "@/types/configuracao";
 import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
 import { definirExigenciaDeMfa, estadoDaSeguranca, nivelAtual } from "./_security";
@@ -369,3 +372,133 @@ export async function setExigirMfa({
 }
 
 export const { update, uploadLogo } = SETTINGS_WRITE_OPERATIONS;
+
+/* -------------------------------------------------------------------------
+   FILA DE CONFERÊNCIA DA INTEGRAÇÃO
+   -------------------------------------------------------------------------
+   Vazia, como no banco: a sincronização está desligada e nenhum vínculo foi
+   proposto. Semear vínculos fictícios faria a tela parecer em uso e esconderia
+   o estado real — que é o de uma fila construída ANTES de precisar dela.
+   ------------------------------------------------------------------------- */
+
+const VINCULOS: VinculoExterno[] = [];
+
+export async function getVinculosExternos(): Promise<ListResult<VinculoExterno>> {
+  return simulate(() => ok(VINCULOS));
+}
+
+export async function confirmarVinculoExterno({
+  id,
+  confirmar,
+}: {
+  id: string;
+  confirmar: boolean;
+}): Promise<SingleResult<VinculoExterno>> {
+  return simulate(() => {
+    const indice = VINCULOS.findIndex((vinculo) => vinculo.id === id);
+    if (indice < 0) {
+      return fail(
+        ERROR_CODE.NOT_FOUND,
+        "Este vínculo já foi conferido por alguém. Recarregue a fila para ver a decisão que está valendo.",
+      );
+    }
+
+    // Decidido sai da fila nos dois casos — confirmar e rejeitar tiram a linha
+    // de "proposto", que é o único estado que a fila mostra.
+    void confirmar;
+    VINCULOS.splice(indice, 1);
+
+    return okOne<VinculoExterno>(null);
+  });
+}
+
+/* -------------------------------------------------------------------------
+   CONSENTIMENTOS
+   ------------------------------------------------------------------------- */
+
+/**
+ * Um aceite por versão vigente, para a tela ter o que mostrar.
+ *
+ * Diferente da fila acima, aqui o vazio não seria informativo: a base fictícia
+ * tem termos publicados, e termo publicado sem nenhum aceite é o estado de
+ * quem acabou de publicar — não o estado normal.
+ */
+const CONSENTIMENTOS: Consentimento[] = TERMOS.filter((versao) => versao.vigente).map(
+  (versao, indice) => ({
+    id: `consentimento-${versao.id}`,
+    pessoa: indice === 0 ? "Helena Marques" : "Rogério Antunes",
+    documento: `${versao.tipo_label} · versão ${versao.versao}`,
+    aceito_em: versao.publicado_em ?? new Date().toISOString(),
+    revogado_em: null,
+  }),
+);
+
+export async function getConsentimentos(): Promise<ListResult<Consentimento>> {
+  return simulate(() => ok(CONSENTIMENTOS));
+}
+
+/* -------------------------------------------------------------------------
+   PEDIDOS DO TITULAR (LGPD)
+   ------------------------------------------------------------------------- */
+
+/**
+ * Um pedido aberto, como no banco.
+ *
+ * A base real tem exatamente um pedido esperando decisão — e era ele que
+ * ninguém via. O mock reproduz esse estado porque é o que a tela precisa
+ * exercitar: uma fila com prazo correndo, não uma fila vazia.
+ */
+const SOLICITACOES: SolicitacaoTitular[] = [
+  {
+    id: "lgpd-001",
+    pessoa: "Marina Vasconcelos",
+    tipo: "access",
+    tipo_label: "Acesso aos dados",
+    status: "requested",
+    status_label: "Aberto",
+    criado_em: new Date(Date.now() - 6 * 86_400_000).toISOString(),
+    decidido_em: null,
+    decidido_por: null,
+    observacao: null,
+    aberto: true,
+  },
+];
+
+export async function getSolicitacoesTitular(): Promise<ListResult<SolicitacaoTitular>> {
+  return simulate(() =>
+    ok(
+      [...SOLICITACOES].sort(
+        (a, b) => Number(b.aberto) - Number(a.aberto) || b.criado_em.localeCompare(a.criado_em),
+      ),
+    ),
+  );
+}
+
+export async function decidirSolicitacaoTitular({
+  id,
+  deferir,
+  observacao,
+}: {
+  id: string;
+  deferir: boolean;
+  observacao: string;
+}): Promise<SingleResult<SolicitacaoTitular>> {
+  return simulate(() => {
+    const solicitacao = SOLICITACOES.find((linha) => linha.id === id);
+    if (!solicitacao) return fail(ERROR_CODE.NOT_FOUND, "Pedido não encontrado.");
+
+    // Mesma recusa do backend: só pedido aberto aceita decisão.
+    if (!solicitacao.aberto) {
+      return fail(ERROR_CODE.VALIDATION, "Este pedido já foi decidido.");
+    }
+
+    solicitacao.status = deferir ? "granted" : "refused";
+    solicitacao.status_label = deferir ? "Deferido" : "Recusado";
+    solicitacao.decidido_em = new Date().toISOString();
+    solicitacao.decidido_por = "Administração";
+    solicitacao.observacao = observacao;
+    solicitacao.aberto = false;
+
+    return okOne(solicitacao);
+  });
+}

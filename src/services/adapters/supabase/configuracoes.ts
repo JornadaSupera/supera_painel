@@ -8,14 +8,17 @@ import {
 } from "@/services/contracts";
 import type {
   ConfiguracaoSeguranca,
+  Consentimento,
   Configuracoes,
   ItemCatalogo,
   MotivoSituacao,
   RegraAlerta,
+  SolicitacaoTitular,
   VersaoLegal,
+  VinculoExterno,
 } from "@/types/configuracao";
 import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
-import { executar, falhaDe, paraIso, umDe } from "./_helpers";
+import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 
 /**
@@ -504,3 +507,249 @@ export async function setExigirMfa({
    ------------------------------------------------------------------------- */
 
 export const { update, uploadLogo } = SETTINGS_WRITE_OPERATIONS;
+
+/* -------------------------------------------------------------------------
+   FILA DE CONFERÊNCIA DA INTEGRAÇÃO
+   -------------------------------------------------------------------------
+   A leitura é por `read_external_refs`, e não por `.from()`: a política da
+   tabela é do papel `clinical_reader`, do qual `authenticated` não é membro —
+   uma consulta direta devolveria zero linhas sem erro nenhum.
+
+   A função EXIGE um estado; ela não tem ramo para "todos". A fila pede
+   `proposed`, que é o único que ainda espera decisão: confirmado e rejeitado
+   já foram resolvidos, e misturá-los faria a fila deixar de ser fila.
+
+   > [!] Hoje ela está vazia, e a tela precisa existir mesmo assim.
+   A sincronização está desligada, então nenhum vínculo foi proposto. Construir
+   a conferência no dia em que os vínculos começarem a chegar é construí-la com
+   pressa — e o erro que ela evita é o pior possível neste sistema.
+   ------------------------------------------------------------------------- */
+
+interface LinhaVinculo {
+  id: string;
+  system: string;
+  entity_type: string;
+  local_id: string | null;
+  external_key: Record<string, unknown> | null;
+  created_at: string;
+}
+
+/** O que o sistema de origem chama a linha, em texto legível. */
+function chaveLegivel(chave: Record<string, unknown> | null): string {
+  if (!chave) return "—";
+
+  const partes = Object.entries(chave)
+    .filter(([, valor]) => valor !== null && valor !== undefined && valor !== "")
+    .map(([campo, valor]) => `${campo}: ${String(valor)}`);
+
+  return partes.length > 0 ? partes.join(" · ") : "—";
+}
+
+export async function getVinculosExternos(): Promise<ListResult<VinculoExterno>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient().rpc("read_external_refs", {
+      p_link_status: "proposed",
+      p_limit: TETO_READ,
+      p_offset: 0,
+    });
+
+    if (error) return falhaDe(error);
+
+    return ok(
+      ((data ?? []) as LinhaVinculo[]).map((linha) => ({
+        id: linha.id,
+        sistema: linha.system,
+        entidade: linha.entity_type,
+        chave_externa: chaveLegivel(linha.external_key),
+        local_id: linha.local_id,
+        proposto_em: paraIso(linha.created_at) ?? linha.created_at,
+      })),
+    );
+  });
+}
+
+/**
+ * Confirma ou rejeita um vínculo proposto.
+ *
+ * A linha sai da fila nos dois casos — é por isso que a resposta não a relê:
+ * ela deixou de ser `proposed`, e uma releitura devolveria "não encontrado"
+ * para uma operação que funcionou.
+ */
+export async function confirmarVinculoExterno({
+  id,
+  confirmar,
+}: {
+  id: string;
+  confirmar: boolean;
+}): Promise<SingleResult<VinculoExterno>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("confirm_external_link", {
+      p_ref_id: id,
+      p_confirm: confirmar,
+    });
+
+    if (error) return falhaDe(error);
+
+    return okOne<VinculoExterno>(null);
+  });
+}
+
+/* -------------------------------------------------------------------------
+   CONSENTIMENTOS
+   ------------------------------------------------------------------------- */
+
+interface LinhaConsentimento {
+  id: string;
+  accepted_at: string;
+  revoked_at: string | null;
+  accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
+  legal_document_versions: { kind: string; version: number } | { kind: string; version: number }[] | null;
+}
+
+/**
+ * Quem aceitou qual versão.
+ *
+ * Leitura direta: `consent_records` tem política para o administrador, fora do
+ * pedágio das tabelas clínicas. Não há escrita — aceitar é ato do titular no
+ * aplicativo, e revogar também.
+ */
+export async function getConsentimentos(): Promise<ListResult<Consentimento>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("consent_records")
+      .select(
+        "id, accepted_at, revoked_at, accounts:account_id ( full_name, email ), legal_document_versions:document_version_id ( kind, version )",
+      )
+      .order("accepted_at", { ascending: false })
+      .limit(TETO_READ);
+
+    if (error) return falhaDe(error);
+
+    return ok(
+      (data as unknown as LinhaConsentimento[]).map((linha) => {
+        const pessoa = umDe(linha.accounts);
+        const versao = umDe(linha.legal_document_versions);
+
+        return {
+          id: linha.id,
+          pessoa: pessoa?.full_name?.trim() || pessoa?.email || "Não identificado",
+          documento: versao
+            ? `${TIPO_LABEL[versao.kind] ?? versao.kind} · versão ${versao.version}`
+            : "Documento não identificado",
+          aceito_em: paraIso(linha.accepted_at) ?? linha.accepted_at,
+          revogado_em: paraIso(linha.revoked_at),
+        };
+      }),
+    );
+  });
+}
+
+/* -------------------------------------------------------------------------
+   PEDIDOS DO TITULAR (LGPD)
+   -------------------------------------------------------------------------
+   Leitura direta: `data_subject_requests` tem política para o administrador.
+   A decisão é por RPC, que aceita apenas deferir e recusar.
+
+   > [!] "Cumprido" existe na estrutura e é inalcançável.
+   O estado `executed` está no enum e nenhuma função o atinge. Para a LGPD o
+   que conta é o ATENDIMENTO, não o deferimento — então é exatamente a prova do
+   atendimento que o painel não consegue registrar. A tela declara isso; o
+   pedido está na carta ao responsável pelo banco.
+   ------------------------------------------------------------------------- */
+
+const TIPO_SOLICITACAO_LABEL: Record<string, string> = {
+  access: "Acesso aos dados",
+  rectification: "Correção de dados",
+  portability: "Portabilidade",
+  consent_revocation: "Revogação de consentimento",
+  deletion: "Exclusão de dados",
+};
+
+const STATUS_SOLICITACAO_LABEL: Record<string, string> = {
+  requested: "Aberto",
+  under_review: "Em análise",
+  granted: "Deferido",
+  executed: "Cumprido",
+  refused: "Recusado",
+};
+
+/** Os dois estados que ainda aceitam decisão — é o que define "aberto". */
+const ABERTOS = new Set(["requested", "under_review"]);
+
+interface LinhaSolicitacao {
+  id: string;
+  request_type: string;
+  status: string;
+  created_at: string;
+  decided_at: string | null;
+  decision_note: string | null;
+  accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
+  decisor: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
+}
+
+function projetarSolicitacao(linha: LinhaSolicitacao): SolicitacaoTitular {
+  const titular = umDe(linha.accounts);
+  const decisor = umDe(linha.decisor);
+
+  return {
+    id: linha.id,
+    pessoa: titular?.full_name?.trim() || titular?.email || "Não identificado",
+    tipo: linha.request_type,
+    tipo_label: TIPO_SOLICITACAO_LABEL[linha.request_type] ?? linha.request_type,
+    status: linha.status,
+    status_label: STATUS_SOLICITACAO_LABEL[linha.status] ?? linha.status,
+    criado_em: paraIso(linha.created_at) ?? linha.created_at,
+    decidido_em: paraIso(linha.decided_at),
+    decidido_por: decisor?.full_name?.trim() || decisor?.email || null,
+    observacao: linha.decision_note,
+    aberto: ABERTOS.has(linha.status),
+  };
+}
+
+export async function getSolicitacoesTitular(): Promise<ListResult<SolicitacaoTitular>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("data_subject_requests")
+      .select(
+        "id, request_type, status, created_at, decided_at, decision_note, accounts:account_id ( full_name, email ), decisor:decided_by ( full_name, email )",
+      )
+      .order("created_at", { ascending: false })
+      .limit(TETO_READ);
+
+    if (error) return falhaDe(error);
+
+    const solicitacoes = (data as unknown as LinhaSolicitacao[]).map(projetarSolicitacao);
+
+    // Aberto primeiro: é uma fila com prazo correndo, e ordenar só por data
+    // misturaria o que espera decisão com o que já foi decidido.
+    return ok(
+      solicitacoes.sort((a, b) => Number(b.aberto) - Number(a.aberto) || b.criado_em.localeCompare(a.criado_em)),
+    );
+  });
+}
+
+export async function decidirSolicitacaoTitular({
+  id,
+  deferir,
+  observacao,
+}: {
+  id: string;
+  deferir: boolean;
+  observacao: string;
+}): Promise<SingleResult<SolicitacaoTitular>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("decide_data_subject_request", {
+      p_request_id: id,
+      p_status: deferir ? "granted" : "refused",
+      p_note: observacao,
+    });
+
+    if (error) return falhaDe(error);
+
+    const { data, error: erroLeitura } = await getSolicitacoesTitular();
+    if (erroLeitura) return fail(erroLeitura.code, erroLeitura.message);
+
+    const solicitacao = data.find((linha) => linha.id === id);
+    return solicitacao ? okOne(solicitacao) : fail(ERROR_CODE.NOT_FOUND, "Pedido não encontrado.");
+  });
+}
