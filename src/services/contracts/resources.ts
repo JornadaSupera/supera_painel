@@ -99,6 +99,24 @@ export const RESOURCES = {
        * alimenta o seletor de quem pode receber o perfil.
        */
       "listContasSemPerfil",
+      /**
+       * As permissões que o backend RESTRINGE, por profissional.
+       *
+       * Outro eixo que `permissoes.getMatrix`: aquela descreve o que cada
+       * PAPEL alcança no painel, esta é a concessão individual que o banco
+       * impõe. A semântica do catálogo é invertida — ver `PermissaoRestrita`.
+       */
+      "listPermissions",
+      "grantPermission",
+      "revokePermission",
+      /**
+       * Desativa a CONTA inteira, não o perfil.
+       *
+       * Separada de `setStatus` porque são atos de tamanho diferente: aquele
+       * revoga o acesso ao painel, este derruba a pessoa de todos os perfis e
+       * do aplicativo, e invalida os aparelhos de push.
+       */
+      "setAccountActive",
     ],
   },
   permissoes: {

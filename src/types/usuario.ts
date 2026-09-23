@@ -88,6 +88,36 @@ export interface UsuarioEntrada {
   registro?: string | null;
 }
 
+/**
+ * Uma permissão que o backend RESTRINGE, e a concessão vigente dela.
+ *
+ * > [!] A semântica do catálogo é invertida, e ler ao contrário é o modo de
+ * > errar previsível.
+ * Código **ausente** do catálogo é liberado a todo profissional ativo. Código
+ * **presente** passa a valer só para quem tem concessão vigente. Ou seja:
+ * cadastrar um código é ato **restritivo**, e tirá-lo reabriria a ação para
+ * todo mundo, em silêncio.
+ *
+ * Daí o nome. Uma lista chamada "permissões" com dois itens sugere que a pessoa
+ * só pode fazer duas coisas, quando o que ela diz é o contrário: estas duas são
+ * as únicas que alguém precisa receber — o resto já vem por padrão.
+ *
+ * O painel **não edita o catálogo**: só concede e revoga por pessoa. Oferecer
+ * "remover permissão do catálogo" seria oferecer um botão cujo efeito real é
+ * liberar a ação para a clínica inteira.
+ */
+export interface PermissaoRestrita {
+  /** Código no backend: `alerts.triage`, `schedule.manage`. */
+  codigo: string;
+  label: string;
+  /** Vigente agora. */
+  concedida: boolean;
+  /** Quando a concessão ORIGINAL aconteceu. Reconceder não reescreve a data. */
+  concedida_em: string | null;
+  /** Quem concedeu. `null` quando o nome não resolve. */
+  concedida_por: string | null;
+}
+
 /** Uma conta que ainda não tem perfil no painel — candidata a receber um. */
 export interface ContaDisponivel {
   id: string;

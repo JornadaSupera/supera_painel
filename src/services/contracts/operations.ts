@@ -39,6 +39,7 @@ import type {
   DistribuicaoEspecialidade,
   LogAcesso,
   MatrizPermissoes,
+  PermissaoRestrita,
   UsuarioDetalhe,
   UsuarioEntrada,
   UsuarioListItem,
@@ -196,8 +197,27 @@ export interface UsuariosOperations {
 
   update(params: { id: string; dados: Partial<UsuarioEntrada> }): Promise<SingleResult<UsuarioDetalhe>>;
 
-  /** Ativar, pausar ou inativar. Pausar mantém o vínculo e suspende o acesso. */
+  /**
+   * Revoga ou devolve o acesso ao PAINEL, sem tocar na conta.
+   *
+   * É a revogação oficial: a pessoa deixa de operar o painel e continua com a
+   * conta dela — o aplicativo, os outros perfis e os aparelhos registrados
+   * seguem valendo. Para derrubar tudo de uma vez existe `setAccountActive`,
+   * que é ato maior e tem nome próprio por isso.
+   *
+   * Vale no instante seguinte: a autorização é consultada a cada chamada, não
+   * carimbada no token.
+   */
   setStatus(params: { id: string; status: StatusUsuario }): Promise<SingleResult<UsuarioDetalhe>>;
+
+  /**
+   * Desativa a CONTA — todos os perfis, o aplicativo e o push de uma vez.
+   *
+   * Separada de `setStatus` porque a pergunta "esta pessoa ainda opera o
+   * painel?" e "esta pessoa ainda usa a plataforma?" têm respostas diferentes,
+   * e um botão só para as duas escolhe a errada metade das vezes.
+   */
+  setAccountActive(params: { id: string; ativa: boolean }): Promise<SingleResult<UsuarioDetalhe>>;
 
   /** Dispara o e-mail de redefinição. O painel nunca escolhe senha de ninguém. */
   resetPassword(params: { id: string }): Promise<SingleResult<{ enviado: true; destino: string }>>;
@@ -211,6 +231,29 @@ export interface UsuariosOperations {
 
   /** Contas sem perfil no painel — quem pode receber um. Ver `UsuarioEntrada`. */
   listContasSemPerfil(): Promise<ListResult<ContaDisponivel>>;
+
+  /**
+   * O catálogo de permissões restritas, com a concessão vigente desta pessoa.
+   *
+   * Devolve **uma linha por código do catálogo**, concedido ou não. Listar só
+   * as concedidas esconderia exatamente o que a tela precisa mostrar: o que
+   * esta pessoa ainda não pode fazer.
+   *
+   * Lista vazia para administrador — a concessão é por profissional, e o
+   * catálogo do banco não alcança o perfil administrativo.
+   */
+  listPermissions(params: { id: string }): Promise<ListResult<PermissaoRestrita>>;
+
+  /** Idempotente: reconceder o que está vigente não duplica nem reescreve a data. */
+  grantPermission(params: { id: string; codigo: string }): Promise<SingleResult<PermissaoRestrita>>;
+
+  /**
+   * Encerra a concessão. A linha revogada FICA, com data e autor.
+   *
+   * Revogar é auditável; nunca ter concedido não deixa rastro nenhum — e é a
+   * diferença que uma apuração pergunta.
+   */
+  revokePermission(params: { id: string; codigo: string }): Promise<SingleResult<PermissaoRestrita>>;
 }
 
 export interface PermissoesOperations {
