@@ -24,6 +24,7 @@ import {
 import { STATUS_CONVITE_LABEL } from "@/types/paciente";
 import type {
   CampoPii,
+  CuidadorVinculado,
   PacienteDetalhe,
   PacienteEntrada,
   PacienteListItem,
@@ -108,6 +109,15 @@ function toDetalhe(row: PacienteMock): PacienteDetalhe {
     desativado_em: row.desativado_em,
     motivo_desativacao: row.motivo_desativacao,
     atualizado_em: row.atualizado_em,
+    /*
+     * Tudo digitado na clínica, como no banco: a integração com o sistema do
+     * consultório está desligada, e nenhuma ficha veio de fora. Sortear
+     * origens aqui faria a tela exercitar um caso que não existe e esconder o
+     * que de fato acontece hoje.
+     */
+    origem_cadastro: { origem: "local", sincronizado_em: null },
+    origem_clinica: { origem: "local", sincronizado_em: null },
+    origem_plano: row.protocolo_id ? { origem: "local", sincronizado_em: null } : null,
   };
 }
 
@@ -378,3 +388,69 @@ export async function exportar(params: ListParams = {}): Promise<ListResult<Reco
 // `export` é palavra reservada: a função nasce como `exportar` e é publicada
 // com o nome do contrato.
 export { exportar as export };
+
+/* -------------------------------------------------------------------------
+   ACOMPANHANTES E VÍNCULO COM A CONTA
+   ------------------------------------------------------------------------- */
+
+/**
+ * Um acompanhante por ficha, de forma estável a partir do índice.
+ *
+ * A base fictícia não tem cuidadores, e sortear um a cada carregamento daria
+ * um vínculo diferente por render. O recorte por posição mantém a tela com o
+ * que exercitar — inclusive o caso do vínculo revogado, que é o que prova que
+ * o histórico não some.
+ */
+function cuidadoresDe(row: PacienteMock, indice: number): CuidadorVinculado[] {
+  if (indice % 4 === 3) return [];
+
+  const revogado = indice % 5 === 0;
+  const nome = `Acompanhante de ${row.nome.split(" ")[0] ?? row.nome}`;
+
+  return [
+    {
+      id: `vinculo-${row.id}`,
+      nome,
+      email_mascarado: maskEmail(`acompanhante.${indice}@exemplo.com`),
+      telefone_mascarado: maskPhone("48999990000"),
+      status: revogado ? "revogado" : "ativo",
+      vinculado_em: row.criado_em ?? new Date().toISOString(),
+      revogado_em: revogado ? row.atualizado_em : null,
+    },
+  ];
+}
+
+export async function listCuidadores({ id }: { id: string }): Promise<ListResult<CuidadorVinculado>> {
+  return comPaciente(id, (row) =>
+    ok(cuidadoresDe(row, pacientes.findIndex((paciente) => paciente.id === row.id))),
+  );
+}
+
+export async function cancelInvite({ id }: { id: string }): Promise<SingleResult<PacienteDetalhe>> {
+  return comPaciente(id, (row) => {
+    // Mesma recusa do backend: cancelar o que não está de pé não é silencioso.
+    if (row.convite_status !== "enviado") {
+      return fail(ERROR_CODE.VALIDATION, "Não há convite pendente para cancelar.");
+    }
+
+    row.convite_status = "nao_enviado";
+    row.convite_enviado_em = null;
+
+    return okOne(toDetalhe(row));
+  });
+}
+
+export async function unlinkAccount({ id }: { id: string }): Promise<SingleResult<PacienteDetalhe>> {
+  return comPaciente(id, (row) => {
+    if (row.convite_status !== "aceito") {
+      return fail(ERROR_CODE.VALIDATION, "Esta ficha não tem conta vinculada.");
+    }
+
+    // A ficha e o histórico ficam; o que se desfaz é a ligação com a conta.
+    row.convite_status = "nao_enviado";
+    row.convite_enviado_em = null;
+    row.ultimo_acesso_app_em = null;
+
+    return okOne(toDetalhe(row));
+  });
+}

@@ -14,6 +14,7 @@ import {
 import { STATUS_CONVITE_LABEL } from "@/types/paciente";
 import type {
   CampoPii,
+  CuidadorVinculado,
   PacienteDetalhe,
   PacienteEntrada,
   PacienteListItem,
@@ -22,7 +23,7 @@ import type {
   StatusConvite,
 } from "@/types/paciente";
 import { PATIENT_DEFAULT_SORT, normalizePatientSearch } from "../_people";
-import { TETO_READ, executar, falhaDe, paraIso } from "./_helpers";
+import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { codigoExibidoDoPaciente, paraCodigoDeFase, paraFase } from "./mapping";
 
@@ -75,6 +76,17 @@ interface LinhaPaciente {
   treatment_phase_id: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * De onde veio cada metade da ficha, e quando.
+   *
+   * Chegam em toda leitura porque `read_patient` devolve `SETOF patients` — o
+   * adapter as recebia e descartava. Hoje valem `local` em tudo, com a
+   * integração desligada; deixam de ser inertes no dia em que ela ligar.
+   */
+  demographics_source: "local" | "gemed";
+  demographics_synced_at: string | null;
+  clinical_source: "local" | "gemed";
+  clinical_synced_at: string | null;
 }
 
 /**
@@ -112,6 +124,8 @@ interface LinhaPlano {
   protocol_name: string;
   cycles_planned: number | null;
   ended_on: string | null;
+  source: "local" | "gemed";
+  synced_at: string | null;
 }
 
 /** Catálogos usados para traduzir id em rótulo. São curtos e mudam por migração. */
@@ -265,6 +279,17 @@ function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDet
     desativado_em: null,
     motivo_desativacao: null,
     atualizado_em: linha.updated_at,
+    origem_cadastro: {
+      origem: linha.demographics_source,
+      sincronizado_em: paraIso(linha.demographics_synced_at),
+    },
+    origem_clinica: {
+      origem: linha.clinical_source,
+      sincronizado_em: paraIso(linha.clinical_synced_at),
+    },
+    origem_plano: contexto.plano
+      ? { origem: contexto.plano.source, sincronizado_em: paraIso(contexto.plano.synced_at) }
+      : null,
   };
 }
 
@@ -913,5 +938,119 @@ export async function sendInvite({ id }: { id: string }): Promise<SingleResult<R
       token: emitido.token,
       expira_em: paraIso(linha?.expires_at),
     });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   ACOMPANHANTES
+   -------------------------------------------------------------------------
+   Leitura direta, sem pedágio: `patient_caregivers` e `caregivers` têm
+   política de SELECT para o administrador, fora do papel `clinical_reader`
+   que barra as tabelas clínicas.
+
+   O NOME E O CONTATO SÃO DE OUTRA PESSOA, e é o que decide a forma desta
+   leitura. Vêm de `accounts`, e saem mascarados — sem operação de revelação,
+   ao contrário do que acontece com o paciente. O painel precisa saber que o
+   vínculo existe e quem é; quem precisa do contato do acompanhante é o
+   titular, no aplicativo dele.
+
+   > [!] O convite de acompanhante PENDENTE é invisível aqui.
+   `caregiver_invitations` só tem política para o titular — convidar é ato dele,
+   e o painel não participa. A tela diz isso, porque a ausência do convite
+   pendente numa lista de vínculos parece dado faltando.
+   ------------------------------------------------------------------------- */
+
+interface LinhaVinculo {
+  id: string;
+  status: "active" | "revoked";
+  granted_at: string;
+  revoked_at: string | null;
+  caregivers: {
+    accounts: { full_name: string | null; email: string; phone: string | null } | null;
+  } | null;
+}
+
+export async function listCuidadores({
+  id,
+}: {
+  id: string;
+}): Promise<ListResult<CuidadorVinculado>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("patient_caregivers")
+      .select(
+        "id, status, granted_at, revoked_at, caregivers:caregiver_id ( accounts:account_id ( full_name, email, phone ) )",
+      )
+      .eq("patient_id", id)
+      .order("granted_at", { ascending: false });
+
+    if (error) return falhaDe(error);
+
+    return ok(
+      (data as unknown as LinhaVinculo[]).map((linha) => {
+        const conta = umDe(umDe(linha.caregivers)?.accounts);
+
+        return {
+          id: linha.id,
+          // Sem nome na conta, o e-mail identifica; sem os dois, dizer que não
+          // se alcançou é melhor do que uma linha em branco que parece defeito.
+          nome: conta?.full_name?.trim() || conta?.email || "Acompanhante não identificado",
+          email_mascarado: maskEmail(conta?.email ?? null),
+          telefone_mascarado: conta?.phone ? maskPhone(conta.phone) : null,
+          status: linha.status === "revoked" ? "revogado" : "ativo",
+          vinculado_em: paraIso(linha.granted_at) ?? linha.granted_at,
+          revogado_em: paraIso(linha.revoked_at),
+        };
+      }),
+    );
+  });
+}
+
+/* -------------------------------------------------------------------------
+   VÍNCULO COM A CONTA DO APLICATIVO
+   ------------------------------------------------------------------------- */
+
+/**
+ * Cancela o convite pendente sem emitir outro.
+ *
+ * A RPC recebe o id do CONVITE, e a tela conhece o id da ficha — a tradução
+ * acontece aqui. Sem convite de pé, o backend recusa com `invitation_not_pending`,
+ * e a recusa é correta: cancelar o que não existe não é operação silenciosa.
+ */
+export async function cancelInvite({ id }: { id: string }): Promise<SingleResult<PacienteDetalhe>> {
+  return executar(async () => {
+    const convite = await carregarConvite(id);
+    if (convite && "error" in convite) return convite;
+
+    if (!convite || convite.status !== "pending") {
+      return fail(ERROR_CODE.VALIDATION, "Não há convite pendente para cancelar.");
+    }
+
+    const { error } = await getSupabaseClient().rpc("cancel_patient_invitation", {
+      p_invitation_id: convite.id,
+    });
+
+    if (error) return falhaDe(error);
+
+    return getById({ id });
+  });
+}
+
+/**
+ * Desfaz o vínculo entre a ficha e a conta do aplicativo.
+ *
+ * A ficha, o histórico e a conta ficam — desfaz-se a ligação. É o caminho para
+ * corrigir uma ativação feita na ficha errada, e o pré-requisito para trocar o
+ * CPF de quem já ativou: um gatilho do banco congela o CPF depois da ativação.
+ */
+export async function unlinkAccount({ id }: { id: string }): Promise<SingleResult<PacienteDetalhe>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("unlink_patient_account", {
+      p_patient_id: id,
+    });
+
+    if (error) return falhaDe(error);
+
+    return getById({ id });
   });
 }
