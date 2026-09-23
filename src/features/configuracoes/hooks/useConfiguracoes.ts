@@ -53,6 +53,58 @@ export function useMotivos() {
   });
 }
 
+export function useSeguranca() {
+  return useQuery({
+    queryKey: queryKeys.settings.security(),
+    queryFn: async () => (await call(() => configuracoesApi.getSeguranca())).data,
+  });
+}
+
+/* -------------------------------------------------------------------------
+   SEGUNDO FATOR OBRIGATÓRIO
+   ------------------------------------------------------------------------- */
+
+/**
+ * Liga e desliga a exigência de segundo fator no acesso administrativo.
+ *
+ * Invalida também a garantia da sessão, e não é detalhe: quem acabou de ligar a
+ * exigência precisa que o painel reavalie **a própria sessão** contra a regra
+ * nova. Sem isso, a tela de quem ligou continuaria operando como se nada
+ * tivesse mudado até o próximo recarregamento.
+ *
+ * A guarda que impede trancar a clínica do lado de fora está no backend, não
+ * aqui. Este hook só traduz a recusa.
+ */
+export function useSetExigirMfa() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ exigir }: { exigir: boolean }) => {
+      const { data } = await call(() => configuracoesApi.setExigirMfa({ exigir }));
+      audit.update(RECURSO, "security_settings", { operacao: "exigir_mfa", exigir });
+
+      return data;
+    },
+    onSuccess: async (seguranca) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.settings.security() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.auth.assurance() }),
+      ]);
+
+      toast.success(
+        seguranca?.exige_mfa ? "Segundo fator agora é obrigatório" : "Exigência desligada",
+        {
+          description: seguranca?.exige_mfa
+            ? "Administradores sem autenticador cadastrado perdem o acesso até cadastrarem um. Quem estiver com sessão de senha apenas verá o painel bloqueado."
+            : "O acesso administrativo volta a aceitar sessão de senha apenas. A exigência continua valendo na tela de login enquanto o painel a pedir.",
+        },
+      );
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível alterar a exigência", { description: erro.message }),
+  });
+}
+
 /* -------------------------------------------------------------------------
    DOCUMENTO LEGAL
    ------------------------------------------------------------------------- */

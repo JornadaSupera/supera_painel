@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/format";
 import type { ItemCatalogo, VersaoLegal } from "@/types/configuracao";
 import { DialogPublicarTermo } from "../components/DialogPublicarTermo";
+import { ExigenciaSegundoFator } from "../components/ExigenciaSegundoFator";
 import { GatilhosAlerta } from "../components/GatilhosAlerta";
 import { MotivosSituacao } from "../components/MotivosSituacao";
 import { useConfiguracoes, useTermos } from "../hooks/useConfiguracoes";
@@ -139,6 +140,7 @@ export function ConfiguracoesPage() {
           <TabsTrigger value="alertas">Gatilhos de alerta</TabsTrigger>
           <TabsTrigger value="motivos">Motivos de situação</TabsTrigger>
           <TabsTrigger value="legais">Termos & privacidade</TabsTrigger>
+          <TabsTrigger value="seguranca">Segurança</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalogos" className="flex flex-col gap-5">
@@ -280,6 +282,10 @@ export function ConfiguracoesPage() {
             que não existe "editar o texto vigente" — editar apagaria a prova do que cada pessoa
             aceitou, e o histórico acima é essa prova.
           </p>
+        </TabsContent>
+
+        <TabsContent value="seguranca">
+          <ExigenciaSegundoFator />
         </TabsContent>
       </Tabs>
 
