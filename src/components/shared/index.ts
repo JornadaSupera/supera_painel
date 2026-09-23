@@ -28,6 +28,9 @@ export { DataTable } from "./DataTable";
 export type { Column, DataTableProps } from "./DataTable";
 
 export { ClearFiltersButton, FilterSelect } from "./FilterBar";
+
+export { Logo } from "./Logo";
+export type { LogoProps } from "./Logo";
 export type { FilterSelectProps } from "./FilterBar";
 
 export { FormSelect } from "./FormSelect";

@@ -1,5 +1,4 @@
 import {
-  Activity,
   ArrowUp,
   CalendarDays,
   ChevronDown,
@@ -12,6 +11,7 @@ import {
 import { useEffect, useMemo, type ReactNode } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 
+import { Logo } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { BrandRibbon } from "@/layouts/BrandRibbon";
@@ -116,9 +116,7 @@ export function LegalDocumentView({ document: legal }: { document: LegalDocument
         <div className="mx-auto max-w-6xl px-4 pt-6 pb-12 sm:px-8 sm:pt-8 sm:pb-14">
           <div className="flex items-center justify-between gap-4">
             <Link to={`/${legal.slug}`} className="flex items-center gap-3">
-              <span className="bg-primary text-primary-foreground shadow-primary/30 flex size-10 items-center justify-center rounded-xl shadow-lg">
-                <Activity size={22} aria-hidden="true" />
-              </span>
+              <Logo height={32} surface="escura" />
               <span className="flex flex-col leading-tight">
                 <span className="font-semibold tracking-tight">Jornada Supera</span>
                 <span className="text-xs opacity-70">{CONTROLLER.shortName}</span>

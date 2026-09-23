@@ -1,8 +1,7 @@
-import { Activity } from "lucide-react";
 import { useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { Can } from "@/components/shared";
+import { Can, Logo } from "@/components/shared";
 import {
   Dialog,
   DialogContent,
@@ -61,10 +60,8 @@ export function MobileMenu() {
       <DialogContent className="top-0 left-0 h-dvh max-w-72 translate-x-0 translate-y-0 gap-0 rounded-none p-0 sm:max-w-72">
         <DialogHeader className="border-border border-b p-4 text-left">
           <DialogTitle className="flex items-center gap-3 text-base">
-            <span className="bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg">
-              <Activity size={18} aria-hidden="true" />
-            </span>
-            Jornada Supera
+            <Logo height={24} />
+            <span className="border-border border-l pl-3">Jornada Supera</span>
           </DialogTitle>
           <DialogDescription className="sr-only">Navegação principal do painel</DialogDescription>
         </DialogHeader>

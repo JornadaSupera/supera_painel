@@ -1,5 +1,7 @@
-import { Activity, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
+
+import { Logo } from "@/components/shared";
 
 /**
  * Frame for the authentication screens.
@@ -24,10 +26,8 @@ export function AuthLayout({
       {/* --------------------------------------------------------- identity */}
       <aside className="bg-sidebar border-sidebar-border hidden flex-col justify-between border-r p-12 lg:flex">
         <div className="flex items-center gap-3">
-          <span className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-lg">
-            <Activity size={20} aria-hidden="true" />
-          </span>
-          <div className="flex flex-col leading-tight">
+          <Logo height={30} />
+          <div className="border-border flex flex-col border-l pl-3 leading-tight">
             <span className="font-semibold tracking-tight">Jornada Supera</span>
             <span className="text-muted-foreground text-xs">Painel administrativo</span>
           </div>
@@ -54,10 +54,10 @@ export function AuthLayout({
         <div className="flex w-full max-w-95 flex-col gap-8">
           {/* The brand shows at the top only when the side column is hidden. */}
           <div className="flex items-center gap-3 lg:hidden">
-            <span className="bg-primary text-primary-foreground flex size-9 items-center justify-center rounded-lg">
-              <Activity size={20} aria-hidden="true" />
+            <Logo height={26} />
+            <span className="border-border border-l pl-3 font-semibold tracking-tight">
+              Jornada Supera
             </span>
-            <span className="font-semibold tracking-tight">Jornada Supera</span>
           </div>
 
           <div className="flex flex-col gap-2">

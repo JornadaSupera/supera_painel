@@ -1,6 +1,7 @@
-import { Activity, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { Logo } from "@/components/shared";
 import { BrandRibbon } from "./BrandRibbon";
 
 /**
@@ -24,9 +25,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
 
       <main className="flex flex-1 flex-col items-center justify-center gap-8 px-4 py-10 sm:py-16">
         <header className="flex flex-col items-center gap-3 text-center">
-          <span className="bg-primary text-primary-foreground shadow-primary/25 flex size-12 items-center justify-center rounded-2xl shadow-lg">
-            <Activity size={26} aria-hidden="true" />
-          </span>
+          <Logo height={40} />
           <div className="flex flex-col leading-tight">
             <span className="text-lg font-semibold tracking-tight">Jornada Supera</span>
             <span className="text-muted-foreground text-xs">

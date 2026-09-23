@@ -1,8 +1,8 @@
-import { Activity, ChevronDown, ChevronsLeft } from "lucide-react";
+import { ChevronDown, ChevronsLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
-import { Can } from "@/components/shared";
+import { Can, Logo } from "@/components/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/stores/layout";
@@ -201,11 +201,11 @@ export function Sidebar() {
     >
       {/* ------------------------------------------------------------- brand */}
       <div className="border-sidebar-border flex h-15 shrink-0 items-center gap-2.5 border-b px-[0.875rem]">
-        <span className="bg-primary text-primary-foreground flex size-8 shrink-0 items-center justify-center rounded-lg">
-          <Activity size={18} aria-hidden="true" />
-        </span>
+        {/* Recolhida sobram ~44 px: o lettering sairia com 13 px de altura e
+            ninguém o leria. Ver `Logo` para por que o selo continua existindo. */}
+        {collapsed ? <Logo variant="selo" /> : <Logo height={26} />}
         <Label collapsed={collapsed}>
-          <span className="flex flex-col leading-tight">
+          <span className="border-border flex flex-col border-l pl-2.5 leading-tight">
             <span className="text-sm font-semibold tracking-tight">Jornada Supera</span>
             <span className="text-muted-foreground text-[11px]">Administração</span>
           </span>
