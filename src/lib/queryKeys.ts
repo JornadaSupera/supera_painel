@@ -126,6 +126,10 @@ export const queryKeys = {
     alertRules: () => ["settings", "alert-rules"] as const,
     reasons: () => ["settings", "reasons"] as const,
     security: () => ["settings", "security"] as const,
+    /** Fila de conferência da integração — só os vínculos ainda propostos. */
+    externalLinks: () => ["settings", "external-links"] as const,
+    consents: () => ["settings", "consents"] as const,
+    dataSubjectRequests: () => ["settings", "data-subject-requests"] as const,
   },
 
   catalogs: {

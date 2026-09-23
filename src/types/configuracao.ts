@@ -100,6 +100,50 @@ export interface ConfiguracaoSeguranca {
   atualizado_por: string | null;
 }
 
+/**
+ * Um vínculo proposto pela integração, esperando conferência humana.
+ *
+ * > [!] A conferência existe para impedir o pior erro possível deste sistema.
+ * Ligar a ficha errada ao paciente errado **mistura prontuários** — e a partir
+ * daí o diário de uma pessoa aparece na ficha de outra. Por isso nada do
+ * sistema externo entra na ficha enquanto o vínculo não for confirmado por
+ * alguém.
+ *
+ * A fila precisa estar de pé **antes** de a sincronização ligar. Construí-la no
+ * dia em que os vínculos começarem a chegar é construí-la com pressa.
+ */
+export interface VinculoExterno {
+  id: string;
+  /** O sistema de origem: `gemed`. */
+  sistema: string;
+  /** Que tipo de registro o vínculo aponta — paciente, plano, diagnóstico. */
+  entidade: string;
+  /** A chave que o sistema de origem usa, legível. */
+  chave_externa: string;
+  /** O registro daqui que o vínculo propõe. `null` quando ainda não aponta um. */
+  local_id: string | null;
+  proposto_em: string;
+}
+
+/**
+ * Um aceite de termo ou de política, por pessoa e por versão.
+ *
+ * É a contrapartida da publicação: publicar cria a obrigação, isto é a prova de
+ * que ela foi cumprida. O aceite é **por versão** — quem aceitou a v1 não
+ * aceitou a v2, e é isso que torna o histórico de versões uma prova e não um
+ * changelog.
+ */
+export interface Consentimento {
+  id: string;
+  /** Nome de quem aceitou, ou o e-mail quando o nome não está preenchido. */
+  pessoa: string;
+  /** "Termos de uso · versão 3". */
+  documento: string;
+  aceito_em: string;
+  /** Revogar é direito do titular, e só ele o exerce. */
+  revogado_em: string | null;
+}
+
 export interface Configuracoes {
   /** Os sintomas marcáveis no diário — a base dos gatilhos de alerta. */
   sintomas: ItemCatalogo[];
@@ -115,4 +159,33 @@ export interface Configuracoes {
    * um campo vazio que ninguém consegue salvar.
    */
   sem_origem: string[];
+}
+
+/**
+ * Um pedido que o titular abriu sobre os próprios dados.
+ *
+ * > [!] Corre prazo legal a partir da abertura.
+ * A LGPD garante ao titular acesso, correção, portabilidade, revogação de
+ * consentimento e exclusão. O paciente abre o pedido pelo aplicativo — e até
+ * esta tela existir, **ninguém no painel sabia que ele existia**. Um pedido sem
+ * resposta não é uma pendência de sistema: é descumprimento com data.
+ */
+export interface SolicitacaoTitular {
+  id: string;
+  /** Quem pediu. Nome da conta, ou o e-mail quando o nome não está preenchido. */
+  pessoa: string;
+  /** `access`, `rectification`, `portability`, `consent_revocation`, `deletion`. */
+  tipo: string;
+  tipo_label: string;
+  /** `requested`, `under_review`, `granted`, `executed`, `refused`. */
+  status: string;
+  status_label: string;
+  /** Aberto em — é daqui que o prazo conta. */
+  criado_em: string;
+  decidido_em: string | null;
+  decidido_por: string | null;
+  /** A justificativa da decisão, que o backend guarda junto. */
+  observacao: string | null;
+  /** `true` enquanto o pedido aceita decisão. */
+  aberto: boolean;
 }

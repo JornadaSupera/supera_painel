@@ -7,9 +7,12 @@ import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type {
   ConfiguracaoSeguranca,
   Configuracoes,
+  Consentimento,
   MotivoSituacao,
   RegraAlerta,
+  SolicitacaoTitular,
   VersaoLegal,
+  VinculoExterno,
 } from "@/types/configuracao";
 import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
 import type {
@@ -497,6 +500,52 @@ export interface ConfiguracoesOperations {
    * pode depender da porta que emperrou.
    */
   setExigirMfa(params: { exigir: boolean }): Promise<SingleResult<ConfiguracaoSeguranca>>;
+
+  /**
+   * Os vínculos que a integração propôs e ninguém conferiu ainda.
+   *
+   * Só os propostos: confirmados e rejeitados já foram decididos, e uma fila de
+   * conferência que mistura pendente com resolvido deixa de ser fila.
+   */
+  getVinculosExternos(): Promise<ListResult<VinculoExterno>>;
+
+  /**
+   * Confirma ou rejeita um vínculo.
+   *
+   * Rejeitar não é o mesmo que ignorar: a linha sai da fila com a decisão
+   * registrada, e a integração não volta a propor o mesmo par sem que alguém
+   * saiba que ele já foi recusado.
+   */
+  confirmarVinculoExterno(params: {
+    id: string;
+    confirmar: boolean;
+  }): Promise<SingleResult<VinculoExterno>>;
+
+  /** Quem aceitou qual versão, e quando. Somente leitura: aceitar é ato do titular. */
+  getConsentimentos(params?: ListParams): Promise<ListResult<Consentimento>>;
+
+  /**
+   * Os pedidos que o titular abriu sobre os próprios dados.
+   *
+   * Abertos primeiro: é uma fila com prazo legal correndo, e ordenar por data
+   * misturaria o que espera decisão com o que já foi decidido.
+   */
+  getSolicitacoesTitular(): Promise<ListResult<SolicitacaoTitular>>;
+
+  /**
+   * Defere ou recusa um pedido, com justificativa.
+   *
+   * > [!] Não há como registrar que o pedido foi CUMPRIDO.
+   * O backend aceita apenas deferido e recusado; "executado" existe na
+   * estrutura e nenhuma função o alcança. Para a LGPD o que conta é o
+   * atendimento, não o deferimento — então é justamente a prova do atendimento
+   * que fica de fora. A tela diz isso em vez de dar o assunto por encerrado.
+   */
+  decidirSolicitacaoTitular(params: {
+    id: string;
+    deferir: boolean;
+    observacao: string;
+  }): Promise<SingleResult<SolicitacaoTitular>>;
 }
 
 /* ---------------------------------------------------------------- Fase 8 */

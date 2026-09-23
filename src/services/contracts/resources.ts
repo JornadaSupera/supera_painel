@@ -209,6 +209,26 @@ export const RESOURCES = {
       "setMotivoAtivo",
       "getSeguranca",
       "setExigirMfa",
+      /**
+       * A fila de conferência da integração, e a decisão sobre cada vínculo.
+       *
+       * Precisa existir **antes** de a sincronização ligar: ligar a ficha
+       * errada ao paciente errado mistura prontuários, e a conferência humana
+       * é o que impede isso.
+       */
+      "getVinculosExternos",
+      "confirmarVinculoExterno",
+      /**
+       * Os pedidos que o titular abriu sobre os proprios dados.
+       *
+       * Fica aqui, e nao numa rota propria, porque o escopo fecha em nove
+       * telas e esta e uma fila de decisao administrativa — a mesma natureza
+       * das outras abas de Configuracoes.
+       */
+      "getSolicitacoesTitular",
+      "decidirSolicitacaoTitular",
+      /** Quem aceitou qual versão de termo — a prova do que a publicação criou. */
+      "getConsentimentos",
     ],
   },
   catalogos: {

@@ -110,6 +110,10 @@ const MENSAGEM_POR_SENTINELA: Record<string, string> = {
   professional_not_found: "Profissional não encontrado.",
   cannot_manage_own_professional_profile:
     "Ninguém edita o próprio perfil profissional. Peça a outro administrador.",
+
+  /* ------------------------------------------------------- integração */
+  link_not_proposed:
+    "Este vínculo já foi conferido por alguém. Recarregue a fila para ver a decisão que está valendo.",
 };
 
 export function traduzirErro(erro: ErroPostgrest | null | undefined): ErrorCode {
