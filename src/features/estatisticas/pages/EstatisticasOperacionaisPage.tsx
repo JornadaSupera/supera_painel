@@ -106,7 +106,9 @@ export function EstatisticasOperacionaisPage() {
         <SkeletonCards count={4} />
       ) : (
         !isError && (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          // Two by two on a phone: one column stacked the four indicators
+          // ~420px tall before the first chart.
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {(data?.indicadores ?? []).map((indicador) => {
               const Icone = ICONES[indicador.chave] ?? Activity;
 
