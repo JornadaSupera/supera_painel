@@ -37,7 +37,8 @@ export function PeriodoToggle({
             aria-checked={ativo}
             onClick={() => onChange(periodo)}
             className={cn(
-              "rounded-sm px-3 py-1.5 text-xs font-medium transition-colors",
+              // 36px tall below md; 28px was under any touch guideline.
+              "rounded-sm px-3 py-1.5 text-xs font-medium transition-colors max-md:min-h-9",
               ativo
                 ? "bg-card text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground",

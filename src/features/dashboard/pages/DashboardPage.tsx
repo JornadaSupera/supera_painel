@@ -8,6 +8,7 @@ import {
   ChartCard,
   DonutChart,
   ErrorState,
+  Footnote,
   LineChart,
   PageHeader,
   StatCard,
@@ -141,7 +142,9 @@ export function DashboardPage() {
           {kpis.isError ? (
             <ErrorState error={kpis.error} onRetry={() => void kpis.refetch()} compact />
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+            // Two across even on a phone: six cards in one column filled two
+            // screens before the first chart.
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
               {kpis.isLoading
                 ? Array.from({ length: 6 }, (_, i) => <StatCard key={i} label="" loading />)
                 : kpis.data?.kpis.map((kpi) => {
@@ -277,10 +280,10 @@ export function DashboardPage() {
         </div>
 
         {/* ----------------------------------------------------------- nota */}
-        <p className="text-muted-foreground text-[11px] leading-relaxed">
+        <Footnote>
           Todos os dados são <strong className="text-foreground font-medium">anonimizados</strong> e
           agregados — nenhum registro individual identificável é mostrado neste dashboard.
-        </p>
+        </Footnote>
       </div>
     </div>
   );
