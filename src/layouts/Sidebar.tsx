@@ -4,6 +4,7 @@ import { NavLink, useLocation } from "react-router-dom";
 
 import { Can, Logo } from "@/components/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { BREAKPOINT, useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { useLayoutStore } from "@/stores/layout";
 import { visibleNavItems, type NavItem } from "./navigation";
@@ -184,8 +185,27 @@ function Group({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
 }
 
 export function Sidebar() {
-  const collapsed = useLayoutStore((state) => state.sidebarCollapsed);
-  const toggle = useLayoutStore((state) => state.toggleSidebar);
+  const storedCollapsed = useLayoutStore((state) => state.sidebarCollapsed);
+  const toggleStored = useLayoutStore((state) => state.toggleSidebar);
+  const location = useLocation();
+
+  /*
+   * Between 1024 and 1280 the full bar took 256px and left the content the
+   * width of a portrait tablet with a desktop layout in it: tables scrolling,
+   * card labels cut. There the rail is the default instead.
+   *
+   * Opening it in that range is momentary — it lasts until the next
+   * navigation — and never touches the stored preference, which belongs to
+   * wide screens. Someone who keeps the bar open at 1440 should not find it
+   * collapsed there because they glanced at a menu item on a laptop.
+   */
+  const wide = useMediaQuery(BREAKPOINT.xl);
+  const [openedAt, setOpenedAt] = useState<string | null>(null);
+
+  const collapsed = wide ? storedCollapsed : openedAt !== location.pathname;
+  const toggle = wide
+    ? toggleStored
+    : () => setOpenedAt(collapsed ? location.pathname : null);
 
   return (
     <aside
