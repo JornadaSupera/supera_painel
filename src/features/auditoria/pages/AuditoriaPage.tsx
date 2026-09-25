@@ -163,6 +163,9 @@ export function AuditoriaPage() {
       align: "right",
       width: 90,
       mono: true,
+      // On a tablet this column is what pushed "Quando" behind a sideways
+      // scroll. The row detail and the export still carry it.
+      hideBelow: "lg",
       render: (registro) => (
         <span className="text-xs">
           {registro.linhas === null ? "—" : formatNumber(registro.linhas)}
