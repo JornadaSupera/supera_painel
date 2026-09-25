@@ -219,7 +219,7 @@ function TextoDaVersao({
         <StatusBadge tone={destaque ? "primary" : "neutral"} size="sm">
           {titulo}
         </StatusBadge>
-        <time className="text-muted-foreground text-[10px] tabular-nums" dateTime={atualizadoEm}>
+        <time className="text-muted-foreground text-[11px] tabular-nums" dateTime={atualizadoEm}>
           {formatDateTime(atualizadoEm)}
         </time>
       </header>

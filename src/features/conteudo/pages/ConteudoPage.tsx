@@ -4,10 +4,10 @@ import { useState } from "react";
 import {
   BackendPendente,
   Can,
-  ClearFiltersButton,
   DataTable,
   EmptyState,
   ErrorState,
+  FilterPanel,
   FilterSelect,
   PageHeader,
   SearchInput,
@@ -251,15 +251,20 @@ export function ConteudoPage() {
           )}
         </h2>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <SearchInput
-            value={busca}
-            onChange={setBusca}
-            placeholder="Buscar orientação…"
-            label="Buscar orientação"
-            className="min-w-60 flex-1"
-          />
-
+        <FilterPanel
+          lead={
+            <SearchInput
+              value={busca}
+              onChange={setBusca}
+              placeholder="Buscar orientação…"
+              label="Buscar orientação"
+              className="min-w-60 flex-1"
+            />
+          }
+          activeCount={Object.values(filtros).filter(Boolean).length}
+          canClear={filtrada}
+          onClear={limparFiltros}
+        >
           <FilterSelect
             label="Status"
             value={filtros.status}
@@ -284,9 +289,7 @@ export function ConteudoPage() {
             options={toOptions(TIPO_CONTEUDO_LABEL)}
             className="w-36"
           />
-
-          <ClearFiltersButton visible={filtrada} onClick={limparFiltros} />
-        </div>
+        </FilterPanel>
 
         <div className="bg-card overflow-hidden rounded-2xl border">
           <DataTable
