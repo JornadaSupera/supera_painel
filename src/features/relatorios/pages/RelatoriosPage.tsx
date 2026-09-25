@@ -4,14 +4,15 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   BarChart,
+  type Column,
   DataTable,
   EmptyState,
   ErrorState,
+  Footnote,
   PageHeader,
   SkeletonCards,
   SkeletonTable,
   StatusBadge,
-  type Column,
 } from "@/components/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -179,12 +180,12 @@ export function RelatoriosPage() {
         );
       })}
 
-      <p className="text-muted-foreground text-[11px] leading-relaxed">
+      <Footnote>
         Filtros pré-configurados entregam a maior parte do valor com uma fração da complexidade.
         Cruzamentos livres ficam para quando houver histórico que os justifique — o cruzamento
         clínico que a equipe mais pediu já tem tela própria em{" "}
         <strong>Estatísticas → Clínicas</strong>.
-      </p>
+      </Footnote>
 
       <JanelaRelatorio
         definicao={aberto}
