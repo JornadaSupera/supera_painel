@@ -105,9 +105,12 @@ export function ConteudoPage() {
       header: "Orientação",
       sortable: true,
       width: "44%",
+      // Title and summary wrap, capped at two lines each. On one unbreakable
+      // line the summary set the table's minimum width at ~1160px, and on a
+      // laptop the status and "Despublicar" sat behind a sideways scroll.
       render: (conteudo) => (
-        <div className="min-w-0">
-          <p className="text-foreground truncate text-sm font-medium">{conteudo.titulo}</p>
+        <div className="max-w-[60ch] min-w-48 whitespace-normal">
+          <p className="text-foreground line-clamp-2 text-sm font-medium">{conteudo.titulo}</p>
 
           {conteudo.confidencial && !can(PERMISSAO.SIGILO_PSICOLOGIA) ? (
             <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[11px]">
@@ -115,7 +118,7 @@ export function ConteudoPage() {
               Sob sigilo profissional
             </p>
           ) : (
-            <p className="text-muted-foreground mt-0.5 truncate text-[11px]">{conteudo.resumo}</p>
+            <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[11px]">{conteudo.resumo}</p>
           )}
         </div>
       ),
@@ -141,6 +144,9 @@ export function ConteudoPage() {
       align: "right",
       width: 80,
       mono: true,
+      // Secondary to the status, and the first to go when the row is short
+      // on room. The phone card still lists it.
+      hideBelow: "xl",
       render: (conteudo) => <span className="text-xs">{conteudo.versao}</span>,
     },
     {
@@ -149,6 +155,7 @@ export function ConteudoPage() {
       align: "right",
       width: 110,
       mono: true,
+      hideBelow: "xl",
       render: (conteudo) =>
         conteudo.visualizacoes === null ? (
           // O traço é clicável no tooltip do cabeçalho? Não — o motivo fica no
@@ -170,7 +177,7 @@ export function ConteudoPage() {
       ),
     },
     {
-      key: "acoes",
+      key: "actions",
       header: <span className="sr-only">Ações</span>,
       width: 130,
       render: (conteudo) => (
