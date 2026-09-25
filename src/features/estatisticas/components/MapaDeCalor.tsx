@@ -1,3 +1,4 @@
+import { BREAKPOINT, useMediaQuery } from "@/hooks/useMediaQuery";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CelulaCruzamento, CruzamentoClinico } from "@/types/estatisticas";
@@ -98,8 +99,11 @@ function tituloDaCelula(
   return `${formatNumber(celula.registros)} registros de ${sintoma} ${grau} em ${protocolo}, de ${pacientes}.`;
 }
 
+const AVISO_CONTAGEM = "O mapa mostra contagem de registros, não prevalência.";
+
 export function MapaDeCalor({ dados }: MapaDeCalorProps) {
   const medida = medidaDe(dados);
+  const desktop = useMediaQuery(BREAKPOINT.md);
 
   const porChave = new Map(
     dados.celulas.map((celula) => [`${celula.protocolo}\u0000${celula.sintoma_id}`, celula]),
@@ -110,14 +114,25 @@ export function MapaDeCalor({ dados }: MapaDeCalorProps) {
       {/* Sem denominador o mapa troca de medida, e isso vem ANTES da tabela:
           quem lê "18" precisa saber que são registros, não por cento, antes de
           tirar conclusão do número. */}
-      {!dados.prevalencia_disponivel && dados.motivo_sem_prevalencia && (
-        <p className="border-border bg-muted/40 text-muted-foreground rounded-xl border px-4 py-3 text-[11px] leading-relaxed">
-          <strong className="text-foreground font-medium">
-            O mapa mostra contagem de registros, não prevalência.
-          </strong>{" "}
-          {dados.motivo_sem_prevalencia}
-        </p>
-      )}
+      {!dados.prevalencia_disponivel &&
+        dados.motivo_sem_prevalencia &&
+        (desktop ? (
+          <p className="border-border bg-muted/40 text-muted-foreground rounded-xl border px-4 py-3 text-[11px] leading-relaxed">
+            <strong className="text-foreground font-medium">{AVISO_CONTAGEM}</strong>{" "}
+            {dados.motivo_sem_prevalencia}
+          </p>
+        ) : (
+          // On a phone the full reason pushed the map a screen down. The
+          // sentence that changes how to read the numbers stays visible; only
+          // the why folds away.
+          <details className="border-border bg-muted/40 text-muted-foreground rounded-xl border px-4 py-3 text-[11px] leading-relaxed">
+            <summary className="cursor-pointer">
+              <strong className="text-foreground font-medium">{AVISO_CONTAGEM}</strong>{" "}
+              <span className="text-primary">Por quê?</span>
+            </summary>
+            <p className="mt-2">{dados.motivo_sem_prevalencia}</p>
+          </details>
+        ))}
 
       <div className="overflow-x-auto">
         <table className="w-full border-separate border-spacing-1 text-xs">

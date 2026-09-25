@@ -5,6 +5,8 @@ import {
   ChartCard,
   EmptyState,
   ErrorState,
+  FilterPanel,
+  Footnote,
   PageHeader,
   SkeletonChart,
   StatusBadge,
@@ -62,13 +64,30 @@ const GRAUS = [
  * representa "sem seleção", e usá-la como valor de opção quebra o componente.
  */
 const TODOS = "todos";
+const GRAU_PADRAO = "2";
 
 export function EstatisticasClinicasPage() {
   const [dias, setDias] = useState("90");
-  const [grauMinimo, setGrauMinimo] = useState("2");
+  const [grauMinimo, setGrauMinimo] = useState(GRAU_PADRAO);
   const [apenasAtivos, setApenasAtivos] = useState(true);
   const [protocolo, setProtocolo] = useState(TODOS);
   const [sintomaId, setSintomaId] = useState(TODOS);
+
+  // The period stays out of the count: it is always set, and on a phone it
+  // is the control that stays in view.
+  const aplicados = [
+    grauMinimo !== GRAU_PADRAO,
+    !apenasAtivos,
+    protocolo !== TODOS,
+    sintomaId !== TODOS,
+  ].filter(Boolean).length;
+
+  const limparFiltros = () => {
+    setGrauMinimo(GRAU_PADRAO);
+    setApenasAtivos(true);
+    setProtocolo(TODOS);
+    setSintomaId(TODOS);
+  };
 
   const filtro: FiltroClinico = {
     dias: Number(dias),
@@ -107,22 +126,30 @@ export function EstatisticasClinicasPage() {
       />
 
       {/* ---------------------------------------------------------- filtros */}
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-muted-foreground text-xs font-medium">Filtros:</span>
+      <FilterPanel
+        lead={
+          <div className="flex items-center gap-3">
+            <span className="text-muted-foreground text-xs font-medium max-md:hidden">
+              Filtros:
+            </span>
 
-        <Select value={dias} onValueChange={setDias}>
-          <SelectTrigger size="sm" aria-label="Período" className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {PERIODOS.map((periodo) => (
-              <SelectItem key={periodo.value} value={periodo.value}>
-                {periodo.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
+            <Select value={dias} onValueChange={setDias}>
+              <SelectTrigger size="sm" aria-label="Período" className="w-44 max-md:h-9 max-md:w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIODOS.map((periodo) => (
+                  <SelectItem key={periodo.value} value={periodo.value}>
+                    {periodo.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        }
+        activeCount={aplicados}
+        onClear={limparFiltros}
+      >
         <Select value={grauMinimo} onValueChange={setGrauMinimo}>
           <SelectTrigger size="sm" aria-label="Grau mínimo" className="w-40">
             <SelectValue />
@@ -198,15 +225,17 @@ export function EstatisticasClinicasPage() {
             </span>
           )}
         </div>
+      </FilterPanel>
 
-        {dados && (
-          <span className="text-muted-foreground text-[11px]">
-            {dados.pacientes_considerados === null
-              ? `${formatNumber(dados.registros_considerados)} registros no recorte`
-              : `${formatNumber(dados.pacientes_considerados)} pacientes no recorte`}
-          </span>
-        )}
-      </div>
+      {/* The size of the cut is a result, not a filter: it stays in view on a
+          phone, where the filters themselves move into a sheet. */}
+      {dados && (
+        <p className="text-muted-foreground -mt-2 text-[11px]">
+          {dados.pacientes_considerados === null
+            ? `${formatNumber(dados.registros_considerados)} registros no recorte`
+            : `${formatNumber(dados.pacientes_considerados)} pacientes no recorte`}
+        </p>
+      )}
 
       {/* Amostra truncada é informação, não detalhe: um percentual calculado
           sobre parte da base, apresentado como se fosse a base inteira, vira
@@ -284,7 +313,7 @@ export function EstatisticasClinicasPage() {
         )}
       </ChartCard>
 
-      <p className="text-muted-foreground text-[11px] leading-relaxed">
+      <Footnote>
         <StatusBadge tone="neutral" size="sm" className="mr-1.5">
           Sem identificação
         </StatusBadge>
@@ -293,7 +322,7 @@ export function EstatisticasClinicasPage() {
           : "Os números são contagens de registros — quem anotou o mesmo sintoma em vinte dias conta vinte vezes. É carga de relato, não prevalência, e as duas leituras não se substituem."}{" "}
         Nenhuma linha desta tela identifica paciente, e a leitura clínica do que os números
         significam é da equipe.
-      </p>
+      </Footnote>
     </div>
   );
 }
