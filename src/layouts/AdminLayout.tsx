@@ -70,13 +70,14 @@ export function AdminLayout() {
           tabIndex={-1}
           className="flex-1 overflow-y-auto focus:outline-none"
         >
-          {/* Full width, no `max-w`.
-              The reference locks the content at 1280px, but that is a
-              limitation of the mockup: in a data panel, every extra horizontal
-              pixel fits another table column and gives the charts room. A
-              white band down the sides of a work monitor is waste, not
-              breathing room. */}
-          <div className="w-full space-y-6 px-4 py-6 sm:px-6 xl:px-8">
+          {/* Capped at 1536px and centred.
+              This used to be full width on the argument that every extra pixel
+              fits another column. On 1920 and 2560 monitors that turned out
+              worse than a margin: table columns 400–500px apart, one bar
+              filling a whole chart, and header actions ~1500px from the
+              record they act on. 1536 still leaves more room than the
+              reference, which locks the content at 1280. */}
+          <div className="mx-auto w-full max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 xl:px-8">
             {garantia.isLoading ? (
               <Loading message="Verificando o nível de acesso…" />
             ) : bloqueado && garantia.data ? (
