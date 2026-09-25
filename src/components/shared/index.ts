@@ -45,6 +45,8 @@ export type { BreadcrumbItem, PageHeaderProps } from "./PageHeader";
 export { Pagination } from "./Pagination";
 export type { PaginationProps } from "./Pagination";
 
+export { ScrollableTabsList } from "./ScrollableTabsList";
+
 export { SearchInput } from "./SearchInput";
 
 export { SkeletonCards, SkeletonChart, SkeletonForm, SkeletonTable } from "./Skeletons";
