@@ -43,7 +43,7 @@ function Linha({
         </label>
 
         <div className="mt-0.5 flex flex-wrap items-center gap-2">
-          <code className="text-muted-foreground font-mono text-[10px]">{permissao.codigo}</code>
+          <code className="text-muted-foreground font-mono text-[11px] break-all">{permissao.codigo}</code>
 
           {permissao.concedida && permissao.concedida_em && (
             <span className="text-muted-foreground text-[11px]">

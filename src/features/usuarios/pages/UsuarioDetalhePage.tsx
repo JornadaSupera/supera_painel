@@ -72,8 +72,10 @@ export function UsuarioDetalhePage() {
     ? CONSELHO_POR_ESPECIALIDADE[usuario.especialidade]
     : null;
 
+  // Header and cards share one width, so the actions sit over the record
+  // they change instead of at the far edge of a wide monitor.
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex max-w-5xl flex-col gap-5">
       <PageHeader
         eyebrow="Gestão"
         title={usuario.nome}
@@ -114,7 +116,7 @@ export function UsuarioDetalhePage() {
         }
       />
 
-      <div className="grid max-w-5xl gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <DetailSection titulo="Identificação" icone={<IdCard size={15} />}>
           <div className="flex items-center gap-3">
             <UserAvatar name={usuario.nome} size="lg" />
@@ -136,7 +138,7 @@ export function UsuarioDetalhePage() {
 
             <DetailField rotulo={conselho ?? "Registro"}>
               {usuario.registro ? (
-                <span className="tabular-nums">{usuario.registro}</span>
+                <span className="break-all tabular-nums">{usuario.registro}</span>
               ) : undefined}
             </DetailField>
 
@@ -192,7 +194,7 @@ export function UsuarioDetalhePage() {
             <ul className="flex flex-wrap gap-1.5">
               {usuario.permissoes_efetivas.map((permissao) => (
                 <li key={permissao}>
-                  <Badge variant="secondary" className="text-[10px] font-normal">
+                  <Badge variant="secondary" className="text-[11px] font-normal">
                     {PERMISSAO_LABEL[permissao] ?? permissao}
                   </Badge>
                 </li>
