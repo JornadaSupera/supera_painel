@@ -1,7 +1,14 @@
-import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { ArrowDown, ArrowDownUp, ArrowUp, ChevronsUpDown } from "lucide-react";
+import { useMemo, type KeyboardEvent, type ReactNode } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -10,8 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { BREAKPOINT, useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
-import type { Sort } from "@/services/contracts";
+import type { Sort, SortDirection } from "@/services/contracts";
 import { Pagination, type PaginationProps } from "./Pagination";
 import { SkeletonTable } from "./Skeletons";
 import { EmptyState, ErrorState, type ErrorLike } from "./StateBlock";
@@ -33,7 +41,11 @@ import { EmptyState, ErrorState, type ErrorLike } from "./StateBlock";
  */
 
 export interface Column<T> {
-  /** Also the sort field sent to the backend. */
+  /**
+   * Also the sort field sent to the backend. The key `"actions"` marks the row
+   * menu: kept narrow on the right of the table, and in the card corner on a
+   * phone.
+   */
   key: string;
   header: ReactNode;
   sortable?: boolean;
@@ -41,8 +53,22 @@ export interface Column<T> {
   align?: "left" | "right" | "center";
   /** Numbers, IDs, CPF and dates — they line up vertically across rows. */
   mono?: boolean;
+  /**
+   * Leaves the table below this breakpoint. For secondary columns only: the
+   * ones that make a laptop scroll sideways to reach the status and the row
+   * actions. The phone card still lists them — it has the height to spare.
+   */
+  hideBelow?: "lg" | "xl";
   render?: (row: T) => ReactNode;
 }
+
+const ACTIONS_KEY = "actions";
+
+/* Literal classes, so Tailwind finds them when it scans the source. */
+const HIDE_BELOW: Record<NonNullable<Column<unknown>["hideBelow"]>, string> = {
+  lg: "hidden lg:table-cell",
+  xl: "hidden xl:table-cell",
+};
 
 export interface DataTableProps<T> {
   columns: Column<T>[];
@@ -132,6 +158,8 @@ export function DataTable<T>({
   const alignment = (align?: Column<T>["align"]) =>
     align === "right" ? "text-right" : align === "center" ? "text-center" : undefined;
 
+  const cardLayout = !useMediaQuery(BREAKPOINT.md);
+
   /* -----------------------------------------------------------------
      STATES — precedence: error, then loading, then empty.
 
@@ -172,16 +200,128 @@ export function DataTable<T>({
 
   const cellPadding = density === "compact" ? "py-2" : "py-3";
 
+  const selectionBar = selecionavel && selected.size > 0 && (
+    <div className="bg-primary/10 border-primary/25 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-5 py-3 text-sm">
+      <span className="font-medium">
+        {selected.size} {selected.size === 1 ? "selecionado" : "selecionados"}
+      </span>
+      <div className="flex flex-wrap items-center gap-2">{selection?.actions}</div>
+    </div>
+  );
+
+  const rowActivation = (row: T) =>
+    onRowClick
+      ? {
+          onClick: () => onRowClick(row),
+          // A clickable row has to be reachable without a mouse.
+          // `role="button"` is not an option on a `<tr>`: it would replace the
+          // row semantics a screen reader uses to announce "row 3 of 20".
+          // tabIndex plus Enter/Space keeps the table a table and still makes
+          // the row operable from the keyboard.
+          tabIndex: 0,
+          onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            // Only when the row itself has focus. Without this, hitting Enter
+            // on a button inside the row would fire the button AND open the
+            // row.
+            if (event.target !== event.currentTarget) return;
+            // Space scrolls the page by default, which would jump the view
+            // instead of opening the record.
+            event.preventDefault();
+            onRowClick(row);
+          },
+        }
+      : {};
+
+  const rowFocus =
+    onRowClick &&
+    "cursor-pointer focus-visible:outline-primary focus-visible:-outline-offset-2 focus-visible:outline-2";
+
+  const cell = (column: Column<T>, row: T) =>
+    column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? "");
+
+  /* ------------------------------------------------------------ phone cards */
+
+  /*
+   * Below `md` a table only fits its first two or three columns, and the ones
+   * that matter — status, the row menu, "when" — end up past the edge behind a
+   * scrollbar nobody notices. Each row becomes a card instead: the first
+   * column as the title, the row menu in the corner, everything else as
+   * label/value pairs. The column definitions stay the same, so no screen has
+   * to describe its rows twice.
+   */
+  if (cardLayout) {
+    const [titleColumn, ...rest] = columns;
+    const actionsColumn = rest.find((column) => column.key === ACTIONS_KEY);
+    const fields = rest.filter((column) => column !== actionsColumn);
+
+    return (
+      <div className={cn("flex min-w-0 flex-col", className)}>
+        {selectionBar}
+
+        {onSortChange && <CardSort columns={columns} sort={sort} onSortChange={onSortChange} />}
+
+        <ul aria-label={caption} className="divide-border divide-y">
+          {data.map((row) => {
+            const id = getRowId(row);
+            const isSelected = selected.has(id);
+
+            return (
+              <li
+                key={id}
+                {...rowActivation(row)}
+                className={cn(
+                  "flex flex-col gap-3 px-4",
+                  density === "compact" ? "py-2.5" : "py-3.5",
+                  rowFocus,
+                  isSelected && "bg-primary/8",
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  {selecionavel && (
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleRow(id)}
+                      onClick={(event) => event.stopPropagation()}
+                      aria-label="Selecionar registro"
+                      className="mt-0.5"
+                    />
+                  )}
+
+                  <div className="min-w-0 flex-1">{titleColumn && cell(titleColumn, row)}</div>
+
+                  {actionsColumn && <div className="-my-1 shrink-0">{cell(actionsColumn, row)}</div>}
+                </div>
+
+                {fields.length > 0 && (
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5">
+                    {fields.map((column) => (
+                      <div key={column.key} className="min-w-0">
+                        <dt className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+                          {column.header}
+                        </dt>
+                        <dd className={cn("mt-0.5 min-w-0 break-words", column.mono && "font-mono text-xs")}>
+                          {cell(column, row)}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+
+        {pagination && <Pagination {...pagination} label={label} />}
+      </div>
+    );
+  }
+
+  /* ------------------------------------------------------------------ table */
+
   return (
     <div className={cn("flex min-w-0 flex-col", className)}>
-      {selecionavel && selected.size > 0 && (
-        <div className="bg-primary/10 border-primary/25 flex items-center justify-between gap-4 border-b px-5 py-3 text-sm">
-          <span className="font-medium">
-            {selected.size} {selected.size === 1 ? "selecionado" : "selecionados"}
-          </span>
-          <div className="flex items-center gap-2">{selection?.actions}</div>
-        </div>
-      )}
+      {selectionBar}
 
       {/* Horizontal scrolling stays INSIDE the table — the page body never
           scrolls sideways. */}
@@ -215,6 +355,7 @@ export function DataTable<T>({
                     className={cn(
                       "text-muted-foreground h-9 text-[10px] font-medium tracking-wider whitespace-nowrap uppercase",
                       alignment(column.align),
+                      column.hideBelow && HIDE_BELOW[column.hideBelow],
                     )}
                     // Announces the sort state to assistive technology.
                     aria-sort={
@@ -254,31 +395,9 @@ export function DataTable<T>({
               return (
                 <TableRow
                   key={id}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  // A clickable row has to be reachable without a mouse.
-                  // `role="button"` is not an option on a `<tr>`: it would
-                  // replace the row semantics a screen reader uses to announce
-                  // "row 3 of 20". tabIndex plus Enter/Space keeps the table a
-                  // table and still makes the row operable from the keyboard.
-                  tabIndex={onRowClick ? 0 : undefined}
-                  onKeyDown={
-                    onRowClick
-                      ? (event) => {
-                          if (event.key !== "Enter" && event.key !== " ") return;
-                          // Only when the row itself has focus. Without this,
-                          // hitting Enter on a button inside the row would fire
-                          // the button AND open the row.
-                          if (event.target !== event.currentTarget) return;
-                          // Space scrolls the page by default, which would jump
-                          // the view instead of opening the record.
-                          event.preventDefault();
-                          onRowClick(row);
-                        }
-                      : undefined
-                  }
+                  {...rowActivation(row)}
                   className={cn(
-                    onRowClick &&
-                      "cursor-pointer focus-visible:outline-primary focus-visible:-outline-offset-2 focus-visible:outline-2",
+                    rowFocus,
                     // A selected row has a background AND a checked box —
                     // colour is not the only signal.
                     isSelected && "bg-primary/8 hover:bg-primary/12",
@@ -305,10 +424,11 @@ export function DataTable<T>({
                         cellPadding,
                         column.mono && "font-mono text-xs",
                         alignment(column.align),
-                        column.key === "actions" && "w-px text-right whitespace-nowrap",
+                        column.hideBelow && HIDE_BELOW[column.hideBelow],
+                        column.key === ACTIONS_KEY && "w-px text-right whitespace-nowrap",
                       )}
                     >
-                      {column.render ? column.render(row) : String((row as Record<string, unknown>)[column.key] ?? "")}
+                      {cell(column, row)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -319,6 +439,73 @@ export function DataTable<T>({
       </div>
 
       {pagination && <Pagination {...pagination} label={label} />}
+    </div>
+  );
+}
+
+/**
+ * Sort control for the phone cards.
+ *
+ * The sortable headers are gone in that layout, and the sort has to stay: a
+ * list that cannot be put in order is a different screen, not a smaller one.
+ * It sends the same `{ field, direction }` the headers send, so the backend
+ * cannot tell which one was used.
+ */
+function CardSort<T>({
+  columns,
+  sort,
+  onSortChange,
+}: {
+  columns: Column<T>[];
+  sort?: Sort | null;
+  onSortChange: (sort: Sort) => void;
+}) {
+  const sortable = columns.filter((column) => column.sortable);
+  if (sortable.length === 0) return null;
+
+  // A header can be markup; the option needs text.
+  const nameOf = (column: Column<T>) =>
+    typeof column.header === "string" ? column.header : column.key;
+
+  const toValue = (field: string, direction: SortDirection) => `${field}:${direction}`;
+
+  // A default order on a field with no column (creation date, say) matches
+  // no option. The empty value keeps the "Ordenar" placeholder instead of an
+  // empty trigger.
+  const current =
+    sort && sortable.some((column) => column.key === sort.field)
+      ? toValue(sort.field, sort.direction)
+      : "";
+
+  return (
+    <div className="border-border flex justify-end border-b px-4 py-2">
+      <Select
+        value={current}
+        onValueChange={(value) => {
+          // The last colon splits: the field name is the backend's, not ours.
+          const cut = value.lastIndexOf(":");
+          onSortChange({
+            field: value.slice(0, cut),
+            direction: value.slice(cut + 1) as SortDirection,
+          });
+        }}
+      >
+        <SelectTrigger size="sm" aria-label="Ordenar lista" className="w-auto max-w-full">
+          <ArrowDownUp aria-hidden="true" />
+          <SelectValue placeholder="Ordenar" />
+        </SelectTrigger>
+
+        <SelectContent>
+          {sortable.flatMap((column) => [
+            <SelectItem key={toValue(column.key, "asc")} value={toValue(column.key, "asc")}>
+              {nameOf(column)} · crescente
+            </SelectItem>,
+            <SelectItem key={toValue(column.key, "desc")} value={toValue(column.key, "desc")}>
+              {nameOf(column)} · decrescente
+            </SelectItem>,
+          ])}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
