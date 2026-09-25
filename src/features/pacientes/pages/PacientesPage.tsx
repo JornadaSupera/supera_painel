@@ -148,7 +148,7 @@ export function PacientesPage() {
       ),
     },
     {
-      key: "acoes",
+      key: "actions",
       header: <span className="sr-only">Ações</span>,
       render: (paciente) => <AcoesPaciente paciente={paciente} />,
     },
