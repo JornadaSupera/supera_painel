@@ -150,7 +150,11 @@ export function PageHeader({
         {subtitle && <p className="text-muted-foreground mt-1 text-sm leading-snug">{subtitle}</p>}
       </div>
 
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {/* The actions wrap instead of holding their row. On a phone the header
+          already drops them under the title; a group that refused to shrink
+          then ran past the screen edge, and the last button — "Desativar",
+          "Editar" — was only reachable by scrolling the page sideways. */}
+      {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
     </header>
   );
 }
