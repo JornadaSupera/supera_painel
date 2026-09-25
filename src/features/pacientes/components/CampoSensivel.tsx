@@ -83,10 +83,18 @@ export function CampoSensivel({
         <Tooltip>
           <TooltipTrigger
             type="button"
-            onClick={alternar}
+            onClick={(evento) => {
+              // In the patient list the whole row opens the record. Without
+              // this, revealing a CPF there also navigated away from it.
+              evento.stopPropagation();
+              alternar();
+            }}
             disabled={revelar.isPending}
             aria-label={`${visivel ? "Ocultar" : "Revelar"} ${ROTULO[campo]}${alvo}`}
-            className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring/50 inline-flex size-5 shrink-0 items-center justify-center rounded-sm transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
+            // The 20px icon keeps its size; the hit area grows to 40px
+            // around it, so the reveal is reachable with a thumb without
+            // pushing the masked value around.
+            className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring/50 relative inline-flex size-5 shrink-0 items-center justify-center rounded-sm transition-colors after:absolute after:-inset-2.5 focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50"
           >
             <Icone size={13} aria-hidden="true" className={cn(revelar.isPending && "animate-spin")} />
           </TooltipTrigger>
