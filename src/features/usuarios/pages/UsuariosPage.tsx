@@ -4,11 +4,12 @@ import { useNavigate } from "react-router-dom";
 
 import {
   Can,
-  ClearFiltersButton,
   DataTable,
   EmptyState,
+  FilterPanel,
   FilterSelect,
   PageHeader,
+  ScrollableTabsList,
   SearchInput,
   StatusBadge,
   TONE_USER_STATUS,
@@ -16,7 +17,7 @@ import {
   type Column,
 } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/auth-context";
 import {
@@ -162,7 +163,7 @@ export function UsuariosPage() {
           {usuario.mfa_ativo === false && (
             <Tooltip>
               <TooltipTrigger asChild>
-                <span className="bg-warning-bg text-warning-foreground border-warning/30 cursor-default rounded-sm border px-1 text-[10px] font-medium">
+                <span className="bg-warning-bg text-warning-foreground border-warning/30 cursor-default rounded-sm border px-1 text-[11px] font-medium">
                   sem 2FA
                 </span>
               </TooltipTrigger>
@@ -209,10 +210,10 @@ export function UsuariosPage() {
         {/* Sem permissão de editar permissões, não há segunda aba — e uma aba
             sozinha é ruído. */}
         {can(PERMISSAO.PERMISSOES_MANAGE) && (
-          <TabsList>
+          <ScrollableTabsList>
             <TabsTrigger value="profissionais">Profissionais</TabsTrigger>
             <TabsTrigger value="permissoes">Permissões por papel</TabsTrigger>
-          </TabsList>
+          </ScrollableTabsList>
         )}
 
         <TabsContent value="profissionais" className="flex flex-col gap-5">
@@ -221,15 +222,22 @@ export function UsuariosPage() {
             carregando={distribuicao.isLoading}
           />
 
-          <div className="flex flex-wrap items-center gap-2">
-            <SearchInput
-              value={busca}
-              onChange={setBusca}
-              placeholder="Buscar profissional…"
-              label="Buscar profissional"
-              className="min-w-60 flex-1"
-            />
-
+          <FilterPanel
+            lead={
+              <SearchInput
+                value={busca}
+                onChange={setBusca}
+                placeholder="Buscar profissional…"
+                label="Buscar profissional"
+                className="min-w-60 flex-1"
+              />
+            }
+            // The specialty strip filters too, so it counts here: the phone
+            // button has to say that the list below is narrowed.
+            activeCount={Object.values(filtros).filter(Boolean).length}
+            canClear={filtrada}
+            onClear={limparFiltros}
+          >
             <FilterSelect
               label="Papel"
               value={filtros.papel}
@@ -245,9 +253,7 @@ export function UsuariosPage() {
               options={toOptions(STATUS_USUARIO_LABEL)}
               className="w-36"
             />
-
-            <ClearFiltersButton visible={filtrada} onClick={limparFiltros} />
-          </div>
+          </FilterPanel>
 
           <div className="bg-card overflow-hidden rounded-2xl border">
             <DataTable
