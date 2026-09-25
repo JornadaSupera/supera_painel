@@ -131,6 +131,9 @@ export function UsuariosPage() {
       key: "horario_inicio",
       header: "Horário chat",
       width: 130,
+      // Leaves the tablet table so status and the row menu fit without a
+      // sideways scroll. The record shows the service window.
+      hideBelow: "lg",
       render: (usuario) =>
         usuario.horario_inicio && usuario.horario_fim ? (
           <span className="text-xs tabular-nums">
@@ -170,7 +173,7 @@ export function UsuariosPage() {
       ),
     },
     {
-      key: "acoes",
+      key: "actions",
       header: <span className="sr-only">Ações</span>,
       render: (usuario) => <AcoesUsuario usuario={usuario} onVerHistorico={setHistoricoDe} />,
     },
