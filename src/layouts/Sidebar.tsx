@@ -69,7 +69,7 @@ function Label({
 function LevelMarker({ collapsed }: { collapsed: boolean }) {
   return (
     <Label collapsed={collapsed}>
-      <span className="bg-supera-uniao/15 text-supera-uniao ml-1 rounded-full px-1.5 py-px text-[10px] font-semibold tracking-wide">
+      <span className="bg-supera-uniao/15 text-supera-uniao ml-1 rounded-full px-1.5 py-px text-[11px] font-semibold tracking-wide">
         Médio
       </span>
     </Label>
