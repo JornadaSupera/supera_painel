@@ -4,10 +4,11 @@ import { Download, FileJson, ShieldCheck } from "lucide-react";
 
 import {
   BackendPendente,
-  ClearFiltersButton,
   DataTable,
   EmptyState,
+  FilterPanel,
   FilterSelect,
+  Footnote,
   PageHeader,
   SearchInput,
   SkeletonCards,
@@ -240,10 +241,13 @@ export function AuditoriaPage() {
 
       {/* ------------------------------------------------------- contadores */}
       <section aria-label="Resumo da janela">
+        {/* Two by two on a phone and four across from lg. One column stacked
+            the counters ~400px tall before the trail even started, and three
+            across left "Sigiloso" alone on a second row. */}
         {resumo.isLoading ? (
-          <SkeletonCards count={3} />
+          <SkeletonCards count={4} />
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {(resumo.data?.contagens ?? []).map((contagem) => (
               <StatCard
                 key={contagem.acao}
@@ -269,15 +273,20 @@ export function AuditoriaPage() {
       </section>
 
       {/* ---------------------------------------------------------- filtros */}
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchInput
-          value={busca}
-          onChange={setBusca}
-          placeholder="Buscar por pessoa, recurso ou paciente…"
-          label="Buscar na trilha"
-          className="min-w-60 flex-1"
-        />
-
+      <FilterPanel
+        lead={
+          <SearchInput
+            value={busca}
+            onChange={setBusca}
+            placeholder="Buscar por pessoa, recurso ou paciente…"
+            label="Buscar na trilha"
+            className="min-w-60 flex-1"
+          />
+        }
+        activeCount={Object.values(filtros).filter(Boolean).length}
+        canClear={filtrada}
+        onClear={limparFiltros}
+      >
         <Select value={janelaDias || "tudo"} onValueChange={(v) => setJanela(v === "tudo" ? "" : v)}>
           <SelectTrigger size="sm" aria-label="Período" className="w-48">
             <SelectValue placeholder="Período" />
@@ -329,9 +338,7 @@ export function AuditoriaPage() {
           options={toOptions(ORIGEM_AUDITORIA_LABEL)}
           className="w-44"
         />
-
-        <ClearFiltersButton visible={filtrada} onClick={limparFiltros} />
-      </div>
+      </FilterPanel>
 
       {/* Um seletor incompleto que se apresenta como completo faz quem apura
           concluir que não há rastro de alguém. */}
@@ -378,14 +385,14 @@ export function AuditoriaPage() {
       </div>
 
       <div className="flex flex-col gap-3">
-        <p className="text-muted-foreground text-[11px] leading-relaxed">
+        <Footnote>
           <StatusBadge tone="neutral" size="sm" className="mr-1.5">
             Imutável
           </StatusBadge>
           Registros de auditoria não são alterados nem apagados por nenhuma tela deste painel. A
           exportação em CSV ou JSON atende ao relatório do encarregado de dados, e leva as colunas
           de origem e de material restrito junto.
-        </p>
+        </Footnote>
       </div>
 
       <DetalheAcesso
