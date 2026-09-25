@@ -57,7 +57,10 @@ export function MobileMenu() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="top-0 left-0 h-dvh max-w-72 translate-x-0 translate-y-0 gap-0 rounded-none p-0 sm:max-w-72">
+      {/* `flex flex-col` over the dialog's grid: a grid at full height split
+          the spare room between header and nav, and the first item started
+          at ~40% of the screen, below an empty band under the logo. */}
+      <DialogContent className="top-0 left-0 flex h-dvh max-w-72 translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-0 sm:max-w-72">
         <DialogHeader className="border-border border-b p-4 text-left">
           <DialogTitle className="flex items-center gap-3 text-base">
             <Logo height={24} />
