@@ -1,6 +1,6 @@
 import { Check, Link2, X } from "lucide-react";
 
-import { EmptyState, ErrorState, SkeletonCards, StatusBadge } from "@/components/shared";
+import { EmptyState, ErrorState, Footnote, SkeletonCards, StatusBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/format";
 import type { VinculoExterno } from "@/types/configuracao";
@@ -124,11 +124,11 @@ export function FilaDeConferencia() {
         )}
       </section>
 
-      <p className="text-muted-foreground text-[11px] leading-relaxed">
+      <Footnote>
         Confirmar libera o sistema de origem a preencher aquela ficha; rejeitar registra a recusa e
         mantém a ficha intocada. Nos dois casos a linha sai da fila com a decisão gravada — quem
         decidiu e quando.
-      </p>
+      </Footnote>
     </div>
   );
 }

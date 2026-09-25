@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { Check, Pencil, Plus, X } from "lucide-react";
 
-import { EmptyState, ErrorState, SkeletonCards } from "@/components/shared";
+import { EmptyState, ErrorState, Footnote, SkeletonCards } from "@/components/shared";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -220,7 +220,7 @@ function LinhaMotivo({
       ) : (
         <div className="min-w-0">
           <p className="text-foreground truncate text-xs font-medium">{motivo.label}</p>
-          <code className="text-muted-foreground font-mono text-[10px]">{motivo.codigo}</code>
+          <code className="text-muted-foreground font-mono text-[11px]">{motivo.codigo}</code>
         </div>
       )}
 
@@ -364,11 +364,11 @@ export function MotivosSituacao() {
         </div>
       )}
 
-      <p className="text-muted-foreground text-[11px] leading-relaxed">
+      <Footnote>
         Motivo se aposenta, nunca se apaga: um compromisso de março aponta para o motivo de março, e
         apagar a linha falsificaria o relatório daquele mês. Para corrigir uma digitação, use o
         lápis — o rótulo muda e o código, que é o que os relatórios agrupam, continua o mesmo.
-      </p>
+      </Footnote>
 
       {/* Confirmação sem campo de motivo, de propósito: a justificativa não tem
           onde ser gravada no backend, e pedir um texto que não chega a lugar

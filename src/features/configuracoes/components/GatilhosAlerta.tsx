@@ -1,6 +1,6 @@
 import { BellRing } from "lucide-react";
 
-import { EmptyState, ErrorState, SkeletonCards, StatusBadge } from "@/components/shared";
+import { EmptyState, ErrorState, Footnote, SkeletonCards, StatusBadge } from "@/components/shared";
 import {
   Select,
   SelectContent,
@@ -156,11 +156,11 @@ export function GatilhosAlerta() {
         </div>
       )}
 
-      <p className="text-muted-foreground text-[11px] leading-relaxed">
+      <Footnote>
         Trocar um limiar não reescreve o passado: os alertas já abertos continuam valendo pela regra
         sob a qual nasceram, e o histórico de cada limiar fica registrado. É o que permite explicar,
         meses depois, por que um sintoma disparou naquele dia.
-      </p>
+      </Footnote>
     </div>
   );
 }

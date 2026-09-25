@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { Scale } from "lucide-react";
 
-import { ConfirmDialog, EmptyState, ErrorState, SkeletonCards, StatusBadge } from "@/components/shared";
+import { ConfirmDialog, EmptyState, ErrorState, Footnote, SkeletonCards, StatusBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
 import type { SolicitacaoTitular } from "@/types/configuracao";
@@ -148,11 +148,11 @@ export function SolicitacoesTitular() {
         )}
       </section>
 
-      <p className="text-muted-foreground text-[11px] leading-relaxed">
+      <Footnote>
         Deferir registra a decisão, não o cumprimento: exportar, corrigir ou excluir o dado acontece
         fora do painel, e o backend ainda não tem onde registrar que foi feito. Para a lei o que
         conta é o atendimento — mantenha o comprovante fora daqui até essa etapa existir.
-      </p>
+      </Footnote>
 
       <ConfirmDialog
         open={decisao !== null}

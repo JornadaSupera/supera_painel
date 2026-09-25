@@ -6,6 +6,7 @@ import {
   BackendPendente,
   EmptyState,
   ErrorState,
+  Footnote,
   PageHeader,
   ScrollableTabsList,
   SkeletonCards,
@@ -108,7 +109,7 @@ function Catalogo({
                 )}
               </div>
 
-              <code className="text-muted-foreground shrink-0 font-mono text-[10px]">
+              <code className="text-muted-foreground shrink-0 font-mono text-[11px]">
                 {item.codigo}
               </code>
             </li>
@@ -206,12 +207,12 @@ export function ConfiguracoesPage() {
             </div>
           )}
 
-          <p className="text-muted-foreground text-[11px] leading-relaxed">
+          <Footnote>
             Os catálogos acima mudam por migração versionada, com revisão — não por formulário. O
             mesmo vocabulário alimenta o diário do paciente, os eixos dos relatórios e os gatilhos
             de alerta, e renomear um código aqui quebraria os três de uma vez. As regras de
             permissão por papel ficam em <strong>Usuários → Permissões por papel</strong>.
-          </p>
+          </Footnote>
         </TabsContent>
 
         <TabsContent value="alertas">
@@ -293,11 +294,11 @@ export function ConfiguracoesPage() {
             </article>
           ))}
 
-          <p className="text-muted-foreground text-[11px] leading-relaxed">
+          <Footnote>
             O aceite é versionado: quem aceitou a versão anterior não aceitou a atual. É por isso
             que não existe "editar o texto vigente" — editar apagaria a prova do que cada pessoa
             aceitou, e o histórico acima é essa prova.
-          </p>
+          </Footnote>
 
           {/* A contrapartida da publicação: uma cria a obrigação, a outra é a
               prova de que ela foi cumprida. */}

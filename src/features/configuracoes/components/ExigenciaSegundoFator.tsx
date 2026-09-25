@@ -1,6 +1,6 @@
 import { ShieldCheck } from "lucide-react";
 
-import { ErrorState, SkeletonCards, StatusBadge } from "@/components/shared";
+import { ErrorState, Footnote, SkeletonCards, StatusBadge } from "@/components/shared";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useGarantiaDaSessao } from "@/hooks/useGarantiaDaSessao";
@@ -45,7 +45,9 @@ export function ExigenciaSegundoFator() {
   return (
     <div className="flex flex-col gap-4">
       <section className="bg-card rounded-2xl border p-5">
-        <header className="mb-4 flex items-start justify-between gap-3">
+        {/* On a phone the badge goes above the title: beside it, it squeezed
+            the heading into three lines. */}
+        <header className="mb-4 flex flex-col-reverse items-start gap-2 sm:flex-row sm:justify-between sm:gap-3">
           <div>
             <h2 className="text-foreground text-sm font-semibold">
               Verificação em duas etapas no acesso administrativo
@@ -104,12 +106,12 @@ export function ExigenciaSegundoFator() {
         </div>
       )}
 
-      <p className="text-muted-foreground text-[11px] leading-relaxed">
+      <Footnote>
         Com a exigência ligada, quem entra apenas com a senha continua com sessão válida e deixa de
         ser reconhecido como administrador — o painel bloqueia e explica, em vez de abrir todas as
         telas zeradas. Administrador sem autenticador cadastrado perde o acesso até cadastrar um, e
         o cadastro do fator ainda não acontece por esta tela.
-      </p>
+      </Footnote>
     </div>
   );
 }
