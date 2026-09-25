@@ -117,11 +117,16 @@ export function PacientesPage() {
       key: "protocolo_nome",
       header: "Protocolo",
       width: "20%",
-      render: (paciente) => (
-        <Badge variant="secondary" className="text-[10px] font-normal">
-          {paciente.protocolo_nome}
-        </Badge>
-      ),
+      // No protocol yet is a dash, like every other empty cell. An empty
+      // badge drew a green pill with nothing in it.
+      render: (paciente) =>
+        paciente.protocolo_nome ? (
+          <Badge variant="secondary" className="text-[11px] font-normal">
+            {paciente.protocolo_nome}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground text-xs">—</span>
+        ),
     },
     {
       key: "fase",

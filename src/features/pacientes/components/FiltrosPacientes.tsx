@@ -1,9 +1,4 @@
-import {
-  ClearFiltersButton,
-  FilterSelect,
-  SearchInput,
-  SourceErrorChip,
-} from "@/components/shared";
+import { FilterPanel, FilterSelect, SearchInput, SourceErrorChip } from "@/components/shared";
 import { useCids, useFasesTratamento, useProtocolos } from "@/hooks/useCatalogos";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { RISCO_LABEL, STATUS_PACIENTE_LABEL, toOptions } from "@/lib/enums";
@@ -54,17 +49,23 @@ export function FiltrosPacientes() {
   }));
 
   const aplicar = (campo: keyof Filtros) => (valor: string) => setFiltro(campo, valor);
+  const aplicados = Object.values(filtros).filter(Boolean).length;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <SearchInput
-        value={busca}
-        onChange={setBusca}
-        placeholder="Buscar por nome, CPF ou código…"
-        label="Buscar paciente"
-        className="min-w-60 flex-1"
-      />
-
+    <FilterPanel
+      lead={
+        <SearchInput
+          value={busca}
+          onChange={setBusca}
+          placeholder="Buscar por nome, CPF ou código…"
+          label="Buscar paciente"
+          className="min-w-60 flex-1"
+        />
+      }
+      activeCount={aplicados}
+      canClear={hasActiveFilters(busca, filtros)}
+      onClear={limparFiltros}
+    >
       {/* Seletor cujo catálogo falhou some e dá lugar ao motivo: uma lista
           vazia por erro de rede é indistinguível de uma lista vazia legítima, e
           quem vê "Protocolo: todos" sem opção nenhuma conclui que a clínica não
@@ -114,13 +115,14 @@ export function FiltrosPacientes() {
         />
       )}
 
+      {/* w-36, not w-32: at 128px "Status: todos" was cut to "Status: todo". */}
       {!semRisco && (
         <FilterSelect
           label="Risco"
           value={filtros.risco}
           onChange={aplicar("risco")}
           options={toOptions(RISCO_LABEL)}
-          className="w-32"
+          className="w-36"
         />
       )}
 
@@ -129,11 +131,9 @@ export function FiltrosPacientes() {
         value={filtros.status}
         onChange={aplicar("status")}
         options={toOptions(STATUS_PACIENTE_LABEL)}
-        className="w-32"
+        className="w-36"
       />
-
-      <ClearFiltersButton visible={hasActiveFilters(busca, filtros)} onClick={limparFiltros} />
-    </div>
+    </FilterPanel>
   );
 }
 
