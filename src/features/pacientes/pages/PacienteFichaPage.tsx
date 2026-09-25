@@ -212,8 +212,10 @@ export function PacienteFichaPage() {
 
   /* ------------------------------------------------------------ leitura */
 
+  // Header and cards share one width. With only the cards capped, a wide
+  // monitor put Editar and Desativar ~1500px from the record they act on.
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex max-w-5xl flex-col gap-5">
       <PageHeader
         eyebrow="Gestão"
         title={paciente.nome}
@@ -298,7 +300,7 @@ export function PacienteFichaPage() {
 
       <OrigemDosDados paciente={paciente} />
 
-      <div className="grid max-w-5xl gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2">
         <DetailSection titulo="Identificação" icone={<User size={15} />}>
           <div className="flex items-center gap-3">
             <UserAvatar name={paciente.nome} size="lg" />
@@ -429,7 +431,7 @@ export function PacienteFichaPage() {
                 <ul className="flex flex-wrap gap-1.5">
                   {paciente.reacoes_previas.map((reacao) => (
                     <li key={reacao}>
-                      <Badge variant="secondary" className="text-[10px] font-normal">
+                      <Badge variant="secondary" className="text-[11px] font-normal">
                         {reacao}
                       </Badge>
                     </li>
