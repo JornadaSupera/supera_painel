@@ -29,6 +29,11 @@ export type { Column, DataTableProps } from "./DataTable";
 
 export { ClearFiltersButton, FilterSelect } from "./FilterBar";
 
+export { FilterPanel } from "./FilterPanel";
+export type { FilterPanelProps } from "./FilterPanel";
+
+export { Footnote } from "./Footnote";
+
 export { Logo } from "./Logo";
 export type { LogoProps } from "./Logo";
 export type { FilterSelectProps } from "./FilterBar";
