@@ -353,7 +353,7 @@ export function DataTable<T>({
                     key={column.key}
                     style={column.width ? { width: column.width } : undefined}
                     className={cn(
-                      "text-muted-foreground h-9 text-[10px] font-medium tracking-wider whitespace-nowrap uppercase",
+                      "text-muted-foreground h-9 text-[11px] font-medium tracking-wider whitespace-nowrap uppercase",
                       alignment(column.align),
                       column.hideBelow && HIDE_BELOW[column.hideBelow],
                     )}
@@ -367,7 +367,13 @@ export function DataTable<T>({
                         type="button"
                         onClick={() => sortBy(column)}
                         className={cn(
-                          "hover:text-foreground inline-flex items-center gap-1 rounded-sm transition-colors",
+                          // `uppercase tracking-wider` again: a button does not
+                          // inherit text-transform, so sortable headers read
+                          // "Status" next to "REGISTRO".
+                          "hover:text-foreground inline-flex items-center gap-1 rounded-sm tracking-wider uppercase transition-colors",
+                          // The label is 14px tall; the hit area grows to the
+                          // header row without changing how it looks.
+                          "relative after:absolute after:-inset-x-2 after:-inset-y-3",
                           active && "text-foreground",
                         )}
                       >

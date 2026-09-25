@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export function DetailField({ rotulo, children }: { rotulo: string; children?: ReactNode }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+      <dt className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
         {rotulo}
       </dt>
       {/*

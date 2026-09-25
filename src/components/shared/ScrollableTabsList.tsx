@@ -46,7 +46,9 @@ export function ScrollableTabsList({ className, ...props }: ComponentProps<typeo
       // more, and a bar under a tab list reads as a rendering glitch.
       className="max-w-full min-w-0 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
-      <TabsList className={cn("w-max", className)} {...props} />
+      {/* 44px tall on touch screens instead of 36: the triggers take the
+          list height, and 29px tabs were hard to hit with a thumb. */}
+      <TabsList className={cn("w-max max-md:h-11!", className)} {...props} />
     </div>
   );
 }

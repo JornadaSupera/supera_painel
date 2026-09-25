@@ -113,7 +113,7 @@ export function StatCard({
         {hasDelta && (
           <span
             className={cn(
-              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold [&_svg]:size-3",
+              "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-semibold [&_svg]:size-3",
               // The project's grade scale: mood-1 is the lime green of "good",
               // mood-5 the red of "bad".
               good
@@ -133,7 +133,7 @@ export function StatCard({
       </div>
 
       <div className="mt-3 min-w-0">
-        <p className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
+        <p className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
           {label}
         </p>
         <p className="mt-0.5 text-2xl font-semibold tabular-nums">
@@ -145,6 +145,11 @@ export function StatCard({
     </>
   );
 
+  // Room under the context line for the floating level pill. Without it the
+  // pill covered the last line whenever the card was narrow — two across on
+  // a phone, for one.
+  const pillRoom = level === "medio" && "pb-9";
+
   const card = onClick ? (
     <button
       type="button"
@@ -152,13 +157,14 @@ export function StatCard({
       className={cn(
         BASE,
         "hover:border-primary/40 h-full w-full cursor-pointer text-left transition-[border-color,box-shadow] hover:shadow-sm",
+        pillRoom,
         !level && className,
       )}
     >
       {content}
     </button>
   ) : (
-    <div className={cn(BASE, "h-full", !level && className)}>{content}</div>
+    <div className={cn(BASE, "h-full", pillRoom, !level && className)}>{content}</div>
   );
 
   if (level !== "medio") return card;

@@ -60,7 +60,7 @@ export function LevelBadge({ level, className }: { level: "MVP" | "Médio"; clas
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium tracking-wide whitespace-nowrap",
+        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tracking-wide whitespace-nowrap",
         level === "MVP"
           ? "bg-primary/10 text-primary border-primary/20"
           : "bg-supera-uniao/15 text-supera-uniao border-supera-uniao/25",
@@ -120,12 +120,19 @@ export function PageHeader({
   return (
     <header className={cn("flex flex-wrap items-start justify-between gap-4", className)}>
       <div className="flex min-w-0 flex-col">
+        {/* Back link and trail used to stack, and both said "Pacientes". One
+            per screen size now: the trail on desktop, where it also names the
+            current record; the back link on a phone, where a 40px target
+            beats a 16px text link. */}
         {backTo && (
           <Button
             variant="ghost"
             size="sm"
             asChild
-            className="text-muted-foreground hover:text-foreground -ml-2 mb-1 h-7 w-fit gap-1 px-2"
+            className={cn(
+              "text-muted-foreground hover:text-foreground -ml-2 mb-1 h-10 w-fit gap-1 px-2 md:h-7",
+              breadcrumb && "md:hidden",
+            )}
           >
             <Link to={backTo}>
               <ArrowLeft size={14} aria-hidden="true" />
@@ -134,7 +141,12 @@ export function PageHeader({
           </Button>
         )}
 
-        {breadcrumb && <Breadcrumb items={breadcrumb} className="mb-1.5" />}
+        {breadcrumb && (
+          <Breadcrumb
+            items={breadcrumb}
+            className={cn("mb-1.5", backTo && "max-md:hidden")}
+          />
+        )}
 
         {eyebrow && (
           <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
@@ -143,7 +155,7 @@ export function PageHeader({
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="mt-0.5 text-2xl font-semibold tracking-tight">{title}</h1>
+          <h1 className="mt-0.5 text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
           {badge ?? (level && <LevelBadge level={level} />)}
         </div>
 
