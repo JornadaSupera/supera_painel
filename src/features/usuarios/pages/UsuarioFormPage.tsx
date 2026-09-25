@@ -83,7 +83,9 @@ function ChipEspecialidade({
       onClick={onClick}
       aria-pressed={ativa}
       className={cn(
-        "focus-visible:ring-ring/50 rounded-full border px-3 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none",
+        // 40px tall below md: at 26px these chips were the hardest target of
+        // the form on a phone.
+        "focus-visible:ring-ring/50 rounded-full border px-3 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none max-md:min-h-10",
         ativa
           ? "border-primary/30 bg-primary/10 text-primary font-medium"
           : "text-muted-foreground hover:bg-muted border-border",

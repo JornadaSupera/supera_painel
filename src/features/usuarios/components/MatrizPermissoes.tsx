@@ -126,7 +126,7 @@ function EditorDaMatriz({ matriz }: { matriz: Matriz }) {
                 <tr className="bg-muted/30 border-b">
                   <th
                     scope="col"
-                    className="text-muted-foreground h-9 px-4 text-left text-[10px] font-medium tracking-wider uppercase"
+                    className="text-muted-foreground h-9 px-4 text-left text-[11px] font-medium tracking-wider uppercase"
                   >
                     Permissão
                   </th>
@@ -135,7 +135,7 @@ function EditorDaMatriz({ matriz }: { matriz: Matriz }) {
                     <th
                       key={papel}
                       scope="col"
-                      className="text-muted-foreground h-9 w-32 px-2 text-center text-[10px] font-medium tracking-wider uppercase"
+                      className="text-muted-foreground h-9 w-32 px-2 text-center text-[11px] font-medium tracking-wider uppercase"
                     >
                       {PAPEL_LABEL[papel]}
                     </th>
@@ -168,17 +168,21 @@ function EditorDaMatriz({ matriz }: { matriz: Matriz }) {
                         </td>
   
                         {matriz.papeis.map((papel) => (
-                          <td key={papel} className="px-2 py-2 text-center">
+                          <td key={papel} className="p-0 text-center">
                             {exclusiva ? (
-                              <span className="text-muted-foreground text-[11px]">
+                              <span className="text-muted-foreground block px-2 py-2 text-[11px]">
                                 só por especialidade
                               </span>
                             ) : (
-                              <Checkbox
-                                checked={(rascunho[papel] ?? []).includes(permissao.id)}
-                                onCheckedChange={() => alternar(papel, permissao.id)}
-                                aria-label={`${permissao.label} para ${PAPEL_LABEL[papel]}`}
-                              />
+                              // The whole cell toggles, not only the 16px box:
+                              // 71 of them per screen on a tablet.
+                              <label className="hover:bg-muted/60 flex h-10 cursor-pointer items-center justify-center px-2">
+                                <Checkbox
+                                  checked={(rascunho[papel] ?? []).includes(permissao.id)}
+                                  onCheckedChange={() => alternar(papel, permissao.id)}
+                                  aria-label={`${permissao.label} para ${PAPEL_LABEL[papel]}`}
+                                />
+                              </label>
                             )}
                           </td>
                         ))}
