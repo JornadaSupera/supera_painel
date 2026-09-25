@@ -7,11 +7,12 @@ import {
   EmptyState,
   ErrorState,
   PageHeader,
+  ScrollableTabsList,
   SkeletonCards,
   StatusBadge,
 } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/format";
 import type { ItemCatalogo, VersaoLegal } from "@/types/configuracao";
 import { ConsentimentosAceitos } from "../components/ConsentimentosAceitos";
@@ -94,7 +95,12 @@ function Catalogo({
       ) : (
         <ul className="divide-border divide-y">
           {itens.map((item) => (
-            <li key={item.id} className="flex items-center justify-between gap-3 py-2">
+            // Wraps instead of truncating: when name and code do not fit side
+            // by side, the code drops under the name rather than cutting it.
+            <li
+              key={item.id}
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 py-2"
+            >
               <div className="min-w-0">
                 <p className="text-foreground truncate text-xs font-medium">{item.label}</p>
                 {item.detalhe && (
@@ -138,7 +144,9 @@ export function ConfiguracoesPage() {
       )}
 
       <Tabs defaultValue="catalogos" className="flex flex-col gap-5">
-        <TabsList>
+        {/* Seven sections do not fit side by side below ~1100px. The list
+            scrolls inside its own strip, so the page keeps its width. */}
+        <ScrollableTabsList>
           <TabsTrigger value="catalogos">Catálogos do sistema</TabsTrigger>
           <TabsTrigger value="alertas">Gatilhos de alerta</TabsTrigger>
           <TabsTrigger value="motivos">Motivos de situação</TabsTrigger>
@@ -146,14 +154,17 @@ export function ConfiguracoesPage() {
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
           <TabsTrigger value="integracao">Integração</TabsTrigger>
           <TabsTrigger value="lgpd">Pedidos do titular</TabsTrigger>
-        </TabsList>
+        </ScrollableTabsList>
 
         <TabsContent value="catalogos" className="flex flex-col gap-5">
           {configuracoes.isLoading ? (
             <SkeletonCards count={4} />
           ) : (
             dados && (
-              <div className="grid gap-5 lg:grid-cols-2">
+              // `grid-cols-1` is `minmax(0, 1fr)`: the implicit column sized
+              // itself to the longest technical code and pushed the cards
+              // past a phone screen.
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 <Catalogo
                   titulo="Sintomas do diário"
                   descricao="Os sintomas que o paciente marca, e o eixo dos relatórios clínicos"
