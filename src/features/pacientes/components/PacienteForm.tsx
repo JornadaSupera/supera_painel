@@ -189,7 +189,32 @@ export function PacienteForm({
         ))}
 
         {/* --------------------------------------------------------- passos */}
-        <ol className="flex flex-wrap items-center gap-2" aria-label="Etapas do cadastro">
+        {/* Phone: one line and a bar. The four chips broke into two rows of
+            26px targets there, and moving between steps already has the
+            Voltar and Continuar buttons at the bottom. */}
+        <div className="flex flex-col gap-2 sm:hidden">
+          <p className="text-sm">
+            <span className="text-muted-foreground tabular-nums">
+              Etapa {etapa + 1} de {ETAPAS.length} ·{" "}
+            </span>
+            <span className="font-medium">{atual?.titulo}</span>
+          </p>
+          <div
+            role="progressbar"
+            aria-label="Progresso do cadastro"
+            aria-valuemin={1}
+            aria-valuemax={ETAPAS.length}
+            aria-valuenow={etapa + 1}
+            className="bg-muted h-1.5 overflow-hidden rounded-full"
+          >
+            <div
+              className="bg-primary h-full rounded-full transition-[width] motion-reduce:transition-none"
+              style={{ width: `${((etapa + 1) / ETAPAS.length) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        <ol className="hidden flex-wrap items-center gap-2 sm:flex" aria-label="Etapas do cadastro">
           {ETAPAS.map((passo, indice) => {
             const concluida = indice < etapa;
             const ativa = indice === etapa;
@@ -201,7 +226,7 @@ export function PacienteForm({
                   onClick={() => setEtapa(indice)}
                   aria-current={ativa ? "step" : undefined}
                   className={cn(
-                    "flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors",
+                    "flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors max-md:min-h-10",
                     ativa && "border-primary/30 bg-primary/10 text-primary font-medium",
                     concluida && !ativa && "border-border text-muted-foreground hover:bg-muted",
                     !ativa && !concluida && "border-border text-muted-foreground/70",
@@ -210,7 +235,7 @@ export function PacienteForm({
                   <span
                     aria-hidden="true"
                     className={cn(
-                      "flex size-4 items-center justify-center rounded-full text-[10px]",
+                      "flex size-4 items-center justify-center rounded-full text-[11px]",
                       ativa || concluida ? "bg-primary text-primary-foreground" : "bg-muted",
                     )}
                   >
@@ -231,8 +256,11 @@ export function PacienteForm({
             </div>
 
             {/* -------------------------------------------- 1 · identificação */}
+            {/* `items-start` in every step grid: stretched to the row height, a
+                field without help text spread the extra height between its
+                own rows, and its input sat ~5px below the one beside it. */}
             {etapa === 0 && (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="nome"
@@ -282,7 +310,7 @@ export function PacienteForm({
 
             {/* ---------------------------------------- 2 · histórico clínico */}
             {etapa === 1 && (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="alergias"
@@ -337,7 +365,7 @@ export function PacienteForm({
 
             {/* ------------------------------------------ 3 · quadro clínico */}
             {etapa === 2 && (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="cid"
@@ -490,7 +518,7 @@ export function PacienteForm({
 
             {/* ------------------------------------------------- 4 · contato */}
             {etapa === 3 && (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid items-start gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="telefone"
