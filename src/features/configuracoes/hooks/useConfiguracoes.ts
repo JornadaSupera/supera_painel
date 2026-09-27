@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { audit } from "@/lib/audit";
+import type { VocabularioTermo } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
 import { toListQuery } from "@/hooks/listQuery";
 import { call, configuracoesApi } from "@/services/apiClient";
@@ -10,14 +11,12 @@ import type { VersaoLegal } from "@/types/configuracao";
 /**
  * Leitura e escrita das configurações da clínica.
  *
- * As três escritas daqui mudam o comportamento do produto para todo mundo ao
- * mesmo tempo — um documento legal novo obriga todos os pacientes a aceitar de
- * novo, um limiar novo passa a disparar alerta para a equipe inteira. Por isso
- * cada uma registra auditoria e cada uma diz, no aviso de sucesso, **o efeito**
- * e não o verbo clicado.
- *
- * O vocabulário do sistema não tem hook de escrita, e é de propósito: ele muda
- * por migração versionada. Ver `types/configuracao.ts`.
+ * As escritas daqui mudam o comportamento do produto para todo mundo ao mesmo
+ * tempo — um documento legal novo obriga todos os pacientes a aceitar de novo,
+ * um limiar novo passa a disparar alerta para a equipe inteira, um termo do
+ * vocabulário retirado some do diário ou do chat de quem usa o aplicativo. Por
+ * isso cada uma registra auditoria e cada uma diz, no aviso de sucesso, **o
+ * efeito** e não o verbo clicado.
  */
 
 const RECURSO = "configuracoes";
@@ -30,6 +29,73 @@ export function useConfiguracoes() {
   return useQuery({
     queryKey: queryKeys.settings.get(),
     queryFn: async () => (await call(() => configuracoesApi.get())).data,
+  });
+}
+
+/* -------------------------------------------------------------------------
+   VOCABULÁRIO DO SISTEMA
+   ------------------------------------------------------------------------- */
+
+/** Corrige rótulo e/ou ordem de um termo. O código, esse não muda. */
+export function useAtualizarTermoVocabulario() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      vocabulario: VocabularioTermo;
+      id: string;
+      label?: string;
+      ordem?: number;
+    }) => {
+      const { data } = await call(() => configuracoesApi.atualizarTermoVocabulario(params));
+      audit.update(RECURSO, params.id, {
+        operacao: "vocabulario_termo",
+        vocabulario: params.vocabulario,
+      });
+
+      return data;
+    },
+    onSuccess: async (termo) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.get() });
+
+      toast.success("Termo atualizado", {
+        description: termo ? `Passa a aparecer como “${termo.label}”.` : undefined,
+      });
+    },
+    onError: (erro) => toast.error("Não foi possível salvar o termo", { description: erro.message }),
+  });
+}
+
+/**
+ * Retira um termo, ou o traz de volta — o mesmo botão nos dois sentidos.
+ *
+ * Diferente de motivo de situação, aqui reativar é possível pelo painel: a
+ * leitura do vocabulário não esconde o que está retirado.
+ */
+export function useSetTermoVocabularioAtivo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { vocabulario: VocabularioTermo; id: string; ativo: boolean }) => {
+      const { data } = await call(() => configuracoesApi.setTermoVocabularioAtivo(params));
+      audit.update(RECURSO, params.id, {
+        operacao: "vocabulario_termo",
+        vocabulario: params.vocabulario,
+        ativo: params.ativo,
+      });
+
+      return data;
+    },
+    onSuccess: async (termo, params) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.get() });
+
+      toast.success(params.ativo ? "Termo reativado" : "Termo retirado", {
+        description: params.ativo
+          ? `“${termo?.label}” volta a ser oferecido em todo o aplicativo.`
+          : `“${termo?.label}” deixa de ser oferecido em todo o aplicativo. Reative a qualquer momento pelo mesmo botão.`,
+      });
+    },
+    onError: (erro) => toast.error("Não foi possível alterar o termo", { description: erro.message }),
   });
 }
 

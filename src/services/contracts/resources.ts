@@ -210,14 +210,19 @@ export const RESOURCES = {
     table: "configuracoes",
     fase: 9,
     /**
-     * `get` e `update` são o VOCABULÁRIO — somente leitura, por decisão de
-     * produto. O resto é a OPERAÇÃO da clínica, que ela mesma mantém: o
-     * documento legal em vigor, o grau que dispara alerta e os motivos de
-     * falta. Ver `types/configuracao.ts` para por que a linha passa aí.
+     * `get` lê o VOCABULÁRIO e a OPERAÇÃO juntos. `update` continua recusado
+     * — não é o caminho de escrita de nada, ver o comentário na interface.
+     * `atualizarTermoVocabulario`/`setTermoVocabularioAtivo` editam rótulo,
+     * ordem e ativo/retirado do vocabulário; o resto das operações abaixo é
+     * a OPERAÇÃO da clínica, que ela mesma mantém: o documento legal em
+     * vigor, o grau que dispara alerta e os motivos de falta. Ver
+     * `types/configuracao.ts` para por que a linha passa aí.
      */
     operations: [
       "get",
       "update",
+      "atualizarTermoVocabulario",
+      "setTermoVocabularioAtivo",
       /** Identidade visual, mensagens e horário — ver `types/configuracao.ts`. */
       "getClinica",
       "uploadLogo",

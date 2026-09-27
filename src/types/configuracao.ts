@@ -1,26 +1,33 @@
 /**
  * Domínio de Configurações.
  *
- * A tela tem duas metades, e a diferença entre elas não é técnica:
+ * A tela tem duas metades, e a diferença entre elas não é "editável vs. não
+ * editável" — as duas são, desde `update_vocabulary_term` e
+ * `set_vocabulary_term_active` (25/09/2026). A diferença é O QUE cada uma
+ * deixa mudar:
  *
  *  - **Vocabulário** — `symptoms`, `notification_types`, `content_categories`,
- *    `conversation_subjects`. Continua somente leitura, de propósito: o mesmo
- *    código alimenta o diário do paciente, o eixo dos relatórios e o gatilho de
- *    alerta, e renomeá-lo por formulário quebraria os três de uma vez. Muda por
- *    migração versionada, com revisão.
+ *    `conversation_subjects`, `appointment_types`. Rótulo e ordem mudam pelo
+ *    painel; retirar e reativar também, pela mesma função nos dois sentidos.
+ *    O que **não** muda é o `código`: é ele que o diário do paciente, o eixo
+ *    dos relatórios e o alvo do gatilho de alerta usam para apontar para o
+ *    mesmo item, e o banco recusa qualquer UPDATE que o altere. Termo novo
+ *    também não se cadastra pelo painel — só por migração revisada, porque o
+ *    conjunto de códigos válidos é fechado nos três lugares que os leem.
  *  - **Operação** — o documento legal em vigor, o grau que dispara alerta, os
  *    motivos de falta. Isso é decisão da clínica, muda com a rotina dela, e o
- *    banco expõe escrita para cada um. Esperar migração para cadastrar "paciente
- *    não tinha transporte" seria burocracia sem finalidade.
+ *    banco expõe escrita para cada um, inclusive criação.
  */
 
-/** Um item de catálogo — sintoma, tipo de notificação, categoria, assunto. */
+/** Um item de catálogo — sintoma, tipo de notificação, categoria, assunto, tipo de compromisso. */
 export interface ItemCatalogo {
   id: string;
   codigo: string;
   label: string;
   /** Texto auxiliar da linha: a área dona, a categoria, o grupo. */
   detalhe: string | null;
+  /** Posição de exibição — o que `update_vocabulary_term` chama de `sort_order`. */
+  ordem: number;
   ativo: boolean;
 }
 
@@ -153,6 +160,8 @@ export interface Configuracoes {
   categorias_conteudo: ItemCatalogo[];
   /** Os assuntos que o paciente escolhe ao abrir uma conversa. */
   assuntos_chat: ItemCatalogo[];
+  /** Os tipos de compromisso da agenda — infusão, consulta, retorno, exame... */
+  tipos_compromisso: ItemCatalogo[];
   /**
    * Chaves de configuração que a tela de referência mostra e o banco não
    * guarda. A interface usa a lista para nomear o que falta em vez de desenhar

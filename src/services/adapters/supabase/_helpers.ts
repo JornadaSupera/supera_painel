@@ -42,6 +42,11 @@ const CODIGO_EXTRA: Record<string, ErrorCode> = {
   // apontou não existe" — sintoma desativado, motivo já removido. É NOT_FOUND,
   // e não falha de validação: o dado enviado estava bem formado.
   P0002: ERROR_CODE.NOT_FOUND,
+  // `restrict_violation`. `guard_notification_type` a usa para recusar
+  // desligar um tipo de notificação obrigatório — regra de segurança clínica,
+  // não erro de formulário, mas ainda uma recusa que quem opera pode entender
+  // e não repetir.
+  "23001": ERROR_CODE.VALIDATION,
 };
 
 /**
@@ -62,6 +67,7 @@ const MENSAGEM_LEGIVEL: ReadonlySet<string> = new Set([
   "P0001", // raise exception sem SQLSTATE próprio
   "22023", // invalid_parameter_value
   "P0002", // no_data_found
+  "23001", // restrict_violation
 ]);
 
 /** Sentinela é um token só (`invalid_cpf`); frase tem espaço. */

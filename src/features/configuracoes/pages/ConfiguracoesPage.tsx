@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { FileText, Lock, Plus } from "lucide-react";
+import { Ban, Check, FileText, Pencil, Plus, RotateCcw, X } from "lucide-react";
 
 import {
   BackendPendente,
@@ -12,9 +12,22 @@ import {
   SkeletonCards,
   StatusBadge,
 } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { formatDate } from "@/lib/format";
+import { VOCABULARIO_TERMO, type VocabularioTermo } from "@/lib/enums";
+import { cn } from "@/lib/utils";
 import type { ItemCatalogo, VersaoLegal } from "@/types/configuracao";
 import { ConsentimentosAceitos } from "../components/ConsentimentosAceitos";
 import { DialogPublicarTermo } from "../components/DialogPublicarTermo";
@@ -24,22 +37,32 @@ import { GatilhosAlerta } from "../components/GatilhosAlerta";
 import { IdentidadeEOperacao } from "../components/IdentidadeEOperacao";
 import { MotivosSituacao } from "../components/MotivosSituacao";
 import { SolicitacoesTitular } from "../components/SolicitacoesTitular";
-import { useConfiguracoes, useTermos } from "../hooks/useConfiguracoes";
+import {
+  useAtualizarTermoVocabulario,
+  useConfiguracoes,
+  useSetTermoVocabularioAtivo,
+  useTermos,
+} from "../hooks/useConfiguracoes";
 
 /**
  * Configurações — o que está valendo no sistema.
  *
  * Protótipo: https://strawti.com.br/prototipos/jornada-supera/admin/configuracoes/
  *
- * > [!] A tela tem duas metades, e elas seguem regras opostas de propósito.
- * O **vocabulário** (sintomas, notificações, categorias, assuntos) é somente
- * leitura: o mesmo código alimenta o diário do paciente, os eixos dos
- * relatórios e o alvo do gatilho de alerta, e trocá-lo por formulário quebraria
- * os três de uma vez, sem revisão e sem migração para reverter.
+ * > [!] A tela tem duas metades, e elas travam eixos diferentes.
+ * O **vocabulário** (sintomas, notificações, categorias, assuntos, tipos de
+ * compromisso) trava o CÓDIGO, não o resto — desde `update_vocabulary_term` e
+ * `set_vocabulary_term_active` (25/09/2026): rótulo e ordem corrigem-se pelo
+ * painel, e retirar/reativar é a mesma função nos dois sentidos. O código
+ * continua fixo porque é ele que o diário do paciente, os eixos dos relatórios
+ * e o alvo do gatilho de alerta usam para apontar para o mesmo item — trocá-lo
+ * quebraria os três de uma vez. Termo novo continua exigindo migração
+ * revisada: o conjunto de códigos válidos é fechado nesses três lugares.
  *
  * A **operação** — documento legal em vigor, grau que dispara alerta, motivos
- * de falta — é da clínica e muda com a rotina dela. Esperar uma migração para
- * cadastrar "paciente não tinha transporte" seria burocracia sem finalidade.
+ * de falta — é da clínica e muda com a rotina dela, sem nenhum código travado.
+ * Esperar uma migração para cadastrar "paciente não tinha transporte" seria
+ * burocracia sem finalidade.
  *
  * Identidade visual, mensagens e horário de atendimento — que o protótipo
  * oferece e o backend não guardava — ganharam onde gravar em 25/09/2026
@@ -59,16 +82,202 @@ const ESPECIES_LEGAIS: { tipo: VersaoLegal["tipo"]; label: string }[] = [
   { tipo: "politica_de_privacidade", label: "Política de privacidade" },
 ];
 
-/** Uma lista de catálogo, em cartão. Somente leitura, e isso fica dito. */
+/**
+ * Uma linha de termo: rótulo e ordem corrigíveis no lugar, código fixo ao
+ * lado — o mesmo par lápis/código de `MotivosSituacao`, com um segundo campo
+ * porque aqui a ordem também é editável.
+ */
+function LinhaCatalogo({
+  item,
+  vocabulario,
+  onPedirRetirada,
+}: {
+  item: ItemCatalogo;
+  vocabulario: VocabularioTermo;
+  onPedirRetirada: () => void;
+}) {
+  const atualizar = useAtualizarTermoVocabulario();
+  const alternarAtivo = useSetTermoVocabularioAtivo();
+
+  const [editando, setEditando] = useState(false);
+  const [rascunhoLabel, setRascunhoLabel] = useState(item.label);
+  const [rascunhoOrdem, setRascunhoOrdem] = useState(String(item.ordem));
+
+  const cancelar = () => {
+    setRascunhoLabel(item.label);
+    setRascunhoOrdem(String(item.ordem));
+    setEditando(false);
+  };
+
+  const salvar = () => {
+    const label = rascunhoLabel.trim();
+    const ordem = Number(rascunhoOrdem);
+
+    const params: { vocabulario: VocabularioTermo; id: string; label?: string; ordem?: number } = {
+      vocabulario,
+      id: item.id,
+    };
+    if (label !== "" && label !== item.label) params.label = label;
+    // Campo vazio não é "ordem zero" — `Number("")` é `0`, que passa em
+    // `isFinite` sem que ninguém tenha digitado nada.
+    if (rascunhoOrdem.trim() !== "" && Number.isFinite(ordem) && ordem !== item.ordem) {
+      params.ordem = ordem;
+    }
+
+    // Nada mudou: fecha sem chamar o backend por uma escrita vazia.
+    if (params.label === undefined && params.ordem === undefined) return setEditando(false);
+
+    atualizar.mutate(params, { onSuccess: () => setEditando(false) });
+  };
+
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-2.5">
+      <div className="min-w-0 flex-1">
+        {editando ? (
+          <div className="flex items-center gap-2">
+            <Input
+              autoFocus
+              value={rascunhoLabel}
+              maxLength={60}
+              className="h-8 min-w-0 flex-1 text-xs"
+              aria-label={`Rótulo de ${item.codigo}`}
+              onChange={(evento) => setRascunhoLabel(evento.target.value)}
+              onKeyDown={(evento) => {
+                if (evento.key === "Enter") salvar();
+                if (evento.key === "Escape") cancelar();
+              }}
+            />
+            <Input
+              value={rascunhoOrdem}
+              type="number"
+              inputMode="numeric"
+              min={0}
+              className="h-8 w-14 shrink-0 text-xs"
+              aria-label={`Ordem de ${item.codigo}`}
+              onChange={(evento) => setRascunhoOrdem(evento.target.value)}
+              onKeyDown={(evento) => {
+                if (evento.key === "Enter") salvar();
+                if (evento.key === "Escape") cancelar();
+              }}
+            />
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p
+              className={cn(
+                "truncate text-xs font-medium",
+                item.ativo ? "text-foreground" : "text-muted-foreground line-through",
+              )}
+            >
+              {item.label}
+            </p>
+            {!item.ativo && (
+              <StatusBadge tone="neutral" size="sm">
+                Retirado
+              </StatusBadge>
+            )}
+          </div>
+        )}
+
+        {!editando && item.detalhe && (
+          <p className="text-muted-foreground truncate text-[11px]">{item.detalhe}</p>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5">
+        <code className="text-muted-foreground font-mono text-[11px]">{item.codigo}</code>
+
+        {editando ? (
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Salvar termo"
+              disabled={atualizar.isPending}
+              onClick={salvar}
+            >
+              <Check />
+            </Button>
+            <Button variant="ghost" size="icon-sm" aria-label="Cancelar edição" onClick={cancelar}>
+              <X />
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={`Corrigir ${item.label}`}
+              onClick={() => setEditando(true)}
+            >
+              <Pencil />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={alternarAtivo.isPending}
+              onClick={() =>
+                item.ativo
+                  ? onPedirRetirada()
+                  : alternarAtivo.mutate({ vocabulario, id: item.id, ativo: true })
+              }
+            >
+              {item.ativo ? <Ban /> : <RotateCcw />}
+              {item.ativo ? "Retirar" : "Reativar"}
+            </Button>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
+
+/**
+ * O que retirar um termo tira de circulação, por vocabulário — a mesma
+ * repartição de `GRUPO_POR_VOCABULARIO` em `supabase/configuracoes.ts`, só
+ * que aqui a saída é a frase que o diálogo de confirmação mostra.
+ *
+ * As cinco tabelas afetam superfícies diferentes: `notification_types` não
+ * tem "diário" nem "chat" — retirá-lo para de enviar aquele aviso, ponto. Uma
+ * frase genérica citando os quatro outros catálogos numa confirmação de
+ * notificação estaria descrevendo o efeito errado bem na hora em que a pessoa
+ * mais precisa confiar no que está lendo.
+ */
+const SUPERFICIE_POR_VOCABULARIO: Record<VocabularioTermo, string> = {
+  symptoms: "Sai do diário: deixa de aparecer entre os sintomas que o paciente pode marcar.",
+  notification_types:
+    "Esse tipo de notificação para de ser enviado, para todo mundo — ninguém mais recebe o aviso desse evento.",
+  content_categories: "Sai dos chips de filtro da biblioteca de orientações.",
+  conversation_subjects: "Sai da lista de assuntos que o paciente escolhe ao abrir uma conversa no chat.",
+  appointment_types: "Sai das opções de tipo de compromisso da agenda.",
+};
+
+/**
+ * Uma lista de catálogo, em cartão — editável desde `update_vocabulary_term`.
+ *
+ * > [!] Retirar pede confirmação; reativar não.
+ * As duas são a mesma RPC, mas não o mesmo risco: retirar tira o termo de
+ * circulação para quem usa o aplicativo agora, na hora — e um clique errado
+ * nesse sentido só se nota quando alguém reclama. Reativar é sempre
+ * corretivo: é o clique que desfaz o errado, então não pede a mesma pausa.
+ */
 function Catalogo({
   titulo,
   descricao,
   itens,
+  vocabulario,
 }: {
   titulo: string;
   descricao: string;
   itens: ItemCatalogo[];
+  vocabulario: VocabularioTermo;
 }) {
+  const retirar = useSetTermoVocabularioAtivo();
+  // O termo aguardando confirmação de retirada. `null` = nenhum.
+  const [retirando, setRetirando] = useState<ItemCatalogo | null>(null);
+
+  const ativos = itens.filter((item) => item.ativo).length;
+
   return (
     <section className="bg-card rounded-2xl border p-5">
       <header className="mb-3 flex items-start justify-between gap-3">
@@ -77,10 +286,11 @@ function Catalogo({
           <p className="text-muted-foreground text-xs">{descricao}</p>
         </div>
 
-        <StatusBadge tone="neutral" size="sm" className="shrink-0">
-          <Lock size={10} aria-hidden="true" className="mr-1" />
-          Somente leitura
-        </StatusBadge>
+        {itens.length > 0 && (
+          <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+            {ativos} de {itens.length} ativos
+          </span>
+        )}
       </header>
 
       {itens.length === 0 ? (
@@ -88,26 +298,48 @@ function Catalogo({
       ) : (
         <ul className="divide-border divide-y">
           {itens.map((item) => (
-            // Wraps instead of truncating: when name and code do not fit side
-            // by side, the code drops under the name rather than cutting it.
-            <li
+            <LinhaCatalogo
               key={item.id}
-              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 py-2"
-            >
-              <div className="min-w-0">
-                <p className="text-foreground truncate text-xs font-medium">{item.label}</p>
-                {item.detalhe && (
-                  <p className="text-muted-foreground truncate text-[11px]">{item.detalhe}</p>
-                )}
-              </div>
-
-              <code className="text-muted-foreground shrink-0 font-mono text-[11px]">
-                {item.codigo}
-              </code>
-            </li>
+              item={item}
+              vocabulario={vocabulario}
+              onPedirRetirada={() => setRetirando(item)}
+            />
           ))}
         </ul>
       )}
+
+      <AlertDialog
+        open={retirando !== null}
+        onOpenChange={(estado) => {
+          if (!estado) setRetirando(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Retirar “{retirando?.label}”?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {SUPERFICIE_POR_VOCABULARIO[vocabulario]}
+              <strong className="text-foreground mt-2 block font-medium">
+                Reative a qualquer momento pelo mesmo botão: retirar não apaga nada, só tira de
+                circulação.
+              </strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={retirar.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={retirar.isPending}
+              onClick={() => {
+                if (retirando) retirar.mutate({ vocabulario, id: retirando.id, ativo: false });
+                setRetirando(null);
+              }}
+            >
+              Retirar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }
@@ -156,7 +388,7 @@ export function ConfiguracoesPage() {
 
         <TabsContent value="catalogos" className="flex flex-col gap-5">
           {configuracoes.isLoading ? (
-            <SkeletonCards count={4} />
+            <SkeletonCards count={5} />
           ) : (
             dados && (
               // `grid-cols-1` is `minmax(0, 1fr)`: the implicit column sized
@@ -167,21 +399,31 @@ export function ConfiguracoesPage() {
                   titulo="Sintomas do diário"
                   descricao="Os sintomas que o paciente marca, e o eixo dos relatórios clínicos"
                   itens={dados.sintomas}
+                  vocabulario={VOCABULARIO_TERMO.SINTOMAS}
                 />
                 <Catalogo
                   titulo="Tipos de notificação"
                   descricao="O que o aplicativo envia, e o que não pode ser silenciado"
                   itens={dados.notificacoes}
+                  vocabulario={VOCABULARIO_TERMO.NOTIFICACOES}
                 />
                 <Catalogo
                   titulo="Categorias de conteúdo"
                   descricao="Os chips de filtro da biblioteca de orientações"
                   itens={dados.categorias_conteudo}
+                  vocabulario={VOCABULARIO_TERMO.CATEGORIAS_CONTEUDO}
                 />
                 <Catalogo
                   titulo="Assuntos do chat"
                   descricao="O que o paciente escolhe ao abrir uma conversa"
                   itens={dados.assuntos_chat}
+                  vocabulario={VOCABULARIO_TERMO.ASSUNTOS_CHAT}
+                />
+                <Catalogo
+                  titulo="Tipos de compromisso"
+                  descricao="O que aparece na agenda, e o recorte do relatório de sessões de infusão"
+                  itens={dados.tipos_compromisso}
+                  vocabulario={VOCABULARIO_TERMO.TIPOS_COMPROMISSO}
                 />
               </div>
             )
@@ -205,10 +447,12 @@ export function ConfiguracoesPage() {
           )}
 
           <Footnote>
-            Os catálogos acima mudam por migração versionada, com revisão — não por formulário. O
-            mesmo vocabulário alimenta o diário do paciente, os eixos dos relatórios e os gatilhos
-            de alerta, e renomear um código aqui quebraria os três de uma vez. As regras de
-            permissão por papel ficam em <strong>Usuários → Permissões por papel</strong>.
+            Rótulo, ordem e o estado ativo/retirado dos catálogos acima mudam por aqui, com
+            auditoria a cada edição. O código de cada termo continua fixo — é ele que o diário, os
+            relatórios e os gatilhos de alerta usam para apontar para o mesmo item, e o backend
+            recusa qualquer tentativa de trocá-lo. Cadastrar um termo novo continua exigindo
+            migração revisada, pela mesma razão. As regras de permissão por papel ficam em{" "}
+            <strong>Usuários → Permissões por papel</strong>.
           </Footnote>
         </TabsContent>
 

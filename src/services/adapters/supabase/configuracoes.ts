@@ -1,3 +1,4 @@
+import type { VocabularioTermo } from "@/lib/enums";
 import {
   ERROR_CODE,
   fail,
@@ -31,21 +32,27 @@ const TIPOS_ACEITOS_LOGO = ["image/png", "image/jpeg", "image/webp"];
 /**
  * Configurações — o que está valendo, e o que o painel edita.
  *
- * A tela tem duas metades e elas obedecem a regras opostas no banco, o que é
- * intencional dos dois lados:
+ * As duas metades da tela têm RPC própria, `SECURITY DEFINER`, com
+ * `private.is_active_admin()` no corpo como única barreira — mas cada uma
+ * trava um eixo diferente:
  *
  *  - **Vocabulário** (`symptoms`, `notification_types`, `content_categories`,
- *    `conversation_subjects`) é SELECT-only para `authenticated`. Não há
- *    política de escrita, e a razão é boa: `symptoms` é ao mesmo tempo o
- *    seletor do diário, o eixo dos relatórios e o alvo do gatilho de alerta —
- *    renomear um código numa tarde quebraria as três coisas de uma vez.
+ *    `conversation_subjects`, `appointment_types`) trava o `código`, nunca o
+ *    rótulo ou a ordem. `update_vocabulary_term` recusa qualquer UPDATE que
+ *    mude `code` (gatilho `trg_reject_code_change`) — é ele que o diário do
+ *    paciente, o eixo dos relatórios e o alvo do gatilho de alerta usam para
+ *    apontar para o mesmo item, e renomeá-lo numa tarde quebraria os três de
+ *    uma vez. Retirar e reativar são a MESMA função,
+ *    `set_vocabulary_term_active`, nos dois sentidos — a leitura não filtra
+ *    por `is_active`, então um termo retirado continua visível e reversível.
+ *    Criar termo novo continua fora do painel: nenhuma RPC insere, só migração.
  *  - **Operação** (documento legal, limiar de alerta, motivo de situação) tem
- *    RPC própria, `SECURITY DEFINER`, com `private.is_active_admin()` no corpo
- *    como única barreira. São decisões da clínica que mudam com a rotina dela.
+ *    escrita completa, inclusive criação. São decisões da clínica que mudam
+ *    com a rotina dela.
  *
- * As RPCs desta metade levantam **frase em português**, não sentinela — ver
- * `MENSAGEM_LEGIVEL` em `_helpers`, que é o que faz a frase chegar à tela em
- * vez de virar "Verifique os dados informados".
+ * As RPCs das duas metades levantam **frase em português**, não sentinela —
+ * ver `MENSAGEM_LEGIVEL` em `_helpers`, que é o que faz a frase chegar à tela
+ * em vez de virar "Verifique os dados informados".
  */
 
 interface LinhaCatalogo {
@@ -53,6 +60,7 @@ interface LinhaCatalogo {
   code: string;
   label: string;
   is_active: boolean;
+  sort_order: number;
 }
 
 function projetar(linha: LinhaCatalogo, detalhe: string | null = null): ItemCatalogo {
@@ -61,6 +69,7 @@ function projetar(linha: LinhaCatalogo, detalhe: string | null = null): ItemCata
     codigo: linha.code,
     label: linha.label,
     detalhe,
+    ordem: Number(linha.sort_order),
     ativo: linha.is_active,
   };
 }
@@ -80,15 +89,32 @@ export async function get(): Promise<SingleResult<Configuracoes>> {
   return executar(async () => {
     const supabase = getSupabaseClient();
 
-    const [sintomas, notificacoes, categorias, assuntos] = await Promise.all([
-      supabase.from("symptoms").select("id, code, label, is_active, is_psychological").order("sort_order"),
-      supabase.from("notification_types").select("id, code, label, is_active, category, is_silenceable").order("sort_order"),
-      supabase.from("content_categories").select("id, code, label, is_active, specialties ( label )").order("sort_order"),
-      supabase.from("conversation_subjects").select("id, code, label, is_active, specialties ( label )").order("sort_order"),
+    const [sintomas, notificacoes, categorias, assuntos, tiposCompromisso] = await Promise.all([
+      supabase
+        .from("symptoms")
+        .select("id, code, label, is_active, sort_order, is_psychological")
+        .order("sort_order"),
+      supabase
+        .from("notification_types")
+        .select("id, code, label, is_active, sort_order, category, is_silenceable")
+        .order("sort_order"),
+      supabase
+        .from("content_categories")
+        .select("id, code, label, is_active, sort_order, specialties ( label )")
+        .order("sort_order"),
+      supabase
+        .from("conversation_subjects")
+        .select("id, code, label, is_active, sort_order, specialties ( label )")
+        .order("sort_order"),
+      supabase
+        .from("appointment_types")
+        .select("id, code, label, is_active, sort_order")
+        .order("sort_order"),
     ]);
 
     // Basta uma falhar para a tela não poder afirmar o que está valendo.
-    const erro = sintomas.error ?? notificacoes.error ?? categorias.error ?? assuntos.error;
+    const erro =
+      sintomas.error ?? notificacoes.error ?? categorias.error ?? assuntos.error ?? tiposCompromisso.error;
     if (erro) return falhaDe(erro);
 
     return okOne({
@@ -123,8 +149,113 @@ export async function get(): Promise<SingleResult<Configuracoes>> {
         })[]
       ).map((linha) => projetar(linha, umDe(linha.specialties)?.label ?? "Qualquer área")),
 
+      // Sem `especialidade` própria — a agenda não amarra tipo de compromisso
+      // a área —, então não há o que pôr em `detalhe`.
+      tipos_compromisso: (tiposCompromisso.data as unknown as LinhaCatalogo[]).map((linha) =>
+        projetar(linha),
+      ),
+
       sem_origem: SEM_ORIGEM,
     });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   ESCRITA DO VOCABULÁRIO — `update_vocabulary_term` + `set_vocabulary_term_active`
+   -------------------------------------------------------------------------
+   As duas RPCs aceitam `p_vocabulary` como o NOME DA TABELA — sem tradução no
+   meio, ao contrário de especialidade ou fase. `private.vocabulary_table`
+   recusa qualquer valor fora das cinco, então um `VocabularioTermo` errado
+   falha na função, não em silêncio.
+   ------------------------------------------------------------------------- */
+
+/** De qual grupo de `Configuracoes` reler o termo, depois de escrever. */
+const GRUPO_POR_VOCABULARIO: Record<VocabularioTermo, (config: Configuracoes) => ItemCatalogo[]> = {
+  symptoms: (config) => config.sintomas,
+  notification_types: (config) => config.notificacoes,
+  content_categories: (config) => config.categorias_conteudo,
+  conversation_subjects: (config) => config.assuntos_chat,
+  appointment_types: (config) => config.tipos_compromisso,
+};
+
+/**
+ * Um termo, relido depois de escrever — via `get()` inteiro, como
+ * `regraDoSintoma` relê `getRegrasAlerta()`.
+ *
+ * Não existe leitura de UM termo só: as cinco tabelas são pequenas (a maior é
+ * um punhado de sintomas), e cada `detalhe` depende de um enriquecimento
+ * (categoria, especialidade, silenciável) que já mora em `get()`. Duplicar
+ * essa lógica para poupar quatro consultas pequenas custaria mais do que
+ * paga.
+ */
+async function termoDoVocabulario(
+  vocabulario: VocabularioTermo,
+  id: string,
+): Promise<SingleResult<ItemCatalogo>> {
+  const { data, error } = await get();
+  if (error) return fail(error.code, error.message);
+  if (!data) return fail(ERROR_CODE.UNKNOWN, "Não foi possível reler o vocabulário depois de gravar.");
+
+  const termo = GRUPO_POR_VOCABULARIO[vocabulario](data).find((item) => item.id === id);
+  return termo ? okOne(termo) : fail(ERROR_CODE.NOT_FOUND, "Termo não encontrado no vocabulário.");
+}
+
+/**
+ * Corrige rótulo e/ou ordem. O `código` não é parâmetro: não é editável, e a
+ * RPC nem o aceita — `update_vocabulary_term` só recebe `p_label` e
+ * `p_sort_order`.
+ */
+export async function atualizarTermoVocabulario({
+  vocabulario,
+  id,
+  label,
+  ordem,
+}: {
+  vocabulario: VocabularioTermo;
+  id: string;
+  label?: string;
+  ordem?: number;
+}): Promise<SingleResult<ItemCatalogo>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("update_vocabulary_term", {
+      p_vocabulary: vocabulario,
+      p_id: id,
+      // Nulo mantém a coluna — o mesmo contrato de `update_status_reason`.
+      p_label: label ?? null,
+      p_sort_order: ordem ?? null,
+    });
+
+    if (error) return falhaDe(error);
+    return termoDoVocabulario(vocabulario, id);
+  });
+}
+
+/**
+ * Retira um termo, ou o reativa — a MESMA função nos dois sentidos.
+ *
+ * Ao contrário de `setMotivoAtivo`, a releitura sempre acontece: a política
+ * de SELECT do vocabulário não filtra por `is_active`, então retirar não
+ * torna a linha invisível, e devolver `null` aqui esconderia um termo que o
+ * painel continua enxergando.
+ */
+export async function setTermoVocabularioAtivo({
+  vocabulario,
+  id,
+  ativo,
+}: {
+  vocabulario: VocabularioTermo;
+  id: string;
+  ativo: boolean;
+}): Promise<SingleResult<ItemCatalogo>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("set_vocabulary_term_active", {
+      p_vocabulary: vocabulario,
+      p_id: id,
+      p_is_active: ativo,
+    });
+
+    if (error) return falhaDe(error);
+    return termoDoVocabulario(vocabulario, id);
   });
 }
 

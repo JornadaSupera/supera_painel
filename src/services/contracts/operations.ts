@@ -1,4 +1,4 @@
-import type { FaseTratamento, Papel, Periodo, StatusUsuario } from "@/lib/enums";
+import type { FaseTratamento, Papel, Periodo, StatusUsuario, VocabularioTermo } from "@/lib/enums";
 import type { Permissao } from "@/lib/rbac";
 import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
 import type { DesafioMfa, GarantiaDaSessao, ResultadoLogin, Sessao } from "@/types/auth";
@@ -10,6 +10,7 @@ import type {
   Configuracoes,
   Consentimento,
   IntervaloAtendimento,
+  ItemCatalogo,
   MotivoSituacao,
   RegraAlerta,
   SlideOnboarding,
@@ -479,7 +480,14 @@ export interface EstatisticasOperacionaisOperations {
 /* ---------------------------------------------------------------- Fase 9 */
 
 export interface ConfiguracoesOperations {
-  /** Catálogos em vigor, mais a lista do que ainda não é dado do backend. */
+  /**
+   * Catálogos em vigor, mais a lista do que ainda não é dado do backend.
+   *
+   * Inclui os termos RETIRADOS: ao contrário de `getMotivos`, a política de
+   * leitura destas cinco tabelas não filtra por `ativo`, e é isso que torna
+   * `setTermoVocabularioAtivo` reversível pelo painel — não há um estado que
+   * só quem administra o banco enxerga.
+   */
   get(): Promise<SingleResult<Configuracoes>>;
 
   /** Termos e política, todas as versões — o histórico é exigência de aceite. */
@@ -501,8 +509,51 @@ export interface ConfiguracoesOperations {
     corpo: string;
   }): Promise<SingleResult<VersaoLegal>>;
 
-  /** Continua recusando: catálogo do sistema muda por migração, não por formulário. */
+  /**
+   * Continua recusando — mas não porque o vocabulário seja fixo: veja
+   * `atualizarTermoVocabulario` e `setTermoVocabularioAtivo`, logo abaixo.
+   * Esta chamada aceita o objeto `Configuracoes` inteiro de uma vez, e nunca
+   * foi o caminho de escrita de nada aqui — fica no contrato só para a
+   * superfície ficar completa.
+   */
   update(params: Partial<Configuracoes>): Promise<SingleResult<Configuracoes>>;
+
+  /**
+   * Corrige rótulo e/ou ordem de um termo do vocabulário.
+   *
+   * `vocabulario` é o nome da tabela (`symptoms`, `notification_types`,
+   * `content_categories`, `conversation_subjects`, `appointment_types`) — o
+   * mesmo valor que `p_vocabulary` espera, sem tradução no meio. O `código`
+   * não está entre os parâmetros porque não é editável: o backend recusa
+   * qualquer UPDATE que o altere, e é ele que o diário, os relatórios e os
+   * gatilhos de alerta usam para apontar para o mesmo item.
+   */
+  atualizarTermoVocabulario(params: {
+    vocabulario: VocabularioTermo;
+    id: string;
+    label?: string;
+    ordem?: number;
+  }): Promise<SingleResult<ItemCatalogo>>;
+
+  /**
+   * Retira um termo do vocabulário, ou o reativa — a MESMA função nos dois
+   * sentidos, ao contrário de `setMotivoAtivo`.
+   *
+   * A diferença de `setMotivoAtivo` não é a função, é a tabela: a leitura do
+   * vocabulário não filtra por `ativo` (ver `get()`, acima), então um termo
+   * retirado continua visível e reversível pelo painel.
+   *
+   * > [!] `notification_types` pode recusar retirar.
+   * Um tipo de notificação não silenciável é obrigatório — o backend recusa
+   * desligá-lo (`guard_notification_type`), porque desligar calaria a
+   * notificação para todo mundo, sem exceção. A recusa chega como mensagem
+   * legível, não como erro genérico.
+   */
+  setTermoVocabularioAtivo(params: {
+    vocabulario: VocabularioTermo;
+    id: string;
+    ativo: boolean;
+  }): Promise<SingleResult<ItemCatalogo>>;
 
   /** Identidade visual, mensagens e horário — `clinic_settings`, desde 25/09/2026. */
   getClinica(): Promise<SingleResult<ClinicaConfiguracao>>;

@@ -1,3 +1,4 @@
+import type { VocabularioTermo } from "@/lib/enums";
 import { efeitosAdversos } from "@/mocks/protocolos";
 import {
   ERROR_CODE,
@@ -28,10 +29,11 @@ import { simulate } from "./_helpers";
 /**
  * Configurações — catálogos sobre a base fictícia.
  *
- * Recusa a edição do VOCABULÁRIO exatamente como o adapter Supabase, e pela
- * mesma razão de produto: catálogo do sistema muda por migração revisada, não
- * por formulário. Um mock que aceitasse salvar faria a tela prometer um botão
- * que o backend real nega.
+ * A escrita do VOCABULÁRIO reproduz a mesma trava do adapter Supabase, campo a
+ * campo: rótulo e ordem mudam, ativo/retirado alterna nos dois sentidos, mas o
+ * `código` nunca muda e nenhuma função cria termo novo — reproduzir só metade
+ * dessa trava faria a tela parecer mais permissiva aqui do que é no backend
+ * real.
  *
  * A escrita de OPERAÇÃO — documento legal, limiar de alerta, motivo de
  * situação — existe dos dois lados, então aqui ela é de verdade, em memória. As
@@ -40,39 +42,71 @@ import { simulate } from "./_helpers";
  * parecer pronta e quebrar só contra o backend real.
  */
 
-function item(codigo: string, label: string, detalhe: string | null): ItemCatalogo {
+function item(codigo: string, label: string, detalhe: string | null): Omit<ItemCatalogo, "ordem"> {
   return { id: `cat-${codigo}`, codigo, label, detalhe, ativo: true };
 }
 
-const SINTOMAS: ItemCatalogo[] = efeitosAdversos.map((efeito) =>
-  item(efeito.id, efeito.nome, efeito.sistema),
+/** A posição de exibição é a ordem da lista — igual ao `sort_order` de origem. */
+function comOrdem(itens: Omit<ItemCatalogo, "ordem">[]): ItemCatalogo[] {
+  return itens.map((item, ordem) => ({ ...item, ordem }));
+}
+
+const SINTOMAS: ItemCatalogo[] = comOrdem(
+  efeitosAdversos.map((efeito) => item(efeito.id, efeito.nome, efeito.sistema)),
 );
 
-const NOTIFICACOES: ItemCatalogo[] = [
+const NOTIFICACOES: ItemCatalogo[] = comOrdem([
   item("appointment_reminder_24h", "Lembrete de compromisso", "Agenda · pode ser silenciada"),
   item("appointment_scheduled", "Novo compromisso agendado", "Agenda · pode ser silenciada"),
-  item("appointment_changed", "Compromisso alterado", "Agenda · não silenciável"),
+  item("appointment_changed", "Compromisso alterado", "Agenda · pode ser silenciada"),
   item("chat_message", "Nova mensagem da equipe", "Chat · pode ser silenciada"),
   item("chat_assigned", "Conversa atribuída a você", "Chat · pode ser silenciada"),
   item("content_published", "Nova orientação disponível", "Conteúdo · pode ser silenciada"),
   item("critical_alert", "Alerta de sintoma crítico", "Clínico · não silenciável"),
-];
+]);
 
-const CATEGORIAS: ItemCatalogo[] = [
+const CATEGORIAS: ItemCatalogo[] = comOrdem([
   item("nutrition", "Nutrição", "Nutricionista"),
   item("psychology", "Psicologia", "Psicólogo"),
   item("dentistry", "Odontologia", "Dentista"),
   item("physiotherapy", "Fisioterapia", "Fisioterapeuta"),
   item("nursing", "Enfermagem", "Enfermeiro"),
   item("oral_medication", "Medicação Oral", "Transversal"),
-];
+]);
 
-const ASSUNTOS: ItemCatalogo[] = [
+const ASSUNTOS: ItemCatalogo[] = comOrdem([
   item("symptoms", "Dúvida sobre sintomas", "Qualquer área"),
   item("medication", "Dúvida sobre medicação", "Farmacêutico"),
   item("appointment", "Agenda e compromissos", "Qualquer área"),
   item("other", "Outro assunto", "Qualquer área"),
-];
+]);
+
+/** Os mesmos sete tipos da base de homologação, na mesma ordem. */
+const TIPOS_COMPROMISSO: ItemCatalogo[] = comOrdem([
+  item("medical_consultation", "Consulta médica", null),
+  item("follow_up", "Retorno", null),
+  item("infusion", "Infusão / quimioterapia", null),
+  item("medication_pickup", "Retirada de medicação", null),
+  item("procedure", "Procedimento", null),
+  item("multidisciplinary", "Avaliação multidisciplinar", null),
+  item("lab_exam", "Exame laboratorial", null),
+]);
+
+/**
+ * As obrigatórias (`is_silenceable = false`) — `guard_notification_type` as
+ * protege. Só `critical_alert` está no mock hoje; `alert_assigned`, a outra
+ * obrigatória da base real, ainda não tem linha aqui.
+ */
+const NOTIFICACOES_OBRIGATORIAS = new Set(["critical_alert"]);
+
+/** As cinco listas vivas, por nome de tabela — a mesma chave que a RPC real usa. */
+const LISTA_POR_VOCABULARIO: Record<VocabularioTermo, ItemCatalogo[]> = {
+  symptoms: SINTOMAS,
+  notification_types: NOTIFICACOES,
+  content_categories: CATEGORIAS,
+  conversation_subjects: ASSUNTOS,
+  appointment_types: TIPOS_COMPROMISSO,
+};
 
 const TERMOS_LABEL: Record<VersaoLegal["tipo"], string> = {
   termos_de_uso: "Termos de uso",
@@ -109,9 +143,73 @@ export async function get(): Promise<SingleResult<Configuracoes>> {
       notificacoes: NOTIFICACOES,
       categorias_conteudo: CATEGORIAS,
       assuntos_chat: ASSUNTOS,
+      tipos_compromisso: TIPOS_COMPROMISSO,
       sem_origem: [],
     }),
   );
+}
+
+/* -------------------------------------------------------------------------
+   ESCRITA DO VOCABULÁRIO
+   ------------------------------------------------------------------------- */
+
+export async function atualizarTermoVocabulario({
+  vocabulario,
+  id,
+  label,
+  ordem,
+}: {
+  vocabulario: VocabularioTermo;
+  id: string;
+  label?: string;
+  ordem?: number;
+}): Promise<SingleResult<ItemCatalogo>> {
+  return simulate(() => {
+    const termo = LISTA_POR_VOCABULARIO[vocabulario].find((linha) => linha.id === id);
+    if (!termo) return fail(ERROR_CODE.NOT_FOUND, "Termo não encontrado no vocabulário.");
+
+    // Mesma recusa da RPC: rótulo vazio não é "sem mudança", é entrada inválida.
+    if (label !== undefined && !label.trim()) {
+      return fail(ERROR_CODE.VALIDATION, "o rotulo nao pode ser vazio");
+    }
+
+    // Nulo mantém a coluna — o mesmo contrato de `update_vocabulary_term`.
+    if (label !== undefined) termo.label = label.trim();
+    if (ordem !== undefined) termo.ordem = ordem;
+
+    return okOne(termo);
+  });
+}
+
+/**
+ * Retira um termo, ou o reativa — a MESMA função nos dois sentidos, como no
+ * banco. Ao contrário de `setMotivoAtivo`, sempre devolve a linha: o
+ * vocabulário não fica invisível depois de retirado.
+ */
+export async function setTermoVocabularioAtivo({
+  vocabulario,
+  id,
+  ativo,
+}: {
+  vocabulario: VocabularioTermo;
+  id: string;
+  ativo: boolean;
+}): Promise<SingleResult<ItemCatalogo>> {
+  return simulate(() => {
+    const termo = LISTA_POR_VOCABULARIO[vocabulario].find((linha) => linha.id === id);
+    if (!termo) return fail(ERROR_CODE.NOT_FOUND, "Termo não encontrado no vocabulário.");
+
+    // Mesma recusa de `guard_notification_type`: tipo obrigatório não desliga.
+    if (!ativo && vocabulario === "notification_types" && NOTIFICACOES_OBRIGATORIAS.has(termo.codigo)) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        `o tipo ${termo.codigo} e obrigatorio e nao pode ser desligado: desligar o calaria para todos`,
+      );
+    }
+
+    termo.ativo = ativo;
+    return okOne(termo);
+  });
 }
 
 export async function getTermos(): Promise<ListResult<VersaoLegal>> {

@@ -338,6 +338,27 @@ export const REVISAO_EXIGE_COMENTARIO: readonly AcaoRevisao[] = [
 ];
 
 /* ------------------------------------------------------------------------
+   VOCABULÁRIO DO SISTEMA — as cinco tabelas que `update_vocabulary_term` e
+   `set_vocabulary_term_active` aceitam em `p_vocabulary`
+   ------------------------------------------------------------------------ */
+
+/**
+ * O nome de cada tabela É o valor aceito pelo backend — não há tradução aqui,
+ * ao contrário do resto deste arquivo. `private.vocabulary_table` recusa
+ * qualquer string fora destas cinco, então um valor errado falha na função,
+ * não em silêncio.
+ */
+export const VOCABULARIO_TERMO = {
+  SINTOMAS: "symptoms",
+  NOTIFICACOES: "notification_types",
+  CATEGORIAS_CONTEUDO: "content_categories",
+  ASSUNTOS_CHAT: "conversation_subjects",
+  TIPOS_COMPROMISSO: "appointment_types",
+} as const;
+
+export type VocabularioTermo = (typeof VOCABULARIO_TERMO)[keyof typeof VOCABULARIO_TERMO];
+
+/* ------------------------------------------------------------------------
    Helpers
    ------------------------------------------------------------------------ */
 
