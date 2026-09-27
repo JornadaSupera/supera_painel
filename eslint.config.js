@@ -56,7 +56,10 @@ const SEM_SERVICES = {
 };
 
 export default tseslint.config(
-  { ignores: ["dist", "node_modules"] },
+  // `docs/` é vault interno (inclui código que o Pedro manda como referência,
+  // como as Edge Functions em `Atualizações e Respostas/`) — roda fora deste
+  // app Vite, nunca em `src/`, e não deve ser lintado como se fosse nosso.
+  { ignores: ["dist", "node_modules", "docs"] },
 
   {
     files: ["**/*.{ts,tsx}"],
