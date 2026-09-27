@@ -100,7 +100,10 @@ function AvisoAtoClinico({ edicao }: { edicao: boolean }) {
         horário.{" "}
         {edicao
           ? "Trocar o protocolo encerra o plano vigente e abre um novo — o anterior continua no histórico, com as datas que teve."
-          : "Todos são opcionais: a ficha pode nascer sem eles e recebê-los depois, quando o diagnóstico sair."}
+          : "Todos são opcionais: a ficha pode nascer sem eles e recebê-los depois, quando o diagnóstico sair."}{" "}
+        A clínica ainda está confirmando se registrar diagnóstico e protocolo é
+        papel do administrativo ou só do time clínico; até essa definição
+        chegar, o campo continua aberto para quem tiver a ficha em mãos.
       </p>
     </div>
   );
