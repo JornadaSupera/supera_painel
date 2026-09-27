@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Clock, ImageUp, MessageSquareText, Palette, Plus, Trash2, X } from "lucide-react";
 
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type { IntervaloAtendimento, SlideOnboarding } from "@/types/configuracao";
+import type { ClinicaConfiguracao, IntervaloAtendimento, SlideOnboarding } from "@/types/configuracao";
 import {
   useClinica,
   useSalvarHorario,
@@ -41,32 +41,32 @@ const MAX_SLIDES = 5;
 
 function SecaoIdentidade() {
   const clinica = useClinica();
+
+  if (clinica.isLoading) return <SkeletonCards count={1} />;
+  if (clinica.isError) return <ErrorState error={clinica.error} onRetry={() => void clinica.refetch()} />;
+  if (!clinica.data) return null;
+
+  return <FormIdentidade dados={clinica.data} />;
+}
+
+/**
+ * Só monta depois que `clinica.data` existe — é o que evita o flash de
+ * "#00aa92 / sem logo" antes do valor real chegar. Um `useEffect` copiando o
+ * dado remoto para o estado local, como antes, sempre desenha o padrão no
+ * primeiro commit em que `isLoading` vira `false`, porque o efeito só roda
+ * depois: mesma causa do M-10 da auditoria de arquitetura.
+ */
+function FormIdentidade({ dados }: { dados: ClinicaConfiguracao }) {
   const upload = useUploadLogo();
   const salvar = useSalvarIdentidade();
   const inputArquivoRef = useRef<HTMLInputElement>(null);
 
-  const [corPrimaria, setCorPrimaria] = useState(CORES_PADRAO.primaria);
-  const [corSecundaria, setCorSecundaria] = useState(CORES_PADRAO.secundaria);
+  const [corPrimaria, setCorPrimaria] = useState(dados.cor_primaria ?? CORES_PADRAO.primaria);
+  const [corSecundaria, setCorSecundaria] = useState(dados.cor_secundaria ?? CORES_PADRAO.secundaria);
   const [logo, setLogo] = useState<{ path: string | null; url: string | null }>({
-    path: null,
-    url: null,
+    path: dados.logo_path,
+    url: dados.logo_url,
   });
-
-  // Carrega uma vez quando os dados chegam — depois disso o estado é do
-  // formulário, não da leitura. Reler o servidor a cada render sobrescreveria
-  // o que a pessoa está digitando.
-  const carregado = useRef(false);
-  useEffect(() => {
-    if (carregado.current || !clinica.data) return;
-    carregado.current = true;
-
-    setCorPrimaria(clinica.data.cor_primaria ?? CORES_PADRAO.primaria);
-    setCorSecundaria(clinica.data.cor_secundaria ?? CORES_PADRAO.secundaria);
-    setLogo({ path: clinica.data.logo_path, url: clinica.data.logo_url });
-  }, [clinica.data]);
-
-  if (clinica.isLoading) return <SkeletonCards count={1} />;
-  if (clinica.isError) return <ErrorState error={clinica.error} onRetry={() => void clinica.refetch()} />;
 
   const corPrimariaValida = REGEX_COR.test(corPrimaria);
   const corSecundariaValida = REGEX_COR.test(corSecundaria);
@@ -221,22 +221,20 @@ function SecaoIdentidade() {
 
 function SecaoMensagens() {
   const clinica = useClinica();
-  const salvar = useSalvarMensagens();
-
-  const [slides, setSlides] = useState<SlideOnboarding[]>([]);
-  const [mensagemForaHorario, setMensagemForaHorario] = useState("");
-
-  const carregado = useRef(false);
-  useEffect(() => {
-    if (carregado.current || !clinica.data) return;
-    carregado.current = true;
-
-    setSlides(clinica.data.slides_onboarding);
-    setMensagemForaHorario(clinica.data.mensagem_fora_horario ?? "");
-  }, [clinica.data]);
 
   if (clinica.isLoading) return <SkeletonCards count={1} />;
   if (clinica.isError) return <ErrorState error={clinica.error} onRetry={() => void clinica.refetch()} />;
+  if (!clinica.data) return null;
+
+  return <FormMensagens dados={clinica.data} />;
+}
+
+/** Só monta depois que `clinica.data` existe — ver o comentário em `FormIdentidade`. */
+function FormMensagens({ dados }: { dados: ClinicaConfiguracao }) {
+  const salvar = useSalvarMensagens();
+
+  const [slides, setSlides] = useState<SlideOnboarding[]>(dados.slides_onboarding);
+  const [mensagemForaHorario, setMensagemForaHorario] = useState(dados.mensagem_fora_horario ?? "");
 
   const slidesValidos = slides.every(
     (slide) => slide.titulo.trim().length > 0 && slide.corpo.trim().length > 0,
@@ -448,28 +446,28 @@ function LinhaDia({
 
 function SecaoHorario() {
   const clinica = useClinica();
+
+  if (clinica.isLoading) return <SkeletonCards count={1} />;
+  if (clinica.isError) return <ErrorState error={clinica.error} onRetry={() => void clinica.refetch()} />;
+  if (!clinica.data) return null;
+
+  return <FormHorario dados={clinica.data} />;
+}
+
+/** Só monta depois que `clinica.data` existe — ver o comentário em `FormIdentidade`. */
+function FormHorario({ dados }: { dados: ClinicaConfiguracao }) {
   const salvar = useSalvarHorario();
+  const fusoRef = useRef(dados.fuso);
 
-  const [porDia, setPorDia] = useState<Record<number, Intervalo[]>>({});
-  const fusoRef = useRef("America/Sao_Paulo");
-
-  const carregado = useRef(false);
-  useEffect(() => {
-    if (carregado.current || !clinica.data) return;
-    carregado.current = true;
-
-    fusoRef.current = clinica.data.fuso;
+  const [porDia, setPorDia] = useState<Record<number, Intervalo[]>>(() => {
     const agrupado: Record<number, Intervalo[]> = {};
-    for (const intervalo of clinica.data.intervalos) {
+    for (const intervalo of dados.intervalos) {
       const lista = agrupado[intervalo.dia_semana] ?? [];
       lista.push({ abre: intervalo.abre, fecha: intervalo.fecha });
       agrupado[intervalo.dia_semana] = lista;
     }
-    setPorDia(agrupado);
-  }, [clinica.data]);
-
-  if (clinica.isLoading) return <SkeletonCards count={1} />;
-  if (clinica.isError) return <ErrorState error={clinica.error} onRetry={() => void clinica.refetch()} />;
+    return agrupado;
+  });
 
   const todosOsIntervalos: IntervaloAtendimento[] = DIAS_SEMANA.flatMap(({ dia_semana }) =>
     (porDia[dia_semana] ?? []).map((intervalo) => ({ dia_semana, ...intervalo })),
