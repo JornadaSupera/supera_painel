@@ -1,5 +1,5 @@
 import { ERROR_CODE, fail, type ErrorCode, type FailResult } from "@/services/contracts";
-import { mapSupabaseError } from "./client";
+import { getSupabaseClient, mapSupabaseError } from "./client";
 
 /**
  * Infra compartilhada do adapter Supabase.
@@ -210,4 +210,35 @@ export function paraIso(valor: string | null | undefined): string | null {
   if (!valor) return null;
   const data = new Date(valor);
   return Number.isNaN(data.getTime()) ? null : data.toISOString();
+}
+
+/**
+ * Registra uma exportação na trilha, DEPOIS de o arquivo já ter sido gerado.
+ *
+ * `log_data_export` (25/09/2026) é o pedágio de auditoria da EXPORTAÇÃO — o
+ * momento em que o dado sai do ambiente controlado, e o que uma investigação
+ * de vazamento mais precisa encontrar. Falhar em registrar não desfaz uma
+ * exportação que já aconteceu no navegador: o erro só vai para o console, para
+ * não transformar uma falha de auditoria numa exportação recusada.
+ *
+ * `p_scope` é identificador, nunca texto livre (`^[a-z][a-z0-9_]{0,62}$`) —
+ * quem chama é responsável por já ter normalizado o valor.
+ */
+export async function logarExportacao(params: {
+  escopo: string;
+  linhas: number;
+  pacienteId?: string;
+}): Promise<void> {
+  const { error } = await getSupabaseClient().rpc("log_data_export", {
+    p_scope: params.escopo,
+    p_row_count: params.linhas,
+    p_patient_id: params.pacienteId ?? null,
+  });
+
+  if (error) {
+    console.error(
+      `Falha ao registrar a exportação "${params.escopo}" na trilha de auditoria:`,
+      error.message,
+    );
+  }
 }
