@@ -115,24 +115,23 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
     "Enviar para revisão é o ato de quem escreveu — é assim que o texto entra nesta fila.",
   "auditoria.summary.exportacao":
     "Exportação não gera linha na trilha: baixar um CSV do que já está na tela acontece no navegador, sem passar pelo banco.",
-  "conteudos.list.visualizacoes":
-    "Não há contagem de acessos: favorito e leitura vivem na biblioteca do paciente, e nem a equipe nem a administração têm política de leitura ali.",
 
   /* -------------------------------------------------------------------------
-     LEITURA CLÍNICA EM CONJUNTO — a ausência que atingia três telas
+     LEITURA CLÍNICA EM CONJUNTO — a ausência que atingia quatro telas
      -------------------------------------------------------------------------
      As políticas de leitura da equipe são `TO clinical_reader`, e o papel de
      quem faz login (`authenticated`) não é membro dele: quem alcança aquelas
      linhas são as funções `read_*`, que têm `clinical_reader` como dono. Um
      `.from()` nessas tabelas devolve zero linhas SEM erro — e uma tela que soma
-     zero linhas publica `0` com cara de medição. Era o estado das três telas de
-     número.
+     zero linhas publica `0` com cara de medição. Era o estado das quatro telas
+     de número.
 
      A família `summarize_*` resolveu isso: o banco devolve a contagem já somada,
      **sem que nenhuma linha de prontuário chegue ao navegador**. É melhor em
      privacidade do que somar no cliente, e paga UMA leitura auditada onde a soma
-     no cliente pagava uma por paciente. `estatisticasClinicas.crossTab` e
-     `estatisticasOperacionais.getIndicadores` saíram desta lista.
+     no cliente pagava uma por paciente. `estatisticasClinicas.crossTab`,
+     `estatisticasOperacionais.getIndicadores` e a coluna "Acessos" de
+     `conteudos.list` (via `summarize_content_reads`) saíram desta lista.
 
      O que continua fora tem causa própria, e nenhuma delas é de leitura.
      ------------------------------------------------------------------------- */

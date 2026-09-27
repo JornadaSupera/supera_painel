@@ -17,7 +17,8 @@ import { getSupabaseClient } from "./client";
  * de prontuário chegue ao navegador — e o que faz o painel pagar **uma** leitura
  * auditada onde a soma no cliente pagaria uma por paciente.
  *
- * Quatro regras valem para as três funções, e todas mudam o que a tela mostra:
+ * Quatro regras valem para as três primeiras funções — agenda, chat e sintoma
+ * por protocolo —, e todas mudam o que a tela mostra:
  *
  * 1. **A janela é obrigatória.** Varredura sem período é recusada pelo servidor:
  *    sem recorte não é relatório, é dump.
@@ -31,6 +32,17 @@ import { getSupabaseClient } from "./client";
  * 4. **O sigilo vale dentro do agregado.** A administração não vê psicologia no
  *    recorte por especialidade nem no total — os números dela são menores que os
  *    da clínica inteira, por desenho.
+ *
+ * `summarize_content_reads` é a quarta, e só segue a regra 0 (nenhum dado de
+ * paciente sai da função). As outras três não se aplicam: não tem balde nem
+ * `p_granularity` — é uma soma por orientação, não uma série —, a janela é
+ * OPCIONAL no servidor (`p_from`/`p_to` aceitam nulo e viram "desde sempre"),
+ * e o sigilo de Psicologia não é filtrado dentro da função: ela soma
+ * `patient_content_states` inteira, confidencial incluída. É por isso que
+ * `resumirLeituraConteudo` sempre manda as duas datas quando o chamador quer
+ * um recorte, e por isso que quem lê o retorno (`conteudos.ts`,
+ * `relatorios.ts`) descarta a especialidade confidencial no cliente, não no
+ * banco.
  */
 
 /* -------------------------------------------------------------------------
@@ -102,6 +114,17 @@ export interface LinhaResumoSintoma {
    * `patient_count` entre graus contaria duas vezes quem oscilou entre eles.
    */
   patients_at_or_above: number;
+}
+
+/**
+ * `summarize_content_reads` — uma linha por orientação já lida.
+ *
+ * Sem balde: é soma total no recorte, não série no tempo. Item nunca lido não
+ * aparece — não há linha de zero.
+ */
+export interface LinhaResumoLeituraConteudo {
+  content_item_id: string;
+  read_count: number;
 }
 
 export type Granularidade = "day" | "week" | "month";
@@ -220,6 +243,23 @@ export function resumirSintomas(params: {
     p_protocol: params.protocolo ?? null,
     p_symptom_id: params.sintomaId ?? null,
     p_active_only: params.apenasAtivos ?? true,
+  });
+}
+
+/**
+ * Sem `janela`, soma o acervo inteiro desde sempre — é o que a coluna
+ * "Acessos" de `conteudos.list` mostra (histórico acumulado, ver
+ * `contagemDeLeituras` em `./conteudos`). Com `janela`, soma só o recorte —
+ * é o que o relatório "Conteúdo mais acessado" precisa (ver
+ * `conteudoMaisAcessado` em `./relatorios`). A mesma função de banco serve às
+ * duas perguntas; o que muda é só o argumento.
+ */
+export function resumirLeituraConteudo(janela?: Janela): Promise<Resumo<LinhaResumoLeituraConteudo>> {
+  const datas = janela ? comoDatas(janela) : { from: null, to: null };
+
+  return chamar<LinhaResumoLeituraConteudo>("summarize_content_reads", {
+    p_from: datas.from,
+    p_to: datas.to,
   });
 }
 

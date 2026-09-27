@@ -62,9 +62,9 @@ function projetar(linha: ConteudoRaw): ConteudoListItem {
     autor_id: linha.author_id,
     criado_em: linha.created_at,
     atualizado_em: linha.updated_at,
-    // O mock TEM a contagem porque o protótipo a mostra. O Supabase devolve
-    // `null` — a tabela de leitura do paciente não é legível pela administração.
-    // A diferença é real e está documentada nos dois adapters.
+    // O Supabase também tem a contagem agora, via `summarize_content_reads` —
+    // ver `contagemDeLeituras` no outro adapter. `null` continua existindo lá
+    // como "a chamada falhou nesta consulta", não como "não há origem".
     visualizacoes: linha.view_count,
   };
 }

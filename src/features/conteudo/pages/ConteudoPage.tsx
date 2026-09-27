@@ -48,9 +48,6 @@ import { useConteudos, useFilaRevisao, useRevisarConteudo } from "../hooks/useCo
  *
  * Onde nos afastamos do protótipo, e por quê:
  *
- *  - **Coluna "Visualizações"**: o protótipo mostra a contagem de acessos. A
- *    origem dela é a biblioteca do paciente, que nem a equipe nem a
- *    administração podem ler. A coluna diz isso em vez de exibir um zero.
  *  - **Botão "Nova orientação"**: não existe. Redigir é do profissional da
  *    área; o painel administrativo revisa.
  */

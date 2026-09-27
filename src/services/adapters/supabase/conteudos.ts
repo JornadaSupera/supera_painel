@@ -29,6 +29,7 @@ import {
 } from "../_content";
 import { paginate } from "../_list";
 import { executar, falhaDe, umDe } from "./_helpers";
+import { falhou, resumirLeituraConteudo } from "./_summaries";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
 
@@ -163,7 +164,17 @@ function nomeDe(conta: LinhaConta | null, ausente: string): string {
   return conta?.full_name?.trim() || conta?.email || ausente;
 }
 
-function projetar(linha: LinhaVersao): ConteudoListItem {
+/**
+ * `leituras` vem de `contagemDeLeituras()`, uma vez por listagem — não por
+ * linha. `null` quer dizer "esta consulta não buscou contagem": `detalhar` e
+ * `listVersions` não exibem a coluna em lugar nenhum da tela, e chamar a RPC
+ * ali pagaria um acesso auditado por um número que ninguém vê. Só `list()`
+ * busca.
+ *
+ * Dentro do Map, ausência é zero — `summarize_content_reads` só devolve
+ * linha para quem já foi lido, então um item nunca lido nunca aparece nele.
+ */
+function projetar(linha: LinhaVersao, leituras: Map<string, number> | null): ConteudoListItem {
   const item = umDe(linha.content_items);
   const categoria = umDe(item?.content_categories);
   const areaDaCategoria = umDe(categoria?.specialties);
@@ -184,13 +195,39 @@ function projetar(linha: LinhaVersao): ConteudoListItem {
     autor_id: item?.authored_by ?? null,
     criado_em: linha.created_at,
     atualizado_em: linha.updated_at,
-    // Favorito e leitura vivem em `patient_content_states`, e nem a
-    // administração nem a equipe têm política de leitura ali: a biblioteca de
-    // quem se trata é do paciente. A contagem de acessos do protótipo não tem
-    // origem — e `null` faz a tela dizer isso, em vez de estampar um zero que
-    // parece medição.
-    visualizacoes: null,
+    // Sem filtro de `confidencial` aqui, de propósito: a linha em si já não é
+    // mascarada além de título e resumo (categoria, versão e status aparecem
+    // normalmente para Psicologia — é a tela que esconde o texto, não esta
+    // função). Um total de acessos não mascarado é consistente com o resto da
+    // linha, diferente do relatório "Conteúdo mais acessado" (`relatorios.ts`),
+    // que é exportável e por isso descarta confidencial no agregado inteiro.
+    visualizacoes: leituras ? (leituras.get(linha.content_item_id) ?? 0) : null,
   };
+}
+
+/**
+ * Quantas vezes cada orientação já foi lida, somado o acervo inteiro.
+ *
+ * `summarize_content_reads` é da mesma família de `summarize_appointments`:
+ * soma sobre `patient_content_states` sem que nenhuma leitura de paciente
+ * chegue ao navegador. Sem `p_from`/`p_to` ela soma o tempo todo — a coluna
+ * "Acessos" do protótipo é histórico acumulado, não um recorte de período
+ * (quem precisa do recorte é o relatório "Conteúdo mais acessado", que passa
+ * a janela — ver `conteudoMaisAcessado` em `./relatorios`).
+ *
+ * `null` no retorno (e não um Map vazio) é o que diferencia "a chamada
+ * falhou" de "ninguém leu nada ainda" — `projetar` usa a diferença para
+ * escolher entre o traço de indisponível e um zero de verdade.
+ */
+async function contagemDeLeituras(): Promise<Map<string, number> | null> {
+  const resumo = await resumirLeituraConteudo();
+
+  if (falhou(resumo)) {
+    console.error("Falha ao ler a contagem de acessos da biblioteca:", resumo.error.message);
+    return null;
+  }
+
+  return new Map(resumo.linhas.map((linha) => [linha.content_item_id, Number(linha.read_count)]));
 }
 
 /** Histórico de decisões de uma versão. Falha aqui não derruba a ficha. */
@@ -228,7 +265,7 @@ async function detalhar(linha: LinhaVersao): Promise<ConteudoDetalhe> {
     .filter((cid): cid is LinhaCid => cid !== null);
 
   return {
-    ...projetar(linha),
+    ...projetar(linha, null),
     corpo: linha.body,
     video_url: linha.video_url,
     minutos_leitura: linha.estimated_reading_minutes,
@@ -255,14 +292,17 @@ const ORDENACAO_PADRAO = { field: "atualizado_em", direction: "desc" } as const;
  */
 export async function list(params: ListParams = {}): Promise<ListResult<ConteudoListItem>> {
   return executar(async () => {
-    const { data, error } = await getSupabaseClient()
-      .from("content_versions")
-      .select(SELECT_VERSAO)
-      .order("updated_at", { ascending: false });
+    const [{ data, error }, leituras] = await Promise.all([
+      getSupabaseClient()
+        .from("content_versions")
+        .select(SELECT_VERSAO)
+        .order("updated_at", { ascending: false }),
+      contagemDeLeituras(),
+    ]);
 
     if (error) return falhaDe(error);
 
-    const versoes = (data as unknown as LinhaVersao[]).map(projetar);
+    const versoes = (data as unknown as LinhaVersao[]).map((linha) => projetar(linha, leituras));
 
     return paginate(
       versoes,
@@ -301,7 +341,7 @@ export async function listVersions({
 
     if (error) return falhaDe(error);
 
-    return paginate((data as unknown as LinhaVersao[]).map(projetar), {
+    return paginate((data as unknown as LinhaVersao[]).map((linha) => projetar(linha, null)), {
       ...params,
       sort: params.sort ?? { field: "versao", direction: "desc" },
     });
