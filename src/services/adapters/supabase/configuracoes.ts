@@ -7,12 +7,15 @@ import {
   type SingleResult,
 } from "@/services/contracts";
 import type {
+  ClinicaConfiguracao,
   ConfiguracaoSeguranca,
   Consentimento,
   Configuracoes,
+  IntervaloAtendimento,
   ItemCatalogo,
   MotivoSituacao,
   RegraAlerta,
+  SlideOnboarding,
   SolicitacaoTitular,
   VersaoLegal,
   VinculoExterno,
@@ -20,6 +23,10 @@ import type {
 import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
 import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
+
+const BUCKET_BRANDING = "clinic-branding";
+const TAMANHO_MAXIMO_LOGO = 2 * 1024 * 1024;
+const TIPOS_ACEITOS_LOGO = ["image/png", "image/jpeg", "image/webp"];
 
 /**
  * Configurações — o que está valendo, e o que o painel edita.
@@ -61,17 +68,13 @@ function projetar(linha: LinhaCatalogo, detalhe: string | null = null): ItemCata
 /**
  * Chaves que a tela de referência mostra e que o banco não guarda.
  *
- * Nomeadas uma a uma para que a interface diga o que falta. "Configurações
- * indisponíveis" não ajuda ninguém; "não há onde guardar o logo da clínica"
- * diz o que pedir a quem.
+ * As cinco que moravam aqui (`identidade_visual`, `cor_primaria`,
+ * `horario_atendimento_chat`, `resposta_automatica`, `textos_de_onboarding`)
+ * ganharam onde gravar em `clinic_settings` (25/09/2026) — ver `getClinica`,
+ * `salvarIdentidade`, `salvarMensagens` e `salvarHorario`. Vazio por ora;
+ * nomear aqui é o que se faz quando alguma peça voltar a faltar.
  */
-const SEM_ORIGEM = [
-  "identidade_visual",
-  "cor_primaria",
-  "horario_atendimento_chat",
-  "resposta_automatica",
-  "textos_de_onboarding",
-];
+const SEM_ORIGEM: string[] = [];
 
 export async function get(): Promise<SingleResult<Configuracoes>> {
   return executar(async () => {
@@ -122,6 +125,185 @@ export async function get(): Promise<SingleResult<Configuracoes>> {
 
       sem_origem: SEM_ORIGEM,
     });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   IDENTIDADE, MENSAGENS E HORÁRIO — `clinic_settings` + `clinic_business_hours`
+   -------------------------------------------------------------------------
+   Linha única (`id = 1`), leitura direta para qualquer `authenticated` —
+   sem pedágio de auditoria, porque não é dado clínico. A escrita é por RPC,
+   uma por seção, cada uma substituindo o grupo inteiro que recebe: não existe
+   "só a cor" sem o logo junto, nem "só terça" na semana de atendimento.
+   ------------------------------------------------------------------------- */
+
+interface LinhaClinicSettings {
+  primary_color: string | null;
+  secondary_color: string | null;
+  logo_path: string | null;
+  time_zone: string;
+  onboarding_slides: { title: string; body: string }[];
+  off_hours_message: string | null;
+}
+
+interface LinhaHorario {
+  weekday: number;
+  opens_at: string;
+  closes_at: string;
+}
+
+/** URL pública do bucket `clinic-branding` — o bucket é público, de propósito. */
+function urlDoLogo(path: string | null): string | null {
+  if (!path) return null;
+  return getSupabaseClient().storage.from(BUCKET_BRANDING).getPublicUrl(path).data.publicUrl;
+}
+
+function projetarClinica(settings: LinhaClinicSettings, horario: LinhaHorario[]): ClinicaConfiguracao {
+  return {
+    cor_primaria: settings.primary_color,
+    cor_secundaria: settings.secondary_color,
+    logo_path: settings.logo_path,
+    logo_url: urlDoLogo(settings.logo_path),
+    fuso: settings.time_zone,
+    slides_onboarding: settings.onboarding_slides.map((slide) => ({
+      titulo: slide.title,
+      corpo: slide.body,
+    })),
+    mensagem_fora_horario: settings.off_hours_message,
+    intervalos: horario
+      .map((linha) => ({
+        dia_semana: linha.weekday,
+        abre: linha.opens_at.slice(0, 5),
+        fecha: linha.closes_at.slice(0, 5),
+      }))
+      .sort((a, b) => a.dia_semana - b.dia_semana || a.abre.localeCompare(b.abre)),
+  };
+}
+
+export async function getClinica(): Promise<SingleResult<ClinicaConfiguracao>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const [settings, horario] = await Promise.all([
+      supabase
+        .from("clinic_settings")
+        .select("primary_color, secondary_color, logo_path, time_zone, onboarding_slides, off_hours_message")
+        .eq("id", 1)
+        .single(),
+      supabase.from("clinic_business_hours").select("weekday, opens_at, closes_at"),
+    ]);
+
+    if (settings.error) return falhaDe(settings.error);
+    if (horario.error) return falhaDe(horario.error);
+
+    return okOne(
+      projetarClinica(
+        settings.data as unknown as LinhaClinicSettings,
+        (horario.data ?? []) as unknown as LinhaHorario[],
+      ),
+    );
+  });
+}
+
+/**
+ * Sobe o logo para o bucket `clinic-branding` — nunca grava `clinic_settings`.
+ *
+ * Caminho novo a cada envio (`logo/<instante>-<nome>`), nunca sobrescrito: se
+ * `salvarIdentidade` falhar depois do upload, o arquivo velho continua sendo o
+ * que `logo_path` aponta, em vez de já ter sido substituído por um que a linha
+ * não referencia ainda.
+ */
+export async function uploadLogo({
+  arquivo,
+}: {
+  arquivo: File;
+}): Promise<SingleResult<{ path: string; url: string }>> {
+  return executar(async () => {
+    if (!TIPOS_ACEITOS_LOGO.includes(arquivo.type)) {
+      return fail(ERROR_CODE.VALIDATION, "O logo aceita apenas PNG, JPEG ou WebP.");
+    }
+
+    if (arquivo.size > TAMANHO_MAXIMO_LOGO) {
+      return fail(ERROR_CODE.VALIDATION, "O logo precisa ter até 2 MB.");
+    }
+
+    const extensao = arquivo.type === "image/png" ? "png" : arquivo.type === "image/webp" ? "webp" : "jpg";
+    const caminho = `logo/${Date.now()}.${extensao}`;
+
+    const { error } = await getSupabaseClient()
+      .storage.from(BUCKET_BRANDING)
+      .upload(caminho, arquivo, { contentType: arquivo.type, upsert: false });
+
+    if (error) return falhaDe({ message: error.message });
+
+    const url = urlDoLogo(caminho);
+    if (!url) return fail(ERROR_CODE.UNKNOWN, "O upload terminou sem devolver a URL do logo.");
+
+    return okOne({ path: caminho, url });
+  });
+}
+
+export async function salvarIdentidade({
+  corPrimaria,
+  corSecundaria,
+  logoPath,
+}: {
+  corPrimaria: string;
+  corSecundaria: string;
+  logoPath: string | null;
+}): Promise<SingleResult<ClinicaConfiguracao>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("set_clinic_branding", {
+      p_primary_color: corPrimaria,
+      p_secondary_color: corSecundaria,
+      p_logo_path: logoPath,
+    });
+
+    if (error) return falhaDe(error);
+    return getClinica();
+  });
+}
+
+export async function salvarMensagens({
+  slidesOnboarding,
+  mensagemForaHorario,
+}: {
+  slidesOnboarding: SlideOnboarding[];
+  mensagemForaHorario: string | null;
+}): Promise<SingleResult<ClinicaConfiguracao>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("set_clinic_messages", {
+      p_onboarding_slides: slidesOnboarding.map((slide) => ({
+        title: slide.titulo,
+        body: slide.corpo,
+      })),
+      p_off_hours_message: mensagemForaHorario,
+    });
+
+    if (error) return falhaDe(error);
+    return getClinica();
+  });
+}
+
+export async function salvarHorario({
+  fuso,
+  intervalos,
+}: {
+  fuso: string;
+  intervalos: IntervaloAtendimento[];
+}): Promise<SingleResult<ClinicaConfiguracao>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("set_clinic_business_hours", {
+      p_time_zone: fuso,
+      p_hours: intervalos.map((intervalo) => ({
+        weekday: intervalo.dia_semana,
+        opens_at: intervalo.abre,
+        closes_at: intervalo.fecha,
+      })),
+    });
+
+    if (error) return falhaDe(error);
+    return getClinica();
   });
 }
 
@@ -506,7 +688,7 @@ export async function setExigirMfa({
    ESCRITA QUE CONTINUA RECUSADA — e por quê
    ------------------------------------------------------------------------- */
 
-export const { update, uploadLogo } = SETTINGS_WRITE_OPERATIONS;
+export const { update } = SETTINGS_WRITE_OPERATIONS;
 
 /* -------------------------------------------------------------------------
    FILA DE CONFERÊNCIA DA INTEGRAÇÃO
@@ -648,13 +830,21 @@ export async function getConsentimentos(): Promise<ListResult<Consentimento>> {
    PEDIDOS DO TITULAR (LGPD)
    -------------------------------------------------------------------------
    Leitura direta: `data_subject_requests` tem política para o administrador.
-   A decisão é por RPC, que aceita apenas deferir e recusar.
+   A decisão é por RPC (`decide_data_subject_request`), que aceita deferir e
+   recusar. O ciclo completo — `close_data_subject_request_cycle`, 25/09/2026
+   — abriu o estado `executed`, mas por dois caminhos diferentes conforme o
+   tipo do pedido:
 
-   > [!] "Cumprido" existe na estrutura e é inalcançável.
-   O estado `executed` está no enum e nenhuma função o atinge. Para a LGPD o
-   que conta é o ATENDIMENTO, não o deferimento — então é exatamente a prova do
-   atendimento que o painel não consegue registrar. A tela declara isso; o
-   pedido está na carta ao responsável pelo banco.
+   - Exclusão e revogação de consentimento se EXECUTAM SOZINHAS: a rotina
+     `execute-subject-requests`, a cada 5 minutos, tenta cumprir todo pedido
+     `granted` desses dois tipos. Falhando, o pedido continua `granted` e
+     `execution_error` guarda o motivo — é o painel que precisa mostrar isso,
+     porque senão a falha fica muda.
+   - Correção pede um passo do painel: `complete_data_subject_request` marca
+     como cumprida, e só aceita `granted` + `rectification` — qualquer outro
+     caso devolve `request_not_completable`.
+   - Acesso e portabilidade não passam por `executed`: o titular baixa o
+     pacote sozinho, por `export_my_data`, direto no app.
    ------------------------------------------------------------------------- */
 
 const TIPO_SOLICITACAO_LABEL: Record<string, string> = {
@@ -683,6 +873,7 @@ interface LinhaSolicitacao {
   created_at: string;
   decided_at: string | null;
   decision_note: string | null;
+  execution_error: string | null;
   accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
   decisor: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
 }
@@ -703,16 +894,22 @@ function projetarSolicitacao(linha: LinhaSolicitacao): SolicitacaoTitular {
     decidido_por: decisor?.full_name?.trim() || decisor?.email || null,
     observacao: linha.decision_note,
     aberto: ABERTOS.has(linha.status),
+    // `complete_data_subject_request` só aceita esta combinação — replicar a
+    // regra aqui evita que a tela ofereça um botão que o banco vai recusar.
+    completavel: linha.status === "granted" && linha.request_type === "rectification",
+    execucao_erro: linha.execution_error,
   };
 }
+
+/** Colunas de `data_subject_requests` que a tela precisa, com os dois joins de nome. */
+const SELECT_SOLICITACAO =
+  "id, request_type, status, created_at, decided_at, decision_note, execution_error, accounts:account_id ( full_name, email ), decisor:decided_by ( full_name, email )";
 
 export async function getSolicitacoesTitular(): Promise<ListResult<SolicitacaoTitular>> {
   return executar(async () => {
     const { data, error } = await getSupabaseClient()
       .from("data_subject_requests")
-      .select(
-        "id, request_type, status, created_at, decided_at, decision_note, accounts:account_id ( full_name, email ), decisor:decided_by ( full_name, email )",
-      )
+      .select(SELECT_SOLICITACAO)
       .order("created_at", { ascending: false })
       .limit(TETO_READ);
 
@@ -726,6 +923,22 @@ export async function getSolicitacoesTitular(): Promise<ListResult<SolicitacaoTi
       solicitacoes.sort((a, b) => Number(b.aberto) - Number(a.aberto) || b.criado_em.localeCompare(a.criado_em)),
     );
   });
+}
+
+/** Uma solicitação, para devolver a linha atualizada sem reler a lista inteira. */
+async function buscarSolicitacao(
+  id: string,
+): Promise<SolicitacaoTitular | ReturnType<typeof falhaDe> | ReturnType<typeof fail>> {
+  const { data, error } = await getSupabaseClient()
+    .from("data_subject_requests")
+    .select(SELECT_SOLICITACAO)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return falhaDe(error);
+  if (!data) return fail(ERROR_CODE.NOT_FOUND, "Pedido não encontrado.");
+
+  return projetarSolicitacao(data as unknown as LinhaSolicitacao);
 }
 
 export async function decidirSolicitacaoTitular({
@@ -746,10 +959,38 @@ export async function decidirSolicitacaoTitular({
 
     if (error) return falhaDe(error);
 
-    const { data, error: erroLeitura } = await getSolicitacoesTitular();
-    if (erroLeitura) return fail(erroLeitura.code, erroLeitura.message);
+    const solicitacao = await buscarSolicitacao(id);
+    if (!("id" in solicitacao)) return solicitacao;
 
-    const solicitacao = data.find((linha) => linha.id === id);
-    return solicitacao ? okOne(solicitacao) : fail(ERROR_CODE.NOT_FOUND, "Pedido não encontrado.");
+    return okOne(solicitacao);
+  });
+}
+
+/**
+ * Marca um pedido de correção como cumprido.
+ *
+ * O backend só aceita `granted` + `rectification`; qualquer outro caso
+ * devolve `request_not_completable` (42501), traduzido pelo tratamento de
+ * erro padrão do adapter.
+ */
+export async function completarSolicitacaoTitular({
+  id,
+  observacao,
+}: {
+  id: string;
+  observacao?: string;
+}): Promise<SingleResult<SolicitacaoTitular>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("complete_data_subject_request", {
+      p_request_id: id,
+      p_note: observacao?.trim() || null,
+    });
+
+    if (error) return falhaDe(error);
+
+    const solicitacao = await buscarSolicitacao(id);
+    if (!("id" in solicitacao)) return solicitacao;
+
+    return okOne(solicitacao);
   });
 }

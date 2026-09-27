@@ -21,6 +21,7 @@ import { DialogPublicarTermo } from "../components/DialogPublicarTermo";
 import { ExigenciaSegundoFator } from "../components/ExigenciaSegundoFator";
 import { FilaDeConferencia } from "../components/FilaDeConferencia";
 import { GatilhosAlerta } from "../components/GatilhosAlerta";
+import { IdentidadeEOperacao } from "../components/IdentidadeEOperacao";
 import { MotivosSituacao } from "../components/MotivosSituacao";
 import { SolicitacoesTitular } from "../components/SolicitacoesTitular";
 import { useConfiguracoes, useTermos } from "../hooks/useConfiguracoes";
@@ -40,26 +41,17 @@ import { useConfiguracoes, useTermos } from "../hooks/useConfiguracoes";
  * de falta — é da clínica e muda com a rotina dela. Esperar uma migração para
  * cadastrar "paciente não tinha transporte" seria burocracia sem finalidade.
  *
- * O que o protótipo oferece e o backend não guarda — identidade visual, horário
- * de atendimento, textos de onboarding — continua nomeado item a item. Desenhar
- * campo que não salva é a pior forma de mentir numa interface.
+ * Identidade visual, mensagens e horário de atendimento — que o protótipo
+ * oferece e o backend não guardava — ganharam onde gravar em 25/09/2026
+ * (`clinic_settings`). Vivem na aba "Identidade & horário", com salvamento de
+ * verdade, não mais nomeados como ausentes.
  *
  * A tela detalhada de permissões vive em `/usuarios`, na aba "Permissões por
  * papel", como o próprio protótipo antecipa ao dizer que ela viria depois.
  */
 
-const MOTIVOS_SEM_ORIGEM: Record<string, string> = {
-  identidade_visual:
-    "Logo da clínica: não há tabela de parâmetro nem bucket de marca no Storage. O logo usado hoje pelo aplicativo vem do pacote da build.",
-  cor_primaria:
-    "Cor primária: a paleta é token de tema no código, versionada junto com a interface. Ainda não é dado configurável.",
-  horario_atendimento_chat:
-    "Horário de atendimento no chat: não há tabela de janela de atendimento. As conversas hoje não distinguem dentro e fora do expediente.",
-  resposta_automatica:
-    "Resposta automática fora do horário: depende do horário de atendimento, que ainda não existe como dado.",
-  textos_de_onboarding:
-    "Textos de onboarding e mensagens automáticas: ainda não são dado do backend; hoje vivem no pacote do aplicativo.",
-};
+/** O que a tela de referência ainda oferece e o banco não guarda, se sobrar algum. */
+const MOTIVOS_SEM_ORIGEM: Record<string, string> = {};
 
 /** As duas espécies de documento, na ordem em que o aplicativo as pede. */
 const ESPECIES_LEGAIS: { tipo: VersaoLegal["tipo"]; label: string }[] = [
@@ -148,6 +140,7 @@ export function ConfiguracoesPage() {
         {/* Seven sections do not fit side by side below ~1100px. The list
             scrolls inside its own strip, so the page keeps its width. */}
         <ScrollableTabsList>
+          <TabsTrigger value="identidade">Identidade & horário</TabsTrigger>
           <TabsTrigger value="catalogos">Catálogos do sistema</TabsTrigger>
           <TabsTrigger value="alertas">Gatilhos de alerta</TabsTrigger>
           <TabsTrigger value="motivos">Motivos de situação</TabsTrigger>
@@ -156,6 +149,10 @@ export function ConfiguracoesPage() {
           <TabsTrigger value="integracao">Integração</TabsTrigger>
           <TabsTrigger value="lgpd">Pedidos do titular</TabsTrigger>
         </ScrollableTabsList>
+
+        <TabsContent value="identidade">
+          <IdentidadeEOperacao />
+        </TabsContent>
 
         <TabsContent value="catalogos" className="flex flex-col gap-5">
           {configuracoes.isLoading ? (

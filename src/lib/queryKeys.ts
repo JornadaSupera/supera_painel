@@ -99,6 +99,7 @@ export const queryKeys = {
     definitions: () => ["reports", "definitions"] as const,
     run: <P extends QueryKeyParams<P>>(slug: string, params?: P | null) => ["reports", "run", slug, params ?? {}] as const,
     schedules: () => ["reports", "schedules"] as const,
+    runs: () => ["reports", "runs"] as const,
   },
 
   statistics: {
@@ -130,6 +131,8 @@ export const queryKeys = {
     externalLinks: () => ["settings", "external-links"] as const,
     consents: () => ["settings", "consents"] as const,
     dataSubjectRequests: () => ["settings", "data-subject-requests"] as const,
+    /** Identidade visual, mensagens e horário — `clinic_settings`. */
+    clinic: () => ["settings", "clinic"] as const,
   },
 
   catalogs: {

@@ -8,12 +8,15 @@ import {
   type SingleResult,
 } from "@/services/contracts";
 import type {
+  ClinicaConfiguracao,
   ConfiguracaoSeguranca,
   Consentimento,
   Configuracoes,
+  IntervaloAtendimento,
   ItemCatalogo,
   MotivoSituacao,
   RegraAlerta,
+  SlideOnboarding,
   SolicitacaoTitular,
   VersaoLegal,
   VinculoExterno,
@@ -371,7 +374,101 @@ export async function setExigirMfa({
   });
 }
 
-export const { update, uploadLogo } = SETTINGS_WRITE_OPERATIONS;
+export const { update } = SETTINGS_WRITE_OPERATIONS;
+
+/* -------------------------------------------------------------------------
+   IDENTIDADE, MENSAGENS E HORÁRIO — `clinic_settings` + `clinic_business_hours`
+   -------------------------------------------------------------------------
+   Pré-preenchido, ao contrário da base real (que nasceu vazia em 25/09/2026):
+   é a única forma de a tela mostrar o estado "configurado" sem alguém abrir o
+   painel e preencher os três formulários primeiro. Continua editável — nada
+   aqui é somente leitura.
+   ------------------------------------------------------------------------- */
+
+const CLINICA: ClinicaConfiguracao = {
+  cor_primaria: "#00aa92",
+  cor_secundaria: "#2dc5a6",
+  logo_path: null,
+  logo_url: null,
+  fuso: "America/Sao_Paulo",
+  slides_onboarding: [
+    { titulo: "Bem-vindo à Jornada Supera", corpo: "Acompanhe seu tratamento em um só lugar." },
+    { titulo: "Diário de sintomas", corpo: "Registre como você está se sentindo todos os dias." },
+  ],
+  mensagem_fora_horario: "Nosso atendimento volta no próximo horário comercial. Em caso de urgência, procure o pronto-socorro.",
+  intervalos: [1, 2, 3, 4, 5].map((dia_semana) => ({ dia_semana, abre: "08:00", fecha: "18:00" })),
+};
+
+export async function getClinica(): Promise<SingleResult<ClinicaConfiguracao>> {
+  return simulate(() => okOne({ ...CLINICA, slides_onboarding: [...CLINICA.slides_onboarding], intervalos: [...CLINICA.intervalos] }));
+}
+
+/** Simula o upload com uma URL local — não sai do navegador, mas serve de prévia real. */
+export async function uploadLogo({
+  arquivo,
+}: {
+  arquivo: File;
+}): Promise<SingleResult<{ path: string; url: string }>> {
+  return simulate(() => {
+    if (!["image/png", "image/jpeg", "image/webp"].includes(arquivo.type)) {
+      return fail(ERROR_CODE.VALIDATION, "O logo aceita apenas PNG, JPEG ou WebP.");
+    }
+
+    if (arquivo.size > 2 * 1024 * 1024) {
+      return fail(ERROR_CODE.VALIDATION, "O logo precisa ter até 2 MB.");
+    }
+
+    const path = `logo/${arquivo.name}`;
+    return okOne({ path, url: URL.createObjectURL(arquivo) });
+  });
+}
+
+export async function salvarIdentidade({
+  corPrimaria,
+  corSecundaria,
+  logoPath,
+}: {
+  corPrimaria: string;
+  corSecundaria: string;
+  logoPath: string | null;
+}): Promise<SingleResult<ClinicaConfiguracao>> {
+  return simulate(() => {
+    CLINICA.cor_primaria = corPrimaria;
+    CLINICA.cor_secundaria = corSecundaria;
+    CLINICA.logo_path = logoPath;
+    // O mock não tem bucket: a URL de prévia que `uploadLogo` devolveu já é o
+    // suficiente para a tela mostrar o logo novo depois de salvar.
+    return okOne({ ...CLINICA });
+  });
+}
+
+export async function salvarMensagens({
+  slidesOnboarding,
+  mensagemForaHorario,
+}: {
+  slidesOnboarding: SlideOnboarding[];
+  mensagemForaHorario: string | null;
+}): Promise<SingleResult<ClinicaConfiguracao>> {
+  return simulate(() => {
+    CLINICA.slides_onboarding = slidesOnboarding;
+    CLINICA.mensagem_fora_horario = mensagemForaHorario;
+    return okOne({ ...CLINICA });
+  });
+}
+
+export async function salvarHorario({
+  fuso,
+  intervalos,
+}: {
+  fuso: string;
+  intervalos: IntervaloAtendimento[];
+}): Promise<SingleResult<ClinicaConfiguracao>> {
+  return simulate(() => {
+    CLINICA.fuso = fuso;
+    CLINICA.intervalos = intervalos;
+    return okOne({ ...CLINICA });
+  });
+}
 
 /* -------------------------------------------------------------------------
    FILA DE CONFERÊNCIA DA INTEGRAÇÃO
@@ -442,11 +539,10 @@ export async function getConsentimentos(): Promise<ListResult<Consentimento>> {
    ------------------------------------------------------------------------- */
 
 /**
- * Um pedido aberto, como no banco.
- *
- * A base real tem exatamente um pedido esperando decisão — e era ele que
- * ninguém via. O mock reproduz esse estado porque é o que a tela precisa
- * exercitar: uma fila com prazo correndo, não uma fila vazia.
+ * Pedidos como os que a base real tem hoje: três abertos, dos três tipos que
+ * não pedem nada do painel além da decisão (acesso, portabilidade e
+ * exclusão), mais uma correção já deferida — para exercitar o botão
+ * "marcar como cumprida", que só existe para este tipo e este status.
  */
 const SOLICITACOES: SolicitacaoTitular[] = [
   {
@@ -461,6 +557,53 @@ const SOLICITACOES: SolicitacaoTitular[] = [
     decidido_por: null,
     observacao: null,
     aberto: true,
+    completavel: false,
+    execucao_erro: null,
+  },
+  {
+    id: "lgpd-002",
+    pessoa: "Otávio Beltrão",
+    tipo: "portability",
+    tipo_label: "Portabilidade",
+    status: "requested",
+    status_label: "Aberto",
+    criado_em: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    decidido_em: null,
+    decidido_por: null,
+    observacao: null,
+    aberto: true,
+    completavel: false,
+    execucao_erro: null,
+  },
+  {
+    id: "lgpd-003",
+    pessoa: "Renata Falcão",
+    tipo: "deletion",
+    tipo_label: "Exclusão de dados",
+    status: "requested",
+    status_label: "Aberto",
+    criado_em: new Date(Date.now() - 3 * 86_400_000).toISOString(),
+    decidido_em: null,
+    decidido_por: null,
+    observacao: null,
+    aberto: true,
+    completavel: false,
+    execucao_erro: null,
+  },
+  {
+    id: "lgpd-004",
+    pessoa: "Igor Mesquita",
+    tipo: "rectification",
+    tipo_label: "Correção de dados",
+    status: "granted",
+    status_label: "Deferido",
+    criado_em: new Date(Date.now() - 20 * 86_400_000).toISOString(),
+    decidido_em: new Date(Date.now() - 18 * 86_400_000).toISOString(),
+    decidido_por: "Administração",
+    observacao: "Telefone de contato desatualizado na ficha.",
+    aberto: false,
+    completavel: true,
+    execucao_erro: null,
   },
 ];
 
@@ -498,6 +641,35 @@ export async function decidirSolicitacaoTitular({
     solicitacao.decidido_por = "Administração";
     solicitacao.observacao = observacao;
     solicitacao.aberto = false;
+    solicitacao.completavel = deferir && solicitacao.tipo === "rectification";
+
+    return okOne(solicitacao);
+  });
+}
+
+export async function completarSolicitacaoTitular({
+  id,
+  observacao,
+}: {
+  id: string;
+  observacao?: string;
+}): Promise<SingleResult<SolicitacaoTitular>> {
+  return simulate(() => {
+    const solicitacao = SOLICITACOES.find((linha) => linha.id === id);
+    if (!solicitacao) return fail(ERROR_CODE.NOT_FOUND, "Pedido não encontrado.");
+
+    // Mesma guarda do backend: só correção deferida chega a "cumprido".
+    if (!solicitacao.completavel) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "Este pedido não pode ser marcado como cumprido por aqui.",
+      );
+    }
+
+    solicitacao.status = "executed";
+    solicitacao.status_label = "Cumprido";
+    solicitacao.observacao = observacao?.trim() || solicitacao.observacao;
+    solicitacao.completavel = false;
 
     return okOne(solicitacao);
   });

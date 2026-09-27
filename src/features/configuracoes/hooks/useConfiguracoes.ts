@@ -369,9 +369,10 @@ export function useSolicitacoesTitular() {
 /**
  * Defere ou recusa um pedido do titular.
  *
- * O aviso lembra que decidir **não é cumprir**: o backend não tem como
- * registrar a execução, e para a LGPD o que conta é o atendimento. Omitir isso
- * no momento do sucesso faria quem decidiu dar o assunto por encerrado.
+ * O aviso lembra que decidir **não é cumprir**: exclusão e revogação de
+ * consentimento se executam sozinhas pela rotina agendada; correção pede o
+ * passo extra de `useCompletarSolicitacao`, abaixo; acesso e portabilidade o
+ * titular resolve sozinho, pelo app.
  */
 export function useDecidirSolicitacao() {
   const queryClient = useQueryClient();
@@ -393,11 +394,112 @@ export function useDecidirSolicitacao() {
       toast.success(solicitacao?.status === "granted" ? "Pedido deferido" : "Pedido recusado", {
         description:
           solicitacao?.status === "granted"
-            ? "Falta cumprir o pedido fora do painel — exportar, corrigir ou excluir o dado. O painel ainda não registra o cumprimento."
+            ? solicitacao.tipo === "rectification"
+              ? "Corrija o dado fora do painel e volte aqui para marcar como cumprido."
+              : "A execução acontece sozinha, em até 5 minutos — a tela mostra se ela falhar."
             : "A recusa fica registrada com a justificativa.",
       });
     },
     onError: (erro) =>
       toast.error("Não foi possível registrar a decisão", { description: erro.message }),
+  });
+}
+
+/**
+ * Marca um pedido de correção como cumprido, depois de o dado já ter sido
+ * corrigido fora do painel. Só existe para pedido deferido do tipo correção —
+ * `completavel` já vem calculado pelo adapter, e é o que a tela usa para
+ * mostrar o botão.
+ */
+export function useCompletarSolicitacao() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { id: string; observacao?: string }) => {
+      const { data } = await call(() => configuracoesApi.completarSolicitacaoTitular(params));
+
+      audit.update(RECURSO, params.id, { operacao: "lgpd", cumprido: true });
+
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.dataSubjectRequests() });
+      toast.success("Pedido marcado como cumprido");
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível marcar o pedido como cumprido", { description: erro.message }),
+  });
+}
+
+/* -------------------------------------------------------------------------
+   IDENTIDADE, MENSAGENS E HORÁRIO — `clinic_settings`, desde 25/09/2026
+   ------------------------------------------------------------------------- */
+
+export function useClinica() {
+  return useQuery({
+    queryKey: queryKeys.settings.clinic(),
+    queryFn: async () => (await call(() => configuracoesApi.getClinica())).data,
+  });
+}
+
+/** Sobe o arquivo e devolve `{ path, url }` — não grava nada em `clinic_settings` sozinho. */
+export function useUploadLogo() {
+  return useMutation({
+    mutationFn: async (arquivo: File) => (await call(() => configuracoesApi.uploadLogo({ arquivo }))).data,
+    onError: (erro) => toast.error("Não foi possível enviar o logo", { description: erro.message }),
+  });
+}
+
+export function useSalvarIdentidade() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { corPrimaria: string; corSecundaria: string; logoPath: string | null }) => {
+      const { data } = await call(() => configuracoesApi.salvarIdentidade(params));
+      audit.update(RECURSO, "clinic_settings", { operacao: "identidade_visual" });
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.clinic() });
+      toast.success("Identidade visual salva");
+    },
+    onError: (erro) => toast.error("Não foi possível salvar a identidade visual", { description: erro.message }),
+  });
+}
+
+export function useSalvarMensagens() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      slidesOnboarding: { titulo: string; corpo: string }[];
+      mensagemForaHorario: string | null;
+    }) => {
+      const { data } = await call(() => configuracoesApi.salvarMensagens(params));
+      audit.update(RECURSO, "clinic_settings", { operacao: "mensagens" });
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.clinic() });
+      toast.success("Mensagens salvas");
+    },
+    onError: (erro) => toast.error("Não foi possível salvar as mensagens", { description: erro.message }),
+  });
+}
+
+export function useSalvarHorario() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { fuso: string; intervalos: { dia_semana: number; abre: string; fecha: string }[] }) => {
+      const { data } = await call(() => configuracoesApi.salvarHorario(params));
+      audit.update(RECURSO, "clinic_settings", { operacao: "horario_atendimento" });
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.settings.clinic() });
+      toast.success("Horário de atendimento salvo");
+    },
+    onError: (erro) => toast.error("Não foi possível salvar o horário", { description: erro.message }),
   });
 }
