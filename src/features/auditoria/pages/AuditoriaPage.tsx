@@ -53,10 +53,6 @@ import { DetalheAcesso } from "../components/DetalheAcesso";
  *
  * Onde nos afastamos do protótipo, e por quê:
  *
- *  - **Cartão "Exportação"**: o protótipo mostra cinco contadores; a trilha
- *    sabe separar quatro. O que falta não é zerado — um zero afirmaria que
- *    ninguém exportou nada, e a verdade é que baixar um arquivo acontece no
- *    navegador e não chega ao banco. O motivo aparece embaixo da faixa.
  *  - **Coluna "De onde"**: o protótipo mostra só o endereço. Aqui ele vem
  *    acompanhado da qualidade em que a pessoa agiu — titular, acompanhante,
  *    equipe —, que é o que distingue duas ações feitas sobre a mesma ficha.
@@ -241,13 +237,13 @@ export function AuditoriaPage() {
 
       {/* ------------------------------------------------------- contadores */}
       <section aria-label="Resumo da janela">
-        {/* Two by two on a phone and four across from lg. One column stacked
-            the counters ~400px tall before the trail even started, and three
-            across left "Sigiloso" alone on a second row. */}
+        {/* Two by two on a phone and five across from lg — one row per window,
+            now that "Exportação" (25/09/2026) is a fifth counted category
+            instead of a banner explaining its absence. */}
         {resumo.isLoading ? (
-          <SkeletonCards count={4} />
+          <SkeletonCards count={5} />
         ) : (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
             {(resumo.data?.contagens ?? []).map((contagem) => (
               <StatCard
                 key={contagem.acao}

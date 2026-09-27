@@ -14,7 +14,7 @@ import {
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import { AUDIT_DEFAULT_SORT, buildFacetOptions, summarizeAudit, toAuditExport } from "../_audit";
 import { paginate } from "../_list";
-import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
+import { TETO_READ, executar, falhaDe, logarExportacao, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import {
   QUALIDADES_POR_ORIGEM,
@@ -429,22 +429,26 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Audi
    CONTADORES DA JANELA
    ------------------------------------------------------------------------- */
 
-/** As categorias que `audit_log` sabe separar, na ordem do protótipo. */
+/**
+ * As categorias que `audit_log` sabe separar, na ordem do protótipo.
+ *
+ * `exportacao` entrou em 25/09/2026: até então baixar um CSV não gravava nada
+ * no banco, e o contador ficava declarado ausente. Agora só conta o que o
+ * painel efetivamente declarou por `logarExportacao` — um CSV baixado antes
+ * desta mudança, ou por um cliente que não chama a função, não aparece aqui,
+ * e essa é a mesma regra de qualquer contador desta tela: número vem de linha
+ * na trilha, nunca de inferência.
+ */
 const CONTAVEIS: AcaoAuditoria[] = [
   ACAO_AUDITORIA.LEITURA,
   ACAO_AUDITORIA.EDICAO,
   ACAO_AUDITORIA.EXCLUSAO,
   ACAO_AUDITORIA.SIGILOSO,
+  ACAO_AUDITORIA.EXPORTACAO,
 ];
 
-/**
- * Categorias do protótipo sem origem na trilha.
- *
- * Sobrou uma. `exportacao` é um evento do cliente: nada é gravado no banco
- * quando alguém baixa um CSV do que já estava na tela, então o contador
- * continua declarado ausente em vez de zerado.
- */
-const SEM_ORIGEM: AcaoAuditoria[] = [ACAO_AUDITORIA.EXPORTACAO];
+/** Categorias do protótipo sem origem na trilha. Nenhuma, desde 25/09/2026. */
+const SEM_ORIGEM: AcaoAuditoria[] = [];
 
 export async function getSummary(params: {
   janelaHoras?: number;
@@ -558,9 +562,15 @@ export async function getFacets(
 /** Linhas achatadas para CSV ou JSON. A serialização é da interface (`lib/csv.ts`). */
 export async function exportar(params: ListParams = {}): Promise<ListResult<Record<string, string>>> {
   // Sem paginação: a exportação é do RECORTE inteiro, não da página aberta.
-  return executar(async () =>
-    toAuditExport(await list({ ...params, page: 1, pageSize: TETO_TRILHA })),
-  );
+  return executar(async () => {
+    const resultado = toAuditExport(await list({ ...params, page: 1, pageSize: TETO_TRILHA }));
+
+    if (!resultado.error) {
+      await logarExportacao({ escopo: "auditoria_trilha", linhas: resultado.data.length });
+    }
+
+    return resultado;
+  });
 }
 
 export { exportar as export };

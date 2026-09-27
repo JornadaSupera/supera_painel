@@ -89,19 +89,21 @@ export function paraCodigoDeFase(fase: string | null | undefined): string | null
    ------------------------------------------------------------------------- */
 
 /**
- * O banco registra quatro verbos; o painel exibe sete categorias.
+ * O banco registra cinco verbos; o painel exibe sete categorias.
  *
  * `sigiloso` não é verbo: é a marca `is_restricted_material` sobre uma leitura,
  * e por isso se filtra por coluna própria, não por este mapa. `login` e
  * `logout` continuam sem origem — o ciclo de sessão é do GoTrue, que não
- * escreve nesta tabela. `exportacao` acontece no navegador e não chega ao
- * banco.
+ * escreve nesta tabela. `export` chegou em 25/09/2026 (`add_audit_export_action`):
+ * a exportação passou a ter origem porque o painel passou a declará-la, por
+ * `logarExportacao` — ver `_helpers.ts`.
  */
 const ACAO_POR_VERBO: Record<string, AcaoAuditoria> = {
   read: ACAO_AUDITORIA.LEITURA,
   create: ACAO_AUDITORIA.EDICAO,
   update: ACAO_AUDITORIA.EDICAO,
   delete: ACAO_AUDITORIA.EXCLUSAO,
+  export: ACAO_AUDITORIA.EXPORTACAO,
 };
 
 export function paraAcaoAuditoria(verbo: string | null | undefined): AcaoAuditoria {
