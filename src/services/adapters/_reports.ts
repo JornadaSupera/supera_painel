@@ -191,6 +191,57 @@ export function chatResponseReport(
   };
 }
 
+/**
+ * A ranked row of "Conteúdo mais acessado": one published orientação.
+ *
+ * The index signature is what lets this sit in `ResultadoRelatorio.linhas`
+ * (`Record<string, string | number>[]`) — every other report builds that
+ * shape as an inline object literal, which TypeScript accepts structurally;
+ * a named interface needs the signature spelled out.
+ */
+export interface ContentReadRow {
+  [key: string]: string | number;
+  titulo: string;
+  area: string;
+  leituras: number;
+}
+
+/**
+ * Ranking of most-read published content.
+ *
+ * Sorts here, not at the call site: the adapter's raw rows come pre-sorted
+ * from `summarize_content_reads` (`ORDER BY count DESC`), but the merge step
+ * that attaches titles and drops confidential/unpublished items can change
+ * that order, and a report whose ranking silently stops matching its own
+ * numbers is worse than one that pays a redundant sort.
+ */
+export function contentReadsReport(
+  linhas: ContentReadRow[],
+  dias: number,
+  semVersaoPublicada: number,
+): ResultadoRelatorio {
+  const ordenadas = [...linhas].sort((a, b) => b.leituras - a.leituras);
+  const totalLeituras = ordenadas.reduce((soma, linha) => soma + linha.leituras, 0);
+
+  return {
+    slug: "conteudo-mais-acessado",
+    titulo: "Conteúdo mais acessado",
+    colunas: [
+      { key: "titulo", label: "Orientação" },
+      { key: "area", label: "Área" },
+      { key: "leituras", label: "Leituras", numerica: true },
+    ],
+    linhas: ordenadas,
+    resumo:
+      `${totalLeituras} leituras nos últimos ${dias} dias · ${ordenadas.length} orientações no ranking` +
+      (semVersaoPublicada > 0
+        ? ` · ${semVersaoPublicada} com leitura registrada mas sem versão publicada no momento, fora do ranking`
+        : ""),
+    eixo: "titulo",
+    medida: "leituras",
+  };
+}
+
 /** Engagement rows: people in treatment, how many engaged, and the rate. */
 export function engagementRows(
   total: number,

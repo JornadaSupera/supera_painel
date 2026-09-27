@@ -11,24 +11,28 @@ import type {
 import {
   bySpecialtyReport,
   chatResponseReport,
+  contentReadsReport,
   createReportOperations,
   effectsByProtocolReport,
   isReportFailure,
   listDefinitionsWithout,
+  type ContentReadRow,
   type ReportOutcome,
   type ReportParams,
 } from "../_reports";
-import { TETO_READ, executar, falhaDe, logarExportacao } from "./_helpers";
+import { TETO_READ, executar, falhaDe, logarExportacao, umDe } from "./_helpers";
 import {
   SITUACAO,
   falhou,
   janelaDeDias,
   resumirAgenda,
+  resumirLeituraConteudo,
   rotuloDoMes,
 } from "./_summaries";
 import { getSupabaseClient } from "./client";
 import { crossTab } from "./estatisticasClinicas";
 import { getIndicadores } from "./estatisticasOperacionais";
+import { paraEspecialidade } from "./mapping";
 import { varrerLista } from "./pacientes";
 
 /**
@@ -40,7 +44,7 @@ import { varrerLista } from "./pacientes";
  * Cada relatório é uma função que devolve colunas descritas e linhas achatadas.
  * A tela não sabe de qual tabela o número veio — desenha o que recebe —, o que é
  * o que permite um relatório trocar de origem sem a tela mudar. Foi o que
- * aconteceu nesta rodada: **oito dos doze passaram a rodar** e nenhuma linha da
+ * aconteceu nesta rodada: **nove dos doze passaram a rodar** e nenhuma linha da
  * tela mudou junto.
  *
  * > [!] O que destravou, e o que continua fora
@@ -48,10 +52,11 @@ import { varrerLista } from "./pacientes";
  * contagem somada no banco, sem linha de prontuário no navegador —, e
  * `read_patient_list` deu busca, filtro, total e — desde `rework_patient_list`,
  * 25/09/2026 — data de cadastro à listagem. Com as duas, agenda, chat, diário,
- * protocolo, fase, CID e cadastro passaram a ter fonte. `read_patients`, a
- * função antiga, foi removida na mesma migration; nenhum relatório a usa mais.
+ * protocolo, fase, CID, cadastro e biblioteca de conteúdo passaram a ter fonte.
+ * `read_patients`, a função antiga, foi removida na mesma migration; nenhum
+ * relatório a usa mais.
  *
- * Os quatro que sobram não esperam leitura nenhuma: esperam **definição**. Cada
+ * Os três que sobram não esperam leitura nenhuma: esperam **definição**. Cada
  * um diz o seu motivo no próprio cartão, porque o conjunto de doze é contratado
  * e sumir com o cartão esconderia o que falta entregar.
  */
@@ -62,7 +67,7 @@ const TETO_VARREDURA = TETO_READ * 10;
 /**
  * O QUE CONTINUA SEM ORIGEM — e por quê.
  * =============================================================================
- * Nenhum dos quatro é limitação de leitura. Tirar um slug desta lista sem que a
+ * Nenhum dos três é limitação de leitura. Tirar um slug desta lista sem que a
  * definição exista publica um número calculado sobre critério inventado, que é
  * pior do que um cartão que diz o que falta.
  */
@@ -70,8 +75,6 @@ const SEM_ORIGEM: Record<string, string> = {
   "alertas-ia":
     "A fila de alertas existe no backend, mas nenhum gatilho de criticidade foi cadastrado: sem regra, nenhum alerta dispara. O limiar é decisão clínica, e cadastrá-lo é ato da administração. Fila priorizada por IA, além disso, é do nível Completo — fora do escopo contratado.",
   nps: "As tabelas e a função da pesquisa existem, mas nenhuma pesquisa é aberta: a rotina agendada que dispara o NPS não foi criada, e dois dos três marcos dependem do plano terapêutico, que só a integração com o Gemed preenche. Sem pesquisa aberta não há resposta para contar.",
-  "conteudo-mais-acessado":
-    "A contagem de acessos vive na biblioteca do paciente, e nem a equipe nem a administração têm política de leitura ali. Sem ela não há ranking — e a leitura existe para o titular do dado, não para quem publica.",
   "engajamento-app":
     "“Engajamento” não tem definição em fonte nenhuma: sessões abertas, dias com registro no diário, orientações lidas e mensagens enviadas dariam quatro números diferentes, e o escopo não diz qual deles é o indicador. A pergunta está aberta com a clínica. Número calculado sobre definição inventada é pior que indicador ausente.",
 };
@@ -297,6 +300,95 @@ async function sessoesQuimioterapia(dias: number): Promise<ReportOutcome> {
 }
 
 /* -------------------------------------------------------------------------
+   RELATÓRIO SOBRE A BIBLIOTECA DE CONTEÚDO
+   ------------------------------------------------------------------------- */
+
+interface LinhaEspecialidadeConteudo {
+  code: string;
+  is_confidential: boolean;
+}
+
+interface LinhaCategoriaConteudo {
+  label: string;
+  specialties: LinhaEspecialidadeConteudo | LinhaEspecialidadeConteudo[] | null;
+}
+
+interface LinhaVersaoPublicada {
+  content_item_id: string;
+  title: string;
+  content_items: {
+    content_categories: LinhaCategoriaConteudo | LinhaCategoriaConteudo[] | null;
+  } | null;
+}
+
+/**
+ * Conteúdo mais acessado.
+ *
+ * `summarize_content_reads` devolve id e contagem, sem título nem área — soma
+ * sobre `patient_content_states` inteira, sem que nenhuma leitura de paciente
+ * chegue ao navegador. O título vem de uma segunda consulta, só para os ids
+ * que voltaram, na VERSÃO PUBLICADA: é o texto que o paciente de fato leu.
+ * Item cuja versão publicada já saiu do ar (arquivada, nunca republicada de
+ * novo) fica fora do ranking — a leitura entra na contagem do resumo, mas não
+ * há título para pôr na linha.
+ *
+ * Psicologia sai do ranking por desenho, como nos outros relatórios agregados
+ * desta família (regra 4 de `_summaries.ts`) — só que aqui o filtro é daqui
+ * mesmo: `summarize_content_reads` não distingue confidencial, soma tudo.
+ */
+async function conteudoMaisAcessado(
+  dias: number,
+  especialidade?: string | null,
+): Promise<ReportOutcome> {
+  const resumo = await resumirLeituraConteudo(janelaDeDias(dias));
+  if (falhou(resumo)) return resumo;
+
+  if (resumo.linhas.length === 0) return contentReadsReport([], dias, 0);
+
+  const { data, error } = await getSupabaseClient()
+    .from("content_versions")
+    .select(
+      "content_item_id, title, content_items ( content_categories ( label, specialties ( code, is_confidential ) ) )",
+    )
+    .eq("status", "published")
+    .in(
+      "content_item_id",
+      resumo.linhas.map((linha) => linha.content_item_id),
+    );
+
+  if (error) return falhaDe(error);
+
+  const porItem = new Map(
+    (data as unknown as LinhaVersaoPublicada[]).map((linha) => [linha.content_item_id, linha]),
+  );
+
+  const linhas: ContentReadRow[] = [];
+  let semVersaoPublicada = 0;
+
+  for (const contagem of resumo.linhas) {
+    const versao = porItem.get(contagem.content_item_id);
+    if (!versao) {
+      semVersaoPublicada += 1;
+      continue;
+    }
+
+    const categoria = umDe(versao.content_items?.content_categories);
+    const area = umDe(categoria?.specialties);
+
+    if (area?.is_confidential) continue;
+    if (especialidade && paraEspecialidade(area?.code) !== especialidade) continue;
+
+    linhas.push({
+      titulo: versao.title,
+      area: categoria?.label ?? "Sem categoria",
+      leituras: Number(contagem.read_count),
+    });
+  }
+
+  return contentReadsReport(linhas, dias, semVersaoPublicada);
+}
+
+/* -------------------------------------------------------------------------
    EXECUÇÃO
    ------------------------------------------------------------------------- */
 
@@ -334,6 +426,8 @@ export async function run(params: ReportParams): Promise<SingleResult<ResultadoR
           return chatResponseReport(
             await getIndicadores({ dias, especialidade: params.especialidade }),
           );
+        case "conteudo-mais-acessado":
+          return conteudoMaisAcessado(dias, params.especialidade);
         default:
           return fail(ERROR_CODE.NOT_FOUND, `Relatório "${params.slug}" não existe no catálogo.`);
       }

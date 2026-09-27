@@ -130,7 +130,7 @@ export const DEFINICOES: DefinicaoRelatorio[] = [
     titulo: "Conteúdo mais acessado",
     descricao: "Ranking das orientações da biblioteca por número de acessos.",
     filtros: ["periodo", "especialidade"],
-    disponivel: false,
+    disponivel: true,
   },
 ];
 

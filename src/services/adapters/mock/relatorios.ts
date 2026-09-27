@@ -1,5 +1,6 @@
-import { FASE_TRATAMENTO_LABEL } from "@/lib/enums";
+import { FASE_TRATAMENTO_LABEL, STATUS_CONTEUDO } from "@/lib/enums";
 import { cids } from "@/mocks/cids";
+import { conteudos } from "@/mocks/conteudos";
 import { pacientes } from "@/mocks/pacientes";
 import { protocolos } from "@/mocks/protocolos";
 import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
@@ -13,11 +14,13 @@ import type {
 import {
   bySpecialtyReport,
   chatResponseReport,
+  contentReadsReport,
   createReportOperations,
   effectsByProtocolReport,
   engagementRows,
   isReportFailure,
   listDefinitionsWithout,
+  type ContentReadRow,
   type ReportOutcome,
   type ReportParams,
 } from "../_reports";
@@ -28,7 +31,7 @@ import { getIndicadores } from "./estatisticasOperacionais";
 /**
  * Relatórios — o motor dos doze, sobre a base fictícia.
  *
- * Mesmo catálogo e mesmas colunas do adapter Supabase. Os três indisponíveis
+ * Mesmo catálogo e mesmas colunas do adapter Supabase. Os dois indisponíveis
  * também não rodam aqui: não é limitação do mock, é ausência de origem que o
  * backend real tem, e um mock que os produzisse esconderia justamente o que
  * ainda falta contratar ou construir.
@@ -38,8 +41,6 @@ const SEM_ORIGEM: Record<string, string> = {
   "alertas-ia":
     "Não existe tabela de alerta nem regra de criticidade. Derivar alerta a partir do grau do sintoma seria inferência clínica feita pelo painel.",
   nps: "Não existe pesquisa de satisfação: nenhuma tabela de resposta, nota ou marco de envio.",
-  "conteudo-mais-acessado":
-    "A contagem de acessos vive na biblioteca do paciente, fora do alcance da administração.",
 };
 
 export async function listDefinitions(): Promise<ListResult<DefinicaoRelatorio>> {
@@ -58,7 +59,11 @@ function contar<T>(itens: T[], chave: (item: T) => string): Map<string, number> 
   return total;
 }
 
-async function montar(slug: string, dias: number): Promise<ReportOutcome | null> {
+async function montar(
+  slug: string,
+  dias: number,
+  especialidade?: string | null,
+): Promise<ReportOutcome | null> {
   const ativos = pacientes.filter((paciente) => paciente.status === "ativo");
 
   switch (slug) {
@@ -185,6 +190,22 @@ async function montar(slug: string, dias: number): Promise<ReportOutcome | null>
     case "tempo-resposta-chat":
       return chatResponseReport(await getIndicadores());
 
+    case "conteudo-mais-acessado": {
+      // A ficha fixa não simula versão arquivada nem sigilo fora de alcance:
+      // é só publicado, não confidencial, e — quando houver recorte — da
+      // especialidade pedida, igual ao adapter Supabase depois do filtro.
+      const linhas: ContentReadRow[] = conteudos
+        .filter((linha) => linha.status === STATUS_CONTEUDO.PUBLICADO && !linha.is_confidential)
+        .filter((linha) => !especialidade || linha.specialty === especialidade)
+        .map((linha) => ({
+          titulo: linha.title,
+          area: linha.category_label,
+          leituras: linha.view_count,
+        }));
+
+      return contentReadsReport(linhas, dias, 0);
+    }
+
     default:
       return null;
   }
@@ -194,7 +215,7 @@ export async function run(params: ReportParams): Promise<SingleResult<ResultadoR
   const motivo = SEM_ORIGEM[params.slug];
   if (motivo) return fail(ERROR_CODE.NOT_IMPLEMENTED, motivo);
 
-  const resultado = await montar(params.slug, params.dias ?? 30);
+  const resultado = await montar(params.slug, params.dias ?? 30, params.especialidade);
 
   if (!resultado) {
     return fail(ERROR_CODE.NOT_FOUND, `Relatório "${params.slug}" não existe no catálogo.`);
