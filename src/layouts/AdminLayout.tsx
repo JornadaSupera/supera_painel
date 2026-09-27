@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 
 import { Breadcrumb, Loading } from "@/components/shared";
 import { SessaoSemSegundoFator } from "@/features/auth/components/SessaoSemSegundoFator";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useGarantiaDaSessao } from "@/hooks/useGarantiaDaSessao";
 import { MobileMenu } from "./MobileMenu";
 import { Sidebar } from "./Sidebar";
@@ -37,12 +38,13 @@ export function AdminLayout() {
   const bloqueado = garantia.data ? !garantia.data.suficiente : false;
 
   /* The tab title follows the screen: with several tabs open, "Jornada
-     Supera" repeated helps nobody find their way. */
-  useEffect(() => {
-    const item = navItemByPath(location.pathname);
-    const name = item?.title ?? item?.label;
-    document.title = name ? `${name} · Jornada Supera` : "Jornada Supera · Administração";
-  }, [location.pathname]);
+     Supera" repeated helps nobody find their way. Shared with
+     `PasswordRecoveryPage`/`LegalDocumentView` instead of a second
+     `document.title` effect, so only one mechanism restores the previous
+     title when it changes. */
+  const itemAtual = navItemByPath(location.pathname);
+  const nomeDaTela = itemAtual?.title ?? itemAtual?.label;
+  useDocumentTitle(nomeDaTela ? `${nomeDaTela} · Jornada Supera` : "Jornada Supera · Administração");
 
   /* Changing pages puts the scroll back at the top. Without it, landing in the
      middle of a new screen is disorienting. */

@@ -150,6 +150,13 @@ export function StatCard({
   // a phone, for one.
   const pillRoom = level === "medio" && "pb-9";
 
+  // `className` belongs on whichever element ends up outermost: the card
+  // itself, except when `level="medio"` wraps it below to anchor the badge —
+  // there, the wrapper carries it instead. Gating on `!level` used to drop
+  // `className` silently for `level="mvp"` too, since it is truthy but never
+  // gets a wrapper.
+  const semWrapperProprio = level !== "medio";
+
   const card = onClick ? (
     <button
       type="button"
@@ -158,13 +165,13 @@ export function StatCard({
         BASE,
         "hover:border-primary/40 h-full w-full cursor-pointer text-left transition-[border-color,box-shadow] hover:shadow-sm",
         pillRoom,
-        !level && className,
+        semWrapperProprio && className,
       )}
     >
       {content}
     </button>
   ) : (
-    <div className={cn(BASE, "h-full", pillRoom, !level && className)}>{content}</div>
+    <div className={cn(BASE, "h-full", pillRoom, semWrapperProprio && className)}>{content}</div>
   );
 
   if (level !== "medio") return card;
