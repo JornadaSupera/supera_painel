@@ -89,6 +89,19 @@ export interface LinhaResumoSintoma {
    * nos dois baldes, e somar contaria a mesma pessoa duas vezes.
    */
   patient_count: number;
+  /**
+   * O DENOMINADOR — desde 25/09/2026. Pacientes com plano daquele protocolo
+   * vigente em algum ponto da janela, sob os mesmos filtros de CID e de ficha
+   * ativa. `null` no balde de protocolo nulo: "sem plano" não é um conjunto
+   * que a janela delimite, e dividir ali inventaria uma prevalência.
+   */
+  protocol_patient_count: number | null;
+  /**
+   * Pacientes distintos cujo PIOR grau na janela é ≥ o grau desta linha —
+   * desde 25/09/2026. É o número certo para "grau 2 ou maior": somar
+   * `patient_count` entre graus contaria duas vezes quem oscilou entre eles.
+   */
+  patients_at_or_above: number;
 }
 
 export type Granularidade = "day" | "week" | "month";
@@ -196,6 +209,8 @@ export function resumirSintomas(params: {
   janela: Janela;
   protocolo?: string | null;
   sintomaId?: string | null;
+  /** Recorta pela SITUAÇÃO DA FICHA HOJE — desde 25/09/2026. Padrão: só ativos. */
+  apenasAtivos?: boolean;
 }): Promise<Resumo<LinhaResumoSintoma>> {
   const datas = comoDatas(params.janela);
 
@@ -204,6 +219,7 @@ export function resumirSintomas(params: {
     p_to: datas.to,
     p_protocol: params.protocolo ?? null,
     p_symptom_id: params.sintomaId ?? null,
+    p_active_only: params.apenasAtivos ?? true,
   });
 }
 

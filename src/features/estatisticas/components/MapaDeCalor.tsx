@@ -171,14 +171,24 @@ export function MapaDeCalor({ dados }: MapaDeCalorProps) {
                   const valor = celula ? medida.valorDe(celula) : null;
 
                   if (!celula || valor === null) {
+                    // Célula com registro mas sem percentual só acontece no
+                    // balde "Sem plano terapêutico": ele não tem denominador
+                    // (ver `estatisticasClinicas.ts`), mesmo com o resto do
+                    // mapa em modo prevalência. Dizer "nenhum paciente" aqui
+                    // seria falso — há registro, só não há com que dividi-lo.
+                    const semDenominador =
+                      dados.prevalencia_disponivel && celula && celula.registros > 0;
+
                     return (
                       <td
                         key={sintoma.id}
                         className="text-muted-foreground bg-muted/40 rounded-md px-2 py-2 text-center"
                         title={
-                          dados.prevalencia_disponivel
-                            ? "Nenhum paciente neste protocolo no recorte atual."
-                            : "Nenhum registro deste efeito neste protocolo no recorte atual."
+                          semDenominador
+                            ? `${formatNumber(celula.registros)} registros, sem plano terapêutico — sem denominador de pacientes para calcular percentual aqui.`
+                            : dados.prevalencia_disponivel
+                              ? "Nenhum paciente neste protocolo no recorte atual."
+                              : "Nenhum registro deste efeito neste protocolo no recorte atual."
                         }
                       >
                         —
