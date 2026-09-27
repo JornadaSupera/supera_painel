@@ -162,6 +162,56 @@ export interface Configuracoes {
 }
 
 /**
+ * Um slide do carrossel de onboarding — a primeira coisa que o paciente vê no
+ * app, antes do login. Título até 80 caracteres, corpo até 400 — o mesmo teto
+ * que `set_clinic_messages` valida no banco.
+ */
+export interface SlideOnboarding {
+  titulo: string;
+  corpo: string;
+}
+
+/**
+ * Um intervalo de atendimento num dia da semana.
+ *
+ * `dia_semana`: 0 = domingo, como `set_clinic_business_hours` espera. `abre`
+ * e `fecha` em `"HH:MM"`. Mais de um intervalo por dia é aceito (ex.: manhã e
+ * tarde, com almoço fora); intervalos sobrepostos no mesmo dia o banco recusa.
+ */
+export interface IntervaloAtendimento {
+  dia_semana: number;
+  abre: string;
+  fecha: string;
+}
+
+/**
+ * Identidade visual, mensagens e horário da clínica — `clinic_settings` +
+ * `clinic_business_hours`, desde 25/09/2026.
+ *
+ * > [!] Linha única, criada vazia.
+ * Tudo aqui pode vir `null` ou lista vazia até alguém configurar pela
+ * primeira vez — não é ausência de leitura, é o estado de fábrica.
+ *
+ * > [!] `resposta_automatica` depende de horário E mensagem, os dois.
+ * O guia do banco é explícito: a resposta automática fora do expediente fica
+ * desligada enquanto faltar peça — hoje falta a mensagem. Configurar só o
+ * horário não liga a resposta sozinha.
+ */
+export interface ClinicaConfiguracao {
+  cor_primaria: string | null;
+  cor_secundaria: string | null;
+  /** Caminho no bucket `clinic-branding`. `null` sem logo. */
+  logo_path: string | null;
+  /** URL pública já resolvida — o bucket é público, de propósito. */
+  logo_url: string | null;
+  /** Fuso IANA. Vale para o horário de atendimento inteiro. */
+  fuso: string;
+  slides_onboarding: SlideOnboarding[];
+  mensagem_fora_horario: string | null;
+  intervalos: IntervaloAtendimento[];
+}
+
+/**
  * Um pedido que o titular abriu sobre os próprios dados.
  *
  * > [!] Corre prazo legal a partir da abertura.
@@ -188,4 +238,14 @@ export interface SolicitacaoTitular {
   observacao: string | null;
   /** `true` enquanto o pedido aceita decisão. */
   aberto: boolean;
+  /**
+   * `true` para um pedido de correção já deferido, ainda não marcado como
+   * cumprido — o único caso em que o painel oferece o botão. Exclusão e
+   * revogação de consentimento se executam sozinhas, pela rotina agendada
+   * (`execution_error` avisa quando falham); acesso e portabilidade o titular
+   * baixa direto pelo app.
+   */
+  completavel: boolean;
+  /** Preenchido quando a execução automática (exclusão/revogação) falhou. */
+  execucao_erro: string | null;
 }

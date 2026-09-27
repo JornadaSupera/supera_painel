@@ -5,16 +5,25 @@ import type { DesafioMfa, GarantiaDaSessao, ResultadoLogin, Sessao } from "@/typ
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type {
+  ClinicaConfiguracao,
   ConfiguracaoSeguranca,
   Configuracoes,
   Consentimento,
+  IntervaloAtendimento,
   MotivoSituacao,
   RegraAlerta,
+  SlideOnboarding,
   SolicitacaoTitular,
   VersaoLegal,
   VinculoExterno,
 } from "@/types/configuracao";
-import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
+import type {
+  AgendamentoRelatorio,
+  AgendamentoRelatorioEntrada,
+  DefinicaoRelatorio,
+  ExecucaoRelatorio,
+  ResultadoRelatorio,
+} from "@/types/relatorio";
 import type {
   ComparacaoProtocolo,
   CruzamentoClinico,
@@ -492,9 +501,43 @@ export interface ConfiguracoesOperations {
     corpo: string;
   }): Promise<SingleResult<VersaoLegal>>;
 
-  /** As duas recusam: catálogo do sistema muda por migração, não por formulário. */
+  /** Continua recusando: catálogo do sistema muda por migração, não por formulário. */
   update(params: Partial<Configuracoes>): Promise<SingleResult<Configuracoes>>;
-  uploadLogo(params: { arquivo: File }): Promise<SingleResult<{ url: string }>>;
+
+  /** Identidade visual, mensagens e horário — `clinic_settings`, desde 25/09/2026. */
+  getClinica(): Promise<SingleResult<ClinicaConfiguracao>>;
+
+  /**
+   * Sobe o arquivo e devolve o caminho no bucket `clinic-branding`.
+   *
+   * Sempre ANTES de `salvarIdentidade`: `set_clinic_branding` recusa um
+   * `logoPath` que ainda não existe no bucket — a ordem é sobe, depois grava.
+   */
+  uploadLogo(params: { arquivo: File }): Promise<SingleResult<{ path: string; url: string }>>;
+
+  /**
+   * Salva cor e logo juntos — é uma RPC só, `set_clinic_branding`.
+   *
+   * `logoPath: null` remove o logo. Não trocar o logo significa reenviar o
+   * caminho atual: a função substitui o valor, não mantém o que não veio.
+   */
+  salvarIdentidade(params: {
+    corPrimaria: string;
+    corSecundaria: string;
+    logoPath: string | null;
+  }): Promise<SingleResult<ClinicaConfiguracao>>;
+
+  /** Salva os slides de onboarding e a mensagem fora do horário juntos. */
+  salvarMensagens(params: {
+    slidesOnboarding: SlideOnboarding[];
+    mensagemForaHorario: string | null;
+  }): Promise<SingleResult<ClinicaConfiguracao>>;
+
+  /** Substitui a semana inteira — não existe "editar um dia": `set_clinic_business_hours` apaga e recria tudo. */
+  salvarHorario(params: {
+    fuso: string;
+    intervalos: IntervaloAtendimento[];
+  }): Promise<SingleResult<ClinicaConfiguracao>>;
 
   /**
    * Uma linha por sintoma ATIVO, com ou sem regra.
@@ -588,16 +631,31 @@ export interface ConfiguracoesOperations {
   /**
    * Defere ou recusa um pedido, com justificativa.
    *
-   * > [!] Não há como registrar que o pedido foi CUMPRIDO.
-   * O backend aceita apenas deferido e recusado; "executado" existe na
-   * estrutura e nenhuma função o alcança. Para a LGPD o que conta é o
-   * atendimento, não o deferimento — então é justamente a prova do atendimento
-   * que fica de fora. A tela diz isso em vez de dar o assunto por encerrado.
+   * Deferir não é cumprir. Exclusão e revogação de consentimento se executam
+   * sozinhas pela rotina agendada; correção pede o passo extra de
+   * `completarSolicitacaoTitular`, abaixo. Acesso e portabilidade o titular
+   * resolve sozinho, pelo app.
    */
   decidirSolicitacaoTitular(params: {
     id: string;
     deferir: boolean;
     observacao: string;
+  }): Promise<SingleResult<SolicitacaoTitular>>;
+
+  /**
+   * Marca um pedido de CORREÇÃO como cumprido, depois de o dado já ter sido
+   * corrigido fora do painel.
+   *
+   * > [!] Só serve para `rectification` deferido — `complete_data_subject_request`
+   * recusa qualquer outro tipo ou status com `request_not_completable`. Exclusão e
+   * revogação de consentimento não passam por aqui: a rotina agendada
+   * (`execute-subject-requests`, a cada 5 min) tenta executá-las sozinha assim que
+   * são deferidas, e `execucao_erro` avisa quando ela falha — nesse caso o pedido
+   * continua `granted`, e o reparo é do responsável pelo banco, não desta operação.
+   */
+  completarSolicitacaoTitular(params: {
+    id: string;
+    observacao?: string;
   }): Promise<SingleResult<SolicitacaoTitular>>;
 }
 
@@ -627,9 +685,32 @@ export interface RelatoriosOperations {
     especialidade?: string | null;
   }): Promise<ListResult<Record<string, string>>>;
 
-  /** As três dependem de rotina agendada e tabela de token — ainda não existem. */
-  schedule(params: { slug: string; email: string }): Promise<SingleResult<never>>;
-  listSchedules(): Promise<ListResult<never>>;
+  /**
+   * Os agendamentos cadastrados — de TODOS os administradores, não só de quem
+   * pergunta. A política do banco não filtra por dono: quem cadastrou um
+   * agendamento continua vendo os alheios, porque o aviso chega para a
+   * clínica, não para uma pessoa.
+   */
+  listAgendamentos(): Promise<ListResult<AgendamentoRelatorio>>;
+
+  /** Cadastra — sempre entregando à própria conta; não há seletor de destinatário. */
+  criarAgendamento(params: AgendamentoRelatorioEntrada): Promise<SingleResult<AgendamentoRelatorio>>;
+
+  /** Substitui o agendamento inteiro — não existe "só trocar o horário". */
+  atualizarAgendamento(
+    params: AgendamentoRelatorioEntrada & { id: string },
+  ): Promise<SingleResult<AgendamentoRelatorio>>;
+
+  /** Pausa ou retoma. Não há como apagar — só a rotina do banco decide os `report_runs`. */
+  setAgendamentoAtivo(params: {
+    id: string;
+    ativo: boolean;
+  }): Promise<SingleResult<AgendamentoRelatorio>>;
+
+  /** As últimas gerações — a prova de que a rotina agendada rodou de fato. */
+  listExecucoes(): Promise<ListResult<ExecucaoRelatorio>>;
+
+  /** Continua sem tabela de token no banco: link compartilhável não existe. */
   createShareLink(params: { slug: string }): Promise<SingleResult<never>>;
 }
 

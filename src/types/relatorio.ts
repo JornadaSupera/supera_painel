@@ -69,3 +69,54 @@ export interface ResultadoRelatorio {
   /** Chave da coluna numérica principal, quando houver. */
   medida?: string;
 }
+
+/* -------------------------------------------------------------------------
+   AGENDAMENTO — `report_schedules` + `report_runs`, desde 25/09/2026
+   ------------------------------------------------------------------------- */
+
+export type FrequenciaRelatorio = "diaria" | "semanal" | "mensal";
+
+export const FREQUENCIA_RELATORIO_LABEL: Record<FrequenciaRelatorio, string> = {
+  diaria: "Diária",
+  semanal: "Semanal",
+  mensal: "Mensal",
+};
+
+/**
+ * Uma entrega agendada de um relatório.
+ *
+ * O aviso chega como notificação in-app para quem cadastrou — nunca por
+ * e-mail, e nunca com o arquivo anexado: só uma referência. Quem quiser o
+ * dado entra no painel, e o acesso fica na trilha de auditoria.
+ */
+export interface AgendamentoRelatorio {
+  id: string;
+  slug: string;
+  frequencia: FrequenciaRelatorio;
+  /** `"HH:MM"`, no fuso da clínica. */
+  horario: string;
+  /** 1 (segunda) a 7 (domingo). Só preenchido na frequência semanal. */
+  dia_semana: number | null;
+  /** 1 a 28 — o banco não aceita dia 29 a 31, para nunca pular mês. Só na mensal. */
+  dia_mes: number | null;
+  ativo: boolean;
+  proxima_em: string;
+  ultima_em: string | null;
+}
+
+export interface AgendamentoRelatorioEntrada {
+  slug: string;
+  frequencia: FrequenciaRelatorio;
+  horario: string;
+  diaSemana?: number | null;
+  diaMes?: number | null;
+}
+
+/** Uma geração já concluída — a prova de que a rotina agendada rodou. */
+export interface ExecucaoRelatorio {
+  id: string;
+  slug: string;
+  periodo_de: string;
+  periodo_ate: string;
+  gerado_em: string;
+}

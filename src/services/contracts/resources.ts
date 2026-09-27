@@ -168,7 +168,17 @@ export const RESOURCES = {
   relatorios: {
     table: null, // agregações via RPC/views
     fase: 8,
-    operations: ["listDefinitions", "run", "export", "schedule", "listSchedules", "createShareLink"],
+    operations: [
+      "listDefinitions",
+      "run",
+      "export",
+      "listAgendamentos",
+      "criarAgendamento",
+      "atualizarAgendamento",
+      "setAgendamentoAtivo",
+      "listExecucoes",
+      "createShareLink",
+    ],
   },
   estatisticasClinicas: {
     table: null,
@@ -208,7 +218,12 @@ export const RESOURCES = {
     operations: [
       "get",
       "update",
+      /** Identidade visual, mensagens e horário — ver `types/configuracao.ts`. */
+      "getClinica",
       "uploadLogo",
+      "salvarIdentidade",
+      "salvarMensagens",
+      "salvarHorario",
       "getTermos",
       "publishTermos",
       "getRegrasAlerta",
@@ -238,6 +253,7 @@ export const RESOURCES = {
        */
       "getSolicitacoesTitular",
       "decidirSolicitacaoTitular",
+      "completarSolicitacaoTitular",
       /** Quem aceitou qual versão de termo — a prova do que a publicação criou. */
       "getConsentimentos",
     ],
