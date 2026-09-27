@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { CalendarClock, Pause, Play, Plus } from "lucide-react";
 
-import { EmptyState, ErrorState, Footnote, SkeletonCards, StatusBadge } from "@/components/shared";
+import { Can, EmptyState, ErrorState, Footnote, SkeletonCards, StatusBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +21,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/contexts/auth-context";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
+import { PERMISSAO } from "@/lib/rbac";
 import { DEFINICOES } from "@/services/adapters/relatoriosDefinicoes";
 import {
   FREQUENCIA_RELATORIO_LABEL,
@@ -241,6 +243,9 @@ function DialogoAgendamento({
    ------------------------------------------------------------------------- */
 
 export function AgendamentosRelatorio() {
+  const { can } = useAuth();
+  const podeAgendar = can(PERMISSAO.RELATORIOS_SCHEDULE);
+
   const agendamentos = useAgendamentos();
   const execucoes = useExecucoes();
   const setAtivo = useSetAgendamentoAtivo();
@@ -269,10 +274,12 @@ export function AgendamentosRelatorio() {
           </p>
         </div>
 
-        <Button size="sm" variant="outline" className="shrink-0" onClick={() => setEditando(null)}>
-          <Plus />
-          Agendar
-        </Button>
+        <Can permission={PERMISSAO.RELATORIOS_SCHEDULE}>
+          <Button size="sm" variant="outline" className="shrink-0" onClick={() => setEditando(null)}>
+            <Plus />
+            Agendar
+          </Button>
+        </Can>
       </header>
 
       {lista.length === 0 ? (
@@ -288,38 +295,53 @@ export function AgendamentosRelatorio() {
               key={agendamento.id}
               className="flex flex-wrap items-center justify-between gap-3 py-2.5"
             >
-              <button
-                type="button"
-                className="min-w-0 flex-1 text-left"
-                onClick={() => setEditando(agendamento)}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-foreground truncate text-xs font-medium">
-                    {tituloDoRelatorio(agendamento.slug)}
-                  </p>
-                  <StatusBadge tone={agendamento.ativo ? "success" : "neutral"} size="sm" dot>
-                    {agendamento.ativo ? "Ativo" : "Pausado"}
-                  </StatusBadge>
-                </div>
-                <p className="text-muted-foreground truncate text-[11px]">
-                  {descricaoFrequencia(agendamento)}
-                  {agendamento.ativo && ` · próximo ${relativeTime(agendamento.proxima_em)}`}
-                  {agendamento.ultima_em && ` · última vez ${formatDateTime(agendamento.ultima_em)}`}
-                </p>
-              </button>
+              {(() => {
+                const conteudo = (
+                  <>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-foreground truncate text-xs font-medium">
+                        {tituloDoRelatorio(agendamento.slug)}
+                      </p>
+                      <StatusBadge tone={agendamento.ativo ? "success" : "neutral"} size="sm" dot>
+                        {agendamento.ativo ? "Ativo" : "Pausado"}
+                      </StatusBadge>
+                    </div>
+                    <p className="text-muted-foreground truncate text-[11px]">
+                      {descricaoFrequencia(agendamento)}
+                      {agendamento.ativo && ` · próximo ${relativeTime(agendamento.proxima_em)}`}
+                      {agendamento.ultima_em &&
+                        ` · última vez ${formatDateTime(agendamento.ultima_em)}`}
+                    </p>
+                  </>
+                );
 
-              <Button
-                variant="ghost"
-                size="sm"
-                className="shrink-0"
-                disabled={setAtivo.isPending}
-                onClick={() =>
-                  setAtivo.mutate({ id: agendamento.id, ativo: !agendamento.ativo })
-                }
-              >
-                {agendamento.ativo ? <Pause /> : <Play />}
-                {agendamento.ativo ? "Pausar" : "Retomar"}
-              </Button>
+                return podeAgendar ? (
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 text-left"
+                    onClick={() => setEditando(agendamento)}
+                  >
+                    {conteudo}
+                  </button>
+                ) : (
+                  <div className="min-w-0 flex-1">{conteudo}</div>
+                );
+              })()}
+
+              <Can permission={PERMISSAO.RELATORIOS_SCHEDULE}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  disabled={setAtivo.isPending}
+                  onClick={() =>
+                    setAtivo.mutate({ id: agendamento.id, ativo: !agendamento.ativo })
+                  }
+                >
+                  {agendamento.ativo ? <Pause /> : <Play />}
+                  {agendamento.ativo ? "Pausar" : "Retomar"}
+                </Button>
+              </Can>
             </li>
           ))}
         </ul>
@@ -349,7 +371,12 @@ export function AgendamentosRelatorio() {
         agendados.
       </Footnote>
 
+      {/* `key` força remount a cada troca de alvo — sem isso, o `useState` do
+          formulário só lê `agendamento` no primeiro mount e nunca resincroniza
+          ao editar um segundo agendamento diferente, editando-o com os
+          valores do anterior sem nenhum aviso. */}
       <DialogoAgendamento
+        key={editando?.id ?? "novo"}
         agendamento={editando ?? null}
         aberto={editando !== undefined}
         onFechar={() => setEditando(undefined)}
