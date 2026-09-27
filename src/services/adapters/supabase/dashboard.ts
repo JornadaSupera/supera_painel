@@ -1,6 +1,7 @@
 import { PERIODO, STATUS_PACIENTE, type Periodo } from "@/lib/enums";
 import { okOne, type SingleResult } from "@/services/contracts";
 import type { FatiaCid, Kpi, KpisResposta, PontoSessoes, SeriesResposta } from "@/types/dashboard";
+import type { PacienteListItem } from "@/types/paciente";
 import { TETO_READ, executar, falhaDe } from "./_helpers";
 import {
   SITUACAO,
@@ -25,8 +26,8 @@ import { varrerLista } from "./pacientes";
  *
  * | Indicador           | Situação |
  * |---------------------|----------|
- * | Pacientes ativos    | ✅ `read_patients` |
- * | Novos pacientes     | ✅ `read_patients`, por `created_at` |
+ * | Pacientes ativos    | ✅ `read_patient_list`, via `varrerLista` |
+ * | Novos pacientes     | ✅ `read_patient_list`, por `created_at` |
  * | Sessões de quimio   | ✅ `summarize_appointments`, tipo infusão, situação realizada |
  * | Tempo de resposta   | ✅ `summarize_chat_response_times` |
  * | Pacientes por CID   | ✅ `read_patient_list`, que projeta o CID principal |
@@ -63,9 +64,9 @@ const ROTULO_PERIODO: Record<Periodo, string> = {
 const BALDES_HISTORICO = 7;
 const UM_DIA = 24 * 60 * 60 * 1000;
 
-interface LinhaPaciente {
-  is_active: boolean;
-  created_at: string;
+/** Instante de cadastro de um item da listagem, ou `null` quando ausente. */
+function instanteDeCadastro(item: PacienteListItem): number | null {
+  return item.criado_em ? new Date(item.criado_em).getTime() : null;
 }
 
 /**
@@ -151,25 +152,22 @@ export async function getKpis(
     const dias = DIAS_POR_PERIODO[periodo];
     const rotulo = ROTULO_PERIODO[periodo];
 
-    const { data, error } = await getSupabaseClient().rpc("read_patients", {
-      p_limit: TETO_READ,
-      p_offset: 0,
-    });
+    const varredura = await varrerLista({}, TETO_READ);
+    if (!("itens" in varredura)) return varredura;
 
-    if (error) return falhaDe(error);
+    const ativos = varredura.itens.filter((item) => item.status === STATUS_PACIENTE.ATIVO);
 
-    const linhas = (data ?? []) as LinhaPaciente[];
-    const ativos = linhas.filter((linha) => linha.is_active);
-
-    // `read_patients` tem teto de 200 linhas no servidor. Batendo no teto, o
-    // número é um piso, não um total — e a tela precisa dizer isso.
-    const parcial = linhas.length >= TETO_READ;
+    // `read_patient_list` tem teto de 200 linhas por chamada. Batendo no teto,
+    // o número é um piso, não um total — e a tela precisa dizer isso.
+    const parcial = varredura.parcial;
 
     const agora = Date.now();
     const corte = agora - dias * UM_DIA;
     const corteAnterior = corte - dias * UM_DIA;
 
-    const entradas = linhas.map((linha) => new Date(linha.created_at).getTime());
+    const entradas = varredura.itens
+      .map(instanteDeCadastro)
+      .filter((data): data is number => data !== null);
     const noPeriodo = entradas.filter((data) => data > corte).length;
     const noPeriodoAnterior = entradas.filter(
       (data) => data > corteAnterior && data <= corte,
@@ -181,13 +179,14 @@ export async function getKpis(
         label: "Pacientes ativos",
         valor: ativos.length,
         variacao: ativos
-          .map((linha) => new Date(linha.created_at).getTime())
+          .map(instanteDeCadastro)
+          .filter((data): data is number => data !== null)
           .filter((data) => data > corte).length,
         variacao_unidade: "",
         variacao_periodo: rotulo,
         contexto: parcial ? "em tratamento (parcial)" : "em tratamento",
         historico: historico(
-          ativos.map((linha) => new Date(linha.created_at).getTime()),
+          ativos.map(instanteDeCadastro).filter((data): data is number => data !== null),
           dias,
           { cumulativo: true },
         ),
