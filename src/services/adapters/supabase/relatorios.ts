@@ -1,6 +1,13 @@
 import { FASE_TRATAMENTO_LABEL } from "@/lib/enums";
-import { ERROR_CODE, fail, okOne, type ListResult, type SingleResult } from "@/services/contracts";
-import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
+import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
+import type {
+  AgendamentoRelatorio,
+  AgendamentoRelatorioEntrada,
+  DefinicaoRelatorio,
+  ExecucaoRelatorio,
+  FrequenciaRelatorio,
+  ResultadoRelatorio,
+} from "@/types/relatorio";
 import {
   bySpecialtyReport,
   chatResponseReport,
@@ -11,7 +18,7 @@ import {
   type ReportOutcome,
   type ReportParams,
 } from "../_reports";
-import { TETO_READ, executar, falhaDe } from "./_helpers";
+import { TETO_READ, executar, falhaDe, logarExportacao } from "./_helpers";
 import {
   SITUACAO,
   falhou,
@@ -39,8 +46,10 @@ import { varrerLista } from "./pacientes";
  * > [!] O que destravou, e o que continua fora
  * A família `summarize_*` deu ao painel a leitura em conjunto que faltava —
  * contagem somada no banco, sem linha de prontuário no navegador —, e
- * `read_patient_list` deu busca, filtro e total à listagem. Com as duas, agenda,
- * chat, diário, protocolo, fase e CID passaram a ter fonte.
+ * `read_patient_list` deu busca, filtro, total e — desde `rework_patient_list`,
+ * 25/09/2026 — data de cadastro à listagem. Com as duas, agenda, chat, diário,
+ * protocolo, fase, CID e cadastro passaram a ter fonte. `read_patients`, a
+ * função antiga, foi removida na mesma migration; nenhum relatório a usa mais.
  *
  * Os quatro que sobram não esperam leitura nenhuma: esperam **definição**. Cada
  * um diz o seu motivo no próprio cartão, porque o conjunto de doze é contratado
@@ -180,28 +189,27 @@ async function distribuicaoCid(): Promise<ReportOutcome> {
 /**
  * Novos pacientes por mês.
  *
- * É o **último uso de `read_patients`** no painel, e não por preferência:
- * `read_patient_list` ordena por data de cadastro e **não devolve a coluna**,
- * então a série mensal não tem de onde sair. Enquanto a data não entrar na
- * projeção da listagem, este relatório carrega o teto de 200 do servidor — e
- * avisa quando bate nele, porque um piso apresentado como total é a mesma falha
- * que este arquivo existe para evitar.
+ * Usava `read_patients` porque `read_patient_list` ordenava por data de
+ * cadastro sem devolver a coluna. `rework_patient_list` (25/09/2026)
+ * acrescentou `created_at` à projeção — a mesma que `pacientesAtivos` e
+ * `distribuicaoCid` já liam por `varrerLista` — e `read_patients` foi
+ * removida na mesma migration. A troca também tira o teto de 200: a
+ * varredura pagina até `TETO_VARREDURA`, como os outros dois relatórios desta
+ * família.
  */
 async function novosPacientes(dias: number): Promise<ReportOutcome> {
-  const { data, error } = await getSupabaseClient().rpc("read_patients", {
-    p_limit: TETO_READ,
-    p_offset: 0,
-  });
-
-  if (error) return falhaDe(error);
+  const varredura = await varrerLista({}, TETO_VARREDURA);
+  if (!("itens" in varredura)) return varredura;
 
   const desde = janelaDeDias(dias).from;
-  const todos = (data ?? []) as { created_at: string }[];
-  const noPeriodo = todos.filter((linha) => linha.created_at >= desde);
+  const noPeriodo = varredura.itens.filter(
+    (item): item is typeof item & { criado_em: string } =>
+      item.criado_em !== null && item.criado_em >= desde,
+  );
 
   const porMes = new Map<string, number>();
-  for (const linha of noPeriodo) {
-    const chave = `${linha.created_at.slice(0, 7)}-01`;
+  for (const item of noPeriodo) {
+    const chave = `${item.criado_em.slice(0, 7)}-01`;
     porMes.set(chave, (porMes.get(chave) ?? 0) + 1);
   }
 
@@ -210,7 +218,6 @@ async function novosPacientes(dias: number): Promise<ReportOutcome> {
     .map(([chave, total]) => ({ mes: rotuloDoMes(chave), total }));
 
   const total = linhas.reduce((soma, ponto) => soma + ponto.total, 0);
-  const truncado = todos.length >= TETO_READ;
 
   return {
     slug: "novos-pacientes",
@@ -220,9 +227,9 @@ async function novosPacientes(dias: number): Promise<ReportOutcome> {
       { key: "total", label: "Novos pacientes", numerica: true },
     ],
     linhas,
-    resumo: truncado
-      ? `${total} cadastros nos últimos ${dias} dias · CONTAGEM PARCIAL: a leitura atingiu o teto de ${TETO_READ} fichas do backend e não cobre a base inteira`
-      : `${total} cadastros nos últimos ${dias} dias`,
+    resumo:
+      `${total} cadastros nos últimos ${dias} dias` +
+      (varredura.parcial ? avisoDeParcial(varredura.total, varredura.itens.length) : ""),
     eixo: "mes",
     medida: "total",
   };
@@ -337,7 +344,209 @@ export async function run(params: ReportParams): Promise<SingleResult<ResultadoR
   });
 }
 
-/** Exportação e agendamento/compartilhamento (sem backend). Ver `createReportOperations`. */
-export const { exportar, schedule, listSchedules, createShareLink } = createReportOperations(run);
+/**
+ * Identificador estável para um relatório, fora do banco: nem `log_data_export`
+ * nem `report_schedules` aceitam hífen (`^[a-z][a-z0-9_]{1,62}$`), e o slug do
+ * catálogo usa hífen. A mesma forma serve às duas RPCs — não precisam
+ * combinar entre si, só cada uma bater com o próprio regex.
+ */
+function codigoDoRelatorio(slug: string): string {
+  return `report_${slug.replace(/-/g, "_")}`;
+}
+
+/** O slug do catálogo, a partir do código gravado no banco — o inverso de `codigoDoRelatorio`. */
+function slugDoCodigo(codigo: string): string {
+  return codigo.replace(/^report_/, "").replace(/_/g, "-");
+}
+
+/** Exportação (com trilha) e compartilhamento (sem backend). Ver `createReportOperations`. */
+export const { exportar, createShareLink } = createReportOperations(
+  run,
+  ({ slug, rowCount }) => logarExportacao({ escopo: codigoDoRelatorio(slug), linhas: rowCount }),
+);
+
+/* -------------------------------------------------------------------------
+   AGENDAMENTO — `report_schedules` + `report_runs`, desde 25/09/2026
+   -------------------------------------------------------------------------
+   Cada agendamento entrega para a PRÓPRIA conta — `p_recipient_account_id`
+   fica de fora das chamadas e a função assume `auth.uid()`. Não há seletor de
+   destinatário na tela: escolher outro administrador exigiria listar quem tem
+   o perfil, e o ganho não paga a complexidade agora.
+   ------------------------------------------------------------------------- */
+
+const FREQUENCIA_PARA_BANCO: Record<FrequenciaRelatorio, string> = {
+  diaria: "daily",
+  semanal: "weekly",
+  mensal: "monthly",
+};
+
+const FREQUENCIA_DO_BANCO: Record<string, FrequenciaRelatorio> = {
+  daily: "diaria",
+  weekly: "semanal",
+  monthly: "mensal",
+};
+
+interface LinhaAgendamento {
+  id: string;
+  report_code: string;
+  frequency: string;
+  weekday: number | null;
+  month_day: number | null;
+  send_at: string;
+  is_active: boolean;
+  next_run_at: string;
+  last_run_at: string | null;
+}
+
+function projetarAgendamento(linha: LinhaAgendamento): AgendamentoRelatorio {
+  return {
+    id: linha.id,
+    slug: slugDoCodigo(linha.report_code),
+    frequencia: FREQUENCIA_DO_BANCO[linha.frequency] ?? "diaria",
+    horario: linha.send_at.slice(0, 5),
+    dia_semana: linha.weekday,
+    dia_mes: linha.month_day,
+    ativo: linha.is_active,
+    proxima_em: linha.next_run_at,
+    ultima_em: linha.last_run_at,
+  };
+}
+
+const SELECT_AGENDAMENTO =
+  "id, report_code, frequency, weekday, month_day, send_at, is_active, next_run_at, last_run_at";
+
+export async function listAgendamentos(): Promise<ListResult<AgendamentoRelatorio>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("report_schedules")
+      .select(SELECT_AGENDAMENTO)
+      .order("next_run_at");
+
+    if (error) return falhaDe(error);
+
+    return ok((data as unknown as LinhaAgendamento[]).map(projetarAgendamento));
+  });
+}
+
+async function buscarAgendamento(id: string): Promise<AgendamentoRelatorio | ReturnType<typeof falhaDe>> {
+  const { data, error } = await getSupabaseClient()
+    .from("report_schedules")
+    .select(SELECT_AGENDAMENTO)
+    .eq("id", id)
+    .single();
+
+  if (error) return falhaDe(error);
+  return projetarAgendamento(data as unknown as LinhaAgendamento);
+}
+
+export async function criarAgendamento(
+  params: AgendamentoRelatorioEntrada,
+): Promise<SingleResult<AgendamentoRelatorio>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient().rpc("create_report_schedule", {
+      p_report_code: codigoDoRelatorio(params.slug),
+      p_frequency: FREQUENCIA_PARA_BANCO[params.frequencia],
+      p_send_at: params.horario,
+      p_weekday: params.diaSemana ?? null,
+      p_month_day: params.diaMes ?? null,
+    });
+
+    if (error) return falhaDe(error);
+
+    const agendamento = await buscarAgendamento(data as string);
+    if (!("id" in agendamento)) return agendamento;
+
+    return okOne(agendamento);
+  });
+}
+
+export async function atualizarAgendamento({
+  id,
+  ...params
+}: AgendamentoRelatorioEntrada & { id: string }): Promise<SingleResult<AgendamentoRelatorio>> {
+  return executar(async () => {
+    // A RPC substitui o agendamento inteiro e não tem parâmetro opcional de
+    // destinatário — precisa vir explícito. Reenviamos o mesmo de sempre, em
+    // vez de trocar por quem está editando: mudar quem recebe não é efeito
+    // esperado de "trocar o horário".
+    const { data, error: erroLeitura } = await getSupabaseClient()
+      .from("report_schedules")
+      .select("recipient_account_id")
+      .eq("id", id)
+      .single();
+
+    if (erroLeitura) return falhaDe(erroLeitura);
+
+    const { error } = await getSupabaseClient().rpc("update_report_schedule", {
+      p_schedule_id: id,
+      p_report_code: codigoDoRelatorio(params.slug),
+      p_frequency: FREQUENCIA_PARA_BANCO[params.frequencia],
+      p_send_at: params.horario,
+      p_weekday: params.diaSemana ?? null,
+      p_month_day: params.diaMes ?? null,
+      p_recipient_account_id: (data as { recipient_account_id: string }).recipient_account_id,
+    });
+
+    if (error) return falhaDe(error);
+
+    const agendamento = await buscarAgendamento(id);
+    if (!("id" in agendamento)) return agendamento;
+
+    return okOne(agendamento);
+  });
+}
+
+export async function setAgendamentoAtivo({
+  id,
+  ativo,
+}: {
+  id: string;
+  ativo: boolean;
+}): Promise<SingleResult<AgendamentoRelatorio>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("set_report_schedule_active", {
+      p_schedule_id: id,
+      p_is_active: ativo,
+    });
+
+    if (error) return falhaDe(error);
+
+    const agendamento = await buscarAgendamento(id);
+    if (!("id" in agendamento)) return agendamento;
+
+    return okOne(agendamento);
+  });
+}
+
+interface LinhaExecucao {
+  id: string;
+  report_code: string;
+  period_start: string;
+  period_end: string;
+  created_at: string;
+}
+
+/** As últimas gerações, mais recente primeiro — a prova de que a rotina roda. */
+export async function listExecucoes(): Promise<ListResult<ExecucaoRelatorio>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("report_runs")
+      .select("id, report_code, period_start, period_end, created_at")
+      .order("created_at", { ascending: false })
+      .limit(TETO_READ);
+
+    if (error) return falhaDe(error);
+
+    return ok(
+      (data as unknown as LinhaExecucao[]).map((linha) => ({
+        id: linha.id,
+        slug: slugDoCodigo(linha.report_code),
+        periodo_de: linha.period_start,
+        periodo_ate: linha.period_end,
+        gerado_em: linha.created_at,
+      })),
+    );
+  });
+}
 
 export { exportar as export };

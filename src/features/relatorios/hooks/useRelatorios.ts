@@ -1,10 +1,11 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { audit } from "@/lib/audit";
 import { downloadFile, nameWithDate, toCsv } from "@/lib/csv";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, relatoriosApi } from "@/services/apiClient";
+import type { AgendamentoRelatorioEntrada } from "@/types/relatorio";
 
 /**
  * Catálogo, execução e exportação dos relatórios.
@@ -58,5 +59,74 @@ export function useExportarRelatorio() {
         description: `${linhas} linhas em CSV. A exportação foi registrada na auditoria.`,
       }),
     onError: (erro) => toast.error("Não foi possível exportar", { description: erro.message }),
+  });
+}
+
+/* -------------------------------------------------------------------------
+   AGENDAMENTO — `report_schedules` + `report_runs`, desde 25/09/2026
+   ------------------------------------------------------------------------- */
+
+export function useAgendamentos() {
+  return useQuery({
+    queryKey: queryKeys.reports.schedules(),
+    queryFn: async () => (await call(() => relatoriosApi.listAgendamentos())).data,
+  });
+}
+
+export function useExecucoes() {
+  return useQuery({
+    queryKey: queryKeys.reports.runs(),
+    queryFn: async () => (await call(() => relatoriosApi.listExecucoes())).data,
+  });
+}
+
+export function useCriarAgendamento() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: AgendamentoRelatorioEntrada) => {
+      const { data } = await call(() => relatoriosApi.criarAgendamento(params));
+      audit.update(RECURSO, data?.id ?? params.slug, { operacao: "agendamento" });
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reports.schedules() });
+      toast.success("Relatório agendado");
+    },
+    onError: (erro) => toast.error("Não foi possível agendar", { description: erro.message }),
+  });
+}
+
+export function useAtualizarAgendamento() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: AgendamentoRelatorioEntrada & { id: string }) => {
+      const { data } = await call(() => relatoriosApi.atualizarAgendamento(params));
+      audit.update(RECURSO, params.id, { operacao: "agendamento" });
+      return data;
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reports.schedules() });
+      toast.success("Agendamento atualizado");
+    },
+    onError: (erro) => toast.error("Não foi possível atualizar o agendamento", { description: erro.message }),
+  });
+}
+
+export function useSetAgendamentoAtivo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { id: string; ativo: boolean }) => {
+      const { data } = await call(() => relatoriosApi.setAgendamentoAtivo(params));
+      audit.update(RECURSO, params.id, { operacao: "agendamento", ativo: params.ativo });
+      return data;
+    },
+    onSuccess: async (agendamento) => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.reports.schedules() });
+      toast.success(agendamento?.ativo ? "Agendamento retomado" : "Agendamento pausado");
+    },
+    onError: (erro) => toast.error("Não foi possível mudar o agendamento", { description: erro.message }),
   });
 }

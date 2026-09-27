@@ -2,8 +2,14 @@ import { FASE_TRATAMENTO_LABEL } from "@/lib/enums";
 import { cids } from "@/mocks/cids";
 import { pacientes } from "@/mocks/pacientes";
 import { protocolos } from "@/mocks/protocolos";
-import { ERROR_CODE, fail, okOne, type ListResult, type SingleResult } from "@/services/contracts";
-import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
+import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
+import type {
+  AgendamentoRelatorio,
+  AgendamentoRelatorioEntrada,
+  DefinicaoRelatorio,
+  ExecucaoRelatorio,
+  ResultadoRelatorio,
+} from "@/types/relatorio";
 import {
   bySpecialtyReport,
   chatResponseReport,
@@ -199,6 +205,99 @@ export async function run(params: ReportParams): Promise<SingleResult<ResultadoR
   return simulate(() => okOne(resultado));
 }
 
-export const { exportar, schedule, listSchedules, createShareLink } = createReportOperations(run);
+export const { exportar, createShareLink } = createReportOperations(run);
 
 export { exportar as export };
+
+/* -------------------------------------------------------------------------
+   AGENDAMENTO — `report_schedules` + `report_runs`, desde 25/09/2026
+   ------------------------------------------------------------------------- */
+
+let proximoId = 1;
+
+const AGENDAMENTOS: AgendamentoRelatorio[] = [
+  {
+    id: "agenda-1",
+    slug: "efeitos-por-protocolo",
+    frequencia: "semanal",
+    horario: "08:00",
+    dia_semana: 1,
+    dia_mes: null,
+    ativo: true,
+    proxima_em: new Date(Date.now() + 3 * 86_400_000).toISOString(),
+    ultima_em: new Date(Date.now() - 4 * 86_400_000).toISOString(),
+  },
+];
+
+const EXECUCOES: ExecucaoRelatorio[] = [
+  {
+    id: "execucao-1",
+    slug: "efeitos-por-protocolo",
+    periodo_de: new Date(Date.now() - 11 * 86_400_000).toISOString().slice(0, 10),
+    periodo_ate: new Date(Date.now() - 4 * 86_400_000).toISOString().slice(0, 10),
+    gerado_em: new Date(Date.now() - 4 * 86_400_000).toISOString(),
+  },
+];
+
+export async function listAgendamentos(): Promise<ListResult<AgendamentoRelatorio>> {
+  return simulate(() => ok([...AGENDAMENTOS]));
+}
+
+export async function criarAgendamento(
+  params: AgendamentoRelatorioEntrada,
+): Promise<SingleResult<AgendamentoRelatorio>> {
+  return simulate(() => {
+    const agendamento: AgendamentoRelatorio = {
+      id: `agenda-${proximoId++}`,
+      slug: params.slug,
+      frequencia: params.frequencia,
+      horario: params.horario,
+      dia_semana: params.diaSemana ?? null,
+      dia_mes: params.diaMes ?? null,
+      ativo: true,
+      proxima_em: new Date(Date.now() + 86_400_000).toISOString(),
+      ultima_em: null,
+    };
+
+    AGENDAMENTOS.push(agendamento);
+    return okOne(agendamento);
+  });
+}
+
+export async function atualizarAgendamento({
+  id,
+  ...params
+}: AgendamentoRelatorioEntrada & { id: string }): Promise<SingleResult<AgendamentoRelatorio>> {
+  return simulate(() => {
+    const agendamento = AGENDAMENTOS.find((item) => item.id === id);
+    if (!agendamento) return fail(ERROR_CODE.NOT_FOUND, "Agendamento não encontrado.");
+
+    agendamento.slug = params.slug;
+    agendamento.frequencia = params.frequencia;
+    agendamento.horario = params.horario;
+    agendamento.dia_semana = params.diaSemana ?? null;
+    agendamento.dia_mes = params.diaMes ?? null;
+
+    return okOne(agendamento);
+  });
+}
+
+export async function setAgendamentoAtivo({
+  id,
+  ativo,
+}: {
+  id: string;
+  ativo: boolean;
+}): Promise<SingleResult<AgendamentoRelatorio>> {
+  return simulate(() => {
+    const agendamento = AGENDAMENTOS.find((item) => item.id === id);
+    if (!agendamento) return fail(ERROR_CODE.NOT_FOUND, "Agendamento não encontrado.");
+
+    agendamento.ativo = ativo;
+    return okOne(agendamento);
+  });
+}
+
+export async function listExecucoes(): Promise<ListResult<ExecucaoRelatorio>> {
+  return simulate(() => ok([...EXECUCOES]));
+}

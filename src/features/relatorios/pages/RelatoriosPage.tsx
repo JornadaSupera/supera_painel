@@ -39,6 +39,7 @@ import {
   type DefinicaoRelatorio,
 } from "@/types/relatorio";
 import { useDefinicoes, useExportarRelatorio, useRelatorio } from "../hooks/useRelatorios";
+import { AgendamentosRelatorio } from "../components/AgendamentosRelatorio";
 
 /**
  * Relatórios — o conjunto fechado de doze.
@@ -50,10 +51,13 @@ import { useDefinicoes, useExportarRelatorio, useRelatorio } from "../hooks/useR
  *
  * Onde nos afastamos do protótipo, e por quê:
  *
- *  - **"Agendar por e-mail" e "Exportar todos"**: agendamento exige rotina
- *    agendada e serviço de disparo; link compartilhável exige tabela de token
- *    com expiração. Nenhum dos dois existe, e ambos são caminhos por onde dado
- *    clínico sai da clínica — não é o tipo de coisa a improvisar no cliente.
+ *  - **"Agendar por e-mail" virou "Agendar" — sem e-mail.** `report_schedules`
+ *    (25/09/2026) entrega por notificação in-app, nunca por e-mail: o provedor
+ *    transacional não está contratado, e o aviso com link mantém o dado dentro
+ *    do ambiente controlado. Ver `AgendamentosRelatorio`.
+ *  - **"Exportar todos" e link compartilhável não existem**: o segundo
+ *    exigiria tabela de token com expiração, que ainda não existe — e é outro
+ *    caminho por onde dado clínico sairia da clínica sem passar pela trilha.
  *  - **Três cartões marcados como indisponíveis**: alertas de IA, NPS e
  *    conteúdo mais acessado não têm origem no banco. O cartão fica, com o
  *    motivo: o conjunto de doze é contratado, e escondê-los mascararia o que
@@ -186,6 +190,8 @@ export function RelatoriosPage() {
         clínico que a equipe mais pediu já tem tela própria em{" "}
         <strong>Estatísticas → Clínicas</strong>.
       </Footnote>
+
+      <AgendamentosRelatorio />
 
       <JanelaRelatorio
         definicao={aberto}

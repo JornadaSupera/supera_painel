@@ -223,15 +223,17 @@ function toReportExport(
 }
 
 /**
- * Scheduling and sharing have no backend.
+ * Sharing still has no backend.
  *
- * Scheduled e-mail delivery needs a scheduled routine and a sending service;
- * an internal share link needs a token table with expiry. Neither exists, and
- * both are ways clinical data leaves the clinic — not something to improvise
- * on the client.
+ * An internal share link needs a token table with expiry, and that is a way
+ * clinical data leaves the clinic — not something to improvise on the
+ * client. Scheduling used to sit here too: `report_schedules` (25/09/2026)
+ * gave it a real backend, and each adapter implements it its own way now —
+ * see `listAgendamentos`/`criarAgendamento` in `supabase/relatorios.ts` and
+ * `mock/relatorios.ts`.
  */
-const NO_DELIVERY =
-  "Agendar envio e gerar link compartilhável dependem de rotina agendada e de tabela de token no backend. Os dois fazem dado clínico sair da clínica, e por isso não são improvisados no painel.";
+const NO_SHARE_LINK =
+  "Gerar link compartilhável depende de uma tabela de token com expiração no backend, que ainda não existe. Um link assim faz dado clínico sair da clínica sem passar pela trilha de auditoria — não é algo para improvisar no painel.";
 
 export interface ReportParams {
   slug: string;
@@ -244,19 +246,25 @@ export interface ReportParams {
  * Everything around `run` that does not depend on the backend: the export and
  * the delivery operations. `export` is a reserved word, so the adapter
  * publishes `exportar` under the contract name.
+ *
+ * `logExport` is how the Supabase adapter declares the export to
+ * `log_data_export` (25/09/2026) without this shared file touching the SDK
+ * directly — the architecture guard restricts `@supabase/supabase-js` to
+ * `services/adapters/supabase`. The mock adapter passes nothing: there is no
+ * trail to write to.
  */
 export function createReportOperations(
   run: (params: ReportParams) => Promise<SingleResult<ResultadoRelatorio>>,
+  logExport?: (params: { slug: string; rowCount: number }) => void | Promise<void>,
 ) {
   return {
-    exportar: async (params: ReportParams) => toReportExport(await run(params)),
-
-    schedule: async (): Promise<SingleResult<never>> =>
-      fail(ERROR_CODE.NOT_IMPLEMENTED, NO_DELIVERY),
-
-    listSchedules: async (): Promise<ListResult<never>> => ok([]),
+    exportar: async (params: ReportParams) => {
+      const resultado = toReportExport(await run(params));
+      if (!resultado.error) await logExport?.({ slug: params.slug, rowCount: resultado.data.length });
+      return resultado;
+    },
 
     createShareLink: async (): Promise<SingleResult<never>> =>
-      fail(ERROR_CODE.NOT_IMPLEMENTED, NO_DELIVERY),
+      fail(ERROR_CODE.NOT_IMPLEMENTED, NO_SHARE_LINK),
   };
 }
