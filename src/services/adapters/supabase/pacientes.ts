@@ -1,6 +1,6 @@
 import { FASE_TRATAMENTO_LABEL, STATUS_PACIENTE, STATUS_PACIENTE_LABEL } from "@/lib/enums";
-import { ageInYears } from "@/lib/format";
-import { maskCpf, maskEmail, maskPhone } from "@/lib/mask";
+import { ageInYears, formatDate } from "@/lib/format";
+import { maskEmail, maskPhone } from "@/lib/mask";
 import {
   ERROR_CODE,
   fail,
@@ -24,7 +24,7 @@ import type {
   StatusConvite,
 } from "@/types/paciente";
 import { PATIENT_DEFAULT_SORT, normalizePatientSearch } from "../_people";
-import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
+import { TETO_READ, executar, falhaDe, logarExportacao, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { codigoExibidoDoPaciente, paraCodigoDeFase, paraFase } from "./mapping";
 
@@ -50,14 +50,12 @@ import { codigoExibidoDoPaciente, paraCodigoDeFase, paraFase } from "./mapping";
  *    histórico saem de três funções próprias. Cada uma é um acesso registrado no
  *    titular — e é por isso que a listagem não as chama.
  *
- * > [!] O CPF da LISTA é mascarado pelo banco; o da FICHA, aqui.
- * `read_patient_list` devolve `cpf_masked`, e o documento inteiro não sai da
- * clínica — não há o que vazar no DevTools nem no cache do navegador.
- * `read_patient` ainda devolve `SETOF patients`, com CPF, telefone e e-mail em
- * claro: ali `revealPii` não é uma barreira, é convenção de interface, porque o
- * valor completo já chegou. `lib/mask.ts` reproduz a mesma forma do banco para
- * que lista e ficha não pareçam divergir. A view mascarada para `read_patient`
- * continua pendente com o responsável pelo banco.
+ * > [!] Desde 25/09/2026, CPF/telefone/e-mail vêm mascarados dos dois lados.
+ * `read_patient_list` sempre devolveu `cpf_masked`; `read_patient` passou a
+ * mascarar os mesmos três campos (`mask_patient_identifiers`), e `documents`
+ * passou a vir sempre `null`. O valor completo só sai por
+ * `reveal_patient_identifiers`, uma função própria, com sua própria linha na
+ * trilha — `revealPii` deixou de reusar `read_patient` para chamá-la.
  */
 
 /* -------------------------------------------------------------------------
@@ -228,7 +226,11 @@ function projetar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteLis
     id: linha.id,
     codigo: codigoExibidoDoPaciente(linha.id),
     nome: linha.full_name,
-    cpf_mascarado: maskCpf(linha.cpf),
+    // Já vem mascarado do banco (`mask_patient_identifiers`, 25/09/2026) — na
+    // mesma forma que `read_patient_list` usa na listagem. Passar por
+    // `maskCpf` de novo aplicaria a máscara sobre um valor que já não tem 11
+    // dígitos, e devolveria "—" para toda ficha.
+    cpf_mascarado: linha.cpf ?? "—",
     nascimento: linha.birth_date,
     // `patients` não tem coluna de sexo. `null` mantém a ficha honesta: o
     // campo aparece vazio em vez de exibir um valor que ninguém informou.
@@ -253,8 +255,9 @@ function projetar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteLis
 function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDetalhe {
   return {
     ...projetar(linha, contexto),
-    telefone_mascarado: maskPhone(linha.phone),
-    email_mascarado: maskEmail(linha.email),
+    // Mesmo motivo do CPF acima: já chegam mascarados do banco.
+    telefone_mascarado: linha.phone ?? "—",
+    email_mascarado: linha.email ?? "—",
     estadiamento: contexto.diagnostico?.staging ?? null,
     tnm: contexto.diagnostico?.tnm ?? null,
     diagnostico_em: contexto.diagnostico?.diagnosed_on ?? null,
@@ -314,8 +317,10 @@ function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDet
    invisível** — sem erro, sem aviso, com uma paginação que dizia saber quantas
    páginas tinha.
 
-   `read_patients` continua no ar até a migration que a aposenta. Este arquivo
-   deixou de usá-la, e é esse o aviso que o responsável pelo banco espera.
+   `read_patients` foi removida do banco em 25/09/2026 (`rework_patient_list`) —
+   chamá-la agora devolve `PGRST202`. Este arquivo já não a usa; os outros dois
+   pontos do painel que ainda a chamavam (`dashboard.ts`, `relatorios.ts`)
+   foram corrigidos na mesma rodada.
    ------------------------------------------------------------------------- */
 
 /** Uma linha de `read_patient_list` — projeção estreita, com CPF já mascarado. */
@@ -334,6 +339,8 @@ interface LinhaListaPaciente {
   primary_cid10_label: string | null;
   /** Total do conjunto FILTRADO, repetido em cada linha. */
   total_count: number;
+  /** Data de cadastro — última coluna da projeção desde `rework_patient_list` (25/09/2026). */
+  created_at: string;
 }
 
 /**
@@ -395,10 +402,9 @@ function projetarLinha(linha: LinhaListaPaciente, fases: Fases): PacienteListIte
     // Sai `has_account`, não `account_id`: é o que a lista precisa saber. O
     // convite pendente vive em `patient_invitations`, que é outra leitura.
     convite_status: linha.has_account ? "aceito" : "nao_enviado",
-    // A projeção da lista não traz `created_at` — a ordenação por ele existe no
-    // servidor, a coluna não. Aparece na ficha, onde `read_patient` devolve a
-    // linha inteira.
-    criado_em: null,
+    // Desde `rework_patient_list` (25/09/2026) a projeção traz `created_at` —
+    // antes disso só dava para ordenar por ele no servidor, sem ver o valor.
+    criado_em: paraIso(linha.created_at),
   };
 }
 
@@ -549,14 +555,23 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Paci
   });
 }
 
+/** Uma linha de `reveal_patient_identifiers` — o valor completo, nunca mascarado. */
+interface LinhaIdentificadores {
+  patient_id: string;
+  cpf: string;
+  phone: string | null;
+  email: string | null;
+}
+
 /**
  * Revelação de dado pessoal.
  *
- * A leitura é a mesma `read_patient` da ficha, e é por isso que a chamada
- * continua valendo a pena: ela grava mais uma linha em `audit_log`, com o
- * mesmo ator e o mesmo paciente. É o rastro que a LGPD exige do ato de
- * revelar — ainda que, sem view mascarada no banco, o valor já estivesse no
- * navegador.
+ * Desde `mask_patient_identifiers` (25/09/2026), `read_patient` devolve CPF,
+ * telefone e e-mail mascarados — o valor completo não chega mais ao navegador
+ * por aquela leitura. `reveal_patient_identifiers` é a função própria para o
+ * valor completo, um paciente por vez, e grava sua PRÓPRIA linha em
+ * `audit_log`: é o rastro que a LGPD exige do ato de revelar, e agora é uma
+ * barreira real, não só convenção de interface.
  */
 export async function revealPii({
   id,
@@ -566,11 +581,13 @@ export async function revealPii({
   campos: CampoPii[];
 }): Promise<SingleResult<PiiRevelada>> {
   return executar(async () => {
-    const { data, error } = await getSupabaseClient().rpc("read_patient", { p_patient_id: id });
+    const { data, error } = await getSupabaseClient().rpc("reveal_patient_identifiers", {
+      p_patient_id: id,
+    });
 
     if (error) return falhaDe(error);
 
-    const linha = ((data ?? []) as LinhaPaciente[])[0];
+    const linha = ((data ?? []) as LinhaIdentificadores[])[0];
     if (!linha) return fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.");
 
     const revelado: PiiRevelada = {};
@@ -666,10 +683,10 @@ export async function exportar(
       );
     }
 
-    // Sexo, risco e data de cadastro NÃO viram coluna: a projeção da listagem
-    // não os traz. Uma coluna inteira em branco numa planilha se lê como
-    // cadastro incompleto e manda a equipe procurar um dado que nunca esteve
-    // ali — o mesmo motivo pelo qual a tela omite indicador sem fonte.
+    // Sexo e risco NÃO viram coluna: a projeção da listagem não os traz. Uma
+    // coluna inteira em branco numa planilha se lê como cadastro incompleto e
+    // manda a equipe procurar um dado que nunca esteve ali — o mesmo motivo
+    // pelo qual a tela omite indicador sem fonte.
     const linhas = varredura.itens.map((item) => ({
       Código: item.codigo,
       Paciente: item.nome,
@@ -681,7 +698,10 @@ export async function exportar(
       Fase: item.fase ? FASE_TRATAMENTO_LABEL[item.fase] : "",
       Status: STATUS_PACIENTE_LABEL[item.status],
       "Acesso ao app": STATUS_CONVITE_LABEL[item.convite_status],
+      "Cadastrado em": formatDate(item.criado_em),
     }));
+
+    await logarExportacao({ escopo: "pacientes_lista", linhas: linhas.length });
 
     return ok(linhas, linhas.length);
   });
