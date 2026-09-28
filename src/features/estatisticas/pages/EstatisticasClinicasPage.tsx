@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useCids } from "@/hooks/useCatalogos";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { FiltroClinico } from "@/services/contracts/operations";
@@ -72,6 +73,7 @@ export function EstatisticasClinicasPage() {
   const [apenasAtivos, setApenasAtivos] = useState(true);
   const [protocolo, setProtocolo] = useState(TODOS);
   const [sintomaId, setSintomaId] = useState(TODOS);
+  const [cid, setCid] = useState(TODOS);
 
   // The period stays out of the count: it is always set, and on a phone it
   // is the control that stays in view.
@@ -80,6 +82,7 @@ export function EstatisticasClinicasPage() {
     !apenasAtivos,
     protocolo !== TODOS,
     sintomaId !== TODOS,
+    cid !== TODOS,
   ].filter(Boolean).length;
 
   const limparFiltros = () => {
@@ -87,6 +90,7 @@ export function EstatisticasClinicasPage() {
     setApenasAtivos(true);
     setProtocolo(TODOS);
     setSintomaId(TODOS);
+    setCid(TODOS);
   };
 
   const filtro: FiltroClinico = {
@@ -95,6 +99,7 @@ export function EstatisticasClinicasPage() {
     apenasAtivos,
     protocolo: protocolo === TODOS ? null : protocolo,
     sintomaId: sintomaId === TODOS ? null : sintomaId,
+    cid: cid === TODOS ? null : cid,
   };
 
   const cruzamento = useCruzamentoClinico(filtro);
@@ -104,6 +109,12 @@ export function EstatisticasClinicasPage() {
   const opcoes = useOpcoesDoCruzamento(Number(dias));
   const protocolosDisponiveis = opcoes.data?.protocolos ?? [];
   const sintomasDisponiveis = opcoes.data?.sintomas ?? [];
+
+  // O catálogo inteiro, não recortado pela janela: CID é atributo do
+  // diagnóstico, não do período — ao contrário de protocolo e sintoma, que
+  // `useOpcoesDoCruzamento` restringe ao que apareceu nos dias escolhidos.
+  const cids = useCids();
+  const cidsDisponiveis = cids.data ?? [];
 
   const dados = cruzamento.data;
   const porPercentual = dados?.prevalencia_disponivel ?? true;
@@ -194,6 +205,20 @@ export function EstatisticasClinicasPage() {
             {sintomasDisponiveis.map((sintoma) => (
               <SelectItem key={sintoma.id} value={sintoma.id}>
                 {sintoma.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={cid} onValueChange={setCid} disabled={cids.isLoading || cidsDisponiveis.length === 0}>
+          <SelectTrigger size="sm" aria-label="CID" className="w-40">
+            <SelectValue placeholder="Todos os CID" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TODOS}>Todos os CID</SelectItem>
+            {cidsDisponiveis.map((item) => (
+              <SelectItem key={item.codigo} value={item.codigo}>
+                {item.codigo}
               </SelectItem>
             ))}
           </SelectContent>

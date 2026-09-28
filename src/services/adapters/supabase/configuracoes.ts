@@ -21,6 +21,8 @@ import type {
   VersaoLegal,
   VinculoExterno,
 } from "@/types/configuracao";
+import type { ParametroOperacional } from "@/types/estatisticas";
+import { METAS_OPERACIONAIS } from "../_operationalTargets";
 import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
 import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
@@ -435,6 +437,68 @@ export async function salvarHorario({
 
     if (error) return falhaDe(error);
     return getClinica();
+  });
+}
+
+/* -------------------------------------------------------------------------
+   METAS OPERACIONAIS — linhas de referência do gráfico de volume
+   -------------------------------------------------------------------------
+   `operational_parameters` não é semeada: a linha só existe depois que a
+   administração a cadastra pela primeira vez. Por isso a leitura devolve a
+   lista com o que já foi criado — nunca os dois códigos fixos com valor zero,
+   que se leria como uma meta real de "zero atendimentos".
+   ------------------------------------------------------------------------- */
+
+export async function getMetasOperacionais(): Promise<ListResult<ParametroOperacional>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("operational_parameters")
+      .select("code, label, value")
+      .eq("is_active", true);
+
+    if (error) return falhaDe(error);
+
+    const porCodigo = new Map(
+      (data as { code: string; label: string; value: number }[]).map((linha) => [linha.code, linha]),
+    );
+
+    const linhas = METAS_OPERACIONAIS.map(({ codigo }) => porCodigo.get(codigo))
+      .filter((linha): linha is { code: string; label: string; value: number } => Boolean(linha))
+      .map<ParametroOperacional>((linha) => ({
+        codigo: linha.code,
+        rotulo: linha.label,
+        valor: Number(linha.value),
+      }));
+
+    return ok(linhas, linhas.length);
+  });
+}
+
+/**
+ * Cria ou atualiza uma meta pelo código — `set_operational_parameter` faz
+ * `UPSERT` pela chave de negócio, então salvar a segunda vez é o mesmo ato que
+ * criar a primeira.
+ */
+export async function salvarMetaOperacional({
+  codigo,
+  rotulo,
+  valor,
+}: {
+  codigo: string;
+  rotulo: string;
+  valor: number;
+}): Promise<SingleResult<ParametroOperacional>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("set_operational_parameter", {
+      p_code: codigo,
+      p_label: rotulo,
+      p_value: valor,
+      p_is_active: true,
+    });
+
+    if (error) return falhaDe(error);
+
+    return okOne<ParametroOperacional>({ codigo, rotulo, valor });
   });
 }
 

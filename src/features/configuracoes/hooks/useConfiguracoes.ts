@@ -7,6 +7,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { toListQuery } from "@/hooks/listQuery";
 import { call, configuracoesApi } from "@/services/apiClient";
 import type { VersaoLegal } from "@/types/configuracao";
+import type { ParametroOperacional } from "@/types/estatisticas";
 
 /**
  * Leitura e escrita das configurações da clínica.
@@ -567,5 +568,38 @@ export function useSalvarHorario() {
       toast.success("Horário de atendimento salvo");
     },
     onError: (erro) => toast.error("Não foi possível salvar o horário", { description: erro.message }),
+  });
+}
+
+/* -------------------------------------------------------------------------
+   METAS OPERACIONAIS — linhas de referência do gráfico de volume
+   ------------------------------------------------------------------------- */
+
+export function useMetasOperacionais() {
+  return useQuery({
+    queryKey: queryKeys.settings.operationalTargets(),
+    queryFn: async () => (await call(() => configuracoesApi.getMetasOperacionais())).data,
+  });
+}
+
+export function useSalvarMetaOperacional() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: ParametroOperacional) => {
+      const { data } = await call(() => configuracoesApi.salvarMetaOperacional(params));
+      audit.update(RECURSO, "operational_parameters", { operacao: params.codigo });
+      return data;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.settings.operationalTargets() }),
+        // O gráfico de volume lê a mesma tabela — sem isto a linha de
+        // referência só apareceria depois de sair e voltar da tela.
+        queryClient.invalidateQueries({ queryKey: queryKeys.statistics.operational() }),
+      ]);
+      toast.success("Meta salva");
+    },
+    onError: (erro) => toast.error("Não foi possível salvar a meta", { description: erro.message }),
   });
 }

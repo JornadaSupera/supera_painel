@@ -35,6 +35,7 @@ import { ExigenciaSegundoFator } from "../components/ExigenciaSegundoFator";
 import { FilaDeConferencia } from "../components/FilaDeConferencia";
 import { GatilhosAlerta } from "../components/GatilhosAlerta";
 import { IdentidadeEOperacao } from "../components/IdentidadeEOperacao";
+import { MetasOperacionais } from "../components/MetasOperacionais";
 import { MotivosSituacao } from "../components/MotivosSituacao";
 import { SolicitacoesTitular } from "../components/SolicitacoesTitular";
 import {
@@ -375,6 +376,7 @@ export function ConfiguracoesPage() {
           <TabsTrigger value="identidade">Identidade & horário</TabsTrigger>
           <TabsTrigger value="catalogos">Catálogos do sistema</TabsTrigger>
           <TabsTrigger value="alertas">Gatilhos de alerta</TabsTrigger>
+          <TabsTrigger value="metas">Metas operacionais</TabsTrigger>
           <TabsTrigger value="motivos">Motivos de situação</TabsTrigger>
           <TabsTrigger value="legais">Termos & privacidade</TabsTrigger>
           <TabsTrigger value="seguranca">Segurança</TabsTrigger>
@@ -458,6 +460,10 @@ export function ConfiguracoesPage() {
 
         <TabsContent value="alertas">
           <GatilhosAlerta />
+        </TabsContent>
+
+        <TabsContent value="metas">
+          <MetasOperacionais />
         </TabsContent>
 
         <TabsContent value="motivos">

@@ -25,10 +25,11 @@ import { useEstatisticasOperacionais } from "../hooks/useEstatisticas";
  *
  * Onde nos afastamos do protótipo, e por quê:
  *
- *  - **Linhas de meta e capacidade no gráfico**: o protótipo desenha "meta
- *    320/mês" e "capacidade 380/mês". Não existe tabela de parâmetro
- *    operacional no banco; desenhar as linhas com números inventados faria a
- *    tela afirmar que a clínica bateu ou furou uma meta que ninguém definiu.
+ *  - **Linhas de meta e capacidade no gráfico**: desenhadas a partir de
+ *    `operational_parameters` (desde 25/09/2026), cadastradas em Configurações
+ *    → Metas operacionais. Sem nenhuma delas cadastrada o gráfico não desenha
+ *    linha nenhuma — números inventados afirmariam que a clínica bateu ou
+ *    furou uma meta que ninguém definiu.
  *  - **Fila de alertas**: depende de uma tabela de alerta que não existe.
  *    Derivar "sintoma crítico" a partir do grau seria inferência clínica.
  *  - **Variação percentual nos indicadores**: o protótipo mostra "-3 min",
@@ -44,8 +45,11 @@ const ICONES: Record<string, ComponentType> = {
   conversas_sem_resposta: MessageSquareDashed,
 };
 
+/** O código que `sem_origem` carrega enquanto NENHUMA meta foi cadastrada — ver o adapter. */
+const SEM_META_OU_CAPACIDADE = "meta_mensal_e_capacidade";
+
 const MOTIVO_SEM_PARAMETRO =
-  "Meta mensal e capacidade máxima não existem como dado: não há tabela de parâmetro operacional no banco. Assim que a clínica registrar os dois números, as linhas de referência aparecem no gráfico.";
+  "Meta mensal e capacidade máxima ainda não foram cadastradas. Assim que a administração as definir em Configurações → Metas operacionais, as linhas de referência aparecem no gráfico.";
 
 const MOTIVO_SEM_ALERTAS =
   "A fila de alertas já existe no backend — o que não existe é gatilho. Nenhum limiar de criticidade foi cadastrado, e sem regra nenhum alerta dispara: a fila está vazia por configuração, não por ausência de ocorrência. O limiar é decisão clínica, e cadastrá-lo é ato da administração. Enquanto não houver regra, o painel não exibe o número: “zero alertas” seria lido como tranquilidade.";
@@ -149,12 +153,13 @@ export function EstatisticasOperacionaisPage() {
             data={data?.volume_mensal ?? []}
             xKey="mes"
             series={[{ key: "total", label: "Compromissos" }]}
+            referenceLines={(data?.metas ?? []).map((meta) => ({ y: meta.valor, label: meta.rotulo }))}
             height={220}
           />
         )}
       </ChartCard>
 
-      {(data?.sem_origem.length ?? 0) > 0 && (
+      {(data?.sem_origem.includes(SEM_META_OU_CAPACIDADE) ?? false) && (
         <BackendPendente titulo="Meta e capacidade" motivo={MOTIVO_SEM_PARAMETRO} />
       )}
 

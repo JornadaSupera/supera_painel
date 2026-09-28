@@ -133,6 +133,8 @@ export const queryKeys = {
     dataSubjectRequests: () => ["settings", "data-subject-requests"] as const,
     /** Identidade visual, mensagens e horário — `clinic_settings`. */
     clinic: () => ["settings", "clinic"] as const,
+    /** Metas e capacidade do gráfico de volume — `operational_parameters`. */
+    operationalTargets: () => ["settings", "operational-targets"] as const,
   },
 
   catalogs: {

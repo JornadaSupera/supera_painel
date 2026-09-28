@@ -4,8 +4,10 @@ import type {
   EstatisticasOperacionais,
   IndicadorOperacional,
   LinhaEspecialidade,
+  ParametroOperacional,
   PontoVolume,
 } from "@/types/estatisticas";
+import { METAS_OPERACIONAIS } from "../_operationalTargets";
 import {
   SEM_AREA,
   SEM_AREA_LABEL,
@@ -64,6 +66,12 @@ const MESES = 7;
    O QUE CONTINUA SEM ORIGEM — nomeado, para a tela dizer QUAL falta
    ------------------------------------------------------------------------- */
 
+/**
+ * Só figura em `sem_origem` quando NENHUMA meta foi cadastrada — desde
+ * 25/09/2026 (`create_clinic_settings`) `operational_parameters` existe, e a
+ * ausência real passou a ser "a administração ainda não preencheu", não mais
+ * "o banco não tem onde guardar".
+ */
 const SEM_PARAMETRO_OPERACIONAL = "meta_mensal_e_capacidade";
 
 /**
@@ -270,6 +278,28 @@ function montarIndicadores(
   ];
 }
 
+/**
+ * As metas cadastradas, na ordem fixa da tela — não a ordem que o banco
+ * devolver. Leitura direta: `operational_parameters` tem política de `SELECT`
+ * própria para o administrador, sem pedágio de auditoria, como todo catálogo.
+ */
+async function metasOperacionais(): Promise<ParametroOperacional[] | ReturnType<typeof falhaDe>> {
+  const { data, error } = await getSupabaseClient()
+    .from("operational_parameters")
+    .select("code, label, value")
+    .eq("is_active", true);
+
+  if (error) return falhaDe(error);
+
+  const porCodigo = new Map(
+    (data as { code: string; label: string; value: number }[]).map((linha) => [linha.code, linha]),
+  );
+
+  return METAS_OPERACIONAIS.map(({ codigo }) => porCodigo.get(codigo))
+    .filter((linha): linha is { code: string; label: string; value: number } => Boolean(linha))
+    .map((linha) => ({ codigo: linha.code, rotulo: linha.label, valor: Number(linha.value) }));
+}
+
 /* -------------------------------------------------------------------------
    LEITURA
    ------------------------------------------------------------------------- */
@@ -309,14 +339,19 @@ export async function getIndicadores(
   params?: JanelaOperacional,
 ): Promise<SingleResult<EstatisticasOperacionais>> {
   return executar(async () => {
-    const dados = await consolidar(params);
+    const [dados, metas] = await Promise.all([consolidar(params), metasOperacionais()]);
     if (!("agenda" in dados)) return dados;
+    if (!Array.isArray(metas)) return metas;
 
     return okOne<EstatisticasOperacionais>({
       indicadores: montarIndicadores(dados.agenda, dados.chat, dados.semanas),
       por_especialidade: porEspecialidade(dados.agenda),
       volume_mensal: volumeMensal(dados.agenda),
-      sem_origem: [SEM_PARAMETRO_OPERACIONAL, SEM_VOLUME_DE_MENSAGEM],
+      metas,
+      sem_origem: [
+        ...(metas.length === 0 ? [SEM_PARAMETRO_OPERACIONAL] : []),
+        SEM_VOLUME_DE_MENSAGEM,
+      ],
     });
   });
 }

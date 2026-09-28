@@ -347,11 +347,20 @@ interface LinhaListaPaciente {
  * Campos de ordenação que a função aceita. Qualquer outro é **recusado** pelo
  * servidor — não há SQL dinâmico do outro lado —, então o que a tela pedir fora
  * desta lista cai no padrão em vez de virar erro na cara de quem clicou.
+ *
+ * `primary_cid10_code`, `treatment_phase` e `is_active` entraram em
+ * `rework_patient_list` (25/09/2026), junto com o total do conjunto filtrado.
  */
-const ORDENACAO: Record<string, "full_name" | "birth_date" | "created_at"> = {
+const ORDENACAO: Record<
+  string,
+  "full_name" | "birth_date" | "created_at" | "primary_cid10_code" | "treatment_phase" | "is_active"
+> = {
   nome: "full_name",
   nascimento: "birth_date",
   criado_em: "created_at",
+  cid: "primary_cid10_code",
+  fase: "treatment_phase",
+  status: "is_active",
 };
 
 /** O primeiro valor de um filtro, como texto — ou `null` quando não há filtro. */

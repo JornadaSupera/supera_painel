@@ -44,19 +44,45 @@ export async function listCids(): Promise<ListResult<Cid>> {
   });
 }
 
+/** Uma linha de `summarize_treatment_protocols` — nome distinto, sem paciente. */
+interface LinhaProtocolo {
+  protocol_name: string;
+  plan_count: number;
+  current_patient_count: number;
+}
+
 /**
  * Protocolos terapêuticos.
  *
- * Não existem como catálogo: `treatment_plans.protocol_name` é texto livre, sem
- * tabela de domínio por trás. Levantar os nomes em uso exigiria ler o plano de
- * cada paciente por `read_treatment_plans`, uma chamada auditada por paciente,
- * só para preencher um `<Select>` de filtro.
+ * Não existem como tabela de domínio: `treatment_plans.protocol_name` é texto
+ * livre. `summarize_treatment_protocols()` (desde 25/09/2026) resolve o que
+ * antes exigiria ler o plano de cada paciente só para preencher um `<Select>`
+ * — ela devolve os nomes distintos em uso, com quantos planos e quantos
+ * pacientes vigentes, sem paciente nenhum na resposta.
  *
- * A lista vem vazia, e o filtro correspondente aparece sem opções — que é a
- * descrição honesta do estado do banco.
+ * O nome é o único identificador (como em `read_patient_list`), por isso serve
+ * de `id` e de `nome`. Plano e ciclo previsto não vêm do resumo — a ficha já
+ * os monta à parte, a partir do plano vigente de cada paciente.
  */
 export async function listProtocolos(): Promise<ListResult<Protocolo>> {
-  return ok<Protocolo>([]);
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient().rpc("summarize_treatment_protocols");
+
+    if (error) return falhaDe(error);
+
+    return ok(
+      (data as LinhaProtocolo[])
+        .map<Protocolo>((linha) => ({
+          id: linha.protocol_name,
+          nome: linha.protocol_name,
+          medicamentos: [],
+          ciclos: null,
+          via: "intravenosa",
+          ativo: linha.current_patient_count > 0,
+        }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")),
+    );
+  });
 }
 
 export async function listEspecialidades(): Promise<ListResult<{ value: string; label: string }>> {

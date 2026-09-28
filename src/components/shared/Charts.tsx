@@ -9,6 +9,7 @@ import {
   LineChart as RLineChart,
   Pie,
   PieChart as RPieChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -169,11 +170,18 @@ interface ChartBaseProps {
 
 /* -------------------------------------------------------------------- bar */
 
+/** A horizontal target/capacity line, dashed so it never reads as a data bar. */
+export interface ChartReferenceLine {
+  y: number;
+  label: string;
+}
+
 export interface BarChartProps<T> extends ChartBaseProps {
   data: T[];
   xKey: string;
   series: Series[];
   stacked?: boolean;
+  referenceLines?: ChartReferenceLine[];
 }
 
 export function BarChart<T>({
@@ -181,6 +189,7 @@ export function BarChart<T>({
   xKey,
   series,
   stacked = false,
+  referenceLines = [],
   suffix = "",
   height,
   loading,
@@ -207,6 +216,20 @@ export function BarChart<T>({
             // Rounds only the top of the last series in the stack.
             radius={stacked && i < series.length - 1 ? 0 : [4, 4, 0, 0]}
             maxBarSize={48}
+          />
+        ))}
+
+        {referenceLines.map((linha) => (
+          <ReferenceLine
+            key={linha.label}
+            y={linha.y}
+            // Without this, a Y axis that auto-scales to the bars alone clips
+            // any reference line above the tallest bar — which is the common
+            // case, since a target is usually above where volume actually is.
+            ifOverflow="extendDomain"
+            stroke="var(--muted-foreground)"
+            strokeDasharray="4 4"
+            label={{ value: `${linha.label} · ${formatValue(linha.y)}`, position: "insideTopRight", fill: "var(--muted-foreground)", fontSize: 11 }}
           />
         ))}
       </RBarChart>

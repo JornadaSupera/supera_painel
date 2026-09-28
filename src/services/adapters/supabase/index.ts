@@ -65,26 +65,9 @@ const implemented = {
  * Cada linha sai daqui no dia em que o banco ganhar a política ou a função
  * correspondente — e nenhuma tela muda junto.
  */
-/**
- * Ordenação da listagem de pacientes.
- *
- * `read_patient_list` aceita `full_name`, `birth_date` e `created_at`, e
- * **recusa** qualquer outro valor de `p_order_by` — não há SQL dinâmico do outro
- * lado. Ordenar por CID, fase ou situação exigiria ordenar a página atual no
- * cliente, o que ordenaria vinte linhas e chamaria isso de ordenação da base:
- * a segunda página voltaria a começar do começo.
- */
-const SEM_ORDENACAO_NO_SERVIDOR =
-  "A listagem do backend ordena por nome, nascimento e data de cadastro. Ordenar por esta coluna exigiria ordenar só a página visível, o que embaralharia a paginação em vez de ordenar a base.";
-
 export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "pacientes.list.risco":
     "Não há classificação de risco no backend, e não vai haver nesta fase: “risco” são as etiquetas da sistematização de enfermagem do Gemed, que estão fora do escopo de leitura contratado. Calcular no painel seria inferência clínica no front-end.",
-  "pacientes.filter.protocolo":
-    "O filtro por protocolo existe no backend, mas não há catálogo de protocolos para oferecer: `protocol_name` é texto livre no plano terapêutico, sem tabela de domínio. Levantar os nomes em uso exigiria ler o plano de cada paciente, uma leitura auditada por paciente, só para preencher um seletor.",
-  "pacientes.sort.cid": SEM_ORDENACAO_NO_SERVIDOR,
-  "pacientes.sort.fase": SEM_ORDENACAO_NO_SERVIDOR,
-  "pacientes.sort.status": SEM_ORDENACAO_NO_SERVIDOR,
   "pacientes.form.sexo":
     "Não há coluna de sexo no cadastro, e nenhuma tela do escopo a exibe. Coletar o campo gravaria no vazio.",
   "pacientes.deactivate.motivo":

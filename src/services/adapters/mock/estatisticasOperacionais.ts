@@ -4,6 +4,7 @@ import type {
   EstatisticasOperacionais,
   IndicadorOperacional,
   LinhaEspecialidade,
+  ParametroOperacional,
   PontoVolume,
 } from "@/types/estatisticas";
 import { simulate } from "./_helpers";
@@ -16,8 +17,15 @@ import { simulate } from "./_helpers";
  * calcula de verdade, a partir da agenda e do chat.
  *
  * `sem_origem` é vazio no mock porque o mock inventa meta e capacidade — no
- * backend elas não existem, e a diferença está declarada nos dois lados.
+ * backend elas não existem até a administração cadastrar a primeira, e a
+ * diferença está declarada nos dois lados.
  */
+
+/** Os dois números do protótipo — "meta 320/mês" e "capacidade 380/mês". */
+const METAS: ParametroOperacional[] = [
+  { codigo: "monthly_appointments_target", rotulo: "Meta mensal", valor: 320 },
+  { codigo: "monthly_appointments_capacity", rotulo: "Capacidade máxima", valor: 380 },
+];
 
 const POR_ESPECIALIDADE: LinhaEspecialidade[] = (
   [
@@ -90,6 +98,7 @@ export async function getIndicadores(): Promise<SingleResult<EstatisticasOperaci
       indicadores: INDICADORES,
       por_especialidade: POR_ESPECIALIDADE,
       volume_mensal: VOLUME_MENSAL,
+      metas: METAS,
       sem_origem: [],
     }),
   );

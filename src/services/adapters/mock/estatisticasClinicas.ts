@@ -48,7 +48,8 @@ function montar(params: Parametros): CruzamentoClinico {
   const apenasAtivos = params.apenasAtivos ?? true;
 
   const considerados = pacientes.filter(
-    (paciente) => !apenasAtivos || paciente.status === "ativo",
+    (paciente) =>
+      (!apenasAtivos || paciente.status === "ativo") && (!params.cid || paciente.cid === params.cid),
   );
 
   // O paciente guarda o id do protocolo; o mapa de calor é rotulado pelo nome.

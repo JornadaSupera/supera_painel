@@ -229,6 +229,8 @@ export const RESOURCES = {
       "salvarIdentidade",
       "salvarMensagens",
       "salvarHorario",
+      "getMetasOperacionais",
+      "salvarMetaOperacional",
       "getTermos",
       "publishTermos",
       "getRegrasAlerta",

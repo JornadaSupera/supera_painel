@@ -143,10 +143,23 @@ export interface PontoVolume {
   total: number;
 }
 
+/**
+ * Uma linha de referência do gráfico de volume — meta mensal ou capacidade
+ * máxima. `codigo` é o que identifica o parâmetro no backend
+ * (`operational_parameters.code`); a tela grava e lê sempre os mesmos dois.
+ */
+export interface ParametroOperacional {
+  codigo: string;
+  rotulo: string;
+  valor: number;
+}
+
 export interface EstatisticasOperacionais {
   indicadores: IndicadorOperacional[];
   por_especialidade: LinhaEspecialidade[];
   volume_mensal: PontoVolume[];
+  /** Linhas de referência configuradas — vazio até a administração cadastrar a primeira. */
+  metas: ParametroOperacional[];
   /**
    * Indicadores que a tela mostra no protótipo e o backend não sabe calcular.
    * Vêm nomeados para que a interface diga QUAIS faltam.

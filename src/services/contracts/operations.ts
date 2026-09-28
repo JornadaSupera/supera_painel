@@ -31,6 +31,7 @@ import type {
   EstatisticasOperacionais,
   IndicadorOperacional,
   LinhaEspecialidade,
+  ParametroOperacional,
   PontoVolume,
 } from "@/types/estatisticas";
 import type {
@@ -432,6 +433,8 @@ export interface FiltroClinico {
   protocolo?: string | null;
   /** Id do sintoma. O escopo chama de "efeito adverso"; o catálogo, de sintoma. */
   sintomaId?: string | null;
+  /** Código do CID-10, exatamente como no catálogo (`cid10.code`). Recorte do servidor. */
+  cid?: string | null;
 }
 
 export interface EstatisticasClinicasOperations {
@@ -630,6 +633,28 @@ export interface ConfiguracoesOperations {
    * março, e apagar a linha falsificaria o relatório daquele mês.
    */
   setMotivoAtivo(params: { id: string; ativo: boolean }): Promise<SingleResult<MotivoSituacao>>;
+
+  /**
+   * As linhas de referência do gráfico de volume — `operational_parameters`,
+   * desde 25/09/2026. Sempre os mesmos dois códigos fixos (meta mensal e
+   * capacidade máxima); a lista vem sem a que ainda não foi cadastrada, não com
+   * ela zerada — zero pareceria uma meta real.
+   */
+  getMetasOperacionais(): Promise<ListResult<ParametroOperacional>>;
+
+  /**
+   * Cria ou atualiza uma meta pelo código.
+   *
+   * `codigo` não é de livre escolha: são os dois que o gráfico de volume
+   * desenha (`monthly_appointments_target`, `monthly_appointments_capacity`) —
+   * ver `EstatisticasOperacionaisPage`. Chamar de novo com o mesmo código troca
+   * o valor; não existe "criar outra meta".
+   */
+  salvarMetaOperacional(params: {
+    codigo: string;
+    rotulo: string;
+    valor: number;
+  }): Promise<SingleResult<ParametroOperacional>>;
 
   /** O estado do interruptor de segundo fator, e quem o mexeu por último. */
   getSeguranca(): Promise<SingleResult<ConfiguracaoSeguranca>>;

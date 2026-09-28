@@ -22,6 +22,8 @@ import type {
   VersaoLegal,
   VinculoExterno,
 } from "@/types/configuracao";
+import type { ParametroOperacional } from "@/types/estatisticas";
+import { METAS_OPERACIONAIS } from "../_operationalTargets";
 import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
 import { definirExigenciaDeMfa, estadoDaSeguranca, nivelAtual } from "./_security";
 import { simulate } from "./_helpers";
@@ -565,6 +567,49 @@ export async function salvarHorario({
     CLINICA.fuso = fuso;
     CLINICA.intervalos = intervalos;
     return okOne({ ...CLINICA });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   METAS OPERACIONAIS — linhas de referência do gráfico de volume
+   -------------------------------------------------------------------------
+   Os dois números do protótipo (320 e 380), já cadastrados — ao contrário do
+   backend real, onde a tabela nasce vazia. É o mock demonstrando o desenho com
+   a linha de referência presente; a ausência real fica só do lado Supabase.
+   ------------------------------------------------------------------------- */
+
+const METAS = new Map<string, ParametroOperacional>(
+  [
+    { codigo: "monthly_appointments_target", rotulo: "Meta mensal", valor: 320 },
+    { codigo: "monthly_appointments_capacity", rotulo: "Capacidade máxima", valor: 380 },
+  ].map((meta) => [meta.codigo, meta]),
+);
+
+export async function getMetasOperacionais(): Promise<ListResult<ParametroOperacional>> {
+  return simulate(() => {
+    const linhas = METAS_OPERACIONAIS.map(({ codigo }) => METAS.get(codigo)).filter(
+      (meta): meta is ParametroOperacional => Boolean(meta),
+    );
+
+    return ok(linhas, linhas.length);
+  });
+}
+
+export async function salvarMetaOperacional({
+  codigo,
+  rotulo,
+  valor,
+}: {
+  codigo: string;
+  rotulo: string;
+  valor: number;
+}): Promise<SingleResult<ParametroOperacional>> {
+  return simulate(() => {
+    if (valor < 0) return fail(ERROR_CODE.VALIDATION, "O valor do parâmetro é um número não negativo.");
+
+    const meta = { codigo, rotulo, valor };
+    METAS.set(codigo, meta);
+    return okOne(meta);
   });
 }
 

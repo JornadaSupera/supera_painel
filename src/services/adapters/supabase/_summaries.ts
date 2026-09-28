@@ -232,6 +232,8 @@ export function resumirSintomas(params: {
   janela: Janela;
   protocolo?: string | null;
   sintomaId?: string | null;
+  /** Código do CID-10 — desde 25/09/2026 (`create_panel_summaries`). */
+  cid?: string | null;
   /** Recorta pela SITUAÇÃO DA FICHA HOJE — desde 25/09/2026. Padrão: só ativos. */
   apenasAtivos?: boolean;
 }): Promise<Resumo<LinhaResumoSintoma>> {
@@ -242,6 +244,7 @@ export function resumirSintomas(params: {
     p_to: datas.to,
     p_protocol: params.protocolo ?? null,
     p_symptom_id: params.sintomaId ?? null,
+    p_cid10_code: params.cid ?? null,
     p_active_only: params.apenasAtivos ?? true,
   });
 }

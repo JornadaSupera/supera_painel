@@ -178,6 +178,7 @@ async function cruzar(params: Parametros): Promise<SingleResult<CruzamentoClinic
       janela: janelaDeDias(params.dias ?? 90),
       protocolo: params.protocolo ?? null,
       sintomaId: params.sintomaId ?? null,
+      cid: params.cid ?? null,
       apenasAtivos: params.apenasAtivos,
     });
     if (falhou(resumo)) return resumo;
