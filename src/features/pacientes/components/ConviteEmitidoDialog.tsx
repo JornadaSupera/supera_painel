@@ -20,12 +20,12 @@ import type { ResultadoConvite } from "@/types/paciente";
  * segunda via — o backend guarda só o hash dele. Quem fechar a tela sem anotar
  * precisa emitir outro convite, o que invalida este.
  *
- * > [!] Por que o código aparece no painel
- * Não há provedor de envio contratado ainda. Até haver, quem está na recepção
- * lê o código para o paciente digitar no aplicativo — é o que mantém a ativação
- * testável em vez de bloqueada por uma credencial de terceiro. Quando o envio
- * automático existir, este diálogo deixa de exibir o código e passa a confirmar
- * o disparo.
+ * > [!] Por que o código às vezes aparece, e às vezes não
+ * Sem credencial de SMS configurada, quem está na recepção lê o código para o
+ * paciente digitar no aplicativo — é o que mantém a ativação testável em vez
+ * de bloqueada por uma credencial de terceiro. Com a credencial configurada, o
+ * envio é automático e o diálogo só confirma o disparo: o código nunca sai do
+ * backend nesse caminho, então não há o que copiar.
  *
  * O código sozinho não abre a ficha de ninguém: o aceite exige também CPF e
  * data de nascimento do titular.
@@ -106,6 +106,11 @@ export function ConviteEmitidoDialog({ convite, onClose }: ConviteEmitidoDialogP
               </span>
             </p>
           </div>
+        ) : convite?.via === "sms" ? (
+          <p className="text-muted-foreground text-sm">
+            SMS enviado. O paciente recebe o código de ativação diretamente no celular.
+            {convite.expira_em ? ` Válido até ${formatDateTime(convite.expira_em)}.` : ""}
+          </p>
         ) : (
           <p className="text-muted-foreground text-sm">
             O convite foi registrado. Esta origem de dados não devolve o código de ativação.

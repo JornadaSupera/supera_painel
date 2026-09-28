@@ -385,6 +385,7 @@ export async function sendInvite({ id }: { id: string }): Promise<SingleResult<R
       // app. `null` é a resposta honesta desta origem.
       token: null,
       expira_em: null,
+      via: "manual",
     });
   });
 }

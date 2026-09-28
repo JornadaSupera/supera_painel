@@ -6,6 +6,8 @@ import {
   fail,
   ok,
   okOne,
+  type ErrorCode,
+  type FailResult,
   type FilterValue,
   type ListParams,
   type ListResult,
@@ -1089,12 +1091,90 @@ export async function deactivate({
 }
 
 /**
+ * Mensagem de tela para os códigos que `send-patient-invite` pode recusar —
+ * mesmo vocabulário de `MENSAGEM_POR_SENTINELA` em `_helpers.ts`, mas a Edge
+ * Function devolve `{ error }` no corpo, não um erro no formato PostgREST, e
+ * por isso a tradução mora aqui e não lá.
+ */
+const MENSAGEM_DO_CONVITE_SMS: Record<string, string> = {
+  patient_not_found: "Ficha não encontrada.",
+  patient_already_linked:
+    "Esta ficha já tem conta vinculada. Desfaça o vínculo antes de convidar de novo.",
+  patient_inactive: "A ficha está desativada. Reative antes de convidar.",
+  invalid_phone: "O celular da ficha não está em formato válido para SMS.",
+};
+
+const CODIGO_DO_CONVITE_SMS: Record<string, ErrorCode> = {
+  forbidden: ERROR_CODE.FORBIDDEN,
+  patient_not_found: ERROR_CODE.NOT_FOUND,
+  patient_already_linked: ERROR_CODE.CONFLICT,
+  patient_inactive: ERROR_CODE.CONFLICT,
+  invalid_phone: ERROR_CODE.VALIDATION,
+};
+
+/**
+ * Tenta o envio automático por SMS antes do caminho manual.
+ *
+ * `send-patient-invite` (Edge Function, ADR-026 §7) nunca devolve o token —
+ * ele só existe dentro da mensagem que o paciente recebe. `sms_failed` é o
+ * único código que cai para `invite_patient`: nos dois motivos que o geram —
+ * sem credencial Twilio configurada, ou o envio real falhou — a função já
+ * cancela o convite sozinha antes de responder, então não sobra nada
+ * pendente para o caminho manual reemitir por cima. Um erro que não dá para
+ * ler (rede fora, função inalcançável) cai no mesmo lugar, pelo mesmo motivo:
+ * o caminho manual sempre funciona e é isso que mantém a ativação testável.
+ *
+ * Qualquer outro código é recusa de verdade — ficha errada, já vinculada,
+ * inativa, celular fora de formato — e sobe para a tela como qualquer outra
+ * chamada deste adapter.
+ */
+async function tentarConviteSms(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  patientId: string,
+): Promise<{ enviado: true; resultado: ResultadoConvite } | { enviado: false } | FailResult> {
+  const { data, error } = await supabase.functions.invoke("send-patient-invite", {
+    body: { patient_id: patientId },
+  });
+
+  if (!error) {
+    const resposta = data as { invitation_id: string; phone_masked: string; expires_at: string };
+
+    return {
+      enviado: true,
+      resultado: {
+        paciente_id: patientId,
+        destino: resposta.phone_masked,
+        enviado_em: new Date().toISOString(),
+        token: null,
+        expira_em: paraIso(resposta.expires_at),
+        via: "sms",
+      },
+    };
+  }
+
+  let codigo: string | undefined;
+  try {
+    const resposta: Response | undefined = (error as { context?: Response }).context;
+    const corpo = resposta ? await resposta.clone().json() : null;
+    codigo = (corpo as { error?: string } | null)?.error;
+  } catch {
+    codigo = undefined;
+  }
+
+  if (!codigo || codigo === "sms_failed") return { enviado: false };
+
+  return fail(CODIGO_DO_CONVITE_SMS[codigo] ?? ERROR_CODE.UNKNOWN, MENSAGEM_DO_CONVITE_SMS[codigo]);
+}
+
+/**
  * Emite o convite de acesso ao app.
  *
- * Devolve o token em texto puro — **uma vez**, e não há como reemiti-lo: o
- * banco guarda só o hash. Enquanto não houver provedor de envio, é o painel que
- * o exibe para alguém passar ao paciente, e é isso que torna a ativação
- * testável em vez de bloqueada por uma credencial de terceiro.
+ * Tenta o SMS automático primeiro (`tentarConviteSms`); sem credencial
+ * configurada, cai para o caminho manual de sempre — devolve o token em
+ * texto puro **uma vez**, e não há como reemiti-lo: o banco guarda só o
+ * hash. Enquanto não houver provedor de envio, é o painel que o exibe para
+ * alguém passar ao paciente, e é isso que torna a ativação testável em vez
+ * de bloqueada por uma credencial de terceiro.
  *
  * Emitir cancela o convite pendente anterior. Não é cortesia: quem reemite
  * costuma estar corrigindo o telefone, e manter o token antigo vivo manteria
@@ -1103,6 +1183,10 @@ export async function deactivate({
 export async function sendInvite({ id }: { id: string }): Promise<SingleResult<ResultadoConvite>> {
   return executar(async () => {
     const supabase = getSupabaseClient();
+
+    const viaSms = await tentarConviteSms(supabase, id);
+    if ("error" in viaSms) return viaSms;
+    if (viaSms.enviado) return okOne(viaSms.resultado);
 
     const { data, error } = await supabase.rpc("invite_patient", { p_patient_id: id });
     if (error) return falhaDe(error);
@@ -1122,6 +1206,7 @@ export async function sendInvite({ id }: { id: string }): Promise<SingleResult<R
       enviado_em: paraIso(linha?.created_at) ?? new Date().toISOString(),
       token: emitido.token,
       expira_em: paraIso(linha?.expires_at),
+      via: "manual",
     });
   });
 }

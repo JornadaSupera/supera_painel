@@ -218,4 +218,12 @@ export interface ResultadoConvite {
   /** `null` quando a origem dos dados não expõe o token. */
   token: string | null;
   expira_em: string | null;
+  /**
+   * `"sms"` quando a mensagem já saiu de verdade (`token` vem `null` porque
+   * ele nunca sai do backend nesse caminho); `"manual"` nos outros dois
+   * casos — sem credencial configurada, ou origem de dados que não simula
+   * envio. A tela usa isto para escolher a frase, não o `token` sozinho: os
+   * dois caminhos sem token têm mensagens diferentes.
+   */
+  via: "sms" | "manual";
 }
