@@ -485,15 +485,26 @@ export async function resetPassword({
 /**
  * Contas ainda sem perfil no painel.
  *
- * `accounts` tem política de leitura para administrador, e `professionals` e
- * `admins` são legíveis por qualquer sessão autenticada — então o recorte sai
- * de uma consulta só, sem RPC.
+ * `accounts` tem política de leitura para administrador, e `professionals`,
+ * `admins` e `caregivers` são legíveis por qualquer sessão autenticada —
+ * então o recorte sai de uma consulta só, sem RPC.
+ *
+ * > [!] Conta de paciente NÃO fica de fora daqui.
+ * `patients` só é legível pelas funções `read_*` (auditadas) — `.from()`
+ * devolve zero linhas em silêncio para o role normal, então não há como
+ * excluir essas contas sem uma leitura clínica completa (PII de todo mundo)
+ * só para montar este filtro, o que seria um uso indevido de uma RPC
+ * auditada. Falta uma função do banco dedicada a isso — pedido em aberto
+ * com o Pedro. Até lá, o seletor pode oferecer a conta de um paciente já
+ * cadastrado, e quem concede o perfil precisa saber disso.
  */
 export async function listContasSemPerfil(): Promise<ListResult<ContaDisponivel>> {
   return executar(async () => {
     const { data, error } = await getSupabaseClient()
       .from("accounts")
-      .select("id, full_name, email, created_at, is_active, admins ( id ), professionals ( id )")
+      .select(
+        "id, full_name, email, created_at, is_active, admins ( id ), professionals ( id ), caregivers ( id )",
+      )
       .order("created_at", { ascending: false });
 
     if (error) return falhaDe(error);
@@ -506,12 +517,18 @@ export async function listContasSemPerfil(): Promise<ListResult<ContaDisponivel>
       is_active: boolean;
       admins: { id: string } | { id: string }[] | null;
       professionals: { id: string } | { id: string }[] | null;
+      caregivers: { id: string } | { id: string }[] | null;
     }[];
 
     const disponiveis = linhas
       // Conta desativada fica de fora: conceder perfil a quem não entra produz
-      // um cadastro que parece pronto e não funciona.
-      .filter((linha) => linha.is_active && !umDe(linha.admins) && !umDe(linha.professionals))
+      // um cadastro que parece pronto e não funciona. Conta de acompanhante
+      // também: o vínculo já decide o que ela vê, um segundo perfil por cima
+      // dele seria dois papéis conflitantes na mesma sessão.
+      .filter(
+        (linha) =>
+          linha.is_active && !umDe(linha.admins) && !umDe(linha.professionals) && !umDe(linha.caregivers),
+      )
       .map<ContaDisponivel>((linha) => ({
         id: linha.id,
         nome: linha.full_name?.trim() || linha.email,
