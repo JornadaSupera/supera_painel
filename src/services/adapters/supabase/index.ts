@@ -127,7 +127,7 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "estatisticasOperacionais.porProfissional":
     "O recorte dos resumos é por especialidade, e por profissional não existe — no backend nem aqui. Ranquear pessoa por volume ou por tempo de resposta transformaria um painel de operação em avaliação individual de desempenho, e com poucos casos a média re-identifica quem atendeu.",
   "relatorios.agregados":
-    "Três dos doze relatórios não têm origem no backend: alertas de IA, NPS e conteúdo mais acessado. Cada um diz o seu motivo no próprio cartão.",
+    "Três dos doze relatórios não têm origem no backend: alertas de IA, NPS e engajamento no app. Cada um diz o seu motivo no próprio cartão.",
 };
 
 export const supabaseAdapter = buildAdapter({ name: "supabase", implemented });
