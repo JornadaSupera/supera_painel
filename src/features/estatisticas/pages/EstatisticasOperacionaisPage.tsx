@@ -159,8 +159,13 @@ export function EstatisticasOperacionaisPage() {
         )}
       </ChartCard>
 
+      {/*
+        EmptyState, não BackendPendente: a leitura funciona e o gráfico
+        desenha a linha assim que existir meta — não é feature em
+        construção, é configuração que a administração ainda não fez.
+      */}
       {(data?.sem_origem.includes(SEM_META_OU_CAPACIDADE) ?? false) && (
-        <BackendPendente titulo="Meta e capacidade" motivo={MOTIVO_SEM_PARAMETRO} />
+        <EmptyState compact title="Meta e capacidade" description={MOTIVO_SEM_PARAMETRO} />
       )}
 
       {/* ------------------------------------------------ por especialidade */}
