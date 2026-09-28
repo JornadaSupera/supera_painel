@@ -7,6 +7,7 @@ import {
   BarChart,
   ChartCard,
   DonutChart,
+  EmptyState,
   ErrorState,
   Footnote,
   LineChart,
@@ -82,19 +83,39 @@ const SEM_FONTE: Record<string, string> = {
  * Recharts com um array vazio desenha eixos sem nada dentro, o que se lê como
  * "a clínica não teve movimento" — afirmação que este painel não pode fazer.
  * Na ausência de série, o cartão diz o motivo.
+ *
+ * > [!] Duas causas bem diferentes, dois avisos bem diferentes.
+ * `BackendPendente` é para quando o dado depende de algo que falta no
+ * backend ou numa decisão de terceiro (`efeitos`, `engajamento`) — daí o
+ * ícone de obra e "ainda em desenvolvimento". `sessoes` e `cid` não são
+ * isso: a leitura funciona, só não há registro no período, porque a clínica
+ * de teste tem pouquíssimo movimento. Rotular os dois casos igual faz quem
+ * está olhando o painel achar que um gráfico pronto ainda está sendo
+ * construído — por isso `semDados` usa `EmptyState`, o mesmo aviso neutro
+ * de qualquer lista vazia no painel.
  */
 function ComSerie({
   titulo,
   motivo,
   vazio,
+  variant = "backend",
   children,
 }: {
   titulo: string;
   motivo: string;
   vazio: boolean;
+  variant?: "backend" | "semDados";
   children: ReactNode;
 }) {
   if (!vazio) return children;
+
+  if (variant === "semDados") {
+    return (
+      <div className="flex items-center justify-center" style={{ minHeight: ALTURA_GRAFICO }}>
+        <EmptyState compact title={titulo} description={motivo} />
+      </div>
+    );
+  }
 
   return <BackendPendente titulo={titulo} motivo={motivo} altura={ALTURA_GRAFICO} />;
 }
@@ -211,7 +232,12 @@ export function DashboardPage() {
               )
             }
           >
-            <ComSerie titulo="Sessões de quimioterapia" motivo={SEM_FONTE.sessoes!} vazio={semSerie(series.data?.sessoes)}>
+            <ComSerie
+              titulo="Sessões de quimioterapia"
+              motivo={SEM_FONTE.sessoes!}
+              vazio={semSerie(series.data?.sessoes)}
+              variant="semDados"
+            >
               <BarChart
                 data={series.data?.sessoes ?? []}
                 xKey="periodo"
@@ -225,7 +251,12 @@ export function DashboardPage() {
           </ChartCard>
 
           <ChartCard title="Pacientes por CID" description="Distribuição atual">
-            <ComSerie titulo="Pacientes por CID" motivo={SEM_FONTE.cid!} vazio={semSerie(series.data?.pacientes_por_cid)}>
+            <ComSerie
+              titulo="Pacientes por CID"
+              motivo={SEM_FONTE.cid!}
+              vazio={semSerie(series.data?.pacientes_por_cid)}
+              variant="semDados"
+            >
               <DonutChart
                 data={(series.data?.pacientes_por_cid ?? []).map((fatia) => ({
                   name: fatia.nome,
