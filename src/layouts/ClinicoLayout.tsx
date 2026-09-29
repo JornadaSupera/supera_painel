@@ -4,11 +4,12 @@ import { Navigate, Outlet, useLocation, useParams } from "react-router-dom";
 import { Loading } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { ESPECIALIDADE, ESPECIALIDADE_LABEL, PAPEL, type Especialidade } from "@/lib/enums";
+import { ESPECIALIDADE, ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
 import { MobileMenu } from "./MobileMenu";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { clinicoNavItems } from "./clinico-navigation";
+import { navItemByPath } from "./navigation";
 
 /**
  * Clinical panel frame: sidebar + topbar + content area.
@@ -38,16 +39,10 @@ export function ClinicoLayout() {
   /*
    * A professional's own specialty is their only home here — a farmacêutico
    * opening `/clinico/psicologo/` by hand does not become a psicólogo.
-   * Administrators are the exception: the same broad read they already have
-   * on the administrative side extends to reviewing any area from here, which
-   * is what lets them tell whether a screen is honestly showing "nothing yet"
-   * or hiding a real defect.
+   * Everyone else was already turned away by `AreaRoute`.
    */
   const restritoAPropria =
-    valida &&
-    user?.papel === PAPEL.PROFISSIONAL &&
-    especialidadeDoUsuario &&
-    especialidade !== especialidadeDoUsuario;
+    valida && especialidadeDoUsuario !== null && especialidade !== especialidadeDoUsuario;
 
   // Every hook below runs on every render, whatever branch we take further
   // down — conditional returns come after, never between them.
@@ -55,11 +50,7 @@ export function ClinicoLayout() {
   const items = area ? clinicoNavItems(area) : [];
   const homePath = area ? `/clinico/${area}` : "";
 
-  const itemAtual = area
-    ? items.find(
-        (item) => location.pathname === item.to || location.pathname.startsWith(`${item.to}/`),
-      )
-    : undefined;
+  const itemAtual = area ? navItemByPath(location.pathname, items) : undefined;
   const nomeDaTela = itemAtual?.title ?? itemAtual?.label;
 
   useDocumentTitle(

@@ -156,10 +156,14 @@ export function flatNavItems(items: NavItem[] = NAV_ITEMS): NavItem[] {
 /**
  * The item matching a path.
  * Prefers the longest match, so `/estatisticas/clinicas` beats
- * `/estatisticas`.
+ * `/estatisticas` — and `/clinico/x/pacientes` beats the area's home,
+ * `/clinico/x`, which is a prefix of every clinical route.
  */
-export function navItemByPath(pathname: string): NavItem | undefined {
-  return flatNavItems()
+export function navItemByPath(
+  pathname: string,
+  items: NavItem[] = NAV_ITEMS,
+): NavItem | undefined {
+  return flatNavItems(items)
     .filter((item) => pathname === item.to || pathname.startsWith(`${item.to}/`))
     .sort((a, b) => b.to.length - a.to.length)[0];
 }
