@@ -16,7 +16,7 @@ import type { MatrizPermissoes } from "@/types/usuario";
  * belongs to the specialty; granting it through a role would give the
  * administrator access to session content.
  */
-export const SPECIALTY_EXCLUSIVE_PERMISSIONS: Permissao[] = [PERMISSAO.SIGILO_PSICOLOGIA];
+const SPECIALTY_EXCLUSIVE_PERMISSIONS: Permissao[] = [PERMISSAO.SIGILO_PSICOLOGIA];
 
 /** A snapshot of the matrix: copies, so the screen never mutates the source. */
 export function buildPermissionMatrix(): MatrizPermissoes {

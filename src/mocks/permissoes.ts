@@ -2,15 +2,11 @@ import { PAPEL, type Papel } from "@/lib/enums";
 import { PERMISSAO_LABEL, PERMISSOES_POR_PAPEL, type Permissao } from "@/lib/rbac";
 
 /**
- * Matriz papel × permissão — o estado editável do RBAC.
+ * Matriz papel × permissão — o RBAC em vigor, somente leitura.
  *
- * Semeada a partir de `lib/rbac.ts`, que é a regra vigente em código. Quando o
- * Supabase entrar, esta tabela passa a ser a fonte e `lib/rbac.ts` fica só com
- * o avaliador — a resolução (papel → especialidade → extras) continua sendo
- * dele, para que exista uma implementação só.
- *
- * A edição vive em memória: alterar a matriz aqui muda o painel até recarregar.
- * É o suficiente para validar a tela sem fingir uma persistência que não há.
+ * Espelha `lib/rbac.ts`, que é a regra vigente em código e a mesma que os dois
+ * adapters exibem. A matriz por papel não é editável em lugar nenhum: o que se
+ * concede a uma pessoa em particular é outro eixo, e vive na ficha dela.
  */
 
 /** Agrupamento apenas de apresentação — vira as seções da tabela na tela. */
@@ -41,7 +37,7 @@ export const catalogoPermissoes = (Object.keys(PERMISSAO_LABEL) as Permissao[]).
 
 export const PAPEIS: Papel[] = [PAPEL.ADMIN, PAPEL.PROFISSIONAL];
 
-/** Estado mutável da matriz. Começa igual ao que `lib/rbac.ts` define. */
+/** O que cada papel concede, copiado de `lib/rbac.ts`. */
 export const concedidas: Record<Papel, Permissao[]> = {
   [PAPEL.ADMIN]: [...PERMISSOES_POR_PAPEL[PAPEL.ADMIN]],
   [PAPEL.PROFISSIONAL]: [...PERMISSOES_POR_PAPEL[PAPEL.PROFISSIONAL]],

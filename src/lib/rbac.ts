@@ -31,7 +31,7 @@ export const PERMISSAO = {
 
   USUARIOS_READ: "usuarios:read",
   USUARIOS_MANAGE: "usuarios:manage",
-  /** Editar a matriz papel × permissão. Só administrador. */
+  /** Ver a matriz papel × permissão, que é somente leitura. Só administrador. */
   PERMISSOES_MANAGE: "permissoes:manage",
 
   CONTEUDO_READ: "conteudo:read",

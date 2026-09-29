@@ -1,13 +1,11 @@
 import type {
   CondutaAlerta,
   FaseTratamento,
-  Papel,
   Periodo,
   StatusAlerta,
   StatusUsuario,
   VocabularioTermo,
 } from "@/lib/enums";
-import type { Permissao } from "@/lib/rbac";
 import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
 import type { DesafioMfa, GarantiaDaSessao, ResultadoLogin, Sessao } from "@/types/auth";
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
@@ -354,12 +352,14 @@ export interface UsuariosOperations {
 }
 
 export interface PermissoesOperations {
+  /**
+   * A matriz papel × permissão em vigor, só para leitura.
+   *
+   * É regra do painel (`lib/rbac.ts`), não dado do backend: não há operação de
+   * escrita porque não há onde gravá-la. A exceção por pessoa é outro eixo —
+   * `usuarios.grantPermission`.
+   */
   getMatrix(): Promise<SingleResult<MatrizPermissoes>>;
-
-  /** Salva a matriz inteira: permissão é regra, e regra se aplica de uma vez. */
-  updateMatrix(params: {
-    concedidas: Record<Papel, Permissao[]>;
-  }): Promise<SingleResult<MatrizPermissoes>>;
 }
 
 /* ---------------------------------------------------------------- Fase 7 */
@@ -567,15 +567,6 @@ export interface ConfiguracoesOperations {
     tipo: VersaoLegal["tipo"];
     corpo: string;
   }): Promise<SingleResult<VersaoLegal>>;
-
-  /**
-   * Continua recusando — mas não porque o vocabulário seja fixo: veja
-   * `atualizarTermoVocabulario` e `setTermoVocabularioAtivo`, logo abaixo.
-   * Esta chamada aceita o objeto `Configuracoes` inteiro de uma vez, e nunca
-   * foi o caminho de escrita de nada aqui — fica no contrato só para a
-   * superfície ficar completa.
-   */
-  update(params: Partial<Configuracoes>): Promise<SingleResult<Configuracoes>>;
 
   /**
    * Corrige rótulo e/ou ordem de um termo do vocabulário.

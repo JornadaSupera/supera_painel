@@ -8,15 +8,13 @@ import { STATUS_USUARIO, STATUS_USUARIO_LABEL, type StatusUsuario } from "@/lib/
 import { queryKeys } from "@/lib/queryKeys";
 import { call, permissoesApi, usuariosApi } from "@/services/apiClient";
 import { useUsuariosStore } from "@/stores/usuarios";
-import type { MatrizPermissoes, UsuarioEntrada } from "@/types/usuario";
-import type { Papel } from "@/lib/enums";
-import type { Permissao } from "@/lib/rbac";
+import type { UsuarioEntrada } from "@/types/usuario";
 
 /**
  * Acesso a Usuários e à matriz de permissões.
  *
- * Todo mundo aqui é ação sobre acesso de alguém — criar conta, pausar, resetar
- * senha, desligar segundo fator, mudar o que um papel pode. Por isso cada
+ * Todo mundo aqui é ação sobre acesso de alguém — criar conta, revogar acesso,
+ * resetar senha, desligar segundo fator, conceder permissão. Por isso cada
  * mutation registra auditoria: numa investigação, "quem deu essa permissão e
  * quando" é a primeira pergunta.
  */
@@ -237,36 +235,6 @@ export function useMatrizPermissoes() {
   return useQuery({
     queryKey: queryKeys.permissions.matrix(),
     queryFn: async () => (await call(() => permissoesApi.getMatrix())).data,
-  });
-}
-
-export function useSalvarMatriz() {
-  const queryClient = useQueryClient();
-
-  return useMutation<MatrizPermissoes | null, Error, Record<Papel, Permissao[]>>({
-    mutationFn: async (concedidas) => {
-      const { data } = await call(() => permissoesApi.updateMatrix({ concedidas }));
-      audit.update("permissoes", "matriz", {
-        papeis: Object.fromEntries(
-          Object.entries(concedidas).map(([papel, lista]) => [papel, lista.length]),
-        ),
-      });
-      return data;
-    },
-    onSuccess: async () => {
-      // Invalida usuários também: as permissões efetivas de cada um mudam
-      // junto. Em paralelo — as duas entidades não dependem uma da outra, e
-      // encadear só soma latência antes de a tela atualizar.
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.permissions.all }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.users.all }),
-      ]);
-
-      toast.success("Permissões atualizadas", {
-        description: "Cada pessoa passa a usar as novas permissões no próximo acesso.",
-      });
-    },
-    onError: (erro) => toast.error("Não foi possível salvar", { description: erro.message }),
   });
 }
 

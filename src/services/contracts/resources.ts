@@ -144,7 +144,7 @@ export const RESOURCES = {
   permissoes: {
     table: "permissoes",
     fase: 6,
-    operations: ["getMatrix", "updateMatrix"],
+    operations: ["getMatrix"],
   },
   conteudos: {
     table: "conteudos",
@@ -210,8 +210,8 @@ export const RESOURCES = {
     table: "configuracoes",
     fase: 9,
     /**
-     * `get` lê o VOCABULÁRIO e a OPERAÇÃO juntos. `update` continua recusado
-     * — não é o caminho de escrita de nada, ver o comentário na interface.
+     * `get` lê o VOCABULÁRIO e a OPERAÇÃO juntos. Cada aba grava pela própria
+     * operação: não há escrita do objeto inteiro.
      * `atualizarTermoVocabulario`/`setTermoVocabularioAtivo` editam rótulo,
      * ordem e ativo/retirado do vocabulário; o resto das operações abaixo é
      * a OPERAÇÃO da clínica, que ela mesma mantém: o documento legal em
@@ -220,7 +220,6 @@ export const RESOURCES = {
      */
     operations: [
       "get",
-      "update",
       "atualizarTermoVocabulario",
       "setTermoVocabularioAtivo",
       /** Identidade visual, mensagens e horário — ver `types/configuracao.ts`. */
