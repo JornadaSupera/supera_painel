@@ -110,7 +110,21 @@ function paraFormulario(paciente: PacienteDetalhe): Valores {
 
 /* -------------------------------------------------------------- tela */
 
-export function PacienteFichaPage() {
+export interface PacienteFichaPageProps {
+  /**
+   * Where the patient list lives, for the links that lead back to it. The
+   * clinical panel mounts the same record inside its own frame, so the way
+   * back must stay there instead of landing in the administrative one.
+   */
+  basePath?: string;
+  /** Small label above the title. */
+  eyebrow?: string;
+}
+
+export function PacienteFichaPage({
+  basePath = "/pacientes",
+  eyebrow = "Gestão",
+}: PacienteFichaPageProps = {}) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -135,7 +149,7 @@ export function PacienteFichaPage() {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-5">
-        <PageHeader eyebrow="Gestão" title="Ficha do paciente" />
+        <PageHeader eyebrow={eyebrow} title="Ficha do paciente" />
         <SkeletonForm fields={8} className="max-w-3xl" />
       </div>
     );
@@ -153,13 +167,13 @@ export function PacienteFichaPage() {
     return (
       <div className="flex flex-col gap-5">
         <PageHeader
-          eyebrow="Gestão"
+          eyebrow={eyebrow}
           title={`Editar ${paciente.nome}`}
-          backTo={`/pacientes/${paciente.id}`}
+          backTo={`${basePath}/${paciente.id}`}
           backLabel="Ficha"
           breadcrumb={[
-            { label: "Pacientes", to: "/pacientes" },
-            { label: paciente.nome, to: `/pacientes/${paciente.id}` },
+            { label: "Pacientes", to: basePath },
+            { label: paciente.nome, to: `${basePath}/${paciente.id}` },
             { label: "Editar" },
           ]}
           subtitle={`${paciente.codigo} · alterações ficam registradas na trilha de auditoria`}
@@ -217,11 +231,11 @@ export function PacienteFichaPage() {
   return (
     <div className="flex max-w-5xl flex-col gap-5">
       <PageHeader
-        eyebrow="Gestão"
+        eyebrow={eyebrow}
         title={paciente.nome}
-        backTo="/pacientes"
+        backTo={basePath}
         backLabel="Pacientes"
-        breadcrumb={[{ label: "Pacientes", to: "/pacientes" }, { label: paciente.nome }]}
+        breadcrumb={[{ label: "Pacientes", to: basePath }, { label: paciente.nome }]}
         badge={
           <StatusBadge tone={TONE_PATIENT_STATUS[paciente.status]} size="sm" dot>
             {STATUS_PACIENTE_LABEL[paciente.status]}
@@ -512,7 +526,7 @@ export function PacienteFichaPage() {
         paciente={paciente}
         open={confirmando}
         onOpenChange={setConfirmando}
-        onDeactivated={() => navigate("/pacientes")}
+        onDeactivated={() => navigate(basePath)}
       />
 
       {/* O que fica é o que precisa ser dito: a preocupação de quem clica é o
