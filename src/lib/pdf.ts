@@ -24,6 +24,73 @@ export interface ExportOptions {
 }
 
 /**
+ * Properties that carry colours `html2canvas` reads.
+ *
+ * Tailwind v4 emits `oklab()`/`oklch()` (every `bg-primary/10` becomes a
+ * `color-mix` that the browser resolves to `oklab`), and `html2canvas` throws on
+ * any colour function it does not know — the whole export fails, not just that
+ * element. So the captured clone gets each of these rewritten to plain `rgb()`.
+ */
+const COLOR_PROPERTIES = [
+  "color",
+  "background-color",
+  "background-image",
+  "border-top-color",
+  "border-right-color",
+  "border-bottom-color",
+  "border-left-color",
+  "outline-color",
+  "text-decoration-color",
+  "box-shadow",
+  "text-shadow",
+  "fill",
+  "stroke",
+  "stop-color",
+] as const;
+
+/** `oklab(…)`, `oklch(…)`, `lab(…)`, `lch(…)` and `color(…)` — computed values never nest. */
+const MODERN_COLOR = /(?:oklab|oklch|lab|lch|color)\([^()]*\)/g;
+
+let pixel: CanvasRenderingContext2D | null = null;
+
+/** Resolves any CSS colour to `rgb()`/`rgba()` by painting one pixel of it. */
+function toRgb(color: string): string {
+  pixel ??= Object.assign(document.createElement("canvas"), { width: 1, height: 1 }).getContext(
+    "2d",
+    { willReadFrequently: true },
+  );
+  if (!pixel) return color;
+
+  pixel.clearRect(0, 0, 1, 1);
+  pixel.fillStyle = "#000";
+  pixel.fillStyle = color;
+  pixel.fillRect(0, 0, 1, 1);
+
+  const { data } = pixel.getImageData(0, 0, 1, 1);
+  const [r, g, b, a] = [data[0] ?? 0, data[1] ?? 0, data[2] ?? 0, data[3] ?? 255];
+  return a === 255 ? `rgb(${r}, ${g}, ${b})` : `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(3)})`;
+}
+
+function flattenModernColors(root: Document): void {
+  const view = root.defaultView;
+  if (!view) return;
+
+  for (const el of root.querySelectorAll<HTMLElement | SVGElement>("body, body *")) {
+    const computed = view.getComputedStyle(el);
+
+    for (const property of COLOR_PROPERTIES) {
+      const value = computed.getPropertyValue(property);
+      if (!value || !MODERN_COLOR.test(value)) continue;
+      // `.test` on a global regex advances `lastIndex`; reset before `.replace`.
+      MODERN_COLOR.lastIndex = 0;
+
+      el.style.setProperty(property, value.replace(MODERN_COLOR, toRgb), "important");
+    }
+    MODERN_COLOR.lastIndex = 0;
+  }
+}
+
+/**
  * Captures the element honouring the current theme.
  *
  * `html2canvas` does not inherit the `<body>` background: without
@@ -42,6 +109,7 @@ async function capture(element: HTMLElement): Promise<HTMLCanvasElement> {
     backgroundColor: style.backgroundColor || "#ffffff",
     useCORS: true,
     logging: false,
+    onclone: (clonedDocument) => flattenModernColors(clonedDocument),
     // Elements marked `.no-print` stay out — action buttons, for instance,
     // make no sense in a static capture.
     ignoreElements: (el) => el.classList?.contains("no-print") ?? false,
@@ -111,9 +179,10 @@ export async function exportPdf({
   const width = canvas.width * scale;
   const height = canvas.height * scale;
 
+  // JPEG, not PNG: a lossless full-page capture at 2× came out at ~20 MB.
   pdf.addImage(
-    canvas.toDataURL("image/png"),
-    "PNG",
+    canvas.toDataURL("image/jpeg", 0.92),
+    "JPEG",
     margin + (usableWidth - width) / 2,
     margin,
     width,
