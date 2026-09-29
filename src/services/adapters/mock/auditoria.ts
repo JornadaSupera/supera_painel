@@ -2,7 +2,7 @@ import { sessionEvents, type RecordedEvent } from "@/lib/audit";
 import {
   ACAO_AUDITORIA,
   ORIGEM_AUDITORIA,
-  RECURSO_AUDITORIA_LABEL,
+  rotuloDoRecurso,
   type AcaoAuditoria,
 } from "@/lib/enums";
 import { acessos } from "@/mocks/acessos";
@@ -62,7 +62,7 @@ const semente: AuditoriaListItem[] = acessos.map((acesso, indice) => {
     usuario_id: acesso.usuario_id,
     usuario_nome: NOME_POR_USUARIO.get(acesso.usuario_id) ?? "Sistema",
     recurso: acesso.recurso,
-    recurso_label: RECURSO_AUDITORIA_LABEL[acesso.recurso] ?? acesso.recurso,
+    recurso_label: rotuloDoRecurso(acesso.recurso),
     recurso_id: null,
     paciente_id: paciente?.id ?? null,
     paciente_nome: paciente?.nome ?? null,
@@ -97,7 +97,7 @@ function paraLinha(evento: RecordedEvent): AuditoriaListItem {
     usuario_id: evento.actor_id,
     usuario_nome: evento.actor_name,
     recurso,
-    recurso_label: RECURSO_AUDITORIA_LABEL[recurso] ?? recurso,
+    recurso_label: rotuloDoRecurso(recurso),
     recurso_id: evento.resource_id ?? null,
     paciente_id: evento.patient_id ?? null,
     paciente_nome: evento.patient_id ? (NOME_POR_PACIENTE.get(evento.patient_id) ?? null) : null,

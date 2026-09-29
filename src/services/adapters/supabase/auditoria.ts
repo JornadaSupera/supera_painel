@@ -1,4 +1,4 @@
-import { ACAO_AUDITORIA, RECURSO_AUDITORIA_LABEL, type AcaoAuditoria } from "@/lib/enums";
+import { ACAO_AUDITORIA, rotuloDoRecurso, type AcaoAuditoria } from "@/lib/enums";
 import {
   ERROR_CODE,
   fail,
@@ -228,7 +228,7 @@ function projetar(linha: LinhaLog, nomes: Map<string, string>): AuditoriaListIte
     // integração. Dizer "Sistema" é mais honesto do que deixar em branco.
     usuario_nome: ator?.full_name?.trim() || ator?.email || "Sistema",
     recurso: linha.resource_table,
-    recurso_label: RECURSO_AUDITORIA_LABEL[linha.resource_table] ?? linha.resource_table,
+    recurso_label: rotuloDoRecurso(linha.resource_table),
     recurso_id: linha.resource_id,
     paciente_id: linha.patient_id,
     paciente_nome: rotuloDePaciente(linha.patient_id, nomes),

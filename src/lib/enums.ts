@@ -278,6 +278,21 @@ export const RECURSO_AUDITORIA_LABEL: Record<string, string> = {
   diary_entries: "Diário de sintomas",
   diary_symptom_reports: "Sintoma registrado no diário",
   appointments: "Agenda",
+  alerts: "Fila de alertas",
+  alert_rules: "Gatilho de alerta",
+  auditoria_trilha: "Trilha de auditoria",
+  patient_content_states: "Leitura de orientação",
+  patient_identifiers: "Documento do paciente",
+  patient_invitations: "Convite de paciente",
+  external_refs: "Referência externa",
+  professionals: "Cadastro de profissional",
+  professional_specialties: "Especialidade do profissional",
+  professional_permissions: "Permissão individual",
+  caregivers: "Acompanhante",
+  patient_caregiver_scopes: "Permissões do acompanhante",
+  caregiver_credential_issuances: "Credencial do acompanhante",
+  notification_types: "Tipo de notificação",
+  operational_parameters: "Meta operacional",
   conversations: "Conversa no chat",
   messages: "Mensagem do chat",
   specialty_notes: "Anotação de atendimento",
@@ -294,6 +309,17 @@ export const RECURSO_AUDITORIA_LABEL: Record<string, string> = {
   caregiver_invitations: "Convite de acompanhante",
   patient_caregivers: "Vínculo de acompanhante",
 };
+
+/**
+ * Rótulo de um recurso da trilha. Os relatórios se registram como
+ * `report_<slug>` — um por relatório —, então não cabem no mapa; ficam
+ * "Relatório". O que não for reconhecido aparece com o nome cru.
+ */
+export function rotuloDoRecurso(recurso: string): string {
+  return (
+    RECURSO_AUDITORIA_LABEL[recurso] ?? (recurso.startsWith("report_") ? "Relatório" : recurso)
+  );
+}
 
 /** Origem do registro — inclui a integração Gemed (nível Médio). */
 export const ORIGEM_AUDITORIA = {
