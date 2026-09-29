@@ -80,17 +80,19 @@ function ItemLink({
   item,
   collapsed,
   nested = false,
+  homePath,
 }: {
   item: NavItem;
   collapsed: boolean;
   nested?: boolean;
+  homePath: string;
 }) {
   const content = (
     <NavLink
       to={item.to}
-      // `end` only on the dashboard: the others need to stay active on their
+      // `end` only on the home item: the others need to stay active on their
       // subroutes (`/pacientes/:id` keeps "Pacientes" highlighted).
-      end={item.to === "/dashboard"}
+      end={item.to === homePath}
       className={({ isActive }) =>
         cn(ITEM_BASE, isActive ? ITEM_ACTIVE : ITEM_INACTIVE, nested && "text-[13px]")
       }
@@ -114,7 +116,15 @@ function ItemLink({
   );
 }
 
-function Group({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function Group({
+  item,
+  collapsed,
+  homePath,
+}: {
+  item: NavItem;
+  collapsed: boolean;
+  homePath: string;
+}) {
   const location = useLocation();
   const containsActive = location.pathname.startsWith(item.to);
   const [open, setOpen] = useState(containsActive);
@@ -135,7 +145,11 @@ function Group({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   if (collapsed && firstChild) {
     return (
       <li>
-        <ItemLink item={{ ...firstChild, icon: item.icon, label: item.label }} collapsed />
+        <ItemLink
+          item={{ ...firstChild, icon: item.icon, label: item.label }}
+          collapsed
+          homePath={homePath}
+        />
       </li>
     );
   }
@@ -173,7 +187,7 @@ function Group({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
             {item.children?.map((child) => (
               <Can key={child.to} permission={child.permission} anyOf={child.anyOf}>
                 <li>
-                  <ItemLink item={child} collapsed={false} nested />
+                  <ItemLink item={child} collapsed={false} nested homePath={homePath} />
                 </li>
               </Can>
             ))}
@@ -184,7 +198,20 @@ function Group({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   );
 }
 
-export function Sidebar() {
+export interface SidebarProps {
+  /** Defaults to the admin panel's own list. The clinical panel passes its own. */
+  items?: NavItem[];
+  /** Matched with `end`, so only this item stops being active on subroutes. */
+  homePath?: string;
+  /** Second line under the brand — "Administração" by default. */
+  subtitle?: string;
+}
+
+export function Sidebar({
+  items = visibleNavItems(),
+  homePath = "/dashboard",
+  subtitle = "Administração",
+}: SidebarProps = {}) {
   const storedCollapsed = useLayoutStore((state) => state.sidebarCollapsed);
   const toggleStored = useLayoutStore((state) => state.toggleSidebar);
   const location = useLocation();
@@ -227,7 +254,7 @@ export function Sidebar() {
         <Label collapsed={collapsed}>
           <span className="border-border flex flex-col border-l pl-2.5 leading-tight">
             <span className="text-sm font-semibold tracking-tight">Jornada Supera</span>
-            <span className="text-muted-foreground text-[11px]">Administração</span>
+            <span className="text-muted-foreground text-[11px]">{subtitle}</span>
           </span>
         </Label>
       </div>
@@ -235,13 +262,13 @@ export function Sidebar() {
       {/* -------------------------------------------------------- navigation */}
       <nav aria-label="Navegação principal" className="flex-1 overflow-x-hidden overflow-y-auto px-3 py-4">
         <ul className="flex flex-col gap-0.5">
-          {visibleNavItems().map((item) => (
+          {items.map((item) => (
             <Can key={item.to} permission={item.permission} anyOf={item.anyOf}>
               {item.children ? (
-                <Group item={item} collapsed={collapsed} />
+                <Group item={item} collapsed={collapsed} homePath={homePath} />
               ) : (
                 <li>
-                  <ItemLink item={item} collapsed={collapsed} />
+                  <ItemLink item={item} collapsed={collapsed} homePath={homePath} />
                 </li>
               )}
             </Can>

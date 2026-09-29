@@ -9,7 +9,9 @@ import { MfaPage } from "@/features/auth/pages/MfaPage";
 import { NovaSenhaPage } from "@/features/auth/pages/NovaSenhaPage";
 import { RecuperarSenhaPage } from "@/features/auth/pages/RecuperarSenhaPage";
 import { AdminLayout } from "@/layouts/AdminLayout";
+import { ClinicoLayout } from "@/layouts/ClinicoLayout";
 import { PERMISSAO } from "@/lib/rbac";
+import { HomeRedirect } from "./HomeRedirect";
 import { PermissionRoute } from "./PermissionRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
 
@@ -46,6 +48,14 @@ const EstatisticasOperacionaisPage = lazy(
 );
 const AuditoriaPage = lazy(() => import("@/features/auditoria/pages/AuditoriaPage"));
 const ConfiguracoesPage = lazy(() => import("@/features/configuracoes/pages/ConfiguracoesPage"));
+
+/* Painel clínico — fundação (PA-07). Um chunk por módulo, mesmo critério. */
+const ClinicoDashboardPage = lazy(() => import("@/features/clinico/pages/ClinicoDashboardPage"));
+const ClinicoPacientesPage = lazy(() => import("@/features/clinico/pages/ClinicoPacientesPage"));
+const ClinicoAgendaPage = lazy(() => import("@/features/clinico/pages/ClinicoAgendaPage"));
+const ClinicoChatPage = lazy(() => import("@/features/clinico/pages/ClinicoChatPage"));
+const ClinicoAlertasPage = lazy(() => import("@/features/clinico/pages/ClinicoAlertasPage"));
+const ClinicoConteudoPage = lazy(() => import("@/features/clinico/pages/ClinicoConteudoPage"));
 /* Not a panel screen: its audience is app users, so it stays out of the bundle
    that panel staff load first. */
 const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
@@ -227,11 +237,24 @@ export function AppRoutes() {
                 element={<Navigate to="/estatisticas/clinicas" replace />}
               />
             </Route>
+
+            {/* ----------------------------------------------------- clínico */}
+            {/* Foundation only (PA-07): routing, frame and navigation are
+                real; the six screens still show what is missing instead of
+                a number that isn't there yet. */}
+            <Route path="/clinico/:especialidade" element={<ClinicoLayout />}>
+              <Route index element={<ClinicoDashboardPage />} />
+              <Route path="pacientes" element={<ClinicoPacientesPage />} />
+              <Route path="agenda" element={<ClinicoAgendaPage />} />
+              <Route path="chat" element={<ClinicoChatPage />} />
+              <Route path="alertas" element={<ClinicoAlertasPage />} />
+              <Route path="conteudo" element={<ClinicoConteudoPage />} />
+            </Route>
           </Route>
 
           {/* ------------------------------------------------------ default */}
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="*" element={<HomeRedirect />} />
         </Routes>
       </Suspense>
     </>

@@ -8,6 +8,7 @@ import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from "@/comp
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthLayout } from "@/layouts/AuthLayout";
+import { defaultHomePath } from "@/routes/home-path";
 import { AuthErrorAlert } from "../components/AuthErrorAlert";
 
 /**
@@ -21,7 +22,7 @@ import { AuthErrorAlert } from "../components/AuthErrorAlert";
 const TAMANHO_CODIGO = 6;
 
 export function MfaPage() {
-  const { mfaChallenge, confirmMfa, cancelMfa, isAuthenticated } = useAuth();
+  const { mfaChallenge, confirmMfa, cancelMfa, isAuthenticated, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -76,7 +77,8 @@ export function MfaPage() {
   };
 
   if (isAuthenticated) {
-    const destino = (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? "/dashboard";
+    const destino =
+      (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? defaultHomePath(user);
     return <Navigate to={destino} replace />;
   }
 

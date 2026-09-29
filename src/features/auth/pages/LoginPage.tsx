@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/form";
 import { useAuth } from "@/contexts/auth-context";
 import { AuthLayout } from "@/layouts/AuthLayout";
+import { defaultHomePath } from "@/routes/home-path";
 import { ERROR_CODE } from "@/services/contracts";
 import { AuthErrorAlert } from "../components/AuthErrorAlert";
 import { CorporateEmailField } from "../components/CorporateEmailField";
@@ -29,7 +30,7 @@ import { loginSchema, type LoginForm } from "../schemas";
  * sucedido leva sempre a `/login/mfa`.
  */
 export function LoginPage() {
-  const { signIn, isAuthenticated, mfaChallenge } = useAuth();
+  const { signIn, isAuthenticated, mfaChallenge, user } = useAuth();
   const location = useLocation();
   const [erro, setErro] = useState<string | null>(null);
 
@@ -39,7 +40,8 @@ export function LoginPage() {
   });
 
   if (isAuthenticated) {
-    const destino = (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? "/dashboard";
+    const destino =
+      (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? defaultHomePath(user);
     return <Navigate to={destino} replace />;
   }
 

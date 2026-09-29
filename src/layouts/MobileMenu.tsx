@@ -23,11 +23,19 @@ import { visibleNavItems, type NavItem } from "./navigation";
  * the rest of the page, instead of reimplementing all that in a `<div>`.
  */
 
-function Link({ item, nested = false }: { item: NavItem; nested?: boolean }) {
+function Link({
+  item,
+  nested = false,
+  homePath,
+}: {
+  item: NavItem;
+  nested?: boolean;
+  homePath: string;
+}) {
   return (
     <NavLink
       to={item.to}
-      end={item.to === "/dashboard"}
+      end={item.to === homePath}
       className={({ isActive }) =>
         cn(
           "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors",
@@ -44,7 +52,14 @@ function Link({ item, nested = false }: { item: NavItem; nested?: boolean }) {
   );
 }
 
-export function MobileMenu() {
+export interface MobileMenuProps {
+  /** Defaults to the admin panel's own list. The clinical panel passes its own. */
+  items?: NavItem[];
+  /** Matched with `end`, so only this item stops being active on subroutes. */
+  homePath?: string;
+}
+
+export function MobileMenu({ items = visibleNavItems(), homePath = "/dashboard" }: MobileMenuProps = {}) {
   const open = useLayoutStore((s) => s.mobileMenuOpen);
   const setOpen = useLayoutStore((s) => s.setMobileMenuOpen);
   const location = useLocation();
@@ -71,7 +86,7 @@ export function MobileMenu() {
 
         <nav aria-label="Navegação principal" className="flex-1 overflow-y-auto p-3">
           <ul className="flex flex-col gap-0.5">
-            {visibleNavItems().map((item) => (
+            {items.map((item) => (
               <Can key={item.to} permission={item.permission} anyOf={item.anyOf}>
                 <li className="flex flex-col gap-0.5">
                   {item.children ? (
@@ -81,12 +96,12 @@ export function MobileMenu() {
                       </span>
                       {item.children.map((child) => (
                         <Can key={child.to} permission={child.permission} anyOf={child.anyOf}>
-                          <Link item={child} nested />
+                          <Link item={child} nested homePath={homePath} />
                         </Can>
                       ))}
                     </>
                   ) : (
-                    <Link item={item} />
+                    <Link item={item} homePath={homePath} />
                   )}
                 </li>
               </Can>
