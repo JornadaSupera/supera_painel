@@ -4,7 +4,13 @@ import { Link, useParams } from "react-router-dom";
 import { EmptyState, ErrorState, PageHeader, SearchInput, SkeletonCards, StatusBadge } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { ESPECIALIDADE_LABEL, FASE_TRATAMENTO_LABEL, RISCO_LABEL } from "@/lib/enums";
+import {
+  ESPECIALIDADE_LABEL,
+  FASE_TRATAMENTO_LABEL,
+  RISCO_LABEL,
+  STATUS_PACIENTE,
+  STATUS_PACIENTE_LABEL,
+} from "@/lib/enums";
 import { useMeusPacientes } from "../hooks/useMeusPacientes";
 
 /**
@@ -85,6 +91,15 @@ export function ClinicoPacientesPage() {
                 {paciente.protocolo_nome !== "—" ? ` · ${paciente.protocolo_nome}` : ""}
               </p>
             </div>
+
+            {/* The list covers the whole base, deactivated records included —
+                a card that looks like any other made an inactive patient read
+                as one under care. */}
+            {paciente.status === STATUS_PACIENTE.INATIVO && (
+              <StatusBadge tone="neutral" size="sm">
+                {STATUS_PACIENTE_LABEL[paciente.status]}
+              </StatusBadge>
+            )}
 
             {paciente.fase && (
               <StatusBadge tone="neutral" size="sm">
