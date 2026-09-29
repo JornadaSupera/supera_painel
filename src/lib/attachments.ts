@@ -1,31 +1,33 @@
 /**
- * Chat attachment rules — the same limits the `chat-attachments` bucket
- * enforces, checked here first so a bad file is refused before any message is
- * written. The message and its attachment row are immutable once created, so
- * catching this late leaves a message behind that cannot be taken back.
+ * Attachment rules — the limits both the `chat-attachments` and the
+ * `content-attachments` buckets enforce, checked here first so a bad file is
+ * refused before anything is written. A chat message and its attachment row are
+ * immutable once created, so catching this late leaves a message behind that
+ * cannot be taken back; a content attachment can be removed, but only while the
+ * version is still a draft.
  */
 
-export const CHAT_ATTACHMENT_TYPES = [
+export const ATTACHMENT_TYPES = [
   "image/png",
   "image/jpeg",
   "image/webp",
   "application/pdf",
 ] as const;
 
-export const CHAT_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
+export const ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 
 /** `accept` for the file input. */
-export const CHAT_ATTACHMENT_ACCEPT = CHAT_ATTACHMENT_TYPES.join(",");
+export const ATTACHMENT_ACCEPT = ATTACHMENT_TYPES.join(",");
 
 /** The reason a file cannot be attached, in pt-BR for the screen; `null` when it can. */
-export function chatAttachmentError(file: { type: string; size: number }): string | null {
-  if (!(CHAT_ATTACHMENT_TYPES as readonly string[]).includes(file.type)) {
+export function attachmentError(file: { type: string; size: number }): string | null {
+  if (!(ATTACHMENT_TYPES as readonly string[]).includes(file.type)) {
     return "O anexo aceita apenas PNG, JPEG, WebP ou PDF.";
   }
 
   if (file.size <= 0) return "O arquivo está vazio.";
 
-  if (file.size > CHAT_ATTACHMENT_MAX_BYTES) return "O anexo precisa ter até 20 MB.";
+  if (file.size > ATTACHMENT_MAX_BYTES) return "O anexo precisa ter até 20 MB.";
 
   return null;
 }

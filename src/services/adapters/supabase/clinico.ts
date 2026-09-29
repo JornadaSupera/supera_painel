@@ -1,5 +1,5 @@
 import type { StatusTone } from "@/components/shared";
-import { chatAttachmentError, safeAttachmentName } from "@/lib/attachments";
+import { attachmentError, safeAttachmentName } from "@/lib/attachments";
 import { SEVERIDADE } from "@/lib/enums";
 import type { AutorMensagem, CondutaAlerta, Severidade, StatusAlerta, StatusConversa } from "@/lib/enums";
 import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
@@ -10,7 +10,7 @@ import type {
   ConversaClinico,
   MensagemClinico,
 } from "@/types/clinico";
-import { executar, falhaDe, umDe } from "./_helpers";
+import { executar, falhaDe, profissionalDaSessao, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
 
@@ -490,26 +490,15 @@ export async function enviarMensagem(params: {
 
     // Antes de gravar qualquer coisa: depois, mensagem e anexo não se desfazem.
     if (params.anexo) {
-      const motivo = chatAttachmentError(params.anexo);
+      const motivo = attachmentError(params.anexo);
       if (motivo) return fail(ERROR_CODE.VALIDATION, motivo);
     }
 
     const supabase = getSupabaseClient();
 
-    const { data: sessao } = await supabase.auth.getSession();
-    const contaId = sessao.session?.user.id;
-    if (!contaId) return fail(ERROR_CODE.UNAUTHORIZED, "Sua sessão expirou. Entre de novo para responder.");
-
-    const { data: perfil, error: erroPerfil } = await supabase
-      .from("professionals")
-      .select("id")
-      .eq("account_id", contaId)
-      .maybeSingle();
-    if (erroPerfil) return falhaDe(erroPerfil);
-    const profissionalId = (perfil as { id: string } | null)?.id;
-    if (!profissionalId) {
-      return fail(ERROR_CODE.FORBIDDEN, "Só quem tem perfil de profissional responde a conversas.");
-    }
+    const eu = await profissionalDaSessao();
+    if ("error" in eu) return eu;
+    const { contaId, profissionalId } = eu;
 
     const mensagemId = crypto.randomUUID();
 

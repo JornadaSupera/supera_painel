@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { CHAT_ATTACHMENT_ACCEPT, formatFileSize } from "@/lib/attachments";
+import { ATTACHMENT_ACCEPT, formatFileSize } from "@/lib/attachments";
 import { cn } from "@/lib/utils";
 import { mensagemJaEnviada, useEnviarMensagem } from "../hooks/useConversasClinicas";
 import { MENSAGEM_MAX, mensagemSchema, type MensagemForm } from "../schemas";
@@ -110,7 +110,7 @@ export function ComposerMensagem({
             <input
               ref={seletorRef}
               type="file"
-              accept={CHAT_ATTACHMENT_ACCEPT}
+              accept={ATTACHMENT_ACCEPT}
               className="sr-only"
               tabIndex={-1}
               aria-hidden

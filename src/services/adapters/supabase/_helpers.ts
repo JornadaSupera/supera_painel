@@ -248,3 +248,37 @@ export async function logarExportacao(params: {
     );
   }
 }
+
+/**
+ * Quem está logado, como profissional: a conta e o perfil.
+ *
+ * As políticas de escrita do profissional comparam `author_account_id` com
+ * `auth.uid()` e `author_professional_id` com o perfil da conta, e o cliente
+ * precisa mandar os dois. Sem perfil ativo não há o que escrever — dizer isso é
+ * melhor do que deixar a política recusar sem explicação.
+ */
+export async function profissionalDaSessao(): Promise<
+  { contaId: string; profissionalId: string } | FailResult
+> {
+  const supabase = getSupabaseClient();
+
+  const { data: sessao } = await supabase.auth.getSession();
+  const contaId = sessao.session?.user.id;
+  if (!contaId) {
+    return fail(ERROR_CODE.UNAUTHORIZED, "Sua sessão expirou. Entre de novo para continuar.");
+  }
+
+  const { data: perfil, error } = await supabase
+    .from("professionals")
+    .select("id")
+    .eq("account_id", contaId)
+    .maybeSingle();
+  if (error) return falhaDe(error);
+
+  const profissionalId = (perfil as { id: string } | null)?.id;
+  if (!profissionalId) {
+    return fail(ERROR_CODE.FORBIDDEN, "Só quem tem perfil de profissional faz isto.");
+  }
+
+  return { contaId, profissionalId };
+}

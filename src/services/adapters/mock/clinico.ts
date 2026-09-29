@@ -1,4 +1,4 @@
-import { chatAttachmentError, safeAttachmentName } from "@/lib/attachments";
+import { attachmentError, safeAttachmentName } from "@/lib/attachments";
 import { agendaClinica } from "@/mocks/agendaClinica";
 import { alertasClinicos, type AlertaClinicoMock } from "@/mocks/alertasClinicos";
 import { conversasClinicas, mensagensClinicas } from "@/mocks/conversasClinicas";
@@ -195,7 +195,7 @@ export async function enviarMensagem(params: {
     }
 
     if (params.anexo) {
-      const motivo = chatAttachmentError(params.anexo);
+      const motivo = attachmentError(params.anexo);
       if (motivo) return fail(ERROR_CODE.VALIDATION, motivo);
     }
 
