@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { toast } from "sonner";
 
 import { audit, setAuditActor } from "@/lib/audit";
 import { SESSION, SESSION_EXPIRES } from "@/lib/env";
@@ -110,20 +111,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * token compartilhado no armazenamento, a aba esquecida continuaria
    * desenhando uma tela que já não tem sessão por trás.
    */
+  /*
+   * A third one is the most dangerous: another account signing in on another
+   * tab. The token is shared, so this tab's requests start leaving as that
+   * account while the screen still shows the first one — its menu, its
+   * permissions, and reads recorded in the audit trail under the wrong name.
+   * The tab cannot keep going as either account, so it steps out.
+   */
+  const sessionUserId = useRef<string | null>(null);
+
   useEffect(() => {
+    sessionUserId.current = session?.usuario.id ?? null;
+  }, [session]);
+
+  useEffect(() => {
+    const leave = () => {
+      // Sem chamar `signOut`: quem encerrou já encerrou, e pedir de novo
+      // dispararia outro evento. Aqui só se acompanha o que já aconteceu.
+      // Signing out here would also end the other tab's session.
+      setSession(null);
+      setAuditActor(null);
+      void discardCachedIdentity();
+    };
+
     return authApi.subscribe((evento) => {
       if (evento.tipo === "encerrada") {
-        // Sem chamar `signOut`: quem encerrou já encerrou, e pedir de novo
-        // dispararia outro evento. Aqui só se acompanha o que já aconteceu.
-        setSession(null);
-        setAuditActor(null);
-        void discardCachedIdentity();
+        leave();
         return;
       }
 
-      setSession((atual) =>
-        atual ? { ...atual, token: evento.token, expira_em: evento.expira_em } : atual,
-      );
+      const current = sessionUserId.current;
+      if (current && evento.usuario_id !== current) {
+        leave();
+        toast.warning("Outra conta entrou neste navegador", {
+          description:
+            "Esta aba saiu para não misturar os acessos. Entre novamente para continuar.",
+        });
+        return;
+      }
+
+      if (evento.tipo === "renovada") {
+        setSession((atual) =>
+          atual ? { ...atual, token: evento.token, expira_em: evento.expira_em } : atual,
+        );
+      }
     });
   }, [discardCachedIdentity]);
 

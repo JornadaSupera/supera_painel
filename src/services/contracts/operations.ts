@@ -153,7 +153,8 @@ export interface AuthOperations {
 
   /**
    * Ouve o que muda na sessão sem que nenhuma tela tenha pedido: a renovação
-   * automática do token e o encerramento vindo de outra aba.
+   * automática do token, o encerramento vindo de outra aba e a entrada de
+   * outra conta em outra aba.
    *
    * Devolve a função que cancela a assinatura. Síncrona de propósito — é a
    * única operação do contrato que não vai ao servidor, e transformá-la em
@@ -163,10 +164,18 @@ export interface AuthOperations {
   subscribe(listener: (evento: EventoDeSessao) => void): () => void;
 }
 
-/** O que o `AuthContext` precisa saber quando a sessão muda por fora. */
+/**
+ * O que o `AuthContext` precisa saber quando a sessão muda por fora.
+ *
+ * Every event that carries a session also carries whose it is. The token is
+ * shared by every tab of the browser profile, so a sign-in in another tab
+ * swaps the identity behind all of them — and only the context knows which
+ * account this tab is drawing, so the context is the one that compares.
+ */
 export type EventoDeSessao =
   | { tipo: "encerrada" }
-  | { tipo: "renovada"; token: string; expira_em: string };
+  | { tipo: "ativa"; usuario_id: string }
+  | { tipo: "renovada"; usuario_id: string; token: string; expira_em: string };
 
 /* ---------------------------------------------------------------- Fase 4 */
 

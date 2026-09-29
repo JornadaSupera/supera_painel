@@ -27,9 +27,11 @@ export interface UsuarioAutenticado {
 export interface Sessao {
   usuario: UsuarioAutenticado;
   /**
-   * Só em memória. Nunca em `localStorage` nem em `sessionStorage`: qualquer
-   * script da página lê esses armazenamentos, inclusive um XSS vindo do editor
-   * de conteúdo. A Fase 15 troca por cookie `httpOnly` + refresh.
+   * The GoTrue access token. With the Supabase adapter the client keeps it in
+   * browser storage so a reload does not end the session — a recorded trade,
+   * see `adapters/supabase/client.ts` — which also means every tab of the
+   * profile shares it. Nothing else about the session, and nothing about a
+   * patient, is written to the browser.
    */
   token: string;
   /** ISO 8601 UTC. */

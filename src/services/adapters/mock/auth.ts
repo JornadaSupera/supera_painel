@@ -239,12 +239,6 @@ export async function signOut(): Promise<SingleResult<null>> {
 }
 
 /**
- * A sessão vive só na memória do `AuthContext` — nunca em `localStorage`.
- * Recarregar a página encerra a sessão, e isso é o comportamento pretendido
- * nesta fase. Na Fase 15 o Supabase restaura a sessão a partir de um cookie
- * `httpOnly`, que o JavaScript da página não consegue ler.
- */
-/**
  * No mock nada muda a sessão por fora: não há token para renovar nem outra aba
  * compartilhando armazenamento. A assinatura existe para que as duas fontes
  * tenham a mesma superfície — o `AuthContext` assina sem perguntar em qual
@@ -254,6 +248,7 @@ export function subscribe(): () => void {
   return () => {};
 }
 
+/** The mock keeps nothing between loads: reloading always lands on the login. */
 export async function getSession(): Promise<SingleResult<Sessao>> {
   return simulate(() => okOne<Sessao>(null));
 }

@@ -4,6 +4,7 @@ import { MFA_REQUIRED } from "@/lib/env";
 import { PAPEL, type Papel } from "@/lib/enums";
 import { ERROR_CODE, fail, okOne, type SingleResult } from "@/services/contracts";
 import type {
+  EventoDeSessao,
   PasswordRecoveryInput,
   PasswordResetRequest,
   RecoveryCredential,
@@ -359,7 +360,7 @@ export async function getSession(): Promise<SingleResult<Sessao>> {
 /* -------------------------------------------------------------------------
    MUDANÇAS DE SESSÃO VINDAS DE FORA DA TELA
    -------------------------------------------------------------------------
-   Duas coisas acontecem sem que nenhuma tela tenha pedido, e as duas precisam
+   Três coisas acontecem sem que nenhuma tela tenha pedido, e as três precisam
    chegar ao `AuthContext`:
 
    1. **O token é renovado sozinho.** `autoRefreshToken` troca o access token
@@ -372,19 +373,21 @@ export async function getSession(): Promise<SingleResult<Sessao>> {
    2. **A sessão acaba em outra aba.** Sair em uma aba tem que sair em todas;
       com o token compartilhado no armazenamento, a aba que ficou aberta
       continuaria desenhando uma tela que já não tem sessão por trás.
-   ------------------------------------------------------------------------- */
 
-export type EventoDeSessao =
-  | { tipo: "encerrada" }
-  | { tipo: "renovada"; token: string; expira_em: string };
+   3. **Outra conta entra em outra aba.** The client broadcasts the new
+      session to every tab sharing the storage key, and from then on every
+      request this tab makes carries the other account's token — while the
+      screen still shows the first account's name, menu and permissions.
+      Reads land in the audit trail under the wrong person.
+   ------------------------------------------------------------------------- */
 
 /**
  * Ouve as mudanças e devolve a função que cancela a assinatura.
  *
- * Só os dois eventos acima atravessam. `SIGNED_IN` fica de fora de propósito:
- * ele também dispara na restauração inicial, e o contexto já trata isso em
- * `getSession` — deixá-lo passar faria a entrada acontecer duas vezes, uma
- * delas sem ter conferido o segundo fator.
+ * Nothing here signs anyone in. `SIGNED_IN` also fires on the initial restore,
+ * and entering the panel stays with `getSession`, which checks the second
+ * factor. The events that carry a session only say whose it is, so the context
+ * can tell when the account behind this tab is no longer the one on screen.
  */
 export function subscribe(listener: (evento: EventoDeSessao) => void): () => void {
   const { data } = getSupabaseClient().auth.onAuthStateChange((evento, sessao) => {
@@ -393,15 +396,21 @@ export function subscribe(listener: (evento: EventoDeSessao) => void): () => voi
       return;
     }
 
-    if (evento === "TOKEN_REFRESHED" && sessao) {
-      listener({
-        tipo: "renovada",
-        token: sessao.access_token,
-        expira_em: new Date(
-          sessao.expires_at != null ? sessao.expires_at * 1000 : Date.now() + VALIDADE_PADRAO_MS,
-        ).toISOString(),
-      });
+    if (!sessao) return;
+
+    if (evento !== "TOKEN_REFRESHED") {
+      listener({ tipo: "ativa", usuario_id: sessao.user.id });
+      return;
     }
+
+    listener({
+      tipo: "renovada",
+      usuario_id: sessao.user.id,
+      token: sessao.access_token,
+      expira_em: new Date(
+        sessao.expires_at != null ? sessao.expires_at * 1000 : Date.now() + VALIDADE_PADRAO_MS,
+      ).toISOString(),
+    });
   });
 
   return () => data.subscription.unsubscribe();
