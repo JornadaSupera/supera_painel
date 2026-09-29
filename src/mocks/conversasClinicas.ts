@@ -1,4 +1,4 @@
-import type { StatusConversa } from "@/lib/enums";
+import type { Especialidade, StatusConversa } from "@/lib/enums";
 import { pacientes } from "./pacientes";
 
 /**
@@ -17,6 +17,7 @@ export interface ConversaClinicaMock {
   assunto_label: string;
   status: StatusConversa;
   atribuida: boolean;
+  especialidade_origem: Especialidade | null;
   ultima_mensagem_em: string;
   equipe_leu_em: string | null;
 }
@@ -45,6 +46,7 @@ export const conversasClinicas: ConversaClinicaMock[] = [
     assunto_label: "Sintomas",
     status: "aberta",
     atribuida: false,
+    especialidade_origem: null,
     ultima_mensagem_em: horasAtras(2),
     equipe_leu_em: null,
   },
@@ -55,6 +57,7 @@ export const conversasClinicas: ConversaClinicaMock[] = [
     assunto_label: "Medicação",
     status: "aberta",
     atribuida: true,
+    especialidade_origem: "farmaceutico",
     ultima_mensagem_em: horasAtras(20),
     equipe_leu_em: horasAtras(19),
   },
@@ -65,6 +68,7 @@ export const conversasClinicas: ConversaClinicaMock[] = [
     assunto_label: "Agendamento",
     status: "resolvida",
     atribuida: true,
+    especialidade_origem: "farmaceutico",
     ultima_mensagem_em: horasAtras(96),
     equipe_leu_em: horasAtras(95),
   },

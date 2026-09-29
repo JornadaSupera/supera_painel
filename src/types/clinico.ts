@@ -1,5 +1,12 @@
 import type { StatusTone } from "@/components/shared";
-import type { AutorMensagem, CondutaAlerta, Severidade, StatusAlerta, StatusConversa } from "@/lib/enums";
+import type {
+  AutorMensagem,
+  CondutaAlerta,
+  Especialidade,
+  Severidade,
+  StatusAlerta,
+  StatusConversa,
+} from "@/lib/enums";
 
 /**
  * Domínio do painel clínico — ver PA-07.
@@ -63,6 +70,12 @@ export interface ConversaClinico {
   nao_lida_pela_equipe: boolean;
   /** `null` até alguém da equipe assumir — a fila mostra "não atribuída". */
   atribuida: boolean;
+  /**
+   * The specialty the conversation was routed to when claimed. Only that
+   * specialty can resolve it, so the screen offers "resolve" by comparing it
+   * with the viewer's own. `null` while unassigned.
+   */
+  especialidade_origem: Especialidade | null;
 }
 
 /** Uma mensagem dentro de uma conversa — só leitura (ver PA-07: sem RPC de envio). */

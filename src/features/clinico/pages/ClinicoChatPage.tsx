@@ -136,6 +136,7 @@ function ListaConversas({
 }
 
 function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
+  const { user } = useAuth();
   const mensagens = useMensagensClinicas(conversa.id);
   const assumir = useAssumirConversa();
   const resolver = useResolverConversa();
@@ -148,24 +149,34 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversa.id]);
 
+  const aberta = conversa.status === "aberta";
+  const daMinhaEspecialidade =
+    conversa.especialidade_origem !== null && conversa.especialidade_origem === user?.especialidade;
+  const deOutraEspecialidade = conversa.especialidade_origem !== null && !daMinhaEspecialidade;
+
   return (
     <div className="bg-card flex max-h-[70vh] flex-col rounded-2xl border">
       <header className="border-border flex flex-wrap items-center justify-between gap-2 border-b p-4">
         <div>
           <p className="text-foreground text-sm font-semibold">{conversa.paciente_nome}</p>
-          <p className="text-muted-foreground text-xs">{conversa.assunto_label}</p>
+          <p className="text-muted-foreground text-xs">
+            {conversa.assunto_label}
+            {deOutraEspecialidade &&
+              conversa.especialidade_origem &&
+              ` · com ${ESPECIALIDADE_LABEL[conversa.especialidade_origem]}`}
+          </p>
         </div>
 
         <div className="flex gap-2">
-          {!conversa.atribuida && conversa.status === "aberta" && (
+          {!conversa.atribuida && aberta && (
             <Button size="sm" onClick={() => assumir.mutate(conversa.id)} disabled={assumir.isPending}>
               Assumir
             </Button>
           )}
-          {/* Only an assigned conversation can be resolved: the backend checks
-              it belongs to the caller's own specialty, and an unassigned one
-              belongs to nobody yet. */}
-          {conversa.status === "aberta" && conversa.atribuida && (
+          {/* Only the specialty the conversation was routed to can resolve it —
+              the backend refuses anyone else, and an unassigned one belongs to
+              nobody yet. Offering the button elsewhere only led to a refusal. */}
+          {aberta && daMinhaEspecialidade && (
             <Button
               size="sm"
               variant="outline"

@@ -138,6 +138,7 @@ export async function listConversas(): Promise<ListResult<ConversaClinico>> {
         nao_lida_pela_equipe:
           !conversa.equipe_leu_em || conversa.equipe_leu_em < conversa.ultima_mensagem_em,
         atribuida: conversa.atribuida,
+        especialidade_origem: conversa.especialidade_origem,
       }));
 
     return ok(linhas);
@@ -169,6 +170,9 @@ export async function assumirConversa(params: { id: string }): Promise<SingleRes
     if (conversa.atribuida) return fail(ERROR_CODE.CONFLICT, "Esta conversa já está atribuída.");
 
     conversa.atribuida = true;
+    // The mock has no session to read the claimer's specialty from; it uses
+    // the one its sample conversations are routed to.
+    conversa.especialidade_origem = "farmaceutico";
     return okOne(null);
   });
 }

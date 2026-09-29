@@ -10,6 +10,7 @@ import type {
 } from "@/types/clinico";
 import { executar, falhaDe, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
+import { paraEspecialidade } from "./mapping";
 
 type SupabaseClientLike = ReturnType<typeof getSupabaseClient>;
 
@@ -322,18 +323,31 @@ export async function listConversas(): Promise<ListResult<ConversaClinico>> {
       ...new Set(linhas.map((linha) => linha.subject_id).filter((id): id is string => Boolean(id))),
     ];
 
-    const [nomePorPacienteOuFalha, assuntosRes] = await Promise.all([
+    const idsEspecialidades = [
+      ...new Set(
+        linhas.map((linha) => linha.origin_specialty_id).filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    const [nomePorPacienteOuFalha, assuntosRes, especialidadesRes] = await Promise.all([
       nomesDePacientes(supabase, idsPacientes),
       idsAssuntos.length
         ? supabase.from("conversation_subjects").select("id, label").in("id", idsAssuntos)
         : Promise.resolve({ data: [] as { id: string; label: string }[], error: null }),
+      idsEspecialidades.length
+        ? supabase.from("specialties").select("id, code").in("id", idsEspecialidades)
+        : Promise.resolve({ data: [] as { id: string; code: string }[], error: null }),
     ]);
 
     if (ehFalha(nomePorPacienteOuFalha)) return nomePorPacienteOuFalha;
     const nomePorPaciente = nomePorPacienteOuFalha;
     if (assuntosRes.error) return falhaDe(assuntosRes.error);
+    if (especialidadesRes.error) return falhaDe(especialidadesRes.error);
 
     const labelPorAssunto = new Map((assuntosRes.data ?? []).map((assunto) => [assunto.id, assunto.label]));
+    const codigoPorEspecialidade = new Map(
+      (especialidadesRes.data ?? []).map((especialidade) => [especialidade.id, especialidade.code]),
+    );
 
     const conversas: ConversaClinico[] = linhas.map((linha) => {
       const statusApp = STATUS_CONVERSA_POR_CODIGO[linha.status];
@@ -351,6 +365,9 @@ export async function listConversas(): Promise<ListResult<ConversaClinico>> {
         // `claim_conversation` só assume quando `origin_specialty_id IS NULL` —
         // é a mesma condição, lida ao contrário.
         atribuida: linha.origin_specialty_id !== null,
+        especialidade_origem: linha.origin_specialty_id
+          ? paraEspecialidade(codigoPorEspecialidade.get(linha.origin_specialty_id))
+          : null,
       };
     });
 
