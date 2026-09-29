@@ -1,5 +1,4 @@
-import { Bell, LogOut, Menu, Monitor, Moon, Palette, Search, Sun } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Bell, LogOut, Menu, Monitor, Moon, Search, Sun } from "lucide-react";
 
 import { UserAvatar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -134,15 +133,6 @@ export function Topbar() {
               </DropdownMenuLabel>
 
               <DropdownMenuSeparator />
-
-              {import.meta.env.DEV && (
-                <DropdownMenuItem asChild>
-                  <Link to="/design-system">
-                    <Palette />
-                    Design System
-                  </Link>
-                </DropdownMenuItem>
-              )}
 
               <DropdownMenuItem variant="destructive" onSelect={() => void signOut()}>
                 <LogOut />
