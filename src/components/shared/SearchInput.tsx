@@ -1,4 +1,5 @@
 import { Search, X } from "lucide-react";
+import { useRef } from "react";
 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,8 @@ export function SearchInput({
   label = "Buscar",
   className,
 }: SearchInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
   return (
     <div className={cn("relative flex w-full max-w-85 items-center", className)}>
       <Search
@@ -36,6 +39,7 @@ export function SearchInput({
       />
 
       <Input
+        ref={inputRef}
         type="search"
         value={value}
         onChange={(event) => onChange(event.target.value)}
@@ -48,7 +52,13 @@ export function SearchInput({
       {value && (
         <button
           type="button"
-          onClick={() => onChange("")}
+          onClick={() => {
+            onChange("");
+            // The button unmounts with the value, and the focus would fall to
+            // the page — back to the top of the tab order, away from the field
+            // someone clearing a search is about to type in again.
+            inputRef.current?.focus();
+          }}
           aria-label="Limpar busca"
           className="text-muted-foreground hover:bg-muted hover:text-foreground absolute right-2 flex size-6 items-center justify-center rounded-sm transition-colors"
         >
