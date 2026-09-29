@@ -207,7 +207,7 @@ export function DashboardPage() {
               {!kpis.isLoading && (kpis.data?.kpis.length ?? 0) < TOTAL_INDICADORES && (
                 <BackendPendente
                   className="sm:col-span-2 lg:col-span-3 xl:col-span-4"
-                  motivo="Engajamento no app, NPS e alertas de sintoma crítico ainda não têm indicador: o primeiro não tem definição acordada, o segundo depende de pesquisa aberta e o terceiro, de gatilho de criticidade cadastrado em Configurações."
+                  motivo="Engajamento no app, NPS e alertas de sintoma crítico ainda não têm indicador: o primeiro não tem definição acordada, o segundo depende de pesquisa aberta e o terceiro, de um resumo de alertas que o backend ainda não entrega (e de gatilho de criticidade cadastrado em Configurações)."
                 />
               )}
             </div>

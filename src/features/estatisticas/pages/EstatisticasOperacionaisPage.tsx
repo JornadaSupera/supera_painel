@@ -52,7 +52,7 @@ const MOTIVO_SEM_PARAMETRO =
   "Meta mensal e capacidade máxima ainda não foram cadastradas. Assim que a administração as definir em Configurações → Metas operacionais, as linhas de referência aparecem no gráfico.";
 
 const MOTIVO_SEM_ALERTAS =
-  "A fila de alertas já existe no backend — o que não existe é gatilho. Nenhum limiar de criticidade foi cadastrado, e sem regra nenhum alerta dispara: a fila está vazia por configuração, não por ausência de ocorrência. O limiar é decisão clínica, e cadastrá-lo é ato da administração. Enquanto não houver regra, o painel não exibe o número: “zero alertas” seria lido como tranquilidade.";
+  "A fila de alertas já existe no backend, mas ainda não há um resumo que a conte sem identificar paciente: a leitura disponível devolve alerta por alerta. Sem gatilho de criticidade cadastrado em Configurações → Gatilhos de alerta nenhum alerta dispara, então o painel não exibe o número enquanto ele não puder ser lido com segurança: “zero alertas” seria lido como tranquilidade.";
 
 export function EstatisticasOperacionaisPage() {
   const { data, isLoading, isError, error, refetch } = useEstatisticasOperacionais();
