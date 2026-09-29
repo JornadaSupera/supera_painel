@@ -483,8 +483,26 @@ export interface ClinicoOperations {
 
   /** As conversas — mesma fila de equipe da fila de alertas. */
   listConversas(): Promise<ListResult<ConversaClinico>>;
-  /** Histórico de uma conversa. Sem operação de envio — ver PA-07. */
+  /** Histórico de uma conversa, com os anexos de cada mensagem. */
   listMensagens(params: { conversaId: string }): Promise<ListResult<MensagemClinico>>;
+  /**
+   * Responde na conversa, com um anexo opcional.
+   *
+   * A mensagem não volta na resposta: o profissional não lê a tabela direto, só
+   * pelas leituras do banco. Quem chama relê a conversa.
+   *
+   * > [!] Mensagem e anexo não se desfazem.
+   * A ordem é mensagem, linha do anexo, arquivo — e o banco não apaga nenhuma
+   * das três. Se o arquivo falhar depois de a mensagem sair, o erro diz que a
+   * mensagem foi enviada, em vez de convidar a repetir o envio inteiro.
+   */
+  enviarMensagem(params: {
+    conversaId: string;
+    corpo: string;
+    anexo?: File;
+  }): Promise<SingleResult<null>>;
+  /** O conteúdo de um anexo. Vem como arquivo, não como link: o navegador só exibe `blob:`. */
+  baixarAnexo(params: { caminho: string }): Promise<SingleResult<Blob>>;
   /** Assume uma conversa ainda sem especialidade atribuída. */
   assumirConversa(params: { id: string }): Promise<SingleResult<null>>;
   /** Marca como resolvida uma conversa da própria especialidade. */

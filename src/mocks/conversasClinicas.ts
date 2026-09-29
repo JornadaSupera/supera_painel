@@ -1,4 +1,5 @@
 import type { Especialidade, StatusConversa } from "@/lib/enums";
+import type { AnexoMensagem } from "@/types/clinico";
 import { pacientes } from "./pacientes";
 
 /**
@@ -28,6 +29,7 @@ export interface MensagemClinicaMock {
   autor: "paciente" | "cuidador" | "profissional" | "sistema";
   corpo: string;
   criado_em: string;
+  anexos?: AnexoMensagem[];
 }
 
 function horasAtras(horas: number): string {

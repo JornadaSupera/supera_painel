@@ -1,9 +1,11 @@
 import type { StatusTone } from "@/components/shared";
+import { chatAttachmentError, safeAttachmentName } from "@/lib/attachments";
 import { SEVERIDADE } from "@/lib/enums";
 import type { AutorMensagem, CondutaAlerta, Severidade, StatusAlerta, StatusConversa } from "@/lib/enums";
 import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
 import type {
   AlertaClinico,
+  AnexoMensagem,
   CompromissoAgenda,
   ConversaClinico,
   MensagemClinico,
@@ -281,7 +283,7 @@ export async function resolverAlerta(params: {
 }
 
 /* -------------------------------------------------------------------------
-   CHAT — mesma fila de equipe dos alertas. Sem operação de envio: ver PA-07.
+   CHAT — mesma fila de equipe dos alertas.
    ------------------------------------------------------------------------- */
 
 interface LinhaConversation {
@@ -382,6 +384,14 @@ interface LinhaMessage {
   created_at: string;
 }
 
+interface LinhaAttachment {
+  id: string;
+  message_id: string;
+  storage_path: string;
+  mime_type: string;
+  byte_size: number;
+}
+
 const AUTOR_POR_CODIGO: Record<LinhaMessage["author_kind"], AutorMensagem> = {
   patient: "paciente",
   caregiver: "cuidador",
@@ -389,18 +399,44 @@ const AUTOR_POR_CODIGO: Record<LinhaMessage["author_kind"], AutorMensagem> = {
   system: "sistema",
 };
 
+const BUCKET_CHAT = "chat-attachments";
+
+/** O nome do arquivo é o que vem depois do id da mensagem no caminho do bucket. */
+function nomeDoAnexo(caminho: string): string {
+  return caminho.slice(caminho.indexOf("/") + 1);
+}
+
 export async function listMensagens(params: {
   conversaId: string;
 }): Promise<ListResult<MensagemClinico>> {
   return executar(async () => {
-    const { data, error } = await getSupabaseClient().rpc("read_messages", {
-      p_conversation_id: params.conversaId,
-      p_limit: 200,
-      p_before: null,
-    });
-    if (error) return falhaDe(error);
+    const supabase = getSupabaseClient();
 
-    const linhas = ((data ?? []) as LinhaMessage[])
+    const [mensagensRes, anexosRes] = await Promise.all([
+      supabase.rpc("read_messages", {
+        p_conversation_id: params.conversaId,
+        p_limit: 200,
+        p_before: null,
+      }),
+      supabase.rpc("read_message_attachments", { p_conversation_id: params.conversaId }),
+    ]);
+    if (mensagensRes.error) return falhaDe(mensagensRes.error);
+    if (anexosRes.error) return falhaDe(anexosRes.error);
+
+    const anexosPorMensagem = new Map<string, AnexoMensagem[]>();
+    for (const anexo of (anexosRes.data ?? []) as LinhaAttachment[]) {
+      const lista = anexosPorMensagem.get(anexo.message_id) ?? [];
+      lista.push({
+        id: anexo.id,
+        caminho: anexo.storage_path,
+        nome: nomeDoAnexo(anexo.storage_path),
+        mime_type: anexo.mime_type,
+        tamanho: Number(anexo.byte_size),
+      });
+      anexosPorMensagem.set(anexo.message_id, lista);
+    }
+
+    const linhas = ((mensagensRes.data ?? []) as LinhaMessage[])
       .slice()
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
 
@@ -410,6 +446,7 @@ export async function listMensagens(params: {
         autor: AUTOR_POR_CODIGO[linha.author_kind],
         corpo: linha.body,
         criado_em: linha.created_at,
+        anexos: anexosPorMensagem.get(linha.id) ?? [],
       })),
     );
   });
@@ -427,6 +464,113 @@ function falhaDeConversa(erro: Parameters<typeof falhaDe>[0], motivo: string) {
     return fail(ERROR_CODE.FORBIDDEN, motivo, { code: erro.code, message: erro.message });
   }
   return falhaDe(erro);
+}
+
+/**
+ * Responde na conversa.
+ *
+ * O INSERT direto em `messages` é o caminho previsto: a política
+ * `messages_insert_professional` chama `can_reply_as_professional` (profissional
+ * ativo, conversa aberta, de equipe ou da própria especialidade). O profissional
+ * não tem SELECT na tabela, então o INSERT **não pede a linha de volta** — o id
+ * nasce aqui, e a conversa é relida por `read_messages`.
+ *
+ * O anexo segue a ordem que o banco impõe: a linha em `message_attachments`
+ * precisa existir antes do upload (é ela que autoriza o objeto), e o caminho
+ * começa pelo id da mensagem.
+ */
+export async function enviarMensagem(params: {
+  conversaId: string;
+  corpo: string;
+  anexo?: File;
+}): Promise<SingleResult<null>> {
+  return executar(async () => {
+    const corpo = params.corpo.trim();
+    if (!corpo) return fail(ERROR_CODE.VALIDATION, "Escreva a mensagem antes de enviar.");
+
+    // Antes de gravar qualquer coisa: depois, mensagem e anexo não se desfazem.
+    if (params.anexo) {
+      const motivo = chatAttachmentError(params.anexo);
+      if (motivo) return fail(ERROR_CODE.VALIDATION, motivo);
+    }
+
+    const supabase = getSupabaseClient();
+
+    const { data: sessao } = await supabase.auth.getSession();
+    const contaId = sessao.session?.user.id;
+    if (!contaId) return fail(ERROR_CODE.UNAUTHORIZED, "Sua sessão expirou. Entre de novo para responder.");
+
+    const { data: perfil, error: erroPerfil } = await supabase
+      .from("professionals")
+      .select("id")
+      .eq("account_id", contaId)
+      .maybeSingle();
+    if (erroPerfil) return falhaDe(erroPerfil);
+    const profissionalId = (perfil as { id: string } | null)?.id;
+    if (!profissionalId) {
+      return fail(ERROR_CODE.FORBIDDEN, "Só quem tem perfil de profissional responde a conversas.");
+    }
+
+    const mensagemId = crypto.randomUUID();
+
+    const { error: erroMensagem } = await supabase.from("messages").insert({
+      id: mensagemId,
+      conversation_id: params.conversaId,
+      author_kind: "professional",
+      author_account_id: contaId,
+      author_professional_id: profissionalId,
+      body: corpo,
+    });
+    if (erroMensagem) {
+      return falhaDeConversa(
+        erroMensagem,
+        "Esta conversa já foi encerrada ou não é da sua área: não dá para enviar mensagem nela.",
+      );
+    }
+
+    if (!params.anexo) return okOne(null);
+
+    const caminho = `${mensagemId}/${safeAttachmentName(params.anexo.name, params.anexo.type)}`;
+
+    const { error: erroAnexo } = await supabase.from("message_attachments").insert({
+      message_id: mensagemId,
+      storage_path: caminho,
+      mime_type: params.anexo.type,
+      byte_size: params.anexo.size,
+    });
+    if (erroAnexo) {
+      return fail(
+        ERROR_CODE.UNKNOWN,
+        "A mensagem foi enviada, mas o anexo não pôde ser registrado. Não reenvie a mensagem: envie só o arquivo, numa nova.",
+        { mensagemEnviada: true, code: erroAnexo.code, message: erroAnexo.message },
+      );
+    }
+
+    const { error: erroUpload } = await supabase.storage
+      .from(BUCKET_CHAT)
+      .upload(caminho, params.anexo, { contentType: params.anexo.type, upsert: false });
+    if (erroUpload) {
+      return fail(
+        ERROR_CODE.UNKNOWN,
+        "A mensagem foi enviada, mas o arquivo não subiu. Não reenvie a mensagem: envie só o arquivo, numa nova.",
+        { mensagemEnviada: true, message: erroUpload.message },
+      );
+    }
+
+    return okOne(null);
+  });
+}
+
+export async function baixarAnexo(params: { caminho: string }): Promise<SingleResult<Blob>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient().storage.from(BUCKET_CHAT).download(params.caminho);
+    if (error || !data) {
+      return fail(ERROR_CODE.NOT_FOUND, "Não foi possível abrir este anexo. O arquivo pode não ter chegado a subir.", {
+        message: error?.message,
+      });
+    }
+    return okOne(data);
+  });
 }
 
 export async function assumirConversa(params: { id: string }): Promise<SingleResult<null>> {

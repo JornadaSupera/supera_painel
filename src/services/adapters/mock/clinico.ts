@@ -1,10 +1,17 @@
+import { chatAttachmentError, safeAttachmentName } from "@/lib/attachments";
 import { agendaClinica } from "@/mocks/agendaClinica";
 import { alertasClinicos, type AlertaClinicoMock } from "@/mocks/alertasClinicos";
 import { conversasClinicas, mensagensClinicas } from "@/mocks/conversasClinicas";
 import { SEVERIDADE } from "@/lib/enums";
 import type { CondutaAlerta, Severidade, StatusAlerta } from "@/lib/enums";
 import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
-import type { AlertaClinico, CompromissoAgenda, ConversaClinico, MensagemClinico } from "@/types/clinico";
+import type {
+  AlertaClinico,
+  AnexoMensagem,
+  CompromissoAgenda,
+  ConversaClinico,
+  MensagemClinico,
+} from "@/types/clinico";
 import { now, simulate } from "./_helpers";
 
 /**
@@ -157,9 +164,76 @@ export async function listMensagens(params: {
         autor: mensagem.autor,
         corpo: mensagem.corpo,
         criado_em: mensagem.criado_em,
+        anexos: mensagem.anexos ?? [],
       }));
 
     return ok(linhas);
+  });
+}
+
+/** O conteúdo dos anexos enviados nesta sessão, por caminho. Some ao recarregar, como o resto do mock. */
+const arquivosEnviados = new Map<string, Blob>();
+
+export async function enviarMensagem(params: {
+  conversaId: string;
+  corpo: string;
+  anexo?: File;
+}): Promise<SingleResult<null>> {
+  return simulate(() => {
+    const conversa = conversasClinicas.find((item) => item.id === params.conversaId);
+    if (!conversa) return fail(ERROR_CODE.NOT_FOUND, "Conversa não encontrada.");
+
+    const corpo = params.corpo.trim();
+    if (!corpo) return fail(ERROR_CODE.VALIDATION, "Escreva a mensagem antes de enviar.");
+
+    // A mesma recusa do banco: só responde em conversa aberta.
+    if (conversa.status !== "aberta") {
+      return fail(
+        ERROR_CODE.FORBIDDEN,
+        "Esta conversa já foi encerrada ou não é da sua área: não dá para enviar mensagem nela.",
+      );
+    }
+
+    if (params.anexo) {
+      const motivo = chatAttachmentError(params.anexo);
+      if (motivo) return fail(ERROR_CODE.VALIDATION, motivo);
+    }
+
+    const id = crypto.randomUUID();
+    const agora = now();
+    const anexos: AnexoMensagem[] = [];
+
+    if (params.anexo) {
+      const caminho = `${id}/${safeAttachmentName(params.anexo.name, params.anexo.type)}`;
+      arquivosEnviados.set(caminho, params.anexo);
+      anexos.push({
+        id: crypto.randomUUID(),
+        caminho,
+        nome: caminho.slice(caminho.indexOf("/") + 1),
+        mime_type: params.anexo.type,
+        tamanho: params.anexo.size,
+      });
+    }
+
+    mensagensClinicas.push({
+      id,
+      conversa_id: conversa.id,
+      autor: "profissional",
+      corpo,
+      criado_em: agora,
+      anexos,
+    });
+    conversa.ultima_mensagem_em = agora;
+
+    return okOne(null);
+  });
+}
+
+export async function baixarAnexo(params: { caminho: string }): Promise<SingleResult<Blob>> {
+  return simulate(() => {
+    const arquivo = arquivosEnviados.get(params.caminho);
+    if (!arquivo) return fail(ERROR_CODE.NOT_FOUND, "Não foi possível abrir este anexo.");
+    return okOne(arquivo);
   });
 }
 

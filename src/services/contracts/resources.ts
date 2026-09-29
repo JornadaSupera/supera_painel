@@ -274,6 +274,8 @@ export const RESOURCES = {
       "resolverAlerta",
       "listConversas",
       "listMensagens",
+      "enviarMensagem",
+      "baixarAnexo",
       "assumirConversa",
       "resolverConversa",
       "marcarConversaLida",

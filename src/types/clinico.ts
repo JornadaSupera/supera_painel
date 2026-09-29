@@ -78,10 +78,21 @@ export interface ConversaClinico {
   especialidade_origem: Especialidade | null;
 }
 
-/** Uma mensagem dentro de uma conversa — só leitura (ver PA-07: sem RPC de envio). */
+/** Um arquivo anexado a uma mensagem. O conteúdo se baixa à parte, por `baixarAnexo`. */
+export interface AnexoMensagem {
+  id: string;
+  /** Caminho no bucket: `<id da mensagem>/<nome>`. É o que `baixarAnexo` recebe. */
+  caminho: string;
+  nome: string;
+  mime_type: string;
+  tamanho: number;
+}
+
+/** Uma mensagem dentro de uma conversa. */
 export interface MensagemClinico {
   id: string;
   autor: AutorMensagem;
   corpo: string;
   criado_em: string;
+  anexos: AnexoMensagem[];
 }
