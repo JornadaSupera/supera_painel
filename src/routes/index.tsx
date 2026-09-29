@@ -11,6 +11,7 @@ import { RecuperarSenhaPage } from "@/features/auth/pages/RecuperarSenhaPage";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ClinicoLayout } from "@/layouts/ClinicoLayout";
 import { PERMISSAO } from "@/lib/rbac";
+import { AdminHomeRoute } from "./AdminHomeRoute";
 import { HomeRedirect } from "./HomeRedirect";
 import { PermissionRoute } from "./PermissionRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -151,7 +152,9 @@ export function AppRoutes() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AdminLayout />}>
               <Route element={<PermissionRoute permission={PERMISSAO.DASHBOARD_READ} />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
+                <Route element={<AdminHomeRoute />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                </Route>
               </Route>
 
               {/* Creating requires write access, not read — hence its own
