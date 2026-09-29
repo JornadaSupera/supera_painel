@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { ErrorState, Loading, StatusBadge } from "@/components/shared";
+import { ErrorState, Loading, MarkdownText, StatusBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -190,9 +190,10 @@ export function DialogRevisao({
 /**
  * O corpo de uma versão.
  *
- * O texto é renderizado como parágrafos — nunca por `dangerouslySetInnerHTML`.
- * O corpo vem do editor de outra pessoa, e é exatamente o tipo de campo que
- * carregaria um script se a marcação fosse injetada crua.
+ * O texto é Markdown simples, desenhado como elementos do React — nunca por
+ * `dangerouslySetInnerHTML`. O corpo vem do editor de outra pessoa, e é
+ * exatamente o tipo de campo que carregaria um script se a marcação fosse
+ * injetada crua.
  */
 function TextoDaVersao({
   titulo,
@@ -205,8 +206,6 @@ function TextoDaVersao({
   atualizadoEm: string;
   destaque?: boolean;
 }) {
-  const paragrafos = corpo.split(/\n{2,}/).filter((trecho) => trecho.trim() !== "");
-
   return (
     <section
       className={
@@ -225,16 +224,7 @@ function TextoDaVersao({
       </header>
 
       <div className="max-h-64 overflow-y-auto pr-1">
-        {paragrafos.map((paragrafo, indice) => (
-          <p
-            // O texto não tem id próprio; a posição é o que distingue um
-            // parágrafo do outro dentro da mesma versão imutável.
-            key={`${titulo}-${indice}`}
-            className="text-foreground mb-2 text-xs leading-relaxed whitespace-pre-line last:mb-0"
-          >
-            {paragrafo}
-          </p>
-        ))}
+        <MarkdownText source={corpo} className="text-xs" />
       </div>
     </section>
   );

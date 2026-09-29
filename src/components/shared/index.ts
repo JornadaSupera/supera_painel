@@ -35,6 +35,9 @@ export type { FilterPanelProps } from "./FilterPanel";
 export { Footnote } from "./Footnote";
 
 export { Logo } from "./Logo";
+
+export { MarkdownEditor } from "./MarkdownEditor";
+export { MarkdownText } from "./MarkdownText";
 export type { LogoProps } from "./Logo";
 export type { FilterSelectProps } from "./FilterBar";
 
