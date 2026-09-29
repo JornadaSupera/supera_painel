@@ -694,10 +694,22 @@ export async function setMfa(): Promise<SingleResult<UsuarioDetalhe>> {
    promete.
    ------------------------------------------------------------------------- */
 
+type AutorEmbutido =
+  | { full_name: string | null; email: string }
+  | { full_name: string | null; email: string }[]
+  | null;
+
 interface LinhaConcessao {
   granted_at: string;
   permission_id: string;
-  accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
+  revoked_at: string | null;
+  accounts: AutorEmbutido;
+  revogador: AutorEmbutido;
+}
+
+function nomeDoAutor(autor: AutorEmbutido): string | null {
+  const conta = umDe(autor);
+  return conta?.full_name?.trim() || conta?.email || null;
 }
 
 /**
@@ -721,31 +733,47 @@ export async function listPermissions({
 
     const [catalogo, concessoes] = await Promise.all([
       supabase.from("permissions").select("id, code, label").order("code"),
+      // Revoked rows too: revoking keeps the row, and the latest one is what
+      // tells a revoked permission apart from one never granted.
       supabase
         .from("professional_permissions")
-        .select("permission_id, granted_at, accounts:granted_by_account ( full_name, email )")
-        .eq("professional_id", profissionalId)
-        .is("revoked_at", null),
+        .select(
+          "permission_id, granted_at, revoked_at, accounts:granted_by_account ( full_name, email ), revogador:revoked_by_account ( full_name, email )",
+        )
+        .eq("professional_id", profissionalId),
     ]);
 
     const erro = catalogo.error ?? concessoes.error;
     if (erro) return falhaDe(erro);
 
+    const linhas = concessoes.data as unknown as LinhaConcessao[];
+
     const vigentes = new Map(
-      (concessoes.data as unknown as LinhaConcessao[]).map((linha) => [linha.permission_id, linha]),
+      linhas.filter((linha) => !linha.revoked_at).map((linha) => [linha.permission_id, linha]),
     );
+
+    const ultimaRevogacao = new Map<string, LinhaConcessao>();
+    for (const linha of linhas) {
+      if (!linha.revoked_at) continue;
+      const anterior = ultimaRevogacao.get(linha.permission_id);
+      if (!anterior?.revoked_at || linha.revoked_at > anterior.revoked_at) {
+        ultimaRevogacao.set(linha.permission_id, linha);
+      }
+    }
 
     return ok(
       (catalogo.data as unknown as { id: string; code: string; label: string }[]).map((permissao) => {
         const concessao = vigentes.get(permissao.id);
-        const autor = umDe(concessao?.accounts);
+        const revogacao = concessao ? undefined : ultimaRevogacao.get(permissao.id);
 
         return {
           codigo: permissao.code,
           label: permissao.label,
           concedida: Boolean(concessao),
           concedida_em: concessao ? paraIso(concessao.granted_at) : null,
-          concedida_por: autor?.full_name?.trim() || autor?.email || null,
+          concedida_por: concessao ? nomeDoAutor(concessao.accounts) : null,
+          revogada_em: revogacao ? paraIso(revogacao.revoked_at) : null,
+          revogada_por: revogacao ? nomeDoAutor(revogacao.revogador) : null,
         };
       }),
     );

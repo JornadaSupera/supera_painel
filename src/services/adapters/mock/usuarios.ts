@@ -332,11 +332,15 @@ const CATALOGO_RESTRITO = [
 /** Concessões vigentes, por usuário. Começa vazio, como o banco. */
 const concessoes = new Map<string, Map<string, string>>();
 
+/** Last revocation per user and code — the database keeps revoked rows too. */
+const revogacoes = new Map<string, Map<string, string>>();
+
 function permissoesDe(id: string): PermissaoRestrita[] {
   const doUsuario = concessoes.get(id);
 
   return CATALOGO_RESTRITO.map((permissao) => {
     const concedidaEm = doUsuario?.get(permissao.codigo) ?? null;
+    const revogadaEm = concedidaEm ? null : (revogacoes.get(id)?.get(permissao.codigo) ?? null);
 
     return {
       codigo: permissao.codigo,
@@ -344,6 +348,8 @@ function permissoesDe(id: string): PermissaoRestrita[] {
       concedida: concedidaEm !== null,
       concedida_em: concedidaEm,
       concedida_por: concedidaEm ? "Administração" : null,
+      revogada_em: revogadaEm,
+      revogada_por: revogadaEm ? "Administração" : null,
     };
   });
 }
@@ -406,7 +412,11 @@ export async function revokePermission({
   codigo: string;
 }): Promise<SingleResult<PermissaoRestrita>> {
   return comUsuario(id, () => {
-    concessoes.get(id)?.delete(codigo);
+    if (concessoes.get(id)?.delete(codigo)) {
+      const doUsuario = revogacoes.get(id) ?? new Map<string, string>();
+      doUsuario.set(codigo, new Date().toISOString());
+      revogacoes.set(id, doUsuario);
+    }
     return respostaDaPermissao(id, codigo);
   });
 }

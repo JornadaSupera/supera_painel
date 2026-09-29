@@ -51,6 +51,13 @@ function Linha({
               {permissao.concedida_por && ` · por ${permissao.concedida_por}`}
             </span>
           )}
+
+          {!permissao.concedida && permissao.revogada_em && (
+            <span className="text-muted-foreground text-[11px]">
+              revogada em {formatDate(permissao.revogada_em)}
+              {permissao.revogada_por && ` · por ${permissao.revogada_por}`}
+            </span>
+          )}
         </div>
       </div>
 

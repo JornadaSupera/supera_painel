@@ -116,6 +116,14 @@ export interface PermissaoRestrita {
   concedida_em: string | null;
   /** Quem concedeu. `null` quando o nome não resolve. */
   concedida_por: string | null;
+  /**
+   * The latest revocation, while the permission is not granted again. Revoking
+   * keeps the row in the database; without these the screen showed a revoked
+   * permission exactly like one that was never granted.
+   */
+  revogada_em: string | null;
+  /** Who revoked. `null` when the name does not resolve. */
+  revogada_por: string | null;
 }
 
 /** Uma conta que ainda não tem perfil no painel — candidata a receber um. */
