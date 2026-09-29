@@ -8,7 +8,7 @@ import type { Permissao } from "@/lib/rbac";
  * Espelha o cabeçalho do protótipo: "16 profissionais cadastrados ·
  * 7 especialidades", com a mesma distribuição — 3 médicos, 2 farmacêuticos,
  * 3 enfermeiros, 2 nutricionistas, 2 psicólogos, 2 dentistas,
- * 2 fisioterapeutas — mais os perfis de gestão.
+ * 2 fisioterapeutas — mais as duas contas de administração.
  *
  * Campos em `snake_case`: são as colunas da futura tabela `usuarios`.
  *
@@ -66,7 +66,7 @@ export const usuarios: UsuarioMock[] = [
     tratamento: null,
     email: "ricardo.steil@cosc.com.br",
     senha_mock: "Supera@2026",
-    papel: PAPEL.GESTOR,
+    papel: PAPEL.ADMIN,
     especialidade: null,
     registro: null,
     avatar_url: null,

@@ -17,14 +17,12 @@ import {
  * inventar a sua — e a primeira divergência apareceria como um filtro que não
  * filtra nada, sem erro nenhum.
  *
- * Duas assimetrias que este arquivo NÃO resolve, porque não são de tradução:
+ * Uma assimetria que este arquivo NÃO resolve, porque não é de tradução:
  *
  *  - `manutencao` é fase no painel e não existe em `treatment_phases`.
  *    Nenhum paciente volta com ela; o filtro correspondente vem sempre vazio.
- *  - `gestor` é papel no painel e não existe como perfil no banco. Só há
- *    `admins` e `professionals`.
  *
- * Ambas são decisão de produto pendente, não bug de mapeamento.
+ * É decisão de produto pendente, não bug de mapeamento.
  */
 
 /* -------------------------------------------------------------------------

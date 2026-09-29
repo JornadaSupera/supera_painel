@@ -39,12 +39,11 @@ export const catalogoPermissoes = (Object.keys(PERMISSAO_LABEL) as Permissao[]).
   grupo: grupoDe(id),
 }));
 
-export const PAPEIS: Papel[] = [PAPEL.ADMIN, PAPEL.GESTOR, PAPEL.PROFISSIONAL];
+export const PAPEIS: Papel[] = [PAPEL.ADMIN, PAPEL.PROFISSIONAL];
 
 /** Estado mutável da matriz. Começa igual ao que `lib/rbac.ts` define. */
 export const concedidas: Record<Papel, Permissao[]> = {
   [PAPEL.ADMIN]: [...PERMISSOES_POR_PAPEL[PAPEL.ADMIN]],
-  [PAPEL.GESTOR]: [...PERMISSOES_POR_PAPEL[PAPEL.GESTOR]],
   [PAPEL.PROFISSIONAL]: [...PERMISSOES_POR_PAPEL[PAPEL.PROFISSIONAL]],
 };
 

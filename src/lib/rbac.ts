@@ -70,30 +70,6 @@ export type Permissao = (typeof PERMISSAO)[keyof typeof PERMISSAO];
 const TODAS_PERMISSOES = Object.values(PERMISSAO);
 
 /**
- * Gestor: opera a clínica, mas não mexe na estrutura de acesso nem revela PII
- * em massa. Sem `PERMISSOES_MANAGE` e sem `AUDITORIA_EXPORT` — exportar a
- * trilha de auditoria é atribuição de DPO/administrador.
- */
-const PERMISSOES_GESTOR: Permissao[] = [
-  PERMISSAO.DASHBOARD_READ,
-  PERMISSAO.PACIENTES_READ,
-  PERMISSAO.PACIENTES_WRITE,
-  PERMISSAO.PACIENTES_EXPORT,
-  PERMISSAO.USUARIOS_READ,
-  PERMISSAO.CONTEUDO_READ,
-  PERMISSAO.CONTEUDO_WRITE,
-  PERMISSAO.CONTEUDO_PUBLISH,
-  PERMISSAO.CONTEUDO_APPROVE,
-  PERMISSAO.RELATORIOS_READ,
-  PERMISSAO.RELATORIOS_EXPORT,
-  PERMISSAO.RELATORIOS_SCHEDULE,
-  PERMISSAO.ESTATISTICAS_CLINICAS_READ,
-  PERMISSAO.ESTATISTICAS_READ_ALL,
-  PERMISSAO.AUDITORIA_READ,
-  PERMISSAO.CONFIGURACOES_READ,
-];
-
-/**
  * Profissional clínico: consulta e produz conteúdo, vê só os próprios
  * indicadores. Não gerencia usuários nem configurações da clínica.
  */
@@ -108,7 +84,6 @@ const PERMISSOES_PROFISSIONAL: Permissao[] = [
 
 export const PERMISSOES_POR_PAPEL: Record<Papel, readonly Permissao[]> = {
   [PAPEL.ADMIN]: TODAS_PERMISSOES,
-  [PAPEL.GESTOR]: PERMISSOES_GESTOR,
   [PAPEL.PROFISSIONAL]: PERMISSOES_PROFISSIONAL,
 };
 

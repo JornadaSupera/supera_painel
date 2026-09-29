@@ -583,23 +583,9 @@ async function idsDasEspecialidades(
   return porCodigo;
 }
 
-/**
- * `gestor` não existe como perfil no banco.
- *
- * Há `admins` e `professionals`, e nada entre os dois. O papel continua na
- * matriz de permissões do painel porque descreve um alcance real, mas não há
- * onde gravá-lo — conceder aqui produziria uma pessoa que a lista não mostra.
- */
-const SEM_PERFIL_NO_BANCO =
-  "O papel de gestor não existe como perfil no cadastro: há administrador e profissional, e nada entre os dois. Escolha um dos dois ou fale com o responsável pelo banco.";
-
 export async function create(entrada: UsuarioEntrada): Promise<SingleResult<UsuarioDetalhe>> {
   return executar(async () => {
     const supabase = getSupabaseClient();
-
-    if (entrada.papel === PAPEL.GESTOR) {
-      return fail(ERROR_CODE.NOT_IMPLEMENTED, SEM_PERFIL_NO_BANCO);
-    }
 
     if (entrada.papel === PAPEL.ADMIN) {
       const { error } = await supabase.rpc("create_admin", { p_account_id: entrada.account_id });

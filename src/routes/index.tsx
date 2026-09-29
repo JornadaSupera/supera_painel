@@ -165,7 +165,8 @@ export function AppRoutes() {
               </Route>
 
               {/* The record is READ, and it belongs with the list.
-                  It used to sit under `usuarios:manage`, which the gestor does
+                  It used to sit under `usuarios:manage`, which a person with
+                  only `usuarios:read` (an individual grant, not a role) does
                   not hold: they saw the list, clicked a row and were blocked by
                   the guard — a screen that offers a link it will refuse. The
                   form keeps its own route above, so editing stays behind

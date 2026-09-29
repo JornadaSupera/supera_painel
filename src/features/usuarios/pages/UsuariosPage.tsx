@@ -74,9 +74,9 @@ export function UsuariosPage() {
 
   /**
    * O protótipo diz "16 profissionais cadastrados · 7 especialidades", mas a
-   * lista tem 18 contas: administrador e gestor operam o painel sem ocupar vaga
-   * na equipe assistencial. O subtítulo separa as duas contagens em vez de
-   * chamar 18 de "profissionais" ou esconder duas linhas da tabela.
+   * lista tem 18 contas: as duas de administração operam o painel sem ocupar
+   * vaga na equipe assistencial. O subtítulo separa as duas contagens em vez
+   * de chamar 18 de "profissionais" ou esconder duas linhas da tabela.
    */
   const especialidades = (distribuicao.data ?? []).filter((item) => item.total > 0).length;
   const assistenciais = (distribuicao.data ?? []).reduce((soma, item) => soma + item.total, 0);
@@ -111,7 +111,7 @@ export function UsuariosPage() {
           {usuario.especialidade ? (
             ESPECIALIDADE_LABEL[usuario.especialidade]
           ) : (
-            // Administrador e gestor operam o painel; não ocupam vaga na
+            // Contas de administração operam o painel; não ocupam vaga na
             // equipe assistencial.
             <span className="text-muted-foreground">{PAPEL_LABEL[usuario.papel]}</span>
           )}

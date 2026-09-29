@@ -119,9 +119,9 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Usua
 /**
  * Contagem por especialidade — a faixa do topo da tela.
  *
- * Conta só quem tem especialidade: administrador e gestor operam o painel, não
- * ocupam vaga de equipe assistencial. É por isso que o cabeçalho do protótipo
- * diz "16 profissionais" com 18 contas cadastradas.
+ * Conta só quem tem especialidade: as contas de administração operam o
+ * painel, não ocupam vaga de equipe assistencial. É por isso que o cabeçalho
+ * do protótipo diz "16 profissionais" com 18 contas cadastradas.
  */
 export async function getDistribuicao(): Promise<ListResult<DistribuicaoEspecialidade>> {
   return simulate(() => {

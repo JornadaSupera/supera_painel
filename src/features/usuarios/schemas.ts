@@ -28,13 +28,7 @@ import type { UsuarioEntrada } from "@/types/usuario";
 
 const CAMPO_OBRIGATORIO = "Campo obrigatório.";
 
-/**
- * Os papéis que o cadastro sabe conceder.
- *
- * `gestor` fica de fora: ele descreve um alcance real na matriz de permissões,
- * e não existe como perfil no banco — há administrador e profissional, e nada
- * entre os dois. Oferecê-lo aqui produziria um cadastro que falha no envio.
- */
+/** Os papéis que o cadastro sabe conceder: administrador e profissional. */
 const PAPEIS = [PAPEL.ADMIN, PAPEL.PROFISSIONAL] as const;
 
 const ESPECIALIDADES = [

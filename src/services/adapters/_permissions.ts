@@ -25,7 +25,6 @@ export function buildPermissionMatrix(): MatrizPermissoes {
     permissoes: catalogoPermissoes,
     concedidas: {
       [PAPEL.ADMIN]: [...concedidas[PAPEL.ADMIN]],
-      [PAPEL.GESTOR]: [...concedidas[PAPEL.GESTOR]],
       [PAPEL.PROFISSIONAL]: [...concedidas[PAPEL.PROFISSIONAL]],
     },
     exclusivas_de_especialidade: SPECIALTY_EXCLUSIVE_PERMISSIONS,

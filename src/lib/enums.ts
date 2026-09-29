@@ -12,7 +12,6 @@
 
 export const PAPEL = {
   ADMIN: "admin",
-  GESTOR: "gestor",
   PROFISSIONAL: "profissional",
 } as const;
 
@@ -20,7 +19,6 @@ export type Papel = (typeof PAPEL)[keyof typeof PAPEL];
 
 export const PAPEL_LABEL: Record<Papel, string> = {
   admin: "Administrador",
-  gestor: "Gestor",
   profissional: "Profissional clínico",
 };
 

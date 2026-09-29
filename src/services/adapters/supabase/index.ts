@@ -80,8 +80,6 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
     "O painel não cria contas: ele concede perfil a quem já se cadastrou. Criar acesso de terceiro exigiria a chave de serviço, que nunca entra no navegador — e quem escolhe a senha tem que ser o titular, senão a trilha deixa de sustentar quem fez o quê.",
   "usuarios.update.identidade":
     "Nome e e-mail são da conta, e a única política de escrita ali é a do próprio titular. Corrigi-los é ato da pessoa, não da administração.",
-  "usuarios.papel.gestor":
-    "Gestor não existe como perfil no cadastro: há administrador e profissional, e nada entre os dois. O papel segue na matriz de permissões porque descreve um alcance real, mas não há onde gravá-lo.",
   "usuarios.list.horario":
     "Não há onde guardar a janela de atendimento no chat: nenhuma tabela tem as duas colunas de horário.",
   "usuarios.pause":
