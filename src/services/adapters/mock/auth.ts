@@ -120,7 +120,7 @@ export async function signIn({
       return fail(ERROR_CODE.UNAUTHORIZED, "E-mail ou senha inválidos.");
     }
 
-    // Conta pausada ou inativa também não revela o motivo exato.
+    // Conta inativa também não revela o motivo exato.
     if (usuario.status !== STATUS_USUARIO.ATIVO) {
       return fail(
         ERROR_CODE.FORBIDDEN,

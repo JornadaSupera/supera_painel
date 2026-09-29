@@ -374,13 +374,6 @@ export async function setStatus({
   status: StatusUsuario;
 }): Promise<SingleResult<UsuarioDetalhe>> {
   return executar(async () => {
-    if (status === STATUS_USUARIO.PAUSADO) {
-      return fail(
-        ERROR_CODE.NOT_IMPLEMENTED,
-        "Pausar acesso ainda está em desenvolvimento: o backend só distingue ativo e inativo.",
-      );
-    }
-
     const ativo = status === STATUS_USUARIO.ATIVO;
     const profissionalId = await idDoPerfilProfissional(id);
 

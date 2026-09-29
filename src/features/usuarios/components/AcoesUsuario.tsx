@@ -61,14 +61,10 @@ export function AcoesUsuario({
   const alterarMfa = useAlterarMfa();
   const desativarConta = useDesativarConta();
 
-  // Acesso suspenso é pausado ou inativo: qual dos dois o backend usa depende
-  // de ele ter estado de pausa. Para a tela, os dois significam "não entra".
-  const suspenso =
-    usuario.status === STATUS_USUARIO.PAUSADO || usuario.status === STATUS_USUARIO.INATIVO;
+  const suspenso = usuario.status === STATUS_USUARIO.INATIVO;
 
   const semEdicao = motivoIndisponivel("usuarios.update");
   const semMfa = motivoIndisponivel("usuarios.setMfa");
-  const semPausa = motivoIndisponivel("usuarios.pause") !== null;
 
   return (
     <div onClick={(evento) => evento.stopPropagation()} role="presentation">
@@ -148,20 +144,12 @@ export function AcoesUsuario({
               onSelect={() =>
                 alterarStatus.mutate({
                   id: usuario.id,
-                  status: suspenso
-                    ? STATUS_USUARIO.ATIVO
-                    : semPausa
-                      ? STATUS_USUARIO.INATIVO
-                      : STATUS_USUARIO.PAUSADO,
+                  status: suspenso ? STATUS_USUARIO.ATIVO : STATUS_USUARIO.INATIVO,
                 })
               }
             >
               {suspenso ? <Play /> : <Pause />}
-              {suspenso
-                ? "Devolver acesso ao painel"
-                : semPausa
-                  ? "Revogar acesso ao painel"
-                  : "Pausar acesso"}
+              {suspenso ? "Devolver acesso ao painel" : "Revogar acesso ao painel"}
             </DropdownMenuItem>
 
             {!suspenso && (
