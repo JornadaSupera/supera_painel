@@ -12,7 +12,7 @@ import { AdminLayout } from "@/layouts/AdminLayout";
 import { ClinicoLayout } from "@/layouts/ClinicoLayout";
 import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
-import { AdminHomeRoute } from "./AdminHomeRoute";
+import { AreaRoute } from "./AreaRoute";
 import { HomeRedirect } from "./HomeRedirect";
 import { PermissionRoute } from "./PermissionRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -20,10 +20,11 @@ import { ProtectedRoute } from "./ProtectedRoute";
 /**
  * Route tree — the nine screens of the MVP + Médio scope.
  *
- * Every protected area passes through two gates: `ProtectedRoute` requires a
- * session, `PermissionRoute` requires the module permission. Keeping them apart
- * makes the difference between "not signed in" and "signed in but not allowed"
- * legible at a glance.
+ * Every protected screen passes through three gates: `ProtectedRoute` requires
+ * a session, `AreaRoute` requires the panel to be the account's own (the
+ * administration or a clinical area, never both), and `PermissionRoute`
+ * requires the module permission. Keeping them apart makes "not signed in",
+ * "wrong panel" and "signed in but not allowed" legible at a glance.
  *
  * See `src/layouts/navigation.ts` — the sidebar reads the same permission list,
  * so menu and route never disagree.
@@ -168,11 +169,15 @@ export function AppRoutes() {
 
           {/* ---------------------------------------------------- protected */}
           <Route element={<ProtectedRoute />}>
-            <Route element={<AdminLayout />}>
+            <Route
+              element={
+                <AreaRoute area="admin">
+                  <AdminLayout />
+                </AreaRoute>
+              }
+            >
               <Route element={<PermissionRoute permission={PERMISSAO.DASHBOARD_READ} />}>
-                <Route element={<AdminHomeRoute />}>
-                  <Route path="/dashboard" element={<DashboardPage />} />
-                </Route>
+                <Route path="/dashboard" element={<DashboardPage />} />
               </Route>
 
               {/* Creating requires write access, not read — hence its own
@@ -258,7 +263,14 @@ export function AppRoutes() {
             {/* Foundation only (PA-07): routing, frame and navigation are
                 real; the six screens still show what is missing instead of
                 a number that isn't there yet. */}
-            <Route path="/clinico/:especialidade" element={<ClinicoLayout />}>
+            <Route
+              path="/clinico/:especialidade"
+              element={
+                <AreaRoute area="clinico">
+                  <ClinicoLayout />
+                </AreaRoute>
+              }
+            >
               <Route index element={<ClinicoDashboardPage />} />
               <Route path="pacientes" element={<ClinicoPacientesPage />} />
               <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
