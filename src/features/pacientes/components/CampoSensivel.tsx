@@ -73,6 +73,13 @@ export function CampoSensivel({
   const alvo = nomePaciente ? ` de ${nomePaciente}` : "";
   const Icone = revelar.isPending ? LoaderCircle : visivel ? EyeOff : Eye;
 
+  // Nothing on file: there is nothing to reveal, and offering it anyway would
+  // write an audit entry for having looked at an empty field.
+  const vazio = !mascarado.trim() || mascarado.trim() === "—";
+  if (vazio) {
+    return <span className={cn("tabular-nums", className)}>{mascarado || "—"}</span>;
+  }
+
   return (
     <span className={cn("inline-flex items-center gap-1", className)}>
       <span className={cn("tabular-nums", visivel && "text-foreground font-medium")}>
