@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 
 import { Loading } from "@/components/shared";
 import { AvisoSessao } from "@/features/auth/components/AvisoSessao";
@@ -10,6 +10,7 @@ import { NovaSenhaPage } from "@/features/auth/pages/NovaSenhaPage";
 import { RecuperarSenhaPage } from "@/features/auth/pages/RecuperarSenhaPage";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ClinicoLayout } from "@/layouts/ClinicoLayout";
+import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
 import { AdminHomeRoute } from "./AdminHomeRoute";
 import { HomeRedirect } from "./HomeRedirect";
@@ -64,7 +65,6 @@ const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRe
    reviewers and anyone following a link, not the panel's staff. */
 const TermsOfUsePage = lazy(() => import("@/features/legal/pages/TermsOfUsePage"));
 const PrivacyPolicyPage = lazy(() => import("@/features/legal/pages/PrivacyPolicyPage"));
-const DesignSystemPreview = lazy(() => import("@/app/DesignSystemPreview"));
 
 /**
  * Routes that CONSUME a recovery link. The gate below leaves them alone.
@@ -101,6 +101,24 @@ const ROUTES_THAT_CONSUME_A_LINK = ["/redefinir-senha", "/nova-senha"];
 function needsRecoveryRescue(location: { pathname: string; search: string; hash: string }) {
   if (ROUTES_THAT_CONSUME_A_LINK.includes(location.pathname)) return false;
   return carriesRecoveryLink(location);
+}
+
+/**
+ * The patient record, inside the clinical frame.
+ *
+ * Same page the administrative panel uses; only the way back and the label
+ * above the title change, so a professional never lands in the other panel's
+ * navigation by opening a patient.
+ */
+function ClinicoPacienteFicha() {
+  const { especialidade } = useParams<{ especialidade: string }>();
+
+  return (
+    <PacienteFichaPage
+      basePath={`/clinico/${especialidade}/pacientes`}
+      eyebrow={ESPECIALIDADE_LABEL[especialidade as Especialidade]}
+    />
+  );
 }
 
 export function AppRoutes() {
@@ -229,11 +247,6 @@ export function AppRoutes() {
                 <Route path="/configuracoes" element={<ConfiguracoesPage />} />
               </Route>
 
-              {/* Component gallery — internal tool. */}
-              {import.meta.env.DEV && (
-                <Route path="/design-system" element={<DesignSystemPreview />} />
-              )}
-
               {/* "Estatísticas" alone is not a screen: it leads to the first child. */}
               <Route
                 path="/estatisticas"
@@ -248,6 +261,9 @@ export function AppRoutes() {
             <Route path="/clinico/:especialidade" element={<ClinicoLayout />}>
               <Route index element={<ClinicoDashboardPage />} />
               <Route path="pacientes" element={<ClinicoPacientesPage />} />
+              <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
+                <Route path="pacientes/:id" element={<ClinicoPacienteFicha />} />
+              </Route>
               <Route path="agenda" element={<ClinicoAgendaPage />} />
               <Route path="chat" element={<ClinicoChatPage />} />
               <Route path="alertas" element={<ClinicoAlertasPage />} />

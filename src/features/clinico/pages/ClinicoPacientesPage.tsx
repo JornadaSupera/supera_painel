@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 
 import { EmptyState, ErrorState, PageHeader, SearchInput, SkeletonCards, StatusBadge } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
@@ -18,10 +18,11 @@ import { useMeusPacientes } from "../hooks/useMeusPacientes";
  * já usa, só sem o painel de filtros dele: aqui é busca simples.
  *
  * A ficha do paciente ainda não existe neste painel: o clique abre a ficha do
- * administrativo (`/pacientes/:id`), que o profissional já pode ler.
+ * administrativo, montada dentro deste painel (`pacientes/:id`).
  */
 export function ClinicoPacientesPage() {
   const { user } = useAuth();
+  const { especialidade } = useParams<{ especialidade: string }>();
   const area = user?.especialidade ? ESPECIALIDADE_LABEL[user.especialidade] : "";
 
   const [busca, setBusca] = useState("");
@@ -73,13 +74,14 @@ export function ClinicoPacientesPage() {
         {pacientes.map((paciente) => (
           <Link
             key={paciente.id}
-            to={`/pacientes/${paciente.id}`}
+            to={`/clinico/${especialidade}/pacientes/${paciente.id}`}
             className="bg-card hover:bg-muted/50 focus-visible:ring-ring flex items-center gap-4 rounded-2xl border p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             <div className="min-w-0 flex-1">
               <p className="text-foreground truncate text-sm font-medium">{paciente.nome}</p>
               <p className="text-muted-foreground truncate text-xs">
-                {paciente.codigo} · {paciente.cid} — {paciente.cid_descricao}
+                {paciente.codigo}
+                {paciente.cid && paciente.cid !== "—" ? ` · ${paciente.cid} — ${paciente.cid_descricao}` : ""}
                 {paciente.protocolo_nome !== "—" ? ` · ${paciente.protocolo_nome}` : ""}
               </p>
             </div>
