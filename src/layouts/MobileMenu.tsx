@@ -76,10 +76,12 @@ export function MobileMenu({ items = visibleNavItems(), homePath = "/dashboard" 
           the spare room between header and nav, and the first item started
           at ~40% of the screen, below an empty band under the logo. */}
       <DialogContent className="top-0 left-0 flex h-dvh max-w-72 translate-x-0 translate-y-0 flex-col gap-0 rounded-none p-0 sm:max-w-72">
-        <DialogHeader className="border-border border-b p-4 text-left">
-          <DialogTitle className="flex items-center gap-3 text-base">
+        {/* `pr-14` keeps the title clear of the close button, which the dialog
+            positions absolutely over the last 44px of this header. */}
+        <DialogHeader className="border-border border-b p-4 pr-14 text-left">
+          <DialogTitle className="flex min-w-0 items-center gap-3 text-base">
             <Logo height={24} />
-            <span className="border-border border-l pl-3">Jornada Supera</span>
+            <span className="border-border truncate border-l pl-3">Jornada Supera</span>
           </DialogTitle>
           <DialogDescription className="sr-only">Navegação principal do painel</DialogDescription>
         </DialogHeader>
