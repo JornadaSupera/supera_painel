@@ -525,6 +525,17 @@ async function carregarConvite(id: string): Promise<LinhaConvite | null | Return
   return (data as unknown as LinhaConvite | null) ?? null;
 }
 
+/**
+ * Errors that mean the address names no patient at all.
+ *
+ * The read functions write their audit row before looking the patient up, so
+ * a well-formed id nobody owns fails on the audit table's foreign key (23503)
+ * instead of answering "not found", and a malformed one fails to cast to a
+ * uuid (22P02). Whoever typed or pasted the address needs the same answer for
+ * both, and "check the data you entered" is not it.
+ */
+const FICHA_INEXISTENTE: ReadonlySet<string> = new Set(["23503", "22P02"]);
+
 /** Ficha completa. Quatro chamadas auditadas, mais a fila de convites. */
 export async function getById({ id }: { id: string }): Promise<SingleResult<PacienteDetalhe>> {
   return executar(async () => {
@@ -541,10 +552,12 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Paci
       carregarConvite(id),
     ]);
 
-    if (paciente.error) return falhaDe(paciente.error);
-    if (diagnosticos.error) return falhaDe(diagnosticos.error);
-    if (planos.error) return falhaDe(planos.error);
-    if (historico.error) return falhaDe(historico.error);
+    const erro = paciente.error ?? diagnosticos.error ?? planos.error ?? historico.error;
+    if (erro) {
+      return erro.code && FICHA_INEXISTENTE.has(erro.code)
+        ? fail(ERROR_CODE.NOT_FOUND, "Paciente não encontrado.")
+        : falhaDe(erro);
+    }
     if (convite && "error" in convite) return convite;
 
     const linha = ((paciente.data ?? []) as LinhaPaciente[])[0];
