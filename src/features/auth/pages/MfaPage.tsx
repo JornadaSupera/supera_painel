@@ -12,11 +12,12 @@ import { defaultHomePath } from "@/routes/home-path";
 import { AuthErrorAlert } from "../components/AuthErrorAlert";
 
 /**
- * Segundo fator — obrigatório.
+ * Segundo fator — a verificação de quem tem autenticador.
  *
- * O PDF §5 é explícito: "Login com segundo fator obrigatório". Não existe
- * caminho que chegue ao painel sem passar por aqui; quem tenta acessar a rota
- * sem um desafio em curso volta para o login.
+ * Toda conta com autenticador cadastrado passa por aqui, seja qual for o perfil.
+ * O que é obrigatório é o do administrador ("Login com segundo fator
+ * obrigatório"), e a conta dele sem autenticador cadastra um dentro do painel.
+ * Quem tenta acessar a rota sem um desafio em curso volta para o login.
  */
 
 const TAMANHO_CODIGO = 6;
@@ -168,8 +169,8 @@ export function MfaPage() {
         </Button>
 
         <p className="text-muted-foreground text-xs leading-relaxed">
-          A verificação em duas etapas é obrigatória para todo acesso ao painel, por se tratar de
-          dados de saúde.
+          Esta conta usa verificação em duas etapas. Perdeu o acesso ao aplicativo autenticador?
+          Peça a quem administra a plataforma para redefinir o segundo fator.
         </p>
       </div>
     </AuthLayout>

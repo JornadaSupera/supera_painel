@@ -51,6 +51,8 @@ const EstatisticasOperacionaisPage = lazy(
 );
 const AuditoriaPage = lazy(() => import("@/features/auditoria/pages/AuditoriaPage"));
 const ConfiguracoesPage = lazy(() => import("@/features/configuracoes/pages/ConfiguracoesPage"));
+/* The account's own security screen, shared by both panels. */
+const SegurancaContaPage = lazy(() => import("@/features/auth/pages/SegurancaContaPage"));
 
 /* Painel clínico — fundação (PA-07). Um chunk por módulo, mesmo critério. */
 const ClinicoDashboardPage = lazy(() => import("@/features/clinico/pages/ClinicoDashboardPage"));
@@ -252,6 +254,10 @@ export function AppRoutes() {
                 <Route path="/configuracoes" element={<ConfiguracoesPage />} />
               </Route>
 
+              {/* Every administrator manages their own second factor: no module
+                  permission, because it is the account's, not the panel's. */}
+              <Route path="/seguranca" element={<SegurancaContaPage />} />
+
               {/* "Estatísticas" alone is not a screen: it leads to the first child. */}
               <Route
                 path="/estatisticas"
@@ -280,6 +286,7 @@ export function AppRoutes() {
               <Route path="chat" element={<ClinicoChatPage />} />
               <Route path="alertas" element={<ClinicoAlertasPage />} />
               <Route path="conteudo" element={<ClinicoConteudoPage />} />
+              <Route path="seguranca" element={<SegurancaContaPage />} />
             </Route>
           </Route>
 

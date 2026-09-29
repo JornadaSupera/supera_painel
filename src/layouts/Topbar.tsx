@@ -1,4 +1,5 @@
-import { Bell, LogOut, Menu, Monitor, Moon, Search, Sun } from "lucide-react";
+import { Bell, LogOut, Menu, Monitor, Moon, Search, ShieldCheck, Sun } from "lucide-react";
+import { Link } from "react-router-dom";
 
 import { UserAvatar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { ESPECIALIDADE_LABEL, PAPEL_LABEL } from "@/lib/enums";
+import { panelAreaOf } from "@/routes/home-path";
 import { useLayoutStore } from "@/stores/layout";
 import { useThemeStore, type Theme } from "@/stores/theme";
 
@@ -46,6 +48,15 @@ export function Topbar() {
   const setMobileMenuOpen = useLayoutStore((s) => s.setMobileMenuOpen);
 
   const ThemeIcon = THEME_ICON[theme];
+
+  // The same screen in both panels, inside the frame the person belongs to.
+  const area = panelAreaOf(user);
+  const securityPath =
+    area === "admin"
+      ? "/seguranca"
+      : area === "clinico" && user?.especialidade
+        ? `/clinico/${user.especialidade}/seguranca`
+        : null;
 
   return (
     <header className="bg-background/80 border-border sticky top-0 z-30 flex h-15 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-sm sm:px-6">
@@ -140,6 +151,15 @@ export function Topbar() {
               </DropdownMenuLabel>
 
               <DropdownMenuSeparator />
+
+              {securityPath && (
+                <DropdownMenuItem asChild>
+                  <Link to={securityPath}>
+                    <ShieldCheck />
+                    Segurança da conta
+                  </Link>
+                </DropdownMenuItem>
+              )}
 
               <DropdownMenuItem variant="destructive" onSelect={() => void signOut()}>
                 <LogOut />
