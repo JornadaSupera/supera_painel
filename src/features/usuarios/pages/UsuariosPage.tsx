@@ -26,7 +26,7 @@ import {
   STATUS_USUARIO_LABEL,
   toOptions,
 } from "@/lib/enums";
-import { formatNumber } from "@/lib/format";
+import { pluralize } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { hasActiveFilters } from "@/stores/listStore";
@@ -189,8 +189,8 @@ export function UsuariosPage() {
           isLoading && total === 0
             ? "Carregando equipe…"
             : filtrada
-              ? `${formatNumber(total)} usuários no recorte atual`
-              : `${formatNumber(total)} usuários cadastrados · ${assistenciais} profissionais em ${especialidades} especialidades`
+              ? `${pluralize(total, "usuário", "usuários")} no recorte atual`
+              : `${pluralize(total, "usuário cadastrado", "usuários cadastrados")} · ${pluralize(assistenciais, "profissional", "profissionais")} em ${pluralize(especialidades, "especialidade", "especialidades")}`
         }
         actions={
           <Can permission={PERMISSAO.USUARIOS_MANAGE}>

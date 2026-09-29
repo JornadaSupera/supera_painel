@@ -1,3 +1,4 @@
+import { pluralize } from "@/lib/format";
 import {
   ERROR_CODE,
   fail,
@@ -109,7 +110,7 @@ export function effectsByProtocolReport(
       ? [...linhas].sort((a, b) => b.prevalencia - a.prevalencia)
       : [...linhas].sort((a, b) => b.registros - a.registros),
     resumo: porPercentual
-      ? `grau ${grau} ou maior · ${dados?.pacientes_considerados ?? 0} pacientes · últimos ${dias} dias`
+      ? `grau ${grau} ou maior · ${pluralize(dados?.pacientes_considerados ?? 0, "paciente", "pacientes")} · últimos ${dias} dias`
       : `grau ${grau} ou maior · ${dados?.registros_considerados ?? 0} registros · últimos ${dias} dias · prevalência indisponível: a origem não devolve o total de pacientes por protocolo`,
     eixo: "efeito",
     medida: porPercentual ? "prevalencia" : "registros",
@@ -133,7 +134,7 @@ export function bySpecialtyReport(
         { key: "volume", label: "Atendimentos", numerica: true },
       ],
       linhas: linhas.map((linha) => ({ especialidade: linha.label, volume: linha.volume })),
-      resumo: `${linhas.reduce((soma, linha) => soma + linha.volume, 0)} compromissos no período`,
+      resumo: `${pluralize(linhas.reduce((soma, linha) => soma + linha.volume, 0), "compromisso", "compromissos")} no período`,
       eixo: "especialidade",
       medida: "volume",
     };
@@ -233,7 +234,7 @@ export function contentReadsReport(
     ],
     linhas: ordenadas,
     resumo:
-      `${totalLeituras} leituras nos últimos ${dias} dias · ${ordenadas.length} orientações no ranking` +
+      `${pluralize(totalLeituras, "leitura", "leituras")} nos últimos ${dias} dias · ${pluralize(ordenadas.length, "orientação", "orientações")} no ranking` +
       (semVersaoPublicada > 0
         ? ` · ${semVersaoPublicada} com leitura registrada mas sem versão publicada no momento, fora do ranking`
         : ""),

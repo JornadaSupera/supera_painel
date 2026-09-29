@@ -1,3 +1,4 @@
+import { pluralize } from "@/lib/format";
 import { FASE_TRATAMENTO_LABEL } from "@/lib/enums";
 import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
 import type {
@@ -73,7 +74,7 @@ const TETO_VARREDURA = TETO_READ * 10;
  */
 const SEM_ORIGEM: Record<string, string> = {
   "alertas-ia":
-    "A fila de alertas existe no backend, mas nenhum gatilho de criticidade foi cadastrado: sem regra, nenhum alerta dispara. O limiar é decisão clínica, e cadastrá-lo é ato da administração. Fila priorizada por IA, além disso, é do nível Completo — fora do escopo contratado.",
+    "A fila de alertas existe no backend, mas ainda não há um resumo de volume, tempo até conduta e desfecho que não identifique paciente. Sem gatilho de criticidade cadastrado em Configurações → Gatilhos de alerta, além disso, nenhum alerta dispara. Fila priorizada por IA é do nível Completo — fora do escopo contratado.",
   nps: "As tabelas e a função da pesquisa existem, mas nenhuma pesquisa é aberta: a rotina agendada que dispara o NPS não foi criada, e dois dos três marcos dependem do plano terapêutico, que só a integração com o Gemed preenche. Sem pesquisa aberta não há resposta para contar.",
   "engajamento-app":
     "“Engajamento” não tem definição em fonte nenhuma: sessões abertas, dias com registro no diário, orientações lidas e mensagens enviadas dariam quatro números diferentes, e o escopo não diz qual deles é o indicador. A pergunta está aberta com a clínica. Número calculado sobre definição inventada é pior que indicador ausente.",
@@ -135,7 +136,7 @@ async function pacientesAtivos(): Promise<ReportOutcome> {
     ],
     linhas,
     resumo:
-      `${varredura.itens.length} pacientes ativos` +
+      `${pluralize(varredura.itens.length, "paciente ativo", "pacientes ativos")}` +
       (varredura.parcial ? avisoDeParcial(varredura.total, varredura.itens.length) : ""),
     eixo: "protocolo",
     medida: "total",
@@ -182,7 +183,7 @@ async function distribuicaoCid(): Promise<ReportOutcome> {
     ],
     linhas,
     resumo:
-      `${linhas.length} códigos · ${comCid} de ${varredura.itens.length} fichas com diagnóstico principal registrado` +
+      `${pluralize(linhas.length, "código", "códigos")} · ${comCid} de ${pluralize(varredura.itens.length, "ficha", "fichas")} com diagnóstico principal registrado` +
       (varredura.parcial ? avisoDeParcial(varredura.total, varredura.itens.length) : ""),
     eixo: "codigo",
     medida: "total",
@@ -231,7 +232,7 @@ async function novosPacientes(dias: number): Promise<ReportOutcome> {
     ],
     linhas,
     resumo:
-      `${total} cadastros nos últimos ${dias} dias` +
+      `${pluralize(total, "cadastro", "cadastros")} nos últimos ${dias} dias` +
       (varredura.parcial ? avisoDeParcial(varredura.total, varredura.itens.length) : ""),
     eixo: "mes",
     medida: "total",
@@ -293,7 +294,7 @@ async function sessoesQuimioterapia(dias: number): Promise<ReportOutcome> {
     linhas,
     // A taxa de ocupação da sala de infusão exigiria capacidade instalada, que
     // não é dado do banco. O relatório traz o volume e não finge a taxa.
-    resumo: `${total} sessões realizadas nos últimos ${dias} dias · taxa de ocupação da sala indisponível: a capacidade instalada não é dado do backend`,
+    resumo: `${pluralize(total, "sessão realizada", "sessões realizadas")} nos últimos ${dias} dias · taxa de ocupação da sala indisponível: a capacidade instalada não é dado do backend`,
     eixo: "mes",
     medida: "total",
   };

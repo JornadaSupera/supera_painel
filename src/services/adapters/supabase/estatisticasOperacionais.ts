@@ -22,6 +22,7 @@ import {
   type LinhaResumoAgenda,
   type LinhaResumoChat,
 } from "./_summaries";
+import { pluralize } from "@/lib/format";
 import type { Especialidade } from "@/lib/enums";
 import { executar, falhaDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
@@ -115,7 +116,7 @@ const SEM_VOLUME_DE_MENSAGEM = "mensagens_dia";
  * um resumo do lado do banco. Pedido registrado com o responsável pelo banco.
  */
 const ALERTAS_SEM_REGRA =
-  "Dois passos faltam, e nenhum é de tela: nenhum gatilho de criticidade foi cadastrado, então nenhum alerta dispara — cadastre em Configurações → Gatilhos de alerta; e o backend ainda não resume os alertas em volume, tempo até conduta e desfecho. A leitura disponível devolve alerta por alerta, com o paciente em cada linha, e somar isso aqui traria prontuário para uma tela que não identifica ninguém.";
+  "O backend ainda não resume os alertas em volume, tempo até conduta e desfecho. A leitura disponível devolve alerta por alerta, com o paciente em cada linha, e somar isso aqui traria prontuário para uma tela que não identifica ninguém. E sem gatilho de criticidade cadastrado em Configurações → Gatilhos de alerta nenhum alerta dispara.";
 
 /**
  * A chave da especialidade, a partir do código do painel.
@@ -254,7 +255,7 @@ function montarIndicadores(
       // diferentes na mesma tela é pior que uma taxa imperfeita.
       valor: percentual(faltas, volume),
       unidade: "%",
-      contexto: `${faltas} de ${volume} compromissos`,
+      contexto: `${faltas} de ${pluralize(volume, "compromisso", "compromissos")}`,
       inverter_cor: true,
     },
     {
@@ -272,7 +273,7 @@ function montarIndicadores(
       // O viés é da função, e a tela precisa dizê-lo: a janela recorta a
       // ABERTURA da conversa, então a aberta no fim do período e respondida
       // depois entra aqui. A janela recente sempre parece pior do que foi.
-      contexto: `de ${conversas} abertas no período`,
+      contexto: `de ${pluralize(conversas, "aberta", "abertas")} no período`,
       inverter_cor: true,
     },
   ];

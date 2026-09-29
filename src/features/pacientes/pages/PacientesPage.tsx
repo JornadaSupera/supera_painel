@@ -14,7 +14,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FASE_TRATAMENTO_LABEL, STATUS_PACIENTE_LABEL } from "@/lib/enums";
-import { formatNumber, ageInYears } from "@/lib/format";
+import { ageInYears, pluralize } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { hasActiveFilters } from "@/stores/listStore";
@@ -171,7 +171,7 @@ export function PacientesPage() {
         subtitle={
           isLoading && total === 0
             ? "Carregando cadastro…"
-            : `${formatNumber(total)} ${filtrada ? "pacientes no recorte atual" : "pacientes cadastrados"} · convite por SMS no cadastro`
+            : `${filtrada ? `${pluralize(total, "paciente", "pacientes")} no recorte atual` : pluralize(total, "paciente cadastrado", "pacientes cadastrados")} · convite por SMS no cadastro`
         }
         actions={
           <>
