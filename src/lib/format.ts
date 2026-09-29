@@ -141,6 +141,11 @@ export function formatNumber(
   return value.toLocaleString(LOCALE, options);
 }
 
+/** "1 paciente" / "2 pacientes" — pt-BR treats only exactly 1 as singular. */
+export function pluralize(count: number, singular: string, plural: string): string {
+  return `${formatNumber(count)} ${count === 1 ? singular : plural}`;
+}
+
 /** "12,4%" */
 export function formatPercent(value: number | null | undefined, decimals = 1): string {
   if (value === null || value === undefined || Number.isNaN(value)) return EMPTY;
