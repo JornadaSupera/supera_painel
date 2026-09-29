@@ -61,6 +61,7 @@ const ClinicoAgendaPage = lazy(() => import("@/features/clinico/pages/ClinicoAge
 const ClinicoChatPage = lazy(() => import("@/features/clinico/pages/ClinicoChatPage"));
 const ClinicoAlertasPage = lazy(() => import("@/features/clinico/pages/ClinicoAlertasPage"));
 const ClinicoConteudoPage = lazy(() => import("@/features/clinico/pages/ClinicoConteudoPage"));
+const ClinicoOrientacaoPage = lazy(() => import("@/features/clinico/pages/ClinicoOrientacaoPage"));
 /* Not a panel screen: its audience is app users, so it stays out of the bundle
    that panel staff load first. */
 const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
@@ -285,7 +286,14 @@ export function AppRoutes() {
               <Route path="agenda" element={<ClinicoAgendaPage />} />
               <Route path="chat" element={<ClinicoChatPage />} />
               <Route path="alertas" element={<ClinicoAlertasPage />} />
-              <Route path="conteudo" element={<ClinicoConteudoPage />} />
+              {/* Writing is the professional's, in their own area: the list and the
+                  editor share the module permission, and the database still decides
+                  who is the author. "nova" outranks ":id" by being static. */}
+              <Route element={<PermissionRoute permission={PERMISSAO.CONTEUDO_WRITE} />}>
+                <Route path="conteudo" element={<ClinicoConteudoPage />} />
+                <Route path="conteudo/nova" element={<ClinicoOrientacaoPage />} />
+                <Route path="conteudo/:id" element={<ClinicoOrientacaoPage />} />
+              </Route>
               <Route path="seguranca" element={<SegurancaContaPage />} />
             </Route>
           </Route>
