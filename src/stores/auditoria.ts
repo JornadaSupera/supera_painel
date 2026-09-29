@@ -74,10 +74,13 @@ const UM_DIA = 86_400_000;
  * indefinidamente, e o sintoma era invisível porque `placeholderData` mantinha
  * os dados anteriores na tela enquanto isso acontecia.
  *
- * Arredondar estabiliza a chave por até um minuto. Para uma trilha com
- * retenção de cinco anos, um minuto de defasagem no limite superior não muda
- * resposta nenhuma — e `to` fica no fim do minuto corrente, para que o registro
- * de agora há pouco continue dentro da janela.
+ * Arredondar estabiliza a chave por até um minuto.
+ *
+ * The upper bound is a day ahead, not the end of the current minute. "Now" is
+ * the browser's clock, and the trail is stamped by the server's: a workstation
+ * running a few minutes behind hid exactly the most recent entries — the ones
+ * someone opens the trail to look for. Nothing is recorded in the future, so
+ * the slack widens no answer; it only absorbs a clock that drifted.
  */
 export function janelaComoRange(janelaDias: string): DateRange | null {
   const dias = Number(janelaDias);
@@ -87,6 +90,6 @@ export function janelaComoRange(janelaDias: string): DateRange | null {
 
   return {
     from: new Date(agora - dias * UM_DIA).toISOString(),
-    to: new Date(agora + UM_MINUTO).toISOString(),
+    to: new Date(agora + UM_DIA).toISOString(),
   };
 }
