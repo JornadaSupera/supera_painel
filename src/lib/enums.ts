@@ -153,6 +153,47 @@ export const STATUS_ALERTA_LABEL: Record<StatusAlerta, string> = {
   resolvido: "Resolvido",
 };
 
+/** A conduta registrada ao resolver um alerta — painel clínico, ver PA-07. */
+export const CONDUTA_ALERTA = {
+  ORIENTACAO: "orientacao",
+  AGENDAMENTO: "agendamento",
+  ENCAMINHAMENTO: "encaminhamento",
+} as const;
+
+export type CondutaAlerta = (typeof CONDUTA_ALERTA)[keyof typeof CONDUTA_ALERTA];
+
+export const CONDUTA_ALERTA_LABEL: Record<CondutaAlerta, string> = {
+  orientacao: "Orientação",
+  agendamento: "Agendamento",
+  encaminhamento: "Encaminhamento",
+};
+
+/* ------------------------------------------------------------------------
+   CHAT — painel clínico, ver PA-07
+   ------------------------------------------------------------------------ */
+
+export const STATUS_CONVERSA = {
+  ABERTA: "aberta",
+  RESOLVIDA: "resolvida",
+} as const;
+
+export type StatusConversa = (typeof STATUS_CONVERSA)[keyof typeof STATUS_CONVERSA];
+
+export const STATUS_CONVERSA_LABEL: Record<StatusConversa, string> = {
+  aberta: "Aberta",
+  resolvida: "Resolvida",
+};
+
+/** Quem escreveu uma mensagem — `messages.author_kind` no banco. */
+export const AUTOR_MENSAGEM = {
+  PACIENTE: "paciente",
+  CUIDADOR: "cuidador",
+  PROFISSIONAL: "profissional",
+  SISTEMA: "sistema",
+} as const;
+
+export type AutorMensagem = (typeof AUTOR_MENSAGEM)[keyof typeof AUTOR_MENSAGEM];
+
 /* ------------------------------------------------------------------------
    CONTEÚDO
    ------------------------------------------------------------------------ */

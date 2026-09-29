@@ -1,10 +1,18 @@
-import type { FaseTratamento, Papel, Periodo, StatusUsuario, VocabularioTermo } from "@/lib/enums";
+import type {
+  CondutaAlerta,
+  FaseTratamento,
+  Papel,
+  Periodo,
+  StatusAlerta,
+  StatusUsuario,
+  VocabularioTermo,
+} from "@/lib/enums";
 import type { Permissao } from "@/lib/rbac";
 import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
 import type { DesafioMfa, GarantiaDaSessao, ResultadoLogin, Sessao } from "@/types/auth";
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
-import type { CompromissoAgenda } from "@/types/clinico";
+import type { AlertaClinico, CompromissoAgenda, ConversaClinico, MensagemClinico } from "@/types/clinico";
 import type {
   ClinicaConfiguracao,
   ConfiguracaoSeguranca,
@@ -449,6 +457,31 @@ export interface FiltroClinico {
 export interface ClinicoOperations {
   /** Compromissos do profissional logado, na janela informada. */
   getMinhaAgenda(params: { de: string; ate: string }): Promise<ListResult<CompromissoAgenda>>;
+
+  /**
+   * A fila de alertas — compartilhada pela equipe, não recortada por
+   * profissional. `status` filtra; sem ele vêm todos.
+   */
+  listAlertas(params?: { status?: StatusAlerta }): Promise<ListResult<AlertaClinico>>;
+  /** Assume um alerta em aberto. Exige a permissão `alerts.triage`. */
+  assumirAlerta(params: { id: string }): Promise<SingleResult<null>>;
+  /** Resolve um alerta assumido, com a conduta tomada. */
+  resolverAlerta(params: {
+    id: string;
+    conduta: CondutaAlerta;
+    notas?: string;
+  }): Promise<SingleResult<null>>;
+
+  /** As conversas — mesma fila de equipe da fila de alertas. */
+  listConversas(): Promise<ListResult<ConversaClinico>>;
+  /** Histórico de uma conversa. Sem operação de envio — ver PA-07. */
+  listMensagens(params: { conversaId: string }): Promise<ListResult<MensagemClinico>>;
+  /** Assume uma conversa ainda sem especialidade atribuída. */
+  assumirConversa(params: { id: string }): Promise<SingleResult<null>>;
+  /** Marca como resolvida uma conversa da própria especialidade. */
+  resolverConversa(params: { id: string }): Promise<SingleResult<null>>;
+  /** Registra a leitura da conversa por esta conta. */
+  marcarConversaLida(params: { id: string }): Promise<SingleResult<null>>;
 }
 
 export interface EstatisticasClinicasOperations {

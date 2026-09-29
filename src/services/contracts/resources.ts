@@ -268,7 +268,17 @@ export const RESOURCES = {
   clinico: {
     table: null, // RPCs escopadas ao profissional da própria sessão
     fase: 16, // painel clínico — trilha própria de fases, ver PA-07
-    operations: ["getMinhaAgenda"],
+    operations: [
+      "getMinhaAgenda",
+      "listAlertas",
+      "assumirAlerta",
+      "resolverAlerta",
+      "listConversas",
+      "listMensagens",
+      "assumirConversa",
+      "resolverConversa",
+      "marcarConversaLida",
+    ],
   },
   catalogos: {
     table: "catalogos",
