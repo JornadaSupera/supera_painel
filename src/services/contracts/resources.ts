@@ -163,6 +163,11 @@ export const RESOURCES = {
       "unpublish",
       "listVersions",
       "submitForReview",
+      "listMine",
+      "listCategories",
+      "addAttachment",
+      "removeAttachment",
+      "downloadAttachment",
     ],
   },
   aprovacoes: {

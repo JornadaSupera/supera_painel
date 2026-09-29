@@ -1,4 +1,17 @@
-import { ACAO_REVISAO, STATUS_CONTEUDO, type AcaoRevisao } from "@/lib/enums";
+import {
+  CONTENT_BODY_MAX,
+  CONTENT_READING_MINUTES_MAX,
+  CONTENT_TITLE_MAX,
+  isSupportedVideoUrl,
+} from "@/lib/content";
+import {
+  ACAO_REVISAO,
+  STATUS_CONTEUDO,
+  TIPO_CONTEUDO,
+  type AcaoRevisao,
+  type StatusConteudo,
+  type TipoConteudo,
+} from "@/lib/enums";
 import {
   ERROR_CODE,
   fail,
@@ -17,9 +30,21 @@ import type { ComparacaoVersoes, ConteudoDetalhe, ConteudoListItem } from "@/typ
  * who may write — is one rule, and it lives here once.
  */
 
+/**
+ * The body with its marks removed: a card that shows "**pausas**" and "##" is
+ * showing the syntax, not the text.
+ */
+function stripMarks(body: string): string {
+  return body
+    .replace(/^#{1,3}\s+/gm, "")
+    .replace(/^\s*(?:[-*]|\d+[.)])\s+/gm, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/(^|[\s([])[*_](\S(?:.*?\S)?)[*_](?=$|[\s.,;:!?)\]])/g, "$1$2");
+}
+
 /** Opening lines of the body — the queue card shows what the text is about. */
 export function summarizeBody(body: string, limit = 160): string {
-  const clean = body.replace(/\s+/g, " ").trim();
+  const clean = stripMarks(body).replace(/\s+/g, " ").trim();
   if (clean.length <= limit) return clean;
 
   // Cuts at a word boundary, never in the middle of one.
@@ -101,27 +126,106 @@ export function createApprovalOperations({
   };
 }
 
+/* -------------------------------------------------------------------------
+   AUTHORING
+   -------------------------------------------------------------------------
+   Writing guidance belongs to the professional of the area, in their own
+   workspace — the database requires the author to be whoever writes. The
+   administrative panel reviews, approves and unpublishes; that separation
+   between who drafts and who approves is why the workflow exists.
+   ------------------------------------------------------------------------- */
+
+interface EntryFields {
+  titulo?: string;
+  corpo?: string;
+  tipo?: TipoConteudo;
+  video_url?: string | null;
+  minutos_leitura?: number | null;
+}
+
 /**
- * Writing guidance belongs to the professional of the area, in their own
- * workspace — the database requires the author to be whoever writes. The
- * administrative panel reviews, approves and unpublishes. That is not a gap,
- * it is the separation between who drafts and who approves, which is why the
- * workflow exists; a mock that accepted these would have the screen promise a
- * button the real backend denies.
+ * What the form already checks, checked again where the write happens: the two
+ * adapters must refuse the same entries, and a mock that accepted what the
+ * database rejects would have the screen promise a save that never happens.
+ *
+ * Fields that are absent are not checked, so an edit can send only what changed.
  */
-const AUTHOR_ONLY =
-  "Quem redige a orientação é o profissional da área, no espaço de trabalho dele. O painel administrativo revisa, aprova e despublica.";
+export function invalidContentEntry(entry: EntryFields): FailResult | null {
+  if (entry.titulo !== undefined) {
+    const title = entry.titulo.trim();
+    if (!title) return fail(ERROR_CODE.VALIDATION, "Informe o título da orientação.");
+    if (title.length > CONTENT_TITLE_MAX) {
+      return fail(ERROR_CODE.VALIDATION, `O título tem no máximo ${CONTENT_TITLE_MAX} caracteres.`);
+    }
+  }
 
-export const AUTHOR_ONLY_OPERATIONS = {
-  create: async (): Promise<SingleResult<ConteudoDetalhe>> =>
-    fail(ERROR_CODE.FORBIDDEN, AUTHOR_ONLY),
+  if (entry.corpo !== undefined) {
+    const body = entry.corpo.trim();
+    if (!body) return fail(ERROR_CODE.VALIDATION, "Escreva o texto da orientação.");
+    if (body.length > CONTENT_BODY_MAX) {
+      return fail(ERROR_CODE.VALIDATION, `O texto tem no máximo ${CONTENT_BODY_MAX} caracteres.`);
+    }
+  }
 
-  update: async (): Promise<SingleResult<ConteudoDetalhe>> =>
-    fail(ERROR_CODE.FORBIDDEN, AUTHOR_ONLY),
+  if (entry.tipo === TIPO_CONTEUDO.VIDEO) {
+    const url = entry.video_url?.trim();
+    if (!url) return fail(ERROR_CODE.VALIDATION, "Informe o link do vídeo.");
+  }
 
-  submitForReview: async (): Promise<SingleResult<ConteudoDetalhe>> =>
-    fail(
-      ERROR_CODE.FORBIDDEN,
-      "Enviar para revisão é o ato de quem escreveu — é assim que o texto entra nesta fila.",
-    ),
-};
+  const url = entry.video_url?.trim();
+  if (url && !isSupportedVideoUrl(url)) {
+    return fail(ERROR_CODE.VALIDATION, "O vídeo precisa ser um link https do YouTube ou do Vimeo.");
+  }
+
+  const minutes = entry.minutos_leitura;
+  if (minutes != null && (!Number.isInteger(minutes) || minutes < 1 || minutes > CONTENT_READING_MINUTES_MAX)) {
+    return fail(
+      ERROR_CODE.VALIDATION,
+      `O tempo de leitura vai de 1 a ${CONTENT_READING_MINUTES_MAX} minutos.`,
+    );
+  }
+
+  return null;
+}
+
+/**
+ * What a version needs before it can leave the draft.
+ *
+ * Sending it to review is the point of no return for the text, so an orientation
+ * declared as a PDF has to have the PDF attached — otherwise the patient would be
+ * offered a document that does not exist.
+ */
+export function incompleteForReview(detail: ConteudoDetalhe): FailResult | null {
+  if (detail.tipo === TIPO_CONTEUDO.PDF && !detail.anexos.some((a) => a.mime_type === "application/pdf")) {
+    return fail(
+      ERROR_CODE.VALIDATION,
+      "Uma orientação do tipo PDF precisa do arquivo PDF anexado antes de ir para revisão.",
+    );
+  }
+
+  return null;
+}
+
+/**
+ * The state the AUTHOR sees.
+ *
+ * The database has four states and no memory of why a draft is a draft: a
+ * version the reviewer returned goes back to `draft`, and one they rejected goes
+ * to `archived`. The last decision is what tells them apart — and the author
+ * needs to know, because "returned" comes with a comment to read and "draft"
+ * does not.
+ */
+export function statusForAuthor(
+  status: StatusConteudo,
+  lastAction: AcaoRevisao | null,
+): StatusConteudo {
+  if (status === STATUS_CONTEUDO.RASCUNHO && lastAction === ACAO_REVISAO.DEVOLVER) {
+    return STATUS_CONTEUDO.DEVOLVIDO;
+  }
+
+  if (status === STATUS_CONTEUDO.DESPUBLICADO && lastAction === ACAO_REVISAO.REJEITAR) {
+    return STATUS_CONTEUDO.REJEITADO;
+  }
+
+  return status;
+}

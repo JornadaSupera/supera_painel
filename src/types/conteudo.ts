@@ -16,10 +16,10 @@ import type {
  * inverter os dois faria a aprovação cair na linha errada, e o sintoma seria
  * publicar um texto que ninguém revisou.
  *
- * O corpo é TEXTO PURO, nunca HTML. Nada nesta tela passa por
- * `dangerouslySetInnerHTML`: o texto é renderizado como parágrafos, então não
- * existe caminho de injeção a sanitizar. Se um dia o editor produzir marcação,
- * a sanitização entra ANTES daqui — na camada de dados —, não na renderização.
+ * O corpo é MARKDOWN SIMPLES (negrito, itálico, títulos e listas), nunca HTML.
+ * Nada aqui passa por `dangerouslySetInnerHTML`: o texto vira elementos do React
+ * (`MarkdownText`), então não existe caminho de injeção a sanitizar. Um texto
+ * sem marcação — como os que já existem — é Markdown válido.
  */
 
 export interface ConteudoListItem {
@@ -60,6 +60,23 @@ export interface ConteudoListItem {
   visualizacoes: number | null;
 }
 
+/** Uma categoria em que o profissional pode escrever: as da sua especialidade. */
+export interface CategoriaConteudo {
+  id: string;
+  label: string;
+  especialidade: Especialidade | null;
+}
+
+/** Um arquivo anexado a uma versão em rascunho. O conteúdo se baixa à parte. */
+export interface AnexoConteudo {
+  id: string;
+  /** Caminho no bucket: `<id da versão>/<pasta>/<nome>`. */
+  caminho: string;
+  nome: string;
+  mime_type: string;
+  tamanho: number;
+}
+
 export interface ConteudoDetalhe extends ConteudoListItem {
   corpo: string;
   video_url: string | null;
@@ -68,6 +85,7 @@ export interface ConteudoDetalhe extends ConteudoListItem {
   cids: { code: string; label: string }[];
   /** Decisões já tomadas sobre esta versão, da mais recente para a mais antiga. */
   revisoes: RevisaoConteudo[];
+  anexos: AnexoConteudo[];
 }
 
 /** Uma decisão registrada no workflow: quem decidiu o quê, quando e por quê. */
@@ -90,7 +108,10 @@ export interface ComparacaoVersoes {
   anterior: ConteudoDetalhe | null;
 }
 
-/** Entrada de criação/edição. O painel administrativo hoje só revisa — ver `AUTHOR_ONLY_OPERATIONS`. */
+/**
+ * Entrada de criação/edição. Quem escreve é o profissional, no espaço dele; o
+ * painel administrativo revisa e nunca chama isto.
+ */
 export interface ConteudoEntrada {
   titulo: string;
   corpo: string;
@@ -98,5 +119,6 @@ export interface ConteudoEntrada {
   tipo: TipoConteudo;
   video_url?: string | null;
   minutos_leitura?: number | null;
+  /** Códigos CID-10 ("C50.9"), não ids: o código é a chave natural do catálogo. */
   cids?: string[];
 }

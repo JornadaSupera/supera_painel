@@ -57,6 +57,14 @@ const CATEGORIA = {
   FISIOTERAPIA: { id: "b1c0e5a2-0004-4a10-9f01-000000000004", label: "Fisioterapia" },
 } as const;
 
+/** As categorias em que se pode escrever, e a especialidade dona de cada uma. */
+export const CATEGORIAS: { id: string; label: string; specialty: Especialidade }[] = [
+  { ...CATEGORIA.NUTRICAO, specialty: ESPECIALIDADE.NUTRICIONISTA },
+  { ...CATEGORIA.PSICOLOGIA, specialty: ESPECIALIDADE.PSICOLOGO },
+  { ...CATEGORIA.ODONTOLOGIA, specialty: ESPECIALIDADE.DENTISTA },
+  { ...CATEGORIA.FISIOTERAPIA, specialty: ESPECIALIDADE.FISIOTERAPEUTA },
+];
+
 /* -------------------------------------------------------------------------
    AGUARDANDO REVISÃO — os três cartões do topo do protótipo
    ------------------------------------------------------------------------- */

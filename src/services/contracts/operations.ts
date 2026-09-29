@@ -50,6 +50,8 @@ import type {
 } from "@/types/estatisticas";
 import type {
   ComparacaoVersoes,
+  AnexoConteudo,
+  CategoriaConteudo,
   ConteudoDetalhe,
   ConteudoEntrada,
   ConteudoListItem,
@@ -418,10 +420,40 @@ export interface ConteudosOperations {
 
   unpublish(params: { id: string; motivo?: string }): Promise<SingleResult<ConteudoDetalhe>>;
 
-  /** Redigir é do autor, não do revisor — as três recusam por desenho. */
+  /**
+   * As versões escritas pela própria pessoa, com o estado que o AUTOR precisa
+   * ver: o banco devolve uma versão devolvida ao rascunho e arquiva uma rejeitada,
+   * e aqui elas voltam como "devolvido" e "rejeitado".
+   */
+  listMine(params?: ListParams): Promise<ListResult<ConteudoListItem>>;
+
+  /** As categorias ativas da(s) especialidade(s) da pessoa: onde ela pode escrever. */
+  listCategories(): Promise<ListResult<CategoriaConteudo>>;
+
+  /**
+   * Redigir é do autor, não do revisor: as três exigem perfil de profissional, e
+   * o banco recusa quem não é o autor da versão. Editar só vale enquanto a versão
+   * é rascunho — depois de enviada, mudar o texto faria o revisor aprovar um
+   * texto e publicar outro.
+   *
+   * `create` nasce sempre como rascunho, da primeira versão de uma orientação
+   * nova. Anexo só existe depois: ele pertence à versão.
+   */
   create(params: ConteudoEntrada): Promise<SingleResult<ConteudoDetalhe>>;
   update(params: { id: string; dados: Partial<ConteudoEntrada> }): Promise<SingleResult<ConteudoDetalhe>>;
+  /** Rascunho → em revisão. É o que faz o texto entrar na fila do administrador. */
   submitForReview(params: { id: string }): Promise<SingleResult<ConteudoDetalhe>>;
+
+  /**
+   * Anexos da versão em rascunho: imagem ou PDF.
+   *
+   * A linha do anexo precisa existir antes do arquivo — é ela que autoriza o
+   * upload — e o caminho começa pelo id da versão.
+   */
+  addAttachment(params: { versaoId: string; arquivo: File }): Promise<SingleResult<AnexoConteudo>>;
+  removeAttachment(params: { versaoId: string; anexo: AnexoConteudo }): Promise<SingleResult<null>>;
+  /** O conteúdo de um anexo, como arquivo: o navegador só exibe `blob:`. */
+  downloadAttachment(params: { caminho: string }): Promise<SingleResult<Blob>>;
 }
 
 export interface AprovacoesOperations {

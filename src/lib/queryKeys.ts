@@ -83,6 +83,11 @@ export const queryKeys = {
   contents: {
     ...entity("contents"),
     versions: (id: string) => ["contents", "detail", id, "versions"] as const,
+    /** As do próprio autor. Sob `contents`: enviar para revisão mexe na fila do administrador. */
+    mine: (params?: ListParams) => ["contents", "mine", params ?? {}] as const,
+    categories: () => ["contents", "categories"] as const,
+    /** Fora de `contents.all`: o anexo não muda, e invalidar a lista não deve baixá-lo de novo. */
+    attachment: (caminho: string) => ["content-attachment", caminho] as const,
   },
 
   permissions: {

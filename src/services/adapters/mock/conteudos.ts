@@ -1,31 +1,42 @@
+import { attachmentError, safeAttachmentName } from "@/lib/attachments";
+import { isEditableStatus } from "@/lib/content";
 import {
   ACAO_REVISAO,
   STATUS_CONTEUDO,
+  TIPO_CONTEUDO,
   type AcaoRevisao,
   type StatusConteudo,
 } from "@/lib/enums";
-import { conteudos, revisoes, type ConteudoRaw } from "@/mocks/conteudos";
+import { cids as catalogoCids } from "@/mocks/cids";
+import { CATEGORIAS, conteudos, revisoes, type ConteudoRaw } from "@/mocks/conteudos";
 import {
   ERROR_CODE,
   fail,
+  ok,
   okOne,
   type ListParams,
   type ListResult,
   type SingleResult,
 } from "@/services/contracts";
 import type {
+  AnexoConteudo,
+  CategoriaConteudo,
   ComparacaoVersoes,
   ConteudoDetalhe,
+  ConteudoEntrada,
   ConteudoListItem,
   RevisaoConteudo,
 } from "@/types/conteudo";
 import {
-  AUTHOR_ONLY_OPERATIONS,
   createPublishingOperations,
+  incompleteForReview,
+  invalidContentEntry,
   missingReviewComment,
+  statusForAuthor,
   summarizeBody,
 } from "../_content";
 import { now, paginate, simulate, uuid } from "./_helpers";
+import { autorDaSessao } from "./auth";
 
 /**
  * Conteúdo — mesma superfície do adapter Supabase, sobre arrays.
@@ -82,14 +93,23 @@ function revisoesDe(versaoId: string): RevisaoConteudo[] {
     }));
 }
 
+/** Anexos e conteúdo dos arquivos enviados nesta sessão. Somem ao recarregar, como o resto do mock. */
+const anexosPorVersao = new Map<string, AnexoConteudo[]>();
+const arquivosEnviados = new Map<string, Blob>();
+
 function detalhar(linha: ConteudoRaw): ConteudoDetalhe {
+  const revisoesDaVersao = revisoesDe(linha.id);
+  const base = projetar(linha);
+
   return {
-    ...projetar(linha),
+    ...base,
+    status: statusForAuthor(base.status, revisoesDaVersao[0]?.acao ?? null),
     corpo: linha.body,
     video_url: linha.video_url,
     minutos_leitura: linha.estimated_reading_minutes,
     cids: linha.cid10,
-    revisoes: revisoesDe(linha.id),
+    revisoes: revisoesDaVersao,
+    anexos: anexosPorVersao.get(linha.id) ?? [],
   };
 }
 
@@ -215,10 +235,240 @@ export async function revisar({
 export const { publish, unpublish } = createPublishingOperations(revisar);
 
 /* -------------------------------------------------------------------------
-   ESCRITA DO AUTOR
+   AS ORIENTAÇÕES DO PRÓPRIO AUTOR
    -------------------------------------------------------------------------
-   The mock REFUSES create and edit, just like Supabase — for the same product
-   reason, not for lack of implementation.
+   As mesmas regras do adapter real: só o autor escreve, só na categoria de uma
+   especialidade dele, e só enquanto a versão é rascunho ou foi devolvida.
    ------------------------------------------------------------------------- */
 
-export const { create, update, submitForReview } = AUTHOR_ONLY_OPERATIONS;
+const SEM_PERMISSAO_DE_AUTOR =
+  "Só quem escreveu a orientação edita, e só enquanto a versão é rascunho ou foi devolvida.";
+
+const CATEGORIA_RECUSADA = "Esta categoria não é da sua especialidade, ou está desativada.";
+
+export async function listMine(params: ListParams = {}): Promise<ListResult<ConteudoListItem>> {
+  return simulate(() => {
+    const eu = autorDaSessao();
+    if (!eu) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
+
+    return paginate(
+      versoes
+        .filter((linha) => linha.author_id === eu.id)
+        .map((linha) => ({
+          ...projetar(linha),
+          status: statusForAuthor(linha.status, revisoesDe(linha.id)[0]?.acao ?? null),
+        })),
+      { ...params, sort: params.sort ?? ORDENACAO_PADRAO },
+      { searchFields: CAMPOS_BUSCA },
+    );
+  });
+}
+
+export async function listCategories(): Promise<ListResult<CategoriaConteudo>> {
+  return simulate(() => {
+    const eu = autorDaSessao();
+    if (!eu) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
+
+    return ok(
+      CATEGORIAS.filter((categoria) => categoria.specialty === eu.especialidade).map((categoria) => ({
+        id: categoria.id,
+        label: categoria.label,
+        especialidade: categoria.specialty,
+      })),
+    );
+  });
+}
+
+function cidsDe(codigos: string[]): ConteudoRaw["cid10"] | ReturnType<typeof fail> {
+  const unicos = [...new Set(codigos.map((c) => c.trim()).filter(Boolean))];
+  const achados = unicos.map((codigo) => catalogoCids.find((cid) => cid.codigo === codigo));
+  const faltam = unicos.filter((_, indice) => !achados[indice]);
+  if (faltam.length > 0) return fail(ERROR_CODE.VALIDATION, `CID-10 não encontrado: ${faltam.join(", ")}.`);
+
+  return achados.map((cid) => ({ code: cid?.codigo ?? "", label: cid?.descricao ?? "" }));
+}
+
+export async function create(entrada: ConteudoEntrada): Promise<SingleResult<ConteudoDetalhe>> {
+  return simulate(() => {
+    const invalida = invalidContentEntry(entrada);
+    if (invalida) return invalida;
+
+    const eu = autorDaSessao();
+    if (!eu) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
+
+    const categoria = CATEGORIAS.find((item) => item.id === entrada.categoria_id);
+    if (!categoria || categoria.specialty !== eu.especialidade) {
+      return fail(ERROR_CODE.FORBIDDEN, CATEGORIA_RECUSADA);
+    }
+
+    const cids = cidsDe(entrada.cids ?? []);
+    if ("error" in cids) return cids;
+
+    const agora = now();
+    const linha: ConteudoRaw = {
+      id: uuid(),
+      content_item_id: uuid(),
+      version_no: 1,
+      title: entrada.titulo.trim(),
+      body: entrada.corpo.trim(),
+      media_kind: entrada.tipo,
+      video_url: entrada.tipo === TIPO_CONTEUDO.VIDEO ? (entrada.video_url?.trim() ?? null) : null,
+      estimated_reading_minutes: entrada.minutos_leitura ?? null,
+      status: STATUS_CONTEUDO.RASCUNHO,
+      category_label: categoria.label,
+      category_id: categoria.id,
+      specialty: categoria.specialty,
+      is_confidential: categoria.label === "Psicologia",
+      author_name: eu.nome,
+      author_id: eu.id,
+      cid10: cids,
+      view_count: 0,
+      created_at: agora,
+      updated_at: agora,
+    };
+
+    versoes.push(linha);
+    return okOne(detalhar(linha));
+  });
+}
+
+/** A versão que a pessoa pode alterar, ou o motivo de não poder. */
+function versaoEditavel(id: string): ConteudoRaw | ReturnType<typeof fail> {
+  const linha = acharPorId(id);
+  if (!linha) return fail(ERROR_CODE.NOT_FOUND, "Versão de conteúdo não encontrada.");
+
+  const eu = autorDaSessao();
+  if (!eu || linha.author_id !== eu.id || !isEditableStatus(linha.status)) {
+    return fail(ERROR_CODE.FORBIDDEN, SEM_PERMISSAO_DE_AUTOR);
+  }
+
+  return linha;
+}
+
+export async function update({
+  id,
+  dados,
+}: {
+  id: string;
+  dados: Partial<ConteudoEntrada>;
+}): Promise<SingleResult<ConteudoDetalhe>> {
+  return simulate(() => {
+    const linha = versaoEditavel(id);
+    if ("error" in linha) return linha;
+
+    const tipoFinal = dados.tipo ?? linha.media_kind;
+    const linkFinal = dados.video_url !== undefined ? dados.video_url : linha.video_url;
+
+    const invalida = invalidContentEntry({ ...dados, tipo: tipoFinal, video_url: linkFinal });
+    if (invalida) return invalida;
+
+    const cids = dados.cids ? cidsDe(dados.cids) : null;
+    if (cids && "error" in cids) return cids;
+
+    if (dados.categoria_id) {
+      const eu = autorDaSessao();
+      const categoria = CATEGORIAS.find((item) => item.id === dados.categoria_id);
+      if (!categoria || categoria.specialty !== eu?.especialidade) {
+        return fail(ERROR_CODE.FORBIDDEN, CATEGORIA_RECUSADA);
+      }
+      linha.category_id = categoria.id;
+      linha.category_label = categoria.label;
+      linha.specialty = categoria.specialty;
+      linha.is_confidential = categoria.label === "Psicologia";
+    }
+
+    if (dados.titulo !== undefined) linha.title = dados.titulo.trim();
+    if (dados.corpo !== undefined) linha.body = dados.corpo.trim();
+    if (dados.tipo !== undefined || dados.video_url !== undefined) {
+      linha.media_kind = tipoFinal;
+      linha.video_url = tipoFinal === TIPO_CONTEUDO.VIDEO ? (linkFinal?.trim() ?? null) : null;
+    }
+    if (dados.minutos_leitura !== undefined) linha.estimated_reading_minutes = dados.minutos_leitura;
+    if (cids) linha.cid10 = cids;
+
+    linha.updated_at = now();
+    return okOne(detalhar(linha));
+  });
+}
+
+export async function submitForReview({ id }: { id: string }): Promise<SingleResult<ConteudoDetalhe>> {
+  return simulate(() => {
+    const linha = versaoEditavel(id);
+    if ("error" in linha) return linha;
+
+    const incompleta = incompleteForReview(detalhar(linha));
+    if (incompleta) return incompleta;
+
+    linha.status = STATUS_CONTEUDO.EM_REVISAO;
+    linha.updated_at = now();
+    return okOne(detalhar(linha));
+  });
+}
+
+/* -------------------------------------------------------------------------
+   ANEXOS DA VERSÃO EM RASCUNHO
+   ------------------------------------------------------------------------- */
+
+export async function addAttachment({
+  versaoId,
+  arquivo,
+}: {
+  versaoId: string;
+  arquivo: File;
+}): Promise<SingleResult<AnexoConteudo>> {
+  return simulate(() => {
+    const motivo = attachmentError(arquivo);
+    if (motivo) return fail(ERROR_CODE.VALIDATION, motivo);
+
+    const linha = versaoEditavel(versaoId);
+    if ("error" in linha) return linha;
+
+    const nome = safeAttachmentName(arquivo.name, arquivo.type);
+    const caminho = `${versaoId}/${uuid()}/${nome}`;
+    const anexo: AnexoConteudo = {
+      id: uuid(),
+      caminho,
+      nome,
+      mime_type: arquivo.type,
+      tamanho: arquivo.size,
+    };
+
+    arquivosEnviados.set(caminho, arquivo);
+    anexosPorVersao.set(versaoId, [...(anexosPorVersao.get(versaoId) ?? []), anexo]);
+
+    return okOne(anexo);
+  });
+}
+
+export async function removeAttachment({
+  versaoId,
+  anexo,
+}: {
+  versaoId: string;
+  anexo: AnexoConteudo;
+}): Promise<SingleResult<null>> {
+  return simulate(() => {
+    const linha = versaoEditavel(versaoId);
+    if ("error" in linha) return linha;
+
+    anexosPorVersao.set(
+      versaoId,
+      (anexosPorVersao.get(versaoId) ?? []).filter((item) => item.id !== anexo.id),
+    );
+    arquivosEnviados.delete(anexo.caminho);
+
+    return okOne(null);
+  });
+}
+
+export async function downloadAttachment({
+  caminho,
+}: {
+  caminho: string;
+}): Promise<SingleResult<Blob>> {
+  return simulate(() => {
+    const arquivo = arquivosEnviados.get(caminho);
+    if (!arquivo) return fail(ERROR_CODE.NOT_FOUND, "Não foi possível abrir este anexo.");
+    return okOne(arquivo);
+  });
+}

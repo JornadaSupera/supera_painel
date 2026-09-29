@@ -65,6 +65,12 @@ function usuarioLogado(): UsuarioMock | undefined {
   return usuarios.find((usuario) => usuario.id === usuarioLogadoId);
 }
 
+/** Quem escreve, para os adapters que gravam em nome de alguém (o conteúdo, por exemplo). */
+export function autorDaSessao(): { id: string; nome: string; especialidade: UsuarioMock["especialidade"] } | null {
+  const usuario = usuarioLogado();
+  return usuario ? { id: usuario.id, nome: usuario.nome, especialidade: usuario.especialidade } : null;
+}
+
 function criarSessao(usuario: UsuarioMock): Sessao {
   usuario.ultimo_acesso_em = now();
   usuarioLogadoId = usuario.id;
