@@ -24,7 +24,6 @@ import type {
 } from "@/types/configuracao";
 import type { ParametroOperacional } from "@/types/estatisticas";
 import { METAS_OPERACIONAIS } from "../_operationalTargets";
-import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
 import { definirExigenciaDeMfa, estadoDaSeguranca, nivelAtual } from "./_security";
 import { simulate } from "./_helpers";
 
@@ -473,8 +472,6 @@ export async function setExigirMfa({
     return okOne(estadoDaSeguranca());
   });
 }
-
-export const { update } = SETTINGS_WRITE_OPERATIONS;
 
 /* -------------------------------------------------------------------------
    IDENTIDADE, MENSAGENS E HORÁRIO — `clinic_settings` + `clinic_business_hours`

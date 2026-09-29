@@ -23,7 +23,6 @@ import type {
 } from "@/types/configuracao";
 import type { ParametroOperacional } from "@/types/estatisticas";
 import { METAS_OPERACIONAIS } from "../_operationalTargets";
-import { SETTINGS_WRITE_OPERATIONS } from "../_settings";
 import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 
@@ -878,12 +877,6 @@ export async function setExigirMfa({
     return getSeguranca();
   });
 }
-
-/* -------------------------------------------------------------------------
-   ESCRITA QUE CONTINUA RECUSADA — e por quê
-   ------------------------------------------------------------------------- */
-
-export const { update } = SETTINGS_WRITE_OPERATIONS;
 
 /* -------------------------------------------------------------------------
    FILA DE CONFERÊNCIA DA INTEGRAÇÃO
