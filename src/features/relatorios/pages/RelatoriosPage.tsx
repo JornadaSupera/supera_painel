@@ -59,7 +59,7 @@ import { AgendamentosRelatorio } from "../components/AgendamentosRelatorio";
  *    exigiria tabela de token com expiração, que ainda não existe — e é outro
  *    caminho por onde dado clínico sairia da clínica sem passar pela trilha.
  *  - **Três cartões marcados como indisponíveis**: alertas de IA, NPS e
- *    conteúdo mais acessado não têm origem no banco. O cartão fica, com o
+ *    engajamento no app não têm origem no banco. O cartão fica, com o
  *    motivo: o conjunto de doze é contratado, e escondê-los mascararia o que
  *    ainda falta.
  *  - **Exportação em Excel**: sai em CSV, que o Excel abre. Uma planilha
