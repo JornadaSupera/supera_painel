@@ -51,7 +51,7 @@ import { paraEspecialidade } from "./mapping";
  * > [!] Criar e editar orientação não é operação de administrador.
  * As políticas de INSERT exigem que o autor seja o próprio profissional
  * autenticado: quem escreve é o profissional da área, no espaço dele. O painel
- * administrativo revisa. Ver `INDISPONIVEIS` em `./index.ts`.
+ * administrativo revisa. Ver `AUTHOR_ONLY_OPERATIONS` em `../_content.ts`.
  */
 
 /* -------------------------------------------------------------------------

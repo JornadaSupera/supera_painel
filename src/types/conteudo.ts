@@ -90,7 +90,7 @@ export interface ComparacaoVersoes {
   anterior: ConteudoDetalhe | null;
 }
 
-/** Entrada de criação/edição. O painel administrativo hoje só revisa — ver INDISPONIVEIS. */
+/** Entrada de criação/edição. O painel administrativo hoje só revisa — ver `AUTHOR_ONLY_OPERATIONS`. */
 export interface ConteudoEntrada {
   titulo: string;
   corpo: string;

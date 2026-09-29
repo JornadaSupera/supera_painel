@@ -66,68 +66,18 @@ const implemented = {
  *
  * Cada linha sai daqui no dia em que o banco ganhar a política ou a função
  * correspondente — e nenhuma tela muda junto.
+ *
+ * Só entra aqui a chave que uma tela lê por `motivoIndisponivel`. O que o banco
+ * ainda não tem e a tela já mostra por conta própria (os cartões de relatório
+ * sem origem, a fila de alertas sem gatilho) diz o seu motivo no próprio lugar.
  */
 export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "pacientes.list.risco":
     "Não há classificação de risco no backend, e não vai haver nesta fase: “risco” são as etiquetas da sistematização de enfermagem do Gemed, que estão fora do escopo de leitura contratado. Calcular no painel seria inferência clínica no front-end.",
-  "pacientes.form.sexo":
-    "Não há coluna de sexo no cadastro, e nenhuma tela do escopo a exibe. Coletar o campo gravaria no vazio.",
-  "pacientes.deactivate.motivo":
-    "O motivo da desativação não chega ao backend: a trilha guarda o ato e o ator, e não tem coluna de justificativa. O texto fica no registro do painel.",
-  "pacientes.historico.remover":
-    "Alergia e reação prévia não se apagam: o registro clínico é imutável, e a única operação do backend é acrescentar. Corrigir um termo errado é acrescentar o certo.",
-  "pacientes.convite.envio":
-    "O convite é emitido, não enviado: não há provedor de mensagem contratado. O código aparece uma vez na tela para ser passado ao paciente.",
-  "usuarios.create.conta":
-    "O painel não cria contas: ele concede perfil a quem já se cadastrou. Criar acesso de terceiro exigiria a chave de serviço, que nunca entra no navegador — e quem escolhe a senha tem que ser o titular, senão a trilha deixa de sustentar quem fez o quê.",
-  "usuarios.update.identidade":
-    "Nome e e-mail são da conta, e a única política de escrita ali é a do próprio titular. Corrigi-los é ato da pessoa, não da administração.",
-  "usuarios.list.horario":
-    "Não há onde guardar a janela de atendimento no chat: nenhuma tabela tem as duas colunas de horário.",
-  "usuarios.pause":
-    "Pausar acesso ainda não existe no backend: só há ativo e inativo. Desativar revoga o acesso na hora.",
   "usuarios.setMfa":
     "O segundo fator é gerenciado pela própria pessoa, no aplicativo autenticador dela.",
-  "permissoes.updateMatrix":
-    "A matriz de papéis não é dado do backend: ela descreve o que cada papel alcança nas telas deste painel, e não há onde gravá-la. O catálogo do backend é outro eixo — ele restringe ações do espaço do profissional, e essas são concedidas pessoa a pessoa na ficha de cada uma.",
-  "conteudos.create":
-    "Redigir orientação é do profissional da área, no espaço de trabalho dele — o banco exige que o autor seja quem escreve. O painel administrativo revisa, aprova e despublica.",
-  "conteudos.update":
-    "A edição do texto é do autor, e só enquanto a versão está em rascunho ou devolvida. Para pedir mudança, devolva a versão com um comentário.",
-  "conteudos.submitForReview":
-    "Enviar para revisão é o ato de quem escreveu — é assim que o texto entra nesta fila.",
   "auditoria.summary.exportacao":
     "Exportação não gera linha na trilha: baixar um CSV do que já está na tela acontece no navegador, sem passar pelo banco.",
-
-  /* -------------------------------------------------------------------------
-     LEITURA CLÍNICA EM CONJUNTO — a ausência que atingia quatro telas
-     -------------------------------------------------------------------------
-     As políticas de leitura da equipe são `TO clinical_reader`, e o papel de
-     quem faz login (`authenticated`) não é membro dele: quem alcança aquelas
-     linhas são as funções `read_*`, que têm `clinical_reader` como dono. Um
-     `.from()` nessas tabelas devolve zero linhas SEM erro — e uma tela que soma
-     zero linhas publica `0` com cara de medição. Era o estado das quatro telas
-     de número.
-
-     A família `summarize_*` resolveu isso: o banco devolve a contagem já somada,
-     **sem que nenhuma linha de prontuário chegue ao navegador**. É melhor em
-     privacidade do que somar no cliente, e paga UMA leitura auditada onde a soma
-     no cliente pagava uma por paciente. `estatisticasClinicas.crossTab`,
-     `estatisticasOperacionais.getIndicadores` e a coluna "Acessos" de
-     `conteudos.list` (via `summarize_content_reads`) saíram desta lista.
-
-     O que continua fora tem causa própria, e nenhuma delas é de leitura.
-     ------------------------------------------------------------------------- */
-  "estatisticasClinicas.prevalencia":
-    "O resumo do banco devolve quantos registros e quantas pessoas relataram cada sintoma em cada grau, mas não devolve quantos pacientes havia no protocolo no período — o denominador da prevalência. Sem ele o mapa mostra contagem de registros, que é exata, em vez de um percentual sobre denominador ausente.",
-  "estatisticasOperacionais.mensagensPorDia":
-    "O resumo do chat conta conversas, não mensagens: a unidade é a conversa aberta e o instante da primeira resposta da equipe. Contar mensagens exigiria ler cada conversa, e cada leitura registra acesso a conteúdo clínico.",
-  "estatisticasOperacionais.getFilaAlertas":
-    "A fila de alertas depende de duas coisas que ainda não foram feitas, e nenhuma é de backend: cadastrar o grau que dispara cada sintoma, em Configurações → Gatilhos de alerta, e conceder a permissão de triagem a quem vai atender, na ficha de cada profissional. Sem a primeira nenhum alerta nasce; sem a segunda ninguém pode assumi-lo.",
-  "estatisticasOperacionais.porProfissional":
-    "O recorte dos resumos é por especialidade, e por profissional não existe — no backend nem aqui. Ranquear pessoa por volume ou por tempo de resposta transformaria um painel de operação em avaliação individual de desempenho, e com poucos casos a média re-identifica quem atendeu.",
-  "relatorios.agregados":
-    "Três dos doze relatórios não têm origem no backend: alertas de IA, NPS e engajamento no app. Cada um diz o seu motivo no próprio cartão.",
 };
 
 export const supabaseAdapter = buildAdapter({ name: "supabase", implemented });
