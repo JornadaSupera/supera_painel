@@ -60,6 +60,16 @@ export function formatDateTime(iso: IsoDate): string {
   });
 }
 
+/** "14:32" */
+export function formatTime(iso: IsoDate): string {
+  if (!iso) return EMPTY;
+  return new Date(iso).toLocaleTimeString(LOCALE, {
+    timeZone: TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 /** "25 de agosto de 2026". Mesma regra de `formatDate` para data sem hora. */
 export function formatLongDate(iso: IsoDate): string {
   if (!iso) return EMPTY;

@@ -137,6 +137,12 @@ export const queryKeys = {
     operationalTargets: () => ["settings", "operational-targets"] as const,
   },
 
+  /** Painel clínico — ver PA-07. Recortado pela sessão; sem parâmetro de "quem sou eu" na chave. */
+  clinico: {
+    all: ["clinico"] as const,
+    agenda: <R extends QueryKeyParams<R>>(range?: R | null) => ["clinico", "agenda", range ?? {}] as const,
+  },
+
   catalogs: {
     all: ["catalogs"] as const,
     cids: () => ["catalogs", "cids"] as const,

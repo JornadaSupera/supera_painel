@@ -4,6 +4,7 @@ import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
 import type { DesafioMfa, GarantiaDaSessao, ResultadoLogin, Sessao } from "@/types/auth";
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
+import type { CompromissoAgenda } from "@/types/clinico";
 import type {
   ClinicaConfiguracao,
   ConfiguracaoSeguranca,
@@ -437,6 +438,19 @@ export interface FiltroClinico {
   cid?: string | null;
 }
 
+/**
+ * Painel clínico — ver PA-07.
+ *
+ * Cada operação já é recortada pelo profissional da sessão no próprio banco
+ * (`private.my_professional_id()`); nenhum parâmetro de "quem sou eu" passa
+ * por aqui, e não há como um profissional pedir a agenda de outro por esta
+ * via.
+ */
+export interface ClinicoOperations {
+  /** Compromissos do profissional logado, na janela informada. */
+  getMinhaAgenda(params: { de: string; ate: string }): Promise<ListResult<CompromissoAgenda>>;
+}
+
 export interface EstatisticasClinicasOperations {
   /** Protocolo × Efeito × Grau, contado por PACIENTE distinto. */
   crossTab(params?: FiltroClinico): Promise<SingleResult<CruzamentoClinico>>;
@@ -815,6 +829,7 @@ export interface ResourceOperations {
   conteudos: ConteudosOperations;
   aprovacoes: AprovacoesOperations;
   auditoria: AuditoriaOperations;
+  clinico: ClinicoOperations;
   estatisticasClinicas: EstatisticasClinicasOperations;
   estatisticasOperacionais: EstatisticasOperacionaisOperations;
   configuracoes: ConfiguracoesOperations;

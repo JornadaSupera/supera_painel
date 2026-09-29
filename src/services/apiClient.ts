@@ -7,6 +7,7 @@ import type {
   AuditoriaOperations,
   AuthOperations,
   CatalogosOperations,
+  ClinicoOperations,
   ConfiguracoesOperations,
   ConteudosOperations,
   DashboardOperations,
@@ -103,6 +104,7 @@ export const permissoesApi = api.permissoes as unknown as PermissoesOperations;
 export const conteudosApi = api.conteudos as unknown as ConteudosOperations;
 export const aprovacoesApi = api.aprovacoes as unknown as AprovacoesOperations;
 export const auditoriaApi = api.auditoria as unknown as AuditoriaOperations;
+export const clinicoApi = api.clinico as unknown as ClinicoOperations;
 export const estatisticasClinicasApi = api.estatisticasClinicas as unknown as EstatisticasClinicasOperations;
 export const estatisticasOperacionaisApi = api.estatisticasOperacionais as unknown as EstatisticasOperacionaisOperations;
 export const configuracoesApi = api.configuracoes as unknown as ConfiguracoesOperations;

@@ -265,6 +265,11 @@ export const RESOURCES = {
       "getConsentimentos",
     ],
   },
+  clinico: {
+    table: null, // RPCs escopadas ao profissional da própria sessão
+    fase: 16, // painel clínico — trilha própria de fases, ver PA-07
+    operations: ["getMinhaAgenda"],
+  },
   catalogos: {
     table: "catalogos",
     fase: 5,

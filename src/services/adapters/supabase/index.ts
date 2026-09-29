@@ -7,6 +7,7 @@ import * as aprovacoes from "./aprovacoes";
 import * as auditoria from "./auditoria";
 import * as auth from "./auth";
 import * as catalogos from "./catalogos";
+import * as clinico from "./clinico";
 import * as conteudos from "./conteudos";
 import * as configuracoes from "./configuracoes";
 import * as dashboard from "./dashboard";
@@ -45,6 +46,7 @@ const implemented = {
   conteudos,
   aprovacoes,
   auditoria,
+  clinico,
   estatisticasClinicas,
   estatisticasOperacionais,
   configuracoes,
