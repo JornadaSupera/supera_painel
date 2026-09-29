@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { EmptyState, ErrorState, PageHeader, SkeletonCards, StatusBadge } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
 import { ESPECIALIDADE_LABEL, SEVERIDADE_LABEL, STATUS_ALERTA, STATUS_CONVERSA } from "@/lib/enums";
-import { formatTime, pluralize, relativeTime } from "@/lib/format";
+import { formatTime, pluralize } from "@/lib/format";
+import { ConversaSemResposta } from "../components/ConversaSemResposta";
 import { useAgendaClinica } from "../hooks/useAgendaClinica";
 import { useAlertasClinicos } from "../hooks/useAlertasClinicos";
 import { useConversasClinicas } from "../hooks/useConversasClinicas";
@@ -16,6 +17,7 @@ import { useConversasClinicas } from "../hooks/useConversasClinicas";
  * Três leituras reais: a agenda de hoje (`read_my_agenda`, recortada para o
  * dia corrente) e os resumos das filas de chat e de alertas, as mesmas que as
  * telas Chat e Alertas mostram por inteiro. Aqui só as cinco mais urgentes.
+ * Os três blocos se atualizam sozinhos, e a conversa pode ser respondida daqui.
  */
 
 const LIMITE_RESUMO = 5;
@@ -129,17 +131,7 @@ export function ClinicoDashboardPage() {
               </p>
               <ul className="flex flex-col gap-2">
                 {semResposta.slice(0, LIMITE_RESUMO).map((conversa) => (
-                  <li key={conversa.id}>
-                    <Link
-                      to={`${base}/chat`}
-                      className="hover:bg-muted/50 flex items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors"
-                    >
-                      <span className="min-w-0 flex-1 truncate">{conversa.paciente_nome}</span>
-                      <span className="text-muted-foreground shrink-0 text-xs">
-                        {conversa.assunto_label} · {relativeTime(conversa.ultima_mensagem_em)}
-                      </span>
-                    </Link>
-                  </li>
+                  <ConversaSemResposta key={conversa.id} conversa={conversa} chatHref={`${base}/chat`} />
                 ))}
               </ul>
             </>
