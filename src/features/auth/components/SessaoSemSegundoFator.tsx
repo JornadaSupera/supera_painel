@@ -3,6 +3,7 @@ import { KeyRound, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import type { GarantiaDaSessao } from "@/types/auth";
+import { CadastroAutenticador } from "./CadastroAutenticador";
 
 /**
  * A tela que aparece no lugar do painel quando a sessão não cumpre a exigência
@@ -15,9 +16,10 @@ import type { GarantiaDaSessao } from "@/types/auth";
  * **nenhuma linha, sem erro**. A tela mais perigosa de um sistema de saúde é a
  * que afirma ausência com a mesma cara com que afirmaria presença.
  *
- * O texto muda conforme a conta ter ou não autenticador, porque a ação também
- * muda: quem tem precisa entrar de novo e usar o código; quem não tem precisa
- * que alguém cadastre o fator — e isso ainda não acontece pelo painel.
+ * O texto e a ação mudam conforme a conta ter ou não autenticador: quem tem
+ * precisa entrar de novo e usar o código; quem não tem cadastra um aqui mesmo,
+ * sem depender de mais ninguém — e é isso que impede a exigência de trancar um
+ * administrador que ainda não tinha como cumpri-la.
  */
 
 export interface SessaoSemSegundoFatorProps {
@@ -27,37 +29,46 @@ export interface SessaoSemSegundoFatorProps {
 export function SessaoSemSegundoFator({ garantia }: SessaoSemSegundoFatorProps) {
   const { signOut } = useAuth();
 
+  // `exigido === true` é o banco: aí o painel realmente abriria zerado. Sem
+  // isso, quem exige é o próprio painel, e não há vazio a denunciar.
+  const bancoExige = garantia.exigido === true;
+
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
-      <div className="bg-card w-full max-w-lg rounded-2xl border p-8 text-center">
-        <span
-          aria-hidden="true"
-          className="bg-warning-bg text-warning-foreground mx-auto mb-4 flex size-12 items-center justify-center rounded-full"
-        >
-          <ShieldAlert size={22} />
-        </span>
+      <div className="bg-card w-full max-w-lg rounded-2xl border p-8">
+        <div className="text-center">
+          <span
+            aria-hidden="true"
+            className="bg-warning-bg text-warning-foreground mx-auto mb-4 flex size-12 items-center justify-center rounded-full"
+          >
+            <ShieldAlert size={22} />
+          </span>
 
-        <h1 className="text-foreground text-lg font-semibold">
-          Esta sessão precisa do segundo fator
-        </h1>
+          <h1 className="text-foreground text-lg font-semibold">
+            Esta sessão precisa do segundo fator
+          </h1>
 
-        <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
-          O acesso administrativo passou a exigir verificação em duas etapas. Esta sessão entrou
-          apenas com a senha, então o sistema não a reconhece como administrativa.
-        </p>
+          <p className="text-muted-foreground mt-2 text-sm leading-relaxed">
+            {bancoExige
+              ? "O acesso administrativo passou a exigir verificação em duas etapas. Esta sessão entrou apenas com a senha, então o sistema não a reconhece como administrativa."
+              : "O acesso administrativo exige verificação em duas etapas, e esta sessão entrou apenas com a senha."}
+          </p>
 
-        {/* A parte que ninguém adivinharia sozinho, e a razão de esta tela
-            existir: o sintoma não é um erro, é o painel inteiro em branco. */}
-        <p className="text-muted-foreground border-border mt-4 border-t pt-4 text-xs leading-relaxed">
-          Se continuasse, o painel abriria com{" "}
-          <strong className="text-foreground font-medium">tudo zerado</strong> — nenhum paciente,
-          nenhum registro na trilha, nenhum catálogo. Não é falta de dado: é falta de
-          reconhecimento da sessão.
-        </p>
+          {/* A parte que ninguém adivinharia sozinho, e a razão de esta tela
+              existir: o sintoma não é um erro, é o painel inteiro em branco. */}
+          {bancoExige && (
+            <p className="text-muted-foreground border-border mt-4 border-t pt-4 text-xs leading-relaxed">
+              Se continuasse, o painel abriria com{" "}
+              <strong className="text-foreground font-medium">tudo zerado</strong> — nenhum
+              paciente, nenhum registro na trilha, nenhum catálogo. Não é falta de dado: é falta de
+              reconhecimento da sessão.
+            </p>
+          )}
+        </div>
 
         {garantia.fator_cadastrado ? (
-          <>
-            <p className="text-foreground mt-5 text-sm">
+          <div className="mt-5 text-center">
+            <p className="text-foreground text-sm">
               Sua conta já tem um aplicativo autenticador cadastrado. Entre de novo e informe o
               código para retomar de onde parou.
             </p>
@@ -66,18 +77,20 @@ export function SessaoSemSegundoFator({ garantia }: SessaoSemSegundoFatorProps) 
               <KeyRound />
               Entrar novamente
             </Button>
-          </>
+          </div>
         ) : (
-          <>
-            <p className="text-foreground mt-5 text-sm">
-              Sua conta ainda não tem um aplicativo autenticador cadastrado. O cadastro do fator
-              não é feito por esta tela — procure quem administra a plataforma.
+          <div className="border-border mt-5 flex flex-col gap-4 border-t pt-5">
+            <p className="text-foreground text-sm">
+              Sua conta ainda não tem um aplicativo autenticador. Cadastre um agora: ao ativar, o
+              painel abre nesta mesma sessão.
             </p>
 
-            <Button variant="outline" className="mt-4" onClick={() => void signOut()}>
+            <CadastroAutenticador />
+
+            <Button variant="ghost" size="sm" className="self-start" onClick={() => void signOut()}>
               Sair
             </Button>
-          </>
+          </div>
         )}
       </div>
     </div>
