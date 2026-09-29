@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { EmptyState, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/auth-context";
 import { AUTOR_MENSAGEM, ESPECIALIDADE_LABEL, STATUS_CONVERSA_LABEL } from "@/lib/enums";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ConversaClinico } from "@/types/clinico";
+import { AnexoDaMensagem } from "../components/AnexoDaMensagem";
+import { ComposerMensagem } from "../components/ComposerMensagem";
 import {
   useAssumirConversa,
   useConversasClinicas,
@@ -21,13 +22,14 @@ import {
  *
  * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/farmaceutico/chat/
  *
- * > [!] Só leitura na conversa, de propósito
- * O backend tem `read_conversations`, `claim_conversation`, `resolve_conversation`,
- * `mark_conversation_read` e `read_messages` — mas **nenhuma RPC de envio** de
- * mensagem por um profissional. `start_conversation` existe, só que é para o
- * paciente ou o cuidador abrirem uma conversa nova, não para a equipe responder
- * uma existente. O campo de resposta fica desabilitado, com o motivo à vista,
- * em vez de fingir que a mensagem sai. Ver PA-07.
+ * > [!] A resposta é um INSERT direto, não uma RPC
+ * O banco prevê assim: a política de INSERT em `messages` decide quem responde
+ * (profissional ativo, conversa aberta, de equipe ou da própria especialidade).
+ * Uma recusa dela — conversa encerrada, por exemplo — chega à tela como texto,
+ * e o que a pessoa escreveu continua no campo.
+ *
+ * A conversa aberta e a lista se atualizam sozinhas de tempos em tempos; ver
+ * `useConversasClinicas`.
  */
 
 const RESUMO_AUTOR: Record<string, string> = {
@@ -83,7 +85,9 @@ export function ClinicoChatPage() {
           />
 
           {conversaAtual ? (
-            <PainelConversa conversa={conversaAtual} />
+            // `key`: o campo de resposta e a leitura são de UMA conversa; sem
+            // ela, o rascunho de uma seguiria para a outra ao trocar na lista.
+            <PainelConversa key={conversaAtual.id} conversa={conversaAtual} />
           ) : (
             <div className="bg-card hidden items-center justify-center rounded-2xl border p-8 lg:flex">
               <p className="text-muted-foreground text-sm">Selecione uma conversa.</p>
@@ -142,12 +146,20 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
   const resolver = useResolverConversa();
   const marcarLida = useMarcarConversaLida();
 
-  // Abrir a conversa é o próprio ato de ler — não exige clique à parte. Uma
-  // vez por seleção, não a cada renderização.
+  // Abrir a conversa é o próprio ato de ler — não exige clique à parte. Também
+  // vale para a mensagem que chega com ela aberta: sem isso, a atualização
+  // periódica a deixaria marcada como não lida enquanto alguém a está vendo.
   useEffect(() => {
     if (conversa.nao_lida_pela_equipe) marcarLida.mutate(conversa.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversa.id]);
+  }, [conversa.id, conversa.nao_lida_pela_equipe]);
+
+  // A conversa cresce para baixo: a mensagem nova é a que se quer ver.
+  const fimRef = useRef<HTMLDivElement>(null);
+  const total = mensagens.data?.length ?? 0;
+  useEffect(() => {
+    fimRef.current?.scrollIntoView({ block: "end" });
+  }, [total]);
 
   const aberta = conversa.status === "aberta";
   const daMinhaEspecialidade =
@@ -214,7 +226,14 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
                       daEquipe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
                     )}
                   >
-                    {mensagem.corpo}
+                    <p className="break-words whitespace-pre-wrap">{mensagem.corpo}</p>
+                    {mensagem.anexos.length > 0 && (
+                      <div className="mt-2 flex flex-col items-start gap-2">
+                        {mensagem.anexos.map((anexo) => (
+                          <AnexoDaMensagem key={anexo.id} anexo={anexo} daEquipe={daEquipe} />
+                        ))}
+                      </div>
+                    )}
                   </div>
                   <span className="text-muted-foreground text-[10px]">
                     {RESUMO_AUTOR[mensagem.autor]} · {formatDateTime(mensagem.criado_em)}
@@ -224,18 +243,18 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
             </div>
           );
         })}
+
+        <div ref={fimRef} />
       </div>
 
-      <footer className="border-border flex flex-col gap-1.5 border-t p-3">
-        <Textarea
-          rows={2}
-          disabled
-          placeholder="O envio de mensagens pela equipe ainda não está disponível no backend."
-          aria-describedby="composer-desabilitado"
-        />
-        <p id="composer-desabilitado" className="text-muted-foreground text-[11px]">
-          Ainda em desenvolvimento — não existe operação de envio de mensagem pela equipe.
-        </p>
+      <footer className="border-border border-t p-3">
+        {aberta ? (
+          <ComposerMensagem conversaId={conversa.id} />
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            Esta conversa foi encerrada. Só o paciente pode abrir uma nova.
+          </p>
+        )}
       </footer>
     </div>
   );
