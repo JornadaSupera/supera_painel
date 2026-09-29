@@ -39,6 +39,11 @@ export const RESOURCES = {
        * clínica em branco e ninguém saberia por quê.
        */
       "getGarantia",
+      "getSegundoFator",
+      "iniciarCadastroTotp",
+      "confirmarCadastroTotp",
+      "cancelarCadastroTotp",
+      "removerSegundoFator",
       "requestPasswordReset",
       "completePasswordRecovery",
       /** Renovação do token e encerramento vindo de outra aba. Ver `AuthOperations`. */

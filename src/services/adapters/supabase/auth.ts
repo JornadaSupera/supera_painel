@@ -10,13 +10,14 @@ import type {
   RecoveryCredential,
 } from "@/services/contracts/operations";
 import type {
+  CadastroTotp,
   DesafioMfa,
+  EstadoSegundoFator,
   GarantiaDaSessao,
   ResultadoLogin,
   Sessao,
   UsuarioAutenticado,
 } from "@/types/auth";
-import { maskDestination } from "../_people";
 import { executar, falhaDe, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
@@ -180,6 +181,15 @@ function montarSessao(sessao: SessaoDoGoTrue, usuario: UsuarioAutenticado): Sess
    exige em `mfa.verify` — o fator e o desafio — separados por `|`.
    ------------------------------------------------------------------------- */
 
+/**
+ * O GoTrue recusa um código errado com **422** e `mfa_verification_failed` — não
+ * com 400. Conferir só o status deixava a mensagem cair no texto genérico de
+ * "verifique os dados", que não diz que o problema é o código.
+ */
+function codigoRecusado(erro: AuthError): boolean {
+  return erro.code === "mfa_verification_failed" || erro.status === 400 || erro.status === 422;
+}
+
 function montarDesafio(factorId: string, challengeId: string): string {
   return `${factorId}|${challengeId}`;
 }
@@ -220,7 +230,11 @@ export async function signIn({
       return perfil;
     }
 
-    // Segundo fator desligado por configuração: o acesso termina aqui.
+    /*
+     * Verificação no login desligada por configuração: o acesso termina aqui,
+     * mesmo para quem já cadastrou um autenticador. O cadastro existe e funciona;
+     * o que fica para depois é o login passar a cobrá-lo.
+     */
     if (!MFA_REQUIRED) {
       const { data: sessao } = await supabase.auth.getSession();
       if (!sessao.session) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
@@ -228,6 +242,11 @@ export async function signIn({
       return okOne<ResultadoLogin>({ sessao: montarSessao(sessao.session, perfil) });
     }
 
+    /*
+     * Com a verificação ligada, quem tem autenticador sempre o usa — seja qual
+     * for o perfil. A exigência de TER um é do administrador; o profissional não
+     * é obrigado, mas quem cadastrou não entra só com a senha.
+     */
     const { data: fatores, error: erroFatores } = await supabase.auth.mfa.listFactors();
     if (erroFatores) return falhaDe(erroFatores);
 
@@ -250,20 +269,17 @@ export async function signIn({
     }
 
     /*
-     * Segundo fator exigido, mas a conta não tem autenticador cadastrado.
+     * Sem autenticador cadastrado a sessão entra em um fator só.
      *
-     * A recusa acontece aqui, e não na tela do código: mandar a pessoa para uma
-     * tela onde nada que ela digitar funciona é pior do que dizer o que falta.
-     * O painel ainda não tem tela de cadastro de autenticador — enquanto não
-     * tiver, o caminho é o administrador do projeto cadastrar o fator ou
-     * desligar a exigência em configuração.
+     * Recusar aqui trancava justamente quem ainda não tinha como cumprir a
+     * exigência: sem fator não há código, e sem entrar não há onde cadastrar. A
+     * exigência do administrador passa a ser cobrada DENTRO do painel — a
+     * moldura dele não abre as telas e leva ao cadastro (`getGarantia`).
      */
-    await supabase.auth.signOut();
+    const { data: sessao } = await supabase.auth.getSession();
+    if (!sessao.session) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
 
-    return fail(
-      ERROR_CODE.FORBIDDEN,
-      `Este acesso exige um aplicativo autenticador, e ${maskDestination(perfil.email)} ainda não tem um cadastrado. Procure um administrador da clínica.`,
-    );
+    return okOne<ResultadoLogin>({ sessao: montarSessao(sessao.session, perfil) });
   });
 }
 
@@ -289,7 +305,7 @@ export async function verifyMfa({
     });
 
     if (error) {
-      if (error.status === 400) return fail(ERROR_CODE.UNAUTHORIZED, "Código inválido.");
+      if (codigoRecusado(error)) return fail(ERROR_CODE.UNAUTHORIZED, "Código inválido.");
       return falhaDe(error);
     }
 
@@ -340,6 +356,7 @@ export async function getSession(): Promise<SingleResult<Sessao>> {
     if (error) return falhaDe(error);
     if (!data.session) return okOne<Sessao>(null);
 
+    // Vale para todo perfil: quem tem autenticador não retoma só com a senha.
     if (MFA_REQUIRED) {
       const { data: niveis } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
 
@@ -494,10 +511,17 @@ export async function getGarantia(): Promise<SingleResult<GarantiaDaSessao>> {
     if (data) {
       const exigido = (data as { require_admin_mfa: boolean }).require_admin_mfa;
 
+      /*
+       * Duas exigências, e vale a mais forte: a do banco (`exigido`) e a do
+       * próprio painel (`MFA_REQUIRED`). Só a do banco produz o painel zerado; a
+       * do painel é a cláusula do contrato de que o acesso administrativo tem
+       * segundo fator, e é o que impede um administrador de operar em um fator
+       * só quando o banco ainda não a impõe.
+       */
       return okOne<GarantiaDaSessao>({
         nivel,
         exigido,
-        suficiente: !exigido || nivel === "aal2",
+        suficiente: nivel === "aal2" || (!exigido && !MFA_REQUIRED),
         fator_cadastrado,
       });
     }
@@ -516,6 +540,121 @@ export async function getGarantia(): Promise<SingleResult<GarantiaDaSessao>> {
       suficiente: false,
       fator_cadastrado,
     });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   AUTENTICADOR DA PRÓPRIA CONTA
+   -------------------------------------------------------------------------
+   Tudo aqui é `auth.mfa.*`, do GoTrue, sobre a sessão de quem está logado: o
+   fator de outra pessoa não é alcançável por esta via, e é assim de propósito.
+   TOTP não tem custo — o que custa é o segundo fator por SMS, que não entra.
+   ------------------------------------------------------------------------- */
+
+/** O nome que aparece no aplicativo autenticador, ao lado do e-mail da conta. */
+const EMISSOR_TOTP = "Jornada Supera";
+
+export async function getSegundoFator(): Promise<SingleResult<EstadoSegundoFator>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient().auth.mfa.listFactors();
+    if (error) return falhaDe(error);
+
+    // `totp` já vem só com os verificados: um fator pendente não é autenticador.
+    const fator = data?.totp?.[0];
+
+    return okOne<EstadoSegundoFator>({
+      cadastrado: Boolean(fator),
+      fator_id: fator?.id ?? null,
+      cadastrado_em: fator?.created_at ?? null,
+    });
+  });
+}
+
+export async function iniciarCadastroTotp(): Promise<SingleResult<CadastroTotp>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const { data: fatores, error: erroFatores } = await supabase.auth.mfa.listFactors();
+    if (erroFatores) return falhaDe(erroFatores);
+
+    if (fatores?.totp?.length) {
+      return fail(ERROR_CODE.CONFLICT, "Esta conta já tem um aplicativo autenticador cadastrado.");
+    }
+
+    // Quem fechou a tela no meio deixou um fator pendente, e o GoTrue recusa um
+    // segundo com o mesmo nome. Descartar as sobras é o que faz "tentar de novo"
+    // funcionar em vez de falhar por uma tentativa que ninguém mais vê.
+    for (const pendente of fatores?.all ?? []) {
+      if (pendente.factor_type === "totp" && pendente.status !== "verified") {
+        await supabase.auth.mfa.unenroll({ factorId: pendente.id });
+      }
+    }
+
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      issuer: EMISSOR_TOTP,
+      friendlyName: `Painel ${new Date().toISOString()}`,
+    });
+    if (error) return falhaDe(error);
+
+    return okOne<CadastroTotp>({
+      fator_id: data.id,
+      qr_code: data.totp.qr_code,
+      segredo: data.totp.secret,
+    });
+  });
+}
+
+export async function confirmarCadastroTotp({
+  fator_id,
+  codigo,
+}: {
+  fator_id: string;
+  codigo: string;
+}): Promise<SingleResult<null>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().auth.mfa.challengeAndVerify({
+      factorId: fator_id,
+      code: codigo.trim(),
+    });
+
+    if (error) {
+      // Código errado ou vencido — o aplicativo troca de código a cada 30 s.
+      if (codigoRecusado(error)) {
+        return fail(ERROR_CODE.VALIDATION, "Código inválido ou vencido. Digite o código que o aplicativo mostra agora.");
+      }
+      return falhaDe(error);
+    }
+
+    return okOne(null);
+  });
+}
+
+export async function cancelarCadastroTotp({ fator_id }: { fator_id: string }): Promise<SingleResult<null>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().auth.mfa.unenroll({ factorId: fator_id });
+    if (error) return falhaDe(error);
+
+    return okOne(null);
+  });
+}
+
+export async function removerSegundoFator({ fator_id }: { fator_id: string }): Promise<SingleResult<null>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().auth.mfa.unenroll({ factorId: fator_id });
+
+    if (error) {
+      // Remover um fator verificado exige a sessão em dois fatores.
+      if (error.status === 401 || error.status === 403) {
+        return fail(
+          ERROR_CODE.FORBIDDEN,
+          "Para remover o autenticador, entre de novo e informe o código dele.",
+        );
+      }
+      return falhaDe(error);
+    }
+
+    return okOne(null);
   });
 }
 

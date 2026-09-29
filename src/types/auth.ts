@@ -88,8 +88,34 @@ export interface GarantiaDaSessao {
    * A conta tem autenticador cadastrado e verificado.
    *
    * Muda o texto da recusa por inteiro: quem tem fator precisa **entrar de
-   * novo**; quem não tem precisa **cadastrar um**, e hoje isso não acontece
-   * pelo painel.
+   * novo**; quem não tem precisa **cadastrar um**, o que a própria tela da
+   * recusa oferece.
    */
   fator_cadastrado: boolean;
+}
+
+/**
+ * O segundo fator da PRÓPRIA conta, para a tela de segurança.
+ *
+ * Só o titular vê e mexe: o de outra pessoa não passa por aqui.
+ */
+export interface EstadoSegundoFator {
+  cadastrado: boolean;
+  /** O que se remove. `null` sem autenticador. */
+  fator_id: string | null;
+  cadastrado_em: string | null;
+}
+
+/**
+ * O que o aplicativo autenticador precisa para registrar a conta.
+ *
+ * O fator nasce **não verificado**: só vale depois de a pessoa digitar um
+ * código gerado por ele, e é essa prova que o eleva a autenticador da conta.
+ */
+export interface CadastroTotp {
+  fator_id: string;
+  /** O QR code, como SVG em `data:` — a política de conteúdo do painel aceita. */
+  qr_code: string;
+  /** O mesmo segredo em texto, para quem não consegue apontar a câmera. */
+  segredo: string;
 }

@@ -54,6 +54,8 @@ export const queryKeys = {
     session: () => ["auth", "session"] as const,
     /** Nível de garantia da sessão contra a exigência do backend. */
     assurance: () => ["auth", "assurance"] as const,
+    /** O autenticador da própria conta — ver `useSegundoFator`. */
+    secondFactor: () => ["auth", "second-factor"] as const,
   },
 
   dashboard: {

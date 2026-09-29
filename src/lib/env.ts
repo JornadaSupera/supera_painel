@@ -55,12 +55,17 @@ export const SESSION = {
 } as const;
 
 /**
- * Whether the panel demands a second factor to sign in.
+ * Whether sign-in asks for the second factor at all.
  *
  * The contract requires it for administrators, so the default is on and stays
- * on in production. The switch exists because the panel has no screen for
- * enrolling an authenticator yet: with it forced on and no factor registered,
- * an account that is otherwise valid cannot get in at all.
+ * on in production. Off means the login never asks for a code — even for
+ * someone who already enrolled an authenticator: enrolling works either way,
+ * and turning the check on is a later, deliberate step.
+ *
+ * On, two things follow. Anyone with an authenticator enrolled is asked for a
+ * code, whatever the profile. And an administrator without one may not operate
+ * the panel: the frame stays closed and leads to the enrollment screen.
+ * Professionals are never forced to have one.
  *
  * Turning it off is a deliberate, visible choice in configuration — which is
  * the point. The previous behaviour skipped the factor whenever the build was

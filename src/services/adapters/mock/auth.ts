@@ -8,14 +8,16 @@ import type {
   PasswordResetRequest,
   RecoveryCredential,
 } from "@/services/contracts/operations";
+import { PAPEL } from "@/lib/enums";
 import type {
+  CadastroTotp,
   DesafioMfa,
+  EstadoSegundoFator,
   GarantiaDaSessao,
   ResultadoLogin,
   Sessao,
   UsuarioAutenticado,
 } from "@/types/auth";
-import { maskDestination } from "../_people";
 import { exigenciaDeMfa, nivelAtual, registrarNivel } from "./_security";
 import { now, simulate, uuid } from "./_helpers";
 
@@ -56,8 +58,16 @@ const tentativasPorEmail = new Map<string, { total: number; ultima: number }>();
 const MAX_TENTATIVAS_LOGIN = 5;
 const JANELA_BLOQUEIO_MS = 15 * 60_000;
 
+/** Quem está logado — o mock não tem token, então guarda a conta aqui. */
+let usuarioLogadoId: string | null = null;
+
+function usuarioLogado(): UsuarioMock | undefined {
+  return usuarios.find((usuario) => usuario.id === usuarioLogadoId);
+}
+
 function criarSessao(usuario: UsuarioMock): Sessao {
   usuario.ultimo_acesso_em = now();
+  usuarioLogadoId = usuario.id;
 
   return {
     usuario: paraUsuarioAutenticado(usuario),
@@ -130,13 +140,15 @@ export async function signIn({
 
     tentativasPorEmail.delete(chave);
 
-    // Segundo fator desligado por configuração: o mock entrega a sessão de uma
-    // vez, para que os dois adapters respondam a mesma coisa à mesma chave.
+    // Verificação no login desligada, ou conta sem autenticador: a sessão entra
+    // em um fator só, como no adapter real. A exigência do administrador é
+    // cobrada dentro do painel, onde há o que fazer a respeito — cadastrar o
+    // fator.
     //
     // A sessão nasce em `aal1`, e é justamente esse o caso que interessa
     // exercitar: painel com o fator desligado contra um backend que o exige
     // é a combinação que produz telas vazias sem erro nenhum.
-    if (!MFA_REQUIRED) {
+    if (!MFA_REQUIRED || !usuario.mfa_ativo) {
       registrarNivel("aal1");
       return okOne<ResultadoLogin>({ sessao: criarSessao(usuario) });
     }
@@ -150,8 +162,8 @@ export async function signIn({
 
     const mfa: DesafioMfa = {
       desafio_id,
-      destino: usuario.mfa_ativo ? "seu aplicativo autenticador" : maskDestination(usuario.email),
-      metodo: usuario.mfa_ativo ? "totp" : "sms",
+      destino: "seu aplicativo autenticador",
+      metodo: "totp",
       expira_em: new Date(Date.now() + MFA_VALIDADE_MS).toISOString(),
     };
 
@@ -212,21 +224,142 @@ export async function verifyMfa({
  * administrativo, e quem não é administrador não tem como consultá-la — daí o
  * `null`, que a tela lê como "não se aplica" e não como "não exige".
  *
- * Todo usuário do mock tem autenticador, então `fator_cadastrado` é sempre
- * verdadeiro: o caminho de "não tem fator" é exercitado pelo adapter real, que
- * recusa o login antes da tela do código.
+ * Vale a mais forte das duas exigências, como no adapter real: a do banco e a
+ * do próprio painel (`MFA_REQUIRED`).
  */
 export async function getGarantia(): Promise<SingleResult<GarantiaDaSessao>> {
   return simulate(() => {
     const nivel = nivelAtual();
     const exigido = exigenciaDeMfa();
+    const usuario = usuarioLogado();
+    const fator_cadastrado = usuario?.mfa_ativo ?? false;
+
+    if (usuario && usuario.papel !== PAPEL.ADMIN) {
+      return okOne<GarantiaDaSessao>({ nivel, exigido: null, suficiente: true, fator_cadastrado });
+    }
 
     return okOne<GarantiaDaSessao>({
       nivel,
       exigido,
-      suficiente: !exigido || nivel === "aal2",
-      fator_cadastrado: true,
+      suficiente: nivel === "aal2" || (!exigido && !MFA_REQUIRED),
+      fator_cadastrado,
     });
+  });
+}
+
+/* -------------------------------------------------------------------------
+   AUTENTICADOR DA PRÓPRIA CONTA
+   ------------------------------------------------------------------------- */
+
+/** Cadastros começados e não concluídos, por fator. */
+const cadastrosPendentes = new Map<string, { usuario_id: string }>();
+
+const CODIGO_INVALIDO =
+  "Código inválido ou vencido. Digite o código que o aplicativo mostra agora.";
+
+export async function getSegundoFator(): Promise<SingleResult<EstadoSegundoFator>> {
+  return simulate(() => {
+    const usuario = usuarioLogado();
+    if (!usuario) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
+
+    return okOne<EstadoSegundoFator>({
+      cadastrado: usuario.mfa_ativo,
+      fator_id: usuario.mfa_ativo ? `fator-${usuario.id}` : null,
+      cadastrado_em: usuario.mfa_ativo ? usuario.ultimo_acesso_em : null,
+    });
+  });
+}
+
+export async function iniciarCadastroTotp(): Promise<SingleResult<CadastroTotp>> {
+  return simulate(() => {
+    const usuario = usuarioLogado();
+    if (!usuario) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
+    if (usuario.mfa_ativo) {
+      return fail(ERROR_CODE.CONFLICT, "Esta conta já tem um aplicativo autenticador cadastrado.");
+    }
+
+    for (const [id, pendente] of cadastrosPendentes) {
+      if (pendente.usuario_id === usuario.id) cadastrosPendentes.delete(id);
+    }
+
+    const fator_id = uuid();
+    cadastrosPendentes.set(fator_id, { usuario_id: usuario.id });
+
+    // Um quadro no lugar do QR code: o mock não gera um código legível, e o
+    // segredo em texto é o que exercita o fluxo.
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160">' +
+      '<rect width="160" height="160" fill="white"/>' +
+      '<rect x="12" y="12" width="136" height="136" fill="none" stroke="black" stroke-width="8"/>' +
+      '<text x="80" y="86" font-size="14" text-anchor="middle" font-family="sans-serif">QR de teste</text>' +
+      "</svg>";
+
+    return okOne<CadastroTotp>({
+      fator_id,
+      qr_code: `data:image/svg+xml;utf-8,${encodeURIComponent(svg)}`,
+      segredo: "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP",
+    });
+  });
+}
+
+export async function confirmarCadastroTotp({
+  fator_id,
+  codigo,
+}: {
+  fator_id: string;
+  codigo: string;
+}): Promise<SingleResult<null>> {
+  return simulate(() => {
+    const usuario = usuarioLogado();
+    const pendente = cadastrosPendentes.get(fator_id);
+
+    if (!usuario || !pendente || pendente.usuario_id !== usuario.id) {
+      return fail(ERROR_CODE.NOT_FOUND, "Este cadastro não está mais em andamento. Comece de novo.");
+    }
+
+    if (codigo !== CODIGO_MFA_MOCK) return fail(ERROR_CODE.VALIDATION, CODIGO_INVALIDO);
+
+    cadastrosPendentes.delete(fator_id);
+    usuario.mfa_ativo = true;
+    // O mesmo ato que, no GoTrue, devolve a sessão em dois fatores.
+    registrarNivel("aal2");
+
+    return okOne(null);
+  });
+}
+
+export async function cancelarCadastroTotp({
+  fator_id,
+}: {
+  fator_id: string;
+}): Promise<SingleResult<null>> {
+  return simulate(() => {
+    cadastrosPendentes.delete(fator_id);
+    return okOne(null);
+  });
+}
+
+export async function removerSegundoFator({
+  fator_id,
+}: {
+  fator_id: string;
+}): Promise<SingleResult<null>> {
+  return simulate(() => {
+    const usuario = usuarioLogado();
+    if (!usuario || fator_id !== `fator-${usuario.id}`) {
+      return fail(ERROR_CODE.NOT_FOUND, "Autenticador não encontrado.");
+    }
+
+    // O GoTrue só remove fator verificado com a sessão em dois fatores.
+    if (nivelAtual() !== "aal2") {
+      return fail(
+        ERROR_CODE.FORBIDDEN,
+        "Para remover o autenticador, entre de novo e informe o código dele.",
+      );
+    }
+
+    usuario.mfa_ativo = false;
+    return okOne(null);
   });
 }
 

@@ -7,7 +7,14 @@ import type {
   VocabularioTermo,
 } from "@/lib/enums";
 import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
-import type { DesafioMfa, GarantiaDaSessao, ResultadoLogin, Sessao } from "@/types/auth";
+import type {
+  CadastroTotp,
+  DesafioMfa,
+  EstadoSegundoFator,
+  GarantiaDaSessao,
+  ResultadoLogin,
+  Sessao,
+} from "@/types/auth";
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type { AlertaClinico, CompromissoAgenda, ConversaClinico, MensagemClinico } from "@/types/clinico";
@@ -134,6 +141,33 @@ export interface AuthOperations {
    * as telas de uma vez.
    */
   getGarantia(): Promise<SingleResult<GarantiaDaSessao>>;
+
+  /**
+   * O autenticador (TOTP) da própria conta.
+   *
+   * Cadastrar, conferir e remover são atos do titular sobre a sessão dele: o
+   * banco de identidade só deixa cada pessoa mexer no próprio fator. O de outra
+   * conta não tem operação aqui — redefinir o fator de terceiros exige a chave
+   * de serviço, que nunca entra no navegador.
+   */
+  getSegundoFator(): Promise<SingleResult<EstadoSegundoFator>>;
+  /**
+   * Começa o cadastro: devolve o QR code e o segredo.
+   *
+   * Descarta antes qualquer tentativa anterior que ficou pela metade — sem
+   * isso, abandonar a tela deixaria um fator pendente que trava o próximo
+   * cadastro.
+   */
+  iniciarCadastroTotp(): Promise<SingleResult<CadastroTotp>>;
+  /**
+   * Confere o primeiro código e ativa o fator. A sessão sobe para dois fatores
+   * no mesmo ato, então nada precisa de novo login.
+   */
+  confirmarCadastroTotp(params: { fator_id: string; codigo: string }): Promise<SingleResult<null>>;
+  /** Desiste de um cadastro não concluído. */
+  cancelarCadastroTotp(params: { fator_id: string }): Promise<SingleResult<null>>;
+  /** Remove o autenticador da própria conta. Exige a sessão já em dois fatores. */
+  removerSegundoFator(params: { fator_id: string }): Promise<SingleResult<null>>;
 
   /** Responde sucesso mesmo para e-mail inexistente, por design. */
   requestPasswordReset(params: PasswordResetRequest): Promise<SingleResult<{ enviado: true }>>;
