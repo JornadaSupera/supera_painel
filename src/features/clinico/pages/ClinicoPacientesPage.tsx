@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { EmptyState, ErrorState, PageHeader, SearchInput, SkeletonCards, StatusBadge } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
@@ -16,8 +17,8 @@ import { useMeusPacientes } from "../hooks/useMeusPacientes";
  * PA-07. É a mesma leitura (`read_patient_list`) que o painel administrativo
  * já usa, só sem o painel de filtros dele: aqui é busca simples.
  *
- * A ficha do paciente (clique numa linha) ainda não existe neste painel —
- * fica para a próxima tela.
+ * A ficha do paciente ainda não existe neste painel: o clique abre a ficha do
+ * administrativo (`/pacientes/:id`), que o profissional já pode ler.
  */
 export function ClinicoPacientesPage() {
   const { user } = useAuth();
@@ -36,7 +37,11 @@ export function ClinicoPacientesPage() {
         eyebrow={area}
         title="Pacientes"
         subtitle={
-          !isLoading && !isError ? `${total} pacientes na base compartilhada da equipe` : "Carteira de pacientes"
+          !isLoading && !isError
+            ? filtrada
+              ? `${total} ${total === 1 ? "paciente encontrado" : "pacientes encontrados"}`
+              : `${total} ${total === 1 ? "paciente" : "pacientes"} na base compartilhada da equipe`
+            : "Carteira de pacientes"
         }
       />
 
@@ -66,7 +71,11 @@ export function ClinicoPacientesPage() {
 
       <div className="flex flex-col gap-2">
         {pacientes.map((paciente) => (
-          <article key={paciente.id} className="bg-card flex items-center gap-4 rounded-2xl border p-4">
+          <Link
+            key={paciente.id}
+            to={`/pacientes/${paciente.id}`}
+            className="bg-card hover:bg-muted/50 focus-visible:ring-ring flex items-center gap-4 rounded-2xl border p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+          >
             <div className="min-w-0 flex-1">
               <p className="text-foreground truncate text-sm font-medium">{paciente.nome}</p>
               <p className="text-muted-foreground truncate text-xs">
@@ -89,7 +98,7 @@ export function ClinicoPacientesPage() {
                 Risco {RISCO_LABEL[paciente.risco].toLowerCase()}
               </StatusBadge>
             )}
-          </article>
+          </Link>
         ))}
       </div>
     </div>
