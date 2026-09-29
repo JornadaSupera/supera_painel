@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { queryKeys } from "@/lib/queryKeys";
@@ -80,16 +80,21 @@ export function useAnexoUrl(caminho: string, habilitado = true) {
     retry: false,
   });
 
-  const url = useMemo(
-    () => (consulta.data ? URL.createObjectURL(consulta.data) : null),
-    [consulta.data],
-  );
-
+  // A URL nasce e morre no MESMO efeito. Criá-la durante a renderização e
+  // revogá-la no cleanup quebra com o dado já em cache: o React remonta o
+  // efeito (sempre em desenvolvimento) e reaproveita a URL que o primeiro
+  // cleanup acabou de revogar, e a imagem fica quebrada.
+  const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [url]);
+    if (!consulta.data) {
+      setUrl(null);
+      return;
+    }
+
+    const criada = URL.createObjectURL(consulta.data);
+    setUrl(criada);
+    return () => URL.revokeObjectURL(criada);
+  }, [consulta.data]);
 
   return { url, isLoading: consulta.isLoading, isError: consulta.isError, refetch: consulta.refetch };
 }

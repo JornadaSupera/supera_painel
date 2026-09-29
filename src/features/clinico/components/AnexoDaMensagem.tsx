@@ -23,6 +23,11 @@ export function AnexoDaMensagem({ anexo, daEquipe }: { anexo: AnexoMensagem; daE
 
 function AnexoImagem({ anexo }: { anexo: AnexoMensagem }) {
   const { url, isLoading, isError } = useAnexoUrl(anexo.caminho);
+  const [naoDecodificou, setNaoDecodificou] = useState(false);
+
+  // Arquivo que o navegador não desenha continua sendo um arquivo que se abre:
+  // vira o mesmo botão de baixar do PDF, em vez de um ícone de imagem quebrada.
+  if (naoDecodificou) return <AnexoArquivo anexo={anexo} daEquipe={false} />;
 
   if (isLoading) {
     return (
@@ -43,6 +48,7 @@ function AnexoImagem({ anexo }: { anexo: AnexoMensagem }) {
       <img
         src={url}
         alt={anexo.nome}
+        onError={() => setNaoDecodificou(true)}
         className="max-h-48 max-w-full rounded-xl border object-cover"
       />
     </a>
