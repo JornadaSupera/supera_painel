@@ -473,7 +473,9 @@ export function PacienteFichaPage({
             </DetailField>
 
             <DetailField rotulo="Último acesso">
-              {paciente.ultimo_acesso_app_em ? relativeTime(paciente.ultimo_acesso_app_em) : "Nunca acessou"}
+              {/* "Sem registro", not "never": the database does not expose the
+                  patient's last sign-in yet, so an empty value means unknown. */}
+              {paciente.ultimo_acesso_app_em ? relativeTime(paciente.ultimo_acesso_app_em) : "Sem registro"}
             </DetailField>
 
             <DetailField rotulo="Cadastrado em">
