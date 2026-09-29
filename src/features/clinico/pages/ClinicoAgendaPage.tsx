@@ -1,12 +1,16 @@
+import { Link, useParams } from "react-router-dom";
+
 import { EmptyState, ErrorState, PageHeader, SkeletonCards, StatusBadge } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
 import { formatLongDate, formatTime } from "@/lib/format";
 import { ESPECIALIDADE_LABEL } from "@/lib/enums";
+import { PERMISSAO } from "@/lib/rbac";
 import type { CompromissoAgenda } from "@/types/clinico";
 import { useAgendaClinica } from "../hooks/useAgendaClinica";
 
 /**
- * Agenda pessoal do profissional — a semana corrente.
+ * Agenda pessoal do profissional — a semana corrente. Cada compromisso abre a
+ * ficha do paciente, dentro do painel clínico.
  *
  * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/farmaceutico/agenda/
  *
@@ -47,7 +51,9 @@ function agruparPorDia(compromissos: CompromissoAgenda[]): [string, CompromissoA
 }
 
 export function ClinicoAgendaPage() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const { especialidade } = useParams<{ especialidade: string }>();
+  const podeAbrirFicha = can(PERMISSAO.PACIENTES_READ);
   const area = user?.especialidade ? ESPECIALIDADE_LABEL[user.especialidade] : "";
 
   const janela = semanaCorrente();
@@ -76,32 +82,47 @@ export function ClinicoAgendaPage() {
           <h2 className="text-foreground text-sm font-semibold capitalize">{formatLongDate(dia)}</h2>
 
           <div className="flex flex-col gap-2">
-            {compromissos.map((compromisso) => (
-              // Não é link: a ficha do paciente dentro do painel clínico
-              // ainda não existe (ClinicoPacientesPage segue "em
-              // desenvolvimento") — um link para lá cairia no catch-all.
-              <div
-                key={compromisso.id}
-                className="bg-card flex items-center gap-4 rounded-2xl border p-4"
-              >
-                <div className="flex w-16 shrink-0 flex-col text-xs tabular-nums">
-                  <span className="text-foreground font-medium">{formatTime(compromisso.inicio)}</span>
-                  <span className="text-muted-foreground">{formatTime(compromisso.fim)}</span>
-                </div>
+            {compromissos.map((compromisso) => {
+              const conteudo = (
+                <>
+                  <div className="flex w-16 shrink-0 flex-col text-xs tabular-nums">
+                    <span className="text-foreground font-medium">{formatTime(compromisso.inicio)}</span>
+                    <span className="text-muted-foreground">{formatTime(compromisso.fim)}</span>
+                  </div>
 
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground truncate text-sm font-medium">{compromisso.paciente_nome}</p>
-                  <p className="text-muted-foreground truncate text-xs">
-                    {compromisso.tipo_label}
-                    {compromisso.local ? ` · ${compromisso.local}` : ""}
-                  </p>
-                </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-foreground truncate text-sm font-medium">{compromisso.paciente_nome}</p>
+                    <p className="text-muted-foreground truncate text-xs">
+                      {compromisso.tipo_label}
+                      {compromisso.local ? ` · ${compromisso.local}` : ""}
+                    </p>
+                  </div>
 
-                <StatusBadge tone={compromisso.status_tom} size="sm">
-                  {compromisso.status_label}
-                </StatusBadge>
-              </div>
-            ))}
+                  <StatusBadge tone={compromisso.status_tom} size="sm">
+                    {compromisso.status_label}
+                  </StatusBadge>
+                </>
+              );
+
+              // A ficha exige leitura de paciente (mesma regra da rota): sem ela,
+              // um link só levaria a "sem permissão".
+              return podeAbrirFicha ? (
+                <Link
+                  key={compromisso.id}
+                  to={`/clinico/${especialidade}/pacientes/${compromisso.paciente_id}`}
+                  className="bg-card hover:bg-muted/50 focus-visible:ring-ring flex items-center gap-4 rounded-2xl border p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                >
+                  {conteudo}
+                </Link>
+              ) : (
+                <div
+                  key={compromisso.id}
+                  className="bg-card flex items-center gap-4 rounded-2xl border p-4"
+                >
+                  {conteudo}
+                </div>
+              );
+            })}
           </div>
         </section>
       ))}
