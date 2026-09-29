@@ -72,16 +72,24 @@ const SELECT_LOG = `
  * **zero** nomes resolviam. A coluna de paciente da tela e da exportação
  * ficava em branco, e ninguém era avisado disso.
  *
- * O nome vem de `read_patients`, que é a porta que alcança a tabela. São 200
- * pacientes por chamada e **uma** chamada por leitura da trilha — nunca uma por
- * linha, que encheria a própria trilha de acessos gerados por quem a consulta.
+ * O nome vem de `read_patient_list`, que é a porta que alcança a tabela. São
+ * 200 pacientes por chamada e **uma** chamada por leitura da trilha — nunca uma
+ * por linha, que encheria a própria trilha de acessos gerados por quem a
+ * consulta.
+ *
+ * It used to call `read_patients`, which the database dropped on 25/09/2026.
+ * The failure was swallowed on purpose (see below), so every row quietly read
+ * "unidentified patient". Inactive patients are asked for too: the trail
+ * remembers records that were deactivated since, and the list's default leaves
+ * them out.
  *
  * Que essa chamada registre "administrador leu a lista de pacientes" é
  * correto, não efeito colateral: a tela de fato exibe nome de paciente, e a
  * trilha deve dizer isso.
  */
 async function nomesDePacientes(): Promise<Map<string, string>> {
-  const { data, error } = await getSupabaseClient().rpc("read_patients", {
+  const { data, error } = await getSupabaseClient().rpc("read_patient_list", {
+    p_is_active: null,
     p_limit: TETO_READ,
     p_offset: 0,
   });
@@ -92,7 +100,10 @@ async function nomesDePacientes(): Promise<Map<string, string>> {
   if (error || !data) return new Map();
 
   return new Map(
-    (data as { id: string; full_name: string }[]).map((linha) => [linha.id, linha.full_name]),
+    (data as { patient_id: string; full_name: string }[]).map((linha) => [
+      linha.patient_id,
+      linha.full_name,
+    ]),
   );
 }
 
