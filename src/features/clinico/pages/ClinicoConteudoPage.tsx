@@ -30,7 +30,7 @@ export function ClinicoConteudoPage() {
 
       <BackendPendente
         titulo="Editor de orientações"
-        motivo="A redação de orientações (editor, upload de imagem/PDF, embed de vídeo, marcação por CID/especialidade) é a metade 'painel clínico' do PA-06. A revisão já existe do lado administrativo; o editor em si entra numa próxima fase."
+        motivo="A redação de orientações (editor, upload de imagem/PDF, embed de vídeo, marcação por CID/especialidade) ainda não existe no backend. A revisão já existe do lado administrativo; o editor em si entra numa próxima fase."
         altura={280}
       />
     </div>

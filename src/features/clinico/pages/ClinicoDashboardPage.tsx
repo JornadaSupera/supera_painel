@@ -1,19 +1,24 @@
-import { BackendPendente, EmptyState, ErrorState, PageHeader, SkeletonCards, StatusBadge } from "@/components/shared";
+import { Link } from "react-router-dom";
+
+import { EmptyState, ErrorState, PageHeader, SkeletonCards, StatusBadge } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
-import { ESPECIALIDADE_LABEL } from "@/lib/enums";
-import { formatTime } from "@/lib/format";
+import { ESPECIALIDADE_LABEL, SEVERIDADE_LABEL, STATUS_ALERTA, STATUS_CONVERSA } from "@/lib/enums";
+import { formatTime, pluralize, relativeTime } from "@/lib/format";
 import { useAgendaClinica } from "../hooks/useAgendaClinica";
+import { useAlertasClinicos } from "../hooks/useAlertasClinicos";
+import { useConversasClinicas } from "../hooks/useConversasClinicas";
 
 /**
  * Painel do dia — a tela de entrada do painel clínico.
  *
  * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/farmaceutico/
  *
- * "Pacientes de hoje" já é real — reaproveita `read_my_agenda`, recortado
- * para o dia corrente. "Mensagens não respondidas" e "fila de alertas"
- * continuam honestas sobre o que falta: pedem a leitura de Chat e Alertas,
- * que ainda não foram construídas — ver PA-07.
+ * Três leituras reais: a agenda de hoje (`read_my_agenda`, recortada para o
+ * dia corrente) e os resumos das filas de chat e de alertas, as mesmas que as
+ * telas Chat e Alertas mostram por inteiro. Aqui só as cinco mais urgentes.
  */
+
+const LIMITE_RESUMO = 5;
 
 function saudacao(): string {
   const hora = new Date().getHours();
@@ -38,6 +43,16 @@ export function ClinicoDashboardPage() {
   const agendaDeHoje = useAgendaClinica(hoje());
   const compromissos = agendaDeHoje.data ?? [];
   const vazio = !agendaDeHoje.isLoading && !agendaDeHoje.isError && compromissos.length === 0;
+
+  const base = user?.especialidade ? `/clinico/${user.especialidade}` : "/clinico";
+
+  const conversas = useConversasClinicas();
+  const semResposta = (conversas.data ?? [])
+    .filter((c) => c.status === STATUS_CONVERSA.ABERTA && c.nao_lida_pela_equipe)
+    .sort((a, b) => a.ultima_mensagem_em.localeCompare(b.ultima_mensagem_em));
+
+  const alertas = useAlertasClinicos();
+  const naFila = (alertas.data ?? []).filter((a) => a.status !== STATUS_ALERTA.RESOLVIDO);
 
   return (
     <div className="flex flex-col gap-5">
@@ -84,11 +99,96 @@ export function ClinicoDashboardPage() {
         )}
       </section>
 
-      <BackendPendente
-        titulo="Mensagens não respondidas e fila de alertas"
-        motivo="Essas duas seções pedem a leitura de Chat e de Alertas, que ainda não foram construídas neste painel. Ver PA-07."
-        altura={140}
-      />
+      <div className="grid gap-5 md:grid-cols-2">
+        <section className="bg-card rounded-2xl border p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-foreground text-sm font-semibold">Mensagens não respondidas</h2>
+            <Link to={`${base}/chat`} className="text-primary text-xs font-medium hover:underline">
+              Abrir chat
+            </Link>
+          </div>
+
+          {conversas.isLoading && <SkeletonCards count={2} />}
+
+          {conversas.isError && (
+            <ErrorState compact error={conversas.error} onRetry={() => void conversas.refetch()} />
+          )}
+
+          {!conversas.isLoading && !conversas.isError && semResposta.length === 0 && (
+            <EmptyState
+              compact
+              title="Nenhuma mensagem sem resposta"
+              description="Conversas abertas com mensagem nova da equipe por ler aparecem aqui."
+            />
+          )}
+
+          {semResposta.length > 0 && (
+            <>
+              <p className="text-muted-foreground mb-2 text-xs">
+                {pluralize(semResposta.length, "conversa aguardando", "conversas aguardando")}
+              </p>
+              <ul className="flex flex-col gap-2">
+                {semResposta.slice(0, LIMITE_RESUMO).map((conversa) => (
+                  <li key={conversa.id}>
+                    <Link
+                      to={`${base}/chat`}
+                      className="hover:bg-muted/50 flex items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors"
+                    >
+                      <span className="min-w-0 flex-1 truncate">{conversa.paciente_nome}</span>
+                      <span className="text-muted-foreground shrink-0 text-xs">
+                        {conversa.assunto_label} · {relativeTime(conversa.ultima_mensagem_em)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+
+        <section className="bg-card rounded-2xl border p-5">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-foreground text-sm font-semibold">Fila de alertas</h2>
+            <Link to={`${base}/alertas`} className="text-primary text-xs font-medium hover:underline">
+              Abrir alertas
+            </Link>
+          </div>
+
+          {alertas.isLoading && <SkeletonCards count={2} />}
+
+          {alertas.isError && (
+            <ErrorState compact error={alertas.error} onRetry={() => void alertas.refetch()} />
+          )}
+
+          {!alertas.isLoading && !alertas.isError && naFila.length === 0 && (
+            <EmptyState
+              compact
+              title="Nenhum alerta na fila"
+              description="Quando um sintoma passar do limite cadastrado, o alerta aparece aqui."
+            />
+          )}
+
+          {naFila.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {naFila.slice(0, LIMITE_RESUMO).map((alerta) => (
+                <li key={alerta.id}>
+                  <Link
+                    to={`${base}/alertas`}
+                    className="hover:bg-muted/50 flex items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {alerta.paciente_nome} · {alerta.sintoma_label}
+                    </span>
+                    <StatusBadge tone={alerta.status_tom} size="sm">
+                      {SEVERIDADE_LABEL[alerta.severidade]}
+                    </StatusBadge>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
