@@ -32,6 +32,13 @@ const THEME_ICON: Record<Theme, typeof Sun> = {
   system: Monitor,
 };
 
+/** The store keeps english keys; a screen reader must hear the menu's words. */
+const THEME_LABEL: Record<Theme, string> = {
+  light: "Claro",
+  dark: "Escuro",
+  system: "Sistema",
+};
+
 export function Topbar() {
   const { user, signOut } = useAuth();
   const theme = useThemeStore((s) => s.theme);
@@ -73,7 +80,7 @@ export function Topbar() {
         {/* ------------------------------------------------------ theme */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label={`Tema: ${theme}`}>
+            <Button variant="ghost" size="icon" aria-label={`Tema: ${THEME_LABEL[theme]}`}>
               <ThemeIcon />
             </Button>
           </DropdownMenuTrigger>
