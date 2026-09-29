@@ -162,7 +162,10 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
               Assumir
             </Button>
           )}
-          {conversa.status === "aberta" && (
+          {/* Only an assigned conversation can be resolved: the backend checks
+              it belongs to the caller's own specialty, and an unassigned one
+              belongs to nobody yet. */}
+          {conversa.status === "aberta" && conversa.atribuida && (
             <Button
               size="sm"
               variant="outline"

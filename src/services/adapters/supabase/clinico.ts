@@ -1,7 +1,7 @@
 import type { StatusTone } from "@/components/shared";
 import { SEVERIDADE } from "@/lib/enums";
 import type { AutorMensagem, CondutaAlerta, Severidade, StatusAlerta, StatusConversa } from "@/lib/enums";
-import { ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
+import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
 import type {
   AlertaClinico,
   CompromissoAgenda,
@@ -398,12 +398,28 @@ export async function listMensagens(params: {
   });
 }
 
+/**
+ * The conversation RPCs answer "insufficient_privilege" (`42501`, which the
+ * generic mapping turns into "you have no permission for this content") for
+ * three different reasons — already claimed, already resolved, another
+ * specialty's. The person who clicked needs the actual reason, not a message
+ * that sends them to ask for access they do not lack.
+ */
+function falhaDeConversa(erro: Parameters<typeof falhaDe>[0], motivo: string) {
+  if (erro?.code === "42501") {
+    return fail(ERROR_CODE.FORBIDDEN, motivo, { code: erro.code, message: erro.message });
+  }
+  return falhaDe(erro);
+}
+
 export async function assumirConversa(params: { id: string }): Promise<SingleResult<null>> {
   return executar(async () => {
     const { error } = await getSupabaseClient().rpc("claim_conversation", {
       p_conversation_id: params.id,
     });
-    if (error) return falhaDe(error);
+    if (error) {
+      return falhaDeConversa(error, "A conversa já foi assumida ou resolvida, ou só um profissional ativo com especialidade pode assumi-la.");
+    }
     return okOne(null);
   });
 }
@@ -413,7 +429,9 @@ export async function resolverConversa(params: { id: string }): Promise<SingleRe
     const { error } = await getSupabaseClient().rpc("resolve_conversation", {
       p_conversation_id: params.id,
     });
-    if (error) return falhaDe(error);
+    if (error) {
+      return falhaDeConversa(error, "Esta conversa já foi resolvida ou pertence a outra especialidade.");
+    }
     return okOne(null);
   });
 }
