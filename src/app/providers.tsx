@@ -36,6 +36,11 @@ function createQueryClient() {
         gcTime: 5 * 60_000,
         refetchOnWindowFocus: true,
         refetchOnReconnect: true,
+        // The default ("online") pauses a query while the browser reports no
+        // network. A paused first load is neither loading nor failed, and every
+        // screen read that as an empty list: "0 patients", "no appointments".
+        // Always fetching lets the failure reach the error state and its retry.
+        networkMode: "always",
         retry: (failureCount, error) => {
           const codigo = (error as { code?: ErrorCode }).code;
           if (codigo && NAO_RETENTAVEL.includes(codigo)) return false;
@@ -46,6 +51,9 @@ function createQueryClient() {
         // Escrita nunca é repetida sozinha: pode duplicar registro clínico,
         // convite por SMS ou log de auditoria.
         retry: false,
+        // Same reason: a paused write left its button spinning with no
+        // message. Failing lets the screen say the change did not go through.
+        networkMode: "always",
       },
     },
   });
@@ -61,7 +69,10 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <AuthProvider>
           <TooltipProvider delayDuration={300}>
             {children}
-            <Toaster position="top-right" richColors closeButton />
+            {/* Offset below the 60px top bar: at the default 24px the toast sat
+                over the user menu, the one control someone may reach for
+                right after an action. */}
+            <Toaster position="top-right" offset={{ top: 72 }} richColors closeButton />
           </TooltipProvider>
         </AuthProvider>
       </BrowserRouter>
