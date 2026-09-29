@@ -19,5 +19,7 @@ export function useAgendaClinica(janela: JanelaAgenda) {
   return useQuery({
     queryKey: queryKeys.clinico.agenda(janela),
     queryFn: async () => (await call(() => clinicoApi.getMinhaAgenda(janela))).data,
+    // O dia muda por ação de quem agenda, não só de quem está olhando.
+    refetchInterval: 60_000,
   });
 }
