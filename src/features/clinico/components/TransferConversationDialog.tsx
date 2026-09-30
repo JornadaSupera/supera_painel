@@ -3,7 +3,6 @@ import { TriangleAlert } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 
-import { ErrorState } from "@/components/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,17 +13,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ESPECIALIDADE_LABEL } from "@/lib/enums";
 import type { ConversaClinico } from "@/types/clinico";
-import type { TransferTarget } from "@/types/conversation-transfer";
+import { ColleagueSelect } from "./ColleagueSelect";
 import { useTransferConversation, useTransferTargets } from "../hooks/useConversationTransfer";
 import { transferConversationSchema, type TransferConversationForm } from "../schemas";
 
@@ -36,11 +26,6 @@ import { transferConversationSchema, type TransferConversationForm } from "../sc
  * message written by the database, so the dialog says what will happen without
  * promising a wording.
  */
-
-function describe(target: TransferTarget): string {
-  const areas = target.specialties.map((specialty) => ESPECIALIDADE_LABEL[specialty]).join(", ");
-  return areas ? `${target.name} · ${areas}` : target.name;
-}
 
 export function TransferConversationDialog({
   conversation,
@@ -89,47 +74,15 @@ export function TransferConversationDialog({
             </DialogDescription>
           </DialogHeader>
 
-          {targets.isLoading && <p className="text-muted-foreground text-sm">Carregando colegas…</p>}
-          {targets.isError && (
-            <ErrorState compact error={targets.error} onRetry={() => void targets.refetch()} />
-          )}
-          {targets.data && targets.data.length === 0 && (
-            <p className="text-muted-foreground text-sm">
-              Não há outro profissional ativo para receber a conversa.
-            </p>
-          )}
-
-          {targets.data && targets.data.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="transfer-target">
-                Encaminhar para <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={chosenId}
-                onValueChange={(value) => setValue("professionalId", value, { shouldValidate: true })}
-              >
-                <SelectTrigger
-                  id="transfer-target"
-                  className="w-full"
-                  aria-invalid={Boolean(formState.errors.professionalId)}
-                >
-                  <SelectValue placeholder="Escolha um colega" />
-                </SelectTrigger>
-                <SelectContent>
-                  {targets.data.map((target) => (
-                    <SelectItem key={target.professional_id} value={target.professional_id}>
-                      {describe(target)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {formState.errors.professionalId && (
-                <p role="alert" className="text-destructive text-xs">
-                  {formState.errors.professionalId.message}
-                </p>
-              )}
-            </div>
-          )}
+          <ColleagueSelect
+            id="transfer-target"
+            label="Encaminhar para"
+            emptyText="Não há outro profissional ativo para receber a conversa."
+            open={open}
+            value={chosenId}
+            onChange={(value) => setValue("professionalId", value, { shouldValidate: true })}
+            error={formState.errors.professionalId?.message}
+          />
 
           {chosen?.changed_area && (
             <Alert role="status">
