@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { EmptyState, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/shared";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { AUTOR_MENSAGEM, ESPECIALIDADE_LABEL, STATUS_CONVERSA_LABEL } from "@/lib/enums";
@@ -46,13 +48,21 @@ export function ClinicoChatPage() {
   const conversas = useConversasClinicas();
   const [selecionada, setSelecionada] = useState<string | null>(null);
 
+  // A ficha do paciente leva para cá com `?paciente=`: a conversa dele abre no
+  // lugar da primeira da fila. A lista vem da mais recente para a mais antiga,
+  // então o primeiro que casa é a conversa mais recente daquele paciente.
+  const pacienteDaFicha = useSearchParams()[0].get("paciente");
+  const conversaDoPaciente = pacienteDaFicha
+    ? conversas.data?.find((conversa) => conversa.paciente_id === pacienteDaFicha)
+    : undefined;
+
   // A primeira conversa da lista abre sozinha assim que a fila carrega —
   // uma tela de conversas vazia à direita não convida ninguém a clicar.
   useEffect(() => {
     if (!selecionada && conversas.data && conversas.data.length > 0) {
-      setSelecionada(conversas.data[0]?.id ?? null);
+      setSelecionada((conversaDoPaciente ?? conversas.data[0])?.id ?? null);
     }
-  }, [conversas.data, selecionada]);
+  }, [conversas.data, conversaDoPaciente, selecionada]);
 
   const conversaAtual = conversas.data?.find((conversa) => conversa.id === selecionada) ?? null;
 
@@ -66,6 +76,14 @@ export function ClinicoChatPage() {
         title="Chat"
         subtitle={`${lista.filter((c) => c.status === "aberta").length} conversas abertas`}
       />
+
+      {pacienteDaFicha && conversas.data && !conversaDoPaciente && (
+        <Alert role="status">
+          <AlertDescription>
+            Este paciente ainda não tem conversa com a equipe. A fila abaixo mostra as demais.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {conversas.isLoading && <Loading />}
       {conversas.isError && <ErrorState error={conversas.error} onRetry={() => void conversas.refetch()} />}
