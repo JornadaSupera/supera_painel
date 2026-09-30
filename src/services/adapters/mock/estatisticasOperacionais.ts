@@ -2,11 +2,13 @@ import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
 import { ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
 import type {
   EstatisticasOperacionais,
+  FilaDeAlertas,
   IndicadorOperacional,
   LinhaEspecialidade,
   ParametroOperacional,
   PontoVolume,
 } from "@/types/estatisticas";
+import { alertasClinicos } from "@/mocks/alertasClinicos";
 import { simulate } from "./_helpers";
 
 /**
@@ -116,7 +118,13 @@ export async function getGargalos(): Promise<ListResult<PontoVolume>> {
   return simulate(() => ok(VOLUME_MENSAL));
 }
 
-/** Ver o adapter Supabase: não há tabela de alerta. O mock não inventa uma. */
-export async function getFilaAlertas(): Promise<ListResult<never>> {
-  return simulate(() => ok([]));
+/** Os mesmos números da fila de demonstração do painel clínico. */
+export async function getFilaAlertas(): Promise<SingleResult<FilaDeAlertas>> {
+  return simulate(() =>
+    okOne({
+      pendentes: alertasClinicos.filter((alerta) => alerta.status === "pendente").length,
+      em_atendimento: alertasClinicos.filter((alerta) => alerta.status === "assumido").length,
+      limitado: false,
+    }),
+  );
 }

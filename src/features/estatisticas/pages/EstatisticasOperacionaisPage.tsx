@@ -1,13 +1,13 @@
-import { Activity, CalendarX, Clock, MessageSquareDashed } from "lucide-react";
+import { Activity, CalendarX, Clock, MessageSquareDashed, ShieldAlert } from "lucide-react";
 import type { ComponentType } from "react";
 
 import {
-  BackendPendente,
   BarChart,
   ChartCard,
   DataTable,
   EmptyState,
   ErrorState,
+  Footnote,
   PageHeader,
   SkeletonCards,
   SkeletonChart,
@@ -16,7 +16,7 @@ import {
 } from "@/components/shared";
 import { formatMeasure, formatNumber } from "@/lib/format";
 import type { LinhaEspecialidade } from "@/types/estatisticas";
-import { useEstatisticasOperacionais } from "../hooks/useEstatisticas";
+import { useEstatisticasOperacionais, useFilaDeAlertas } from "../hooks/useEstatisticas";
 
 /**
  * Estatísticas operacionais — a operação da clínica.
@@ -30,8 +30,10 @@ import { useEstatisticasOperacionais } from "../hooks/useEstatisticas";
  *    → Metas operacionais. Sem nenhuma delas cadastrada o gráfico não desenha
  *    linha nenhuma — números inventados afirmariam que a clínica bateu ou
  *    furou uma meta que ninguém definiu.
- *  - **Fila de alertas**: depende de uma tabela de alerta que não existe.
- *    Derivar "sintoma crítico" a partir do grau seria inferência clínica.
+ *  - **Fila de alertas**: só o VOLUME (pendentes e em atendimento), contado sem
+ *    identificar ninguém. Tempo até a conduta e desfecho continuam de fora até
+ *    existir um resumo no banco; derivar "sintoma crítico" a partir do grau seria
+ *    inferência clínica.
  *  - **Variação percentual nos indicadores**: o protótipo mostra "-3 min",
  *    "+12". Comparar com o período anterior exige uma segunda leitura que hoje
  *    dobraria a consulta; o número atual vai sem seta, que é melhor do que uma
@@ -51,11 +53,9 @@ const SEM_META_OU_CAPACIDADE = "meta_mensal_e_capacidade";
 const MOTIVO_SEM_PARAMETRO =
   "Meta mensal e capacidade máxima ainda não foram cadastradas. Assim que a administração as definir em Configurações → Metas operacionais, as linhas de referência aparecem no gráfico.";
 
-const MOTIVO_SEM_ALERTAS =
-  "A fila de alertas já existe, mas ainda não há um resumo que a conte sem identificar paciente: a leitura disponível devolve alerta por alerta. O painel não exibe o número enquanto ele não puder ser lido com segurança: “zero alertas” seria lido como tranquilidade.";
-
 export function EstatisticasOperacionaisPage() {
   const { data, isLoading, isError, error, refetch } = useEstatisticasOperacionais();
+  const fila = useFilaDeAlertas();
 
   const colunas: Column<LinhaEspecialidade>[] = [
     {
@@ -199,7 +199,49 @@ export function EstatisticasOperacionaisPage() {
         </div>
       </section>
 
-      <BackendPendente titulo="Fila de alertas" motivo={MOTIVO_SEM_ALERTAS} />
+      {/* ----------------------------------------------------- fila de alertas */}
+      <section className="flex flex-col gap-3" aria-label="Fila de alertas">
+        <h2 className="text-foreground text-sm font-semibold">
+          Fila de alertas
+          <span className="text-muted-foreground font-normal">
+            {" · situação de agora, sem identificar paciente"}
+          </span>
+        </h2>
+
+        {fila.isLoading ? (
+          <SkeletonCards count={2} />
+        ) : fila.isError ? (
+          <ErrorState compact error={fila.error} onRetry={() => void fila.refetch()} />
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+            <StatCard
+              label="Alertas pendentes"
+              value={fila.data ? `${fila.data.limitado ? "≥ " : ""}${formatNumber(fila.data.pendentes)}` : "—"}
+              context="aguardando um profissional assumir"
+              invertColor
+              icon={<ShieldAlert />}
+              level="medio"
+            />
+            <StatCard
+              label="Em atendimento"
+              value={
+                fila.data ? `${fila.data.limitado ? "≥ " : ""}${formatNumber(fila.data.em_atendimento)}` : "—"
+              }
+              context="já assumidos por um profissional"
+              icon={<ShieldAlert />}
+              level="medio"
+            />
+          </div>
+        )}
+
+        <Footnote>
+          {fila.data?.limitado
+            ? "A leitura da fila para em 200 alertas por situação: os números acima são o mínimo, e pode haver mais. "
+            : ""}
+          Tempo até a conduta e desfecho dos alertas dependem de um resumo que ainda não existe no
+          banco e não aparecem aqui.
+        </Footnote>
+      </section>
     </div>
   );
 }

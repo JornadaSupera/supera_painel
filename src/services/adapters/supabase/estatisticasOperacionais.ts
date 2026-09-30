@@ -2,12 +2,14 @@ import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from 
 import type { JanelaOperacional } from "@/services/contracts/operations";
 import type {
   EstatisticasOperacionais,
+  FilaDeAlertas,
   IndicadorOperacional,
   LinhaEspecialidade,
   ParametroOperacional,
   PontoVolume,
 } from "@/types/estatisticas";
 import { METAS_OPERACIONAIS } from "../_operationalTargets";
+import { contarFilaDeAlertas } from "./_alertQueue";
 import {
   SEM_AREA,
   SEM_AREA_LABEL,
@@ -98,24 +100,6 @@ const SEM_VOLUME_DE_MENSAGEM = "mensagens_dia";
  * sem ocorrência", diria "o gatilho ainda não foi configurado" — e as duas
  * leituras levam a decisões opostas.
  */
-/**
- * Por que o volume, o tempo até conduta e o desfecho ainda não aparecem.
- *
- * Não existe resumo agregado de alertas. A leitura que existe devolve os
- * alertas LINHA A LINHA, com o paciente em cada uma. Calcular a média aqui
- * traria prontuário para o navegador para virar estatística, numa tela cujo
- * compromisso é justamente não identificar ninguém — é o que as funções de
- * resumo vieram substituir nas outras duas telas.
- *
- * Por isso o painel não estima: o número sai quando houver um resumo do lado do
- * banco. Pedido registrado com o responsável pelo banco.
- *
- * Havia uma segunda ausência aqui, a de gatilho de criticidade cadastrado. Ela
- * deixou de valer (existe gatilho ativo), e o texto não a repete: afirmar que
- * nenhum alerta dispara contradiz a tela de Configurações.
- */
-const ALERTAS_SEM_REGRA =
-  "Ainda não existe um resumo dos alertas em volume, tempo até conduta e desfecho. A leitura disponível devolve alerta por alerta, com o paciente em cada linha, e somar isso aqui traria prontuário para uma tela que não identifica ninguém.";
 
 /**
  * A chave da especialidade, a partir do código do painel.
@@ -406,7 +390,12 @@ export async function getGargalos(
   });
 }
 
-/** Ver `ALERTAS_SEM_REGRA`: a fila existe, o gatilho é que não foi cadastrado. */
-export async function getFilaAlertas(): Promise<ListResult<never>> {
-  return fail(ERROR_CODE.NOT_IMPLEMENTED, ALERTAS_SEM_REGRA);
+/** O volume da fila, contado sem identificar ninguém. Ver `_alertQueue`. */
+export async function getFilaAlertas(): Promise<SingleResult<FilaDeAlertas>> {
+  return executar(async () => {
+    const fila = await contarFilaDeAlertas();
+    if (!("pendentes" in fila)) return fila;
+
+    return okOne(fila);
+  });
 }

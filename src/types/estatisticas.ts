@@ -148,6 +148,19 @@ export interface PontoVolume {
  * máxima. `codigo` é o que identifica o parâmetro no backend
  * (`operational_parameters.code`); a tela grava e lê sempre os mesmos dois.
  */
+/**
+ * O volume da fila de alertas: só contagem, nenhuma linha e nenhum paciente.
+ *
+ * `limitado` vem verdadeiro quando a leitura bateu no teto de uma situação: os
+ * números viram mínimos, e a tela precisa dizê-lo em vez de exibir um total que
+ * parece exato.
+ */
+export interface FilaDeAlertas {
+  pendentes: number;
+  em_atendimento: number;
+  limitado: boolean;
+}
+
 export interface ParametroOperacional {
   codigo: string;
   rotulo: string;

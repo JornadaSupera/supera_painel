@@ -56,6 +56,14 @@ export function useComparacaoProtocolos(filtro: FiltroClinico) {
   });
 }
 
+/** O volume da fila de alertas, só contagem. Ver `getFilaAlertas`. */
+export function useFilaDeAlertas() {
+  return useQuery({
+    queryKey: [...queryKeys.statistics.operational(), "fila-de-alertas"],
+    queryFn: async () => (await call(() => estatisticasOperacionaisApi.getFilaAlertas())).data,
+  });
+}
+
 export function useEstatisticasOperacionais() {
   return useQuery({
     queryKey: queryKeys.statistics.operational(),

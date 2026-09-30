@@ -48,6 +48,7 @@ import type {
   ComparacaoProtocolo,
   CruzamentoClinico,
   EstatisticasOperacionais,
+  FilaDeAlertas,
   IndicadorOperacional,
   LinhaEspecialidade,
   ParametroOperacional,
@@ -706,8 +707,12 @@ export interface EstatisticasOperacionaisOperations {
   getAdesaoAgenda(params?: JanelaOperacional): Promise<ListResult<LinhaEspecialidade>>;
   getGargalos(params?: JanelaOperacional): Promise<ListResult<PontoVolume>>;
 
-  /** A fila existe no banco; o que falta é gatilho de criticidade cadastrado. */
-  getFilaAlertas(): Promise<ListResult<never>>;
+  /**
+   * O volume da fila de alertas: pendentes e em atendimento, só contagem.
+   * Tempo até a conduta e desfecho continuam sem origem — dependem de um resumo
+   * no banco que não identifique paciente.
+   */
+  getFilaAlertas(): Promise<SingleResult<FilaDeAlertas>>;
 }
 
 /* ---------------------------------------------------------------- Fase 9 */
