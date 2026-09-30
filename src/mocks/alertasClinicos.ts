@@ -21,6 +21,8 @@ export interface AlertaClinicoMock {
   conduta_tipo: CondutaAlerta | null;
   conduta_notas: string | null;
   criado_em: string;
+  /** Quem cuida do alerta agora. */
+  atribuido_a: string | null;
   assumido_em: string | null;
   resolvido_em: string | null;
 }
@@ -44,6 +46,7 @@ export const alertasClinicos: AlertaClinicoMock[] = [
     conduta_tipo: null,
     conduta_notas: null,
     criado_em: horasAtras(1),
+    atribuido_a: null,
     assumido_em: null,
     resolvido_em: null,
   },
@@ -57,6 +60,7 @@ export const alertasClinicos: AlertaClinicoMock[] = [
     conduta_tipo: null,
     conduta_notas: null,
     criado_em: horasAtras(3),
+    atribuido_a: null,
     assumido_em: null,
     resolvido_em: null,
   },
@@ -70,6 +74,7 @@ export const alertasClinicos: AlertaClinicoMock[] = [
     conduta_tipo: null,
     conduta_notas: null,
     criado_em: horasAtras(6),
+    atribuido_a: "Juliana Fontana",
     assumido_em: horasAtras(5),
     resolvido_em: null,
   },
@@ -83,6 +88,7 @@ export const alertasClinicos: AlertaClinicoMock[] = [
     conduta_tipo: "orientacao",
     conduta_notas: "Orientação de hidratação e antiemético de resgate. Sem sinais de alarme ao contato.",
     criado_em: horasAtras(30),
+    atribuido_a: "Juliana Fontana",
     assumido_em: horasAtras(29),
     resolvido_em: horasAtras(28),
   },

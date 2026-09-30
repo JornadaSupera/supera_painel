@@ -17,6 +17,7 @@ import {
   TOM_POR_STATUS_CONVERSA,
 } from "./_clinicalMaps";
 import { executar, falhaDe, profissionalDaSessao, umDe } from "./_helpers";
+import { namesById, professionalNamesQuery, type ProfessionalNameRow } from "./_professionalNames";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
 
@@ -193,17 +194,28 @@ export async function listAlertas(params?: {
     const idsSintomas = [
       ...new Set(linhas.map((linha) => linha.symptom_id).filter((id): id is string => Boolean(id))),
     ];
+    const idsResponsaveis = [
+      ...new Set(
+        linhas.map((linha) => linha.assigned_professional_id).filter((id): id is string => Boolean(id)),
+      ),
+    ];
 
-    const [nomePorPacienteOuFalha, sintomasRes] = await Promise.all([
+    const [nomePorPacienteOuFalha, sintomasRes, responsaveisRes] = await Promise.all([
       nomesDePacientes(supabase, idsPacientes),
       idsSintomas.length
         ? supabase.from("symptoms").select("id, label").in("id", idsSintomas)
         : Promise.resolve({ data: [] as { id: string; label: string }[], error: null }),
+      idsResponsaveis.length
+        ? professionalNamesQuery(supabase, idsResponsaveis)
+        : Promise.resolve({ data: [] as ProfessionalNameRow[], error: null }),
     ]);
 
     if (ehFalha(nomePorPacienteOuFalha)) return nomePorPacienteOuFalha;
     const nomePorPaciente = nomePorPacienteOuFalha;
     if (sintomasRes.error) return falhaDe(sintomasRes.error);
+    if (responsaveisRes.error) return falhaDe(responsaveisRes.error);
+
+    const nomePorResponsavel = namesById((responsaveisRes.data ?? []) as ProfessionalNameRow[]);
 
     const labelPorSintoma = new Map((sintomasRes.data ?? []).map((sintoma) => [sintoma.id, sintoma.label]));
 
@@ -221,6 +233,9 @@ export async function listAlertas(params?: {
         status_tom: TOM_POR_STATUS_ALERTA[statusApp],
         conduta_tipo: linha.conduct_kind ? CONDUTA_POR_CODIGO[linha.conduct_kind] : null,
         conduta_notas: linha.conduct_notes,
+        atribuido_a: linha.assigned_professional_id
+          ? (nomePorResponsavel.get(linha.assigned_professional_id) ?? null)
+          : null,
         criado_em: linha.created_at,
         assumido_em: linha.assigned_at,
         resolvido_em: linha.resolved_at,
@@ -243,6 +258,51 @@ export async function assumirAlerta(params: { id: string }): Promise<SingleResul
   return executar(async () => {
     const { error } = await getSupabaseClient().rpc("claim_alert", { p_alert_id: params.id });
     if (error) return falhaDe(error);
+    return okOne(null);
+  });
+}
+
+/**
+ * Designa um alerta em atendimento a outro profissional.
+ *
+ * Além da permissão `alerts.triage` (`42501`), a função recusa alerta que não
+ * está em atendimento (`check_violation`, `23514`) e profissional inativo ou
+ * inexistente (`no_data_found`). Cada recusa tem uma frase: a pessoa que clicou
+ * precisa saber o que mudou, e não só que "não deu".
+ */
+export async function designarAlerta(params: {
+  id: string;
+  profissionalId: string;
+}): Promise<SingleResult<null>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient().rpc("assign_alert", {
+      p_alert_id: params.id,
+      p_professional_id: params.profissionalId,
+    });
+
+    if (error) {
+      if (error.code === "42501") {
+        return fail(ERROR_CODE.FORBIDDEN, "Designar um alerta exige a permissão de triagem de alertas.", {
+          code: error.code,
+          message: error.message,
+        });
+      }
+      if (error.code === "23514") {
+        return fail(ERROR_CODE.CONFLICT, "Só um alerta em atendimento pode ser designado. Recarregue a fila.", {
+          code: error.code,
+          message: error.message,
+        });
+      }
+      if (error.code === "P0002") {
+        return fail(
+          ERROR_CODE.NOT_FOUND,
+          "O alerta ou o profissional não existe mais, ou o profissional foi desativado.",
+          { code: error.code, message: error.message },
+        );
+      }
+      return falhaDe(error);
+    }
+
     return okOne(null);
   });
 }

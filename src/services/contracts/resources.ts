@@ -287,6 +287,7 @@ export const RESOURCES = {
       "deleteBlock",
       "listAlertas",
       "assumirAlerta",
+      "designarAlerta",
       "resolverAlerta",
       "listConversas",
       "listMensagens",

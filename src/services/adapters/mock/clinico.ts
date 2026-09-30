@@ -2,7 +2,8 @@ import { attachmentError, safeAttachmentName } from "@/lib/attachments";
 import { agendaClinica } from "@/mocks/agendaClinica";
 import { alertasClinicos, type AlertaClinicoMock } from "@/mocks/alertasClinicos";
 import { conversasClinicas, mensagensClinicas } from "@/mocks/conversasClinicas";
-import { SEVERIDADE } from "@/lib/enums";
+import { usuarios } from "@/mocks/usuarios";
+import { SEVERIDADE, STATUS_USUARIO } from "@/lib/enums";
 import type { CondutaAlerta, Severidade, StatusAlerta } from "@/lib/enums";
 import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
 import type {
@@ -12,6 +13,7 @@ import type {
   ConversaClinico,
   MensagemClinico,
 } from "@/types/clinico";
+import { autorDaSessao } from "./auth";
 import { now, simulate } from "./_helpers";
 
 /**
@@ -67,6 +69,7 @@ function projetarAlerta(alerta: AlertaClinicoMock): AlertaClinico {
     status_tom: TOM_POR_STATUS_ALERTA[alerta.status],
     conduta_tipo: alerta.conduta_tipo,
     conduta_notas: alerta.conduta_notas,
+    atribuido_a: alerta.atribuido_a,
     criado_em: alerta.criado_em,
     assumido_em: alerta.assumido_em,
     resolvido_em: alerta.resolvido_em,
@@ -95,7 +98,31 @@ export async function assumirAlerta(params: { id: string }): Promise<SingleResul
     }
 
     alerta.status = "assumido";
+    alerta.atribuido_a = autorDaSessao()?.nome ?? "Você";
     alerta.assumido_em = now();
+    return okOne(null);
+  });
+}
+
+export async function designarAlerta(params: {
+  id: string;
+  profissionalId: string;
+}): Promise<SingleResult<null>> {
+  return simulate(() => {
+    const alerta = alertasClinicos.find((item) => item.id === params.id);
+    if (!alerta) return fail(ERROR_CODE.NOT_FOUND, "O alerta ou o profissional não existe mais, ou o profissional foi desativado.");
+
+    // A mesma recusa do banco: só um alerta em atendimento se designa.
+    if (alerta.status !== "assumido") {
+      return fail(ERROR_CODE.CONFLICT, "Só um alerta em atendimento pode ser designado. Recarregue a fila.");
+    }
+
+    const destino = usuarios.find((usuario) => usuario.id === params.profissionalId);
+    if (!destino || destino.status !== STATUS_USUARIO.ATIVO) {
+      return fail(ERROR_CODE.NOT_FOUND, "O alerta ou o profissional não existe mais, ou o profissional foi desativado.");
+    }
+
+    alerta.atribuido_a = destino.nome;
     return okOne(null);
   });
 }

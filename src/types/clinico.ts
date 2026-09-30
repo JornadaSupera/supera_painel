@@ -52,6 +52,8 @@ export interface AlertaClinico {
   status_tom: StatusTone;
   conduta_tipo: CondutaAlerta | null;
   conduta_notas: string | null;
+  /** Quem cuida do alerta agora: quem o assumiu, ou quem recebeu a designação. */
+  atribuido_a: string | null;
   criado_em: string;
   assumido_em: string | null;
   resolvido_em: string | null;

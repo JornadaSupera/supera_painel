@@ -562,6 +562,12 @@ export interface ClinicoOperations {
   listAlertas(params?: { status?: StatusAlerta }): Promise<ListResult<AlertaClinico>>;
   /** Assume um alerta em aberto. Exige a permissão `alerts.triage`. */
   assumirAlerta(params: { id: string }): Promise<SingleResult<null>>;
+  /**
+   * Designa um alerta que já está em atendimento a outro profissional. Exige a
+   * permissão `alerts.triage`, e o banco só aceita quem ainda está ativo. O
+   * designado recebe uma notificação.
+   */
+  designarAlerta(params: { id: string; profissionalId: string }): Promise<SingleResult<null>>;
   /** Resolve um alerta assumido, com a conduta tomada. */
   resolverAlerta(params: {
     id: string;
