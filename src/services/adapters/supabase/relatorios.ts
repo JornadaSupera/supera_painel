@@ -17,6 +17,7 @@ import {
   effectsByProtocolReport,
   isReportFailure,
   listDefinitionsWithout,
+  npsReport,
   type ContentReadRow,
   type ReportOutcome,
   type ReportParams,
@@ -34,6 +35,7 @@ import { getSupabaseClient } from "./client";
 import { crossTab } from "./estatisticasClinicas";
 import { getIndicadores } from "./estatisticasOperacionais";
 import { paraEspecialidade } from "./mapping";
+import { getSummary } from "./satisfacao";
 import { varrerLista } from "./pacientes";
 
 /**
@@ -75,7 +77,6 @@ const TETO_VARREDURA = TETO_READ * 10;
 const SEM_ORIGEM: Record<string, string> = {
   "alertas-ia":
     "A fila de alertas existe no backend, mas ainda não há um resumo de volume, tempo até conduta e desfecho que não identifique paciente. Sem gatilho de criticidade cadastrado em Configurações → Gatilhos de alerta, além disso, nenhum alerta dispara. Fila priorizada por IA é do nível Completo — fora do escopo contratado.",
-  nps: "As tabelas e a função da pesquisa existem, mas nenhuma pesquisa é aberta: a rotina agendada que dispara o NPS não foi criada, e dois dos três marcos dependem do plano terapêutico, que só a integração com o Gemed preenche. Sem pesquisa aberta não há resposta para contar.",
   "engajamento-app":
     "“Engajamento” não tem definição em fonte nenhuma: sessões abertas, dias com registro no diário, orientações lidas e mensagens enviadas dariam quatro números diferentes, e o escopo não diz qual deles é o indicador. A pergunta está aberta com a clínica. Número calculado sobre definição inventada é pior que indicador ausente.",
 };
@@ -429,6 +430,8 @@ export async function run(params: ReportParams): Promise<SingleResult<ResultadoR
           );
         case "conteudo-mais-acessado":
           return conteudoMaisAcessado(dias, params.especialidade);
+        case "nps":
+          return npsReport(await getSummary({ days: dias }), dias);
         default:
           return fail(ERROR_CODE.NOT_FOUND, `Relatório "${params.slug}" não existe no catálogo.`);
       }

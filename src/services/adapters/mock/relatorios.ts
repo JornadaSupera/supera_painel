@@ -20,11 +20,13 @@ import {
   engagementRows,
   isReportFailure,
   listDefinitionsWithout,
+  npsReport,
   type ContentReadRow,
   type ReportOutcome,
   type ReportParams,
 } from "../_reports";
 import { simulate } from "./_helpers";
+import { getSummary } from "./satisfacao";
 import { crossTab } from "./estatisticasClinicas";
 import { getIndicadores } from "./estatisticasOperacionais";
 
@@ -40,7 +42,6 @@ import { getIndicadores } from "./estatisticasOperacionais";
 const SEM_ORIGEM: Record<string, string> = {
   "alertas-ia":
     "Não existe tabela de alerta nem regra de criticidade. Derivar alerta a partir do grau do sintoma seria inferência clínica feita pelo painel.",
-  nps: "Não existe pesquisa de satisfação: nenhuma tabela de resposta, nota ou marco de envio.",
 };
 
 export async function listDefinitions(): Promise<ListResult<DefinicaoRelatorio>> {
@@ -205,6 +206,9 @@ async function montar(
 
       return contentReadsReport(linhas, dias, 0);
     }
+
+    case "nps":
+      return npsReport(await getSummary({ days: dias }), dias);
 
     default:
       return null;

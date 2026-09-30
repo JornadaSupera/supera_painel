@@ -9,6 +9,7 @@ import {
 } from "@/services/contracts";
 import type { CruzamentoClinico, EstatisticasOperacionais } from "@/types/estatisticas";
 import type { DefinicaoRelatorio, ResultadoRelatorio } from "@/types/relatorio";
+import type { SatisfactionSummary } from "@/types/satisfaction";
 import { DEFINICOES } from "./relatoriosDefinicoes";
 
 /**
@@ -113,6 +114,57 @@ export function effectsByProtocolReport(
       : `grau ${grau} ou maior · ${dados?.registros_considerados ?? 0} registros · últimos ${dias} dias · prevalência indisponível: a origem não devolve o total de pacientes por protocolo`,
     eixo: "efeito",
     medida: porPercentual ? "prevalencia" : "registros",
+  };
+}
+
+/**
+ * Report 10 — patient satisfaction (NPS), by moment of the journey.
+ *
+ * It reads the same summary the Satisfação screen shows, so the two can never
+ * disagree. Only totals leave here: no comment and no patient, which is why the
+ * report can be exported where the answers themselves cannot.
+ */
+export function npsReport(summary: SingleResult<SatisfactionSummary>, dias: number): ReportOutcome {
+  if (summary.error) return failWith(summary.error);
+
+  const dados = summary.data;
+  const dash = "—";
+
+  const linha = (momento: string, abertas: number, respondidas: number, respostas: number, nps: number | null) => ({
+    momento,
+    abertas,
+    respondidas,
+    respostas,
+    nps: nps ?? dash,
+  });
+
+  const linhas = dados
+    ? [
+        ...dados.by_milestone.map((item) => linha(item.label, item.sent, item.answered, item.responses, item.nps)),
+        linha("Todos os momentos", dados.surveys_sent, dados.surveys_answered, dados.responses, dados.nps),
+      ]
+    : [];
+
+  const resumo = !dados
+    ? "sem dados"
+    : dados.responses === 0
+      ? `últimos ${dias} dias · ${pluralize(dados.surveys_sent, "pesquisa aberta", "pesquisas abertas")}, nenhuma respondida ainda`
+      : `últimos ${dias} dias · ${pluralize(dados.responses, "resposta", "respostas")} · NPS ${dados.nps ?? dash} · nota média ${dados.average ?? dash}${dados.response_rate === null ? "" : ` · ${dados.response_rate}% das pesquisas abertas respondidas`}`;
+
+  return {
+    slug: "nps",
+    titulo: "Satisfação do paciente (NPS)",
+    colunas: [
+      { key: "momento", label: "Momento da jornada" },
+      { key: "abertas", label: "Pesquisas abertas", numerica: true },
+      { key: "respondidas", label: "Já respondidas", numerica: true },
+      { key: "respostas", label: "Respostas no período", numerica: true },
+      { key: "nps", label: "NPS", numerica: true },
+    ],
+    linhas,
+    resumo,
+    eixo: "momento",
+    medida: "respostas",
   };
 }
 
