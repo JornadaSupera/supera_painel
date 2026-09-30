@@ -56,6 +56,18 @@ const INTRODUCAO: Record<AcaoRevisao, string> = {
     "A orientação sai do ar e deixa de aparecer para os pacientes. O texto continua no histórico.",
 };
 
+/**
+ * What the reviewer is asked to write. Returning a version and rejecting it both
+ * require a comment, but they answer different questions: the first says what to
+ * change, the second why the text will not go ahead.
+ */
+const PLACEHOLDER_COMENTARIO: Record<AcaoRevisao, string> = {
+  [ACAO_REVISAO.APROVAR]: "Registre uma observação, se houver.",
+  [ACAO_REVISAO.DEVOLVER]: "O que precisa mudar para esta versão ser aprovada?",
+  [ACAO_REVISAO.REJEITAR]: "Explique por que esta versão não vai seguir.",
+  [ACAO_REVISAO.DESPUBLICAR]: "Registre uma observação, se houver.",
+};
+
 export function DialogRevisao({
   conteudo,
   acao,
@@ -144,11 +156,7 @@ export function DialogRevisao({
               onBlur={() => setTocado(true)}
               aria-invalid={tocado && faltaComentario}
               aria-describedby="ajuda-comentario-revisao"
-              placeholder={
-                exigeComentario
-                  ? "O que precisa mudar para esta versão ser aprovada?"
-                  : "Registre uma observação, se houver."
-              }
+              placeholder={PLACEHOLDER_COMENTARIO[acao]}
             />
 
             <p id="ajuda-comentario-revisao" className="text-muted-foreground text-[11px]">
