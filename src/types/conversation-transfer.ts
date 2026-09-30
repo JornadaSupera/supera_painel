@@ -25,6 +25,8 @@ export interface TransferTarget {
 /** One stretch during which a professional held a conversation. */
 export interface ConversationAssignment {
   id: string;
+  /** `null` quando a origem dos dados não diz quem é. */
+  professional_id: string | null;
   professional_name: string;
   specialty: Especialidade | null;
   /** ISO 8601 UTC. */

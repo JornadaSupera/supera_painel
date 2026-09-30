@@ -74,6 +74,7 @@ export async function transferConversation(params: {
     atribuicoesClinicas.push({
       id: crypto.randomUUID(),
       conversa_id: conversa.id,
+      profissional_id: destino.id,
       profissional_nome: destino.nome,
       especialidade: destino.especialidade,
       atribuida_em: agora,
@@ -104,6 +105,7 @@ export async function listConversationAssignments(params: {
         .sort((a, b) => a.atribuida_em.localeCompare(b.atribuida_em))
         .map<ConversationAssignment>((atribuicao) => ({
           id: atribuicao.id,
+          professional_id: atribuicao.profissional_id,
           professional_name: atribuicao.profissional_nome,
           specialty: atribuicao.especialidade,
           assigned_at: atribuicao.atribuida_em,

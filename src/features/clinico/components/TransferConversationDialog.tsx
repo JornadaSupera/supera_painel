@@ -15,7 +15,11 @@ import {
 } from "@/components/ui/dialog";
 import type { ConversaClinico } from "@/types/clinico";
 import { ColleagueSelect } from "./ColleagueSelect";
-import { useTransferConversation, useTransferTargets } from "../hooks/useConversationTransfer";
+import {
+  useConversationAssignments,
+  useTransferConversation,
+  useTransferTargets,
+} from "../hooks/useConversationTransfer";
 import { transferConversationSchema, type TransferConversationForm } from "../schemas";
 
 /**
@@ -38,6 +42,13 @@ export function TransferConversationDialog({
 }) {
   const targets = useTransferTargets(open);
   const transfer = useTransferConversation();
+
+  // Quem segura a conversa agora não entra na lista: encaminhar para quem já a
+  // tem é um ato sem efeito que o banco aceitaria.
+  const assignments = useConversationAssignments(conversation.id, open);
+  const holderIds = (assignments.data ?? [])
+    .filter((assignment) => assignment.released_at === null && assignment.professional_id)
+    .map((assignment) => assignment.professional_id as string);
 
   const { handleSubmit, setValue, watch, reset, formState } = useForm<TransferConversationForm>({
     resolver: zodResolver(transferConversationSchema),
@@ -79,6 +90,7 @@ export function TransferConversationDialog({
             label="Encaminhar para"
             emptyText="Não há outro profissional ativo para receber a conversa."
             open={open}
+            excluir={holderIds}
             value={chosenId}
             onChange={(value) => setValue("professionalId", value, { shouldValidate: true })}
             error={formState.errors.professionalId?.message}

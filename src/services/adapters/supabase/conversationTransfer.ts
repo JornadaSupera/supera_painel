@@ -167,6 +167,7 @@ export async function listConversationAssignments(params: {
     return ok(
       rows.map<ConversationAssignment>((row) => ({
         id: row.id,
+        professional_id: row.professional_id,
         professional_name: names.get(row.professional_id) ?? "Profissional",
         specialty: paraEspecialidade(codeById.get(row.specialty_id)),
         assigned_at: row.assigned_at,

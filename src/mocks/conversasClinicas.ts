@@ -121,6 +121,7 @@ export const mensagensClinicas: MensagemClinicaMock[] = [
 export interface AtribuicaoClinicaMock {
   id: string;
   conversa_id: string;
+  profissional_id: string | null;
   profissional_nome: string;
   especialidade: Especialidade | null;
   atribuida_em: string;
@@ -131,6 +132,7 @@ export const atribuicoesClinicas: AtribuicaoClinicaMock[] = [
   {
     id: "atribuicao-1",
     conversa_id: conversasClinicas[1]?.id ?? "",
+    profissional_id: null,
     profissional_nome: "Juliana Fontana",
     especialidade: "farmaceutico",
     atribuida_em: horasAtras(21),

@@ -32,6 +32,7 @@ export function ColleagueSelect({
   value,
   onChange,
   error,
+  excluir = [],
 }: {
   id: string;
   label: string;
@@ -43,8 +44,14 @@ export function ColleagueSelect({
   onChange: (professionalId: string) => void;
   /** The form's message for a missing choice. */
   error?: string;
+  /** Professionals not to offer — whoever already holds what is being handed over. */
+  excluir?: readonly string[];
 }) {
-  const colleagues = useTransferTargets(open);
+  const todos = useTransferTargets(open);
+  const colleagues = {
+    ...todos,
+    data: todos.data?.filter((target) => !excluir.includes(target.professional_id)),
+  };
 
   if (colleagues.isLoading) return <p className="text-muted-foreground text-sm">Carregando colegas…</p>;
 
