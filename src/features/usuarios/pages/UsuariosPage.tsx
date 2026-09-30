@@ -260,7 +260,7 @@ export function UsuariosPage() {
               columns={colunas}
               data={usuarios}
               caption="Profissionais cadastrados, com especialidade, registro no conselho, horário de atendimento no chat e status."
-              label="profissionais"
+              label="usuários"
               loading={isLoading}
               error={isError ? error : null}
               onRetry={() => void refetch()}

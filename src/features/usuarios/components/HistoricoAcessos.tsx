@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ACAO_AUDITORIA_LABEL, ORIGEM_AUDITORIA_LABEL } from "@/lib/enums";
+import { ACAO_AUDITORIA_LABEL, ORIGEM_AUDITORIA_LABEL, rotuloDoRecurso } from "@/lib/enums";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { useAcessos } from "../hooks/useUsuarios";
 import type { UsuarioListItem } from "@/types/usuario";
@@ -71,7 +71,7 @@ export function HistoricoAcessos({
                   </StatusBadge>
 
                   <div className="min-w-0">
-                    <p className="truncate text-sm">{log.recurso}</p>
+                    <p className="truncate text-sm">{rotuloDoRecurso(log.recurso)}</p>
                     <p className="text-muted-foreground text-[11px]">
                       {ORIGEM_AUDITORIA_LABEL[log.origem]}
                       {log.user_agent ? ` · ${log.user_agent}` : ""}

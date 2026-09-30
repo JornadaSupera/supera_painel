@@ -130,9 +130,6 @@ function MatrizSomenteLeitura({ matriz }: { matriz: Matriz }) {
                       <tr key={permissao.id} className="hover:bg-muted/40 border-b transition-colors">
                         <td className="px-4 py-2">
                           <span>{permissao.label}</span>
-                          <span className="text-muted-foreground ml-2 font-mono text-[11px]">
-                            {permissao.id}
-                          </span>
                         </td>
 
                         {matriz.papeis.map((papel) => (
@@ -209,9 +206,6 @@ function PermissionsByRole({
                 >
                   <span className="flex min-w-0 flex-col">
                     <span className="text-sm">{permissao.label}</span>
-                    <span className="text-muted-foreground font-mono text-[11px] break-all">
-                      {permissao.id}
-                    </span>
                   </span>
 
                   {exclusive ? (
