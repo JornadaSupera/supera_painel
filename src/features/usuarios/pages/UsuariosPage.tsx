@@ -186,11 +186,14 @@ export function UsuariosPage() {
         eyebrow="Gestão"
         title="Usuários"
         subtitle={
-          isLoading && total === 0
-            ? "Carregando equipe…"
-            : filtrada
-              ? `${pluralize(total, "usuário", "usuários")} no recorte atual`
-              : `${pluralize(total, "usuário cadastrado", "usuários cadastrados")} · ${pluralize(assistenciais, "profissional", "profissionais")} em ${pluralize(especialidades, "especialidade", "especialidades")}`
+          // A leitura falhou: o total é desconhecido, não zero.
+          isError
+            ? "Não foi possível ler a equipe agora"
+            : isLoading && total === 0
+              ? "Carregando equipe…"
+              : filtrada
+                ? `${pluralize(total, "usuário", "usuários")} no recorte atual`
+                : `${pluralize(total, "usuário cadastrado", "usuários cadastrados")} · ${pluralize(assistenciais, "profissional", "profissionais")} em ${pluralize(especialidades, "especialidade", "especialidades")}`
         }
         actions={
           <Can permission={PERMISSAO.USUARIOS_MANAGE}>
