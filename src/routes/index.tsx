@@ -8,6 +8,8 @@ import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { MfaPage } from "@/features/auth/pages/MfaPage";
 import { NovaSenhaPage } from "@/features/auth/pages/NovaSenhaPage";
 import { RecuperarSenhaPage } from "@/features/auth/pages/RecuperarSenhaPage";
+import { PatientChatShortcut } from "@/features/clinico/components/PatientChatShortcut";
+import { PatientRecordPanel } from "@/features/clinico/components/PatientRecordPanel";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ClinicoLayout } from "@/layouts/ClinicoLayout";
 import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
@@ -110,18 +112,26 @@ function needsRecoveryRescue(location: { pathname: string; search: string; hash:
 /**
  * The patient record, inside the clinical frame.
  *
- * Same page the administrative panel uses; only the way back and the label
- * above the title change, so a professional never lands in the other panel's
- * navigation by opening a patient.
+ * Same page the administrative panel uses; the way back and the label above the
+ * title change, so a professional never lands in the other panel's navigation by
+ * opening a patient. It adds what only a professional needs: the shortcut to the
+ * patient's chat and the multidisciplinary timeline, where they write in their
+ * own area. Composed here because a feature does not import another feature.
  */
 function ClinicoPacienteFicha() {
-  const { especialidade } = useParams<{ especialidade: string }>();
+  const { especialidade, id } = useParams<{ especialidade: string; id: string }>();
+  const area = especialidade as Especialidade;
+  const base = `/clinico/${area}`;
+  const chatHref = `${base}/chat?paciente=${id ?? ""}`;
 
   return (
     <PacienteFichaPage
-      basePath={`/clinico/${especialidade}/pacientes`}
-      eyebrow={ESPECIALIDADE_LABEL[especialidade as Especialidade]}
-    />
+      basePath={`${base}/pacientes`}
+      eyebrow={ESPECIALIDADE_LABEL[area]}
+      extraActions={<PatientChatShortcut href={chatHref} />}
+    >
+      {id && <PatientRecordPanel patientId={id} area={area} chatHref={chatHref} />}
+    </PacienteFichaPage>
   );
 }
 

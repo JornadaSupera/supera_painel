@@ -8,6 +8,7 @@ import {
   isSupportedVideoUrl,
 } from "@/lib/content";
 import { TIPO_CONTEUDO } from "@/lib/enums";
+import { SPECIALTY_NOTE_MAX } from "@/lib/patient-record";
 
 /**
  * Validação da resposta no chat.
@@ -85,3 +86,23 @@ export const orientacaoSchema = z
   });
 
 export type OrientacaoForm = z.infer<typeof orientacaoSchema>;
+
+/* -------------------------------------------------------------------------
+   ANOTAÇÃO DA FICHA
+   ------------------------------------------------------------------------- */
+
+/**
+ * Anotação pontual de uma especialidade. A nota não se edita nem se apaga depois
+ * de salva, então o limite e o vazio são recusados aqui, com a regra que os dois
+ * adapters repetem (`specialtyNoteError`).
+ */
+export const specialtyNoteSchema = z.object({
+  body: z
+    .string()
+    .trim()
+    .min(1, "Escreva a anotação antes de salvar.")
+    .max(SPECIALTY_NOTE_MAX, `A anotação tem no máximo ${SPECIALTY_NOTE_MAX} caracteres.`),
+  flagDistress: z.boolean(),
+});
+
+export type SpecialtyNoteForm = z.infer<typeof specialtyNoteSchema>;
