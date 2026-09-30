@@ -24,7 +24,8 @@ import {
   type AlertRowStatus,
   type ConversationRowStatus,
 } from "./_clinicalMaps";
-import { executar, falhaDe, profissionalDaSessao, TETO_READ, umDe } from "./_helpers";
+import { executar, falhaDe, profissionalDaSessao, TETO_READ } from "./_helpers";
+import { namesById, NO_NAME, professionalNamesQuery, type ProfessionalNameRow } from "./_professionalNames";
 import { getSupabaseClient } from "./client";
 import { paraCodigoDeEspecialidade, paraEspecialidade } from "./mapping";
 
@@ -96,15 +97,8 @@ interface SpecialtyRow {
   is_confidential: boolean;
 }
 
-interface ProfessionalNameRow {
-  id: string;
-  accounts: { full_name: string | null } | { full_name: string | null }[] | null;
-}
-
 /** Per source, how many rows one timeline asks for. The database caps a read at 200 anyway. */
 const ROWS_PER_SOURCE = 100;
-
-const NO_NAME = "Profissional";
 
 function idsOf<T>(rows: T[], pick: (row: T) => string | null | undefined): string[] {
   return [...new Set(rows.map(pick).filter((id): id is string => Boolean(id)))];
@@ -204,7 +198,7 @@ export async function getPatientTimeline(params: {
         ? supabase.from("appointment_statuses").select("id, code, label").in("id", statusIds)
         : empty<{ id: string; code: string; label: string }>(),
       professionalIds.length
-        ? supabase.from("professionals").select("id, accounts ( full_name )").in("id", professionalIds)
+        ? professionalNamesQuery(supabase, professionalIds)
         : empty<ProfessionalNameRow>(),
     ]);
 
@@ -216,12 +210,7 @@ export async function getPatientTimeline(params: {
     const subjectLabel = new Map((subjectsRes.data ?? []).map((row) => [row.id, row.label]));
     const typeLabel = new Map((typesRes.data ?? []).map((row) => [row.id, row.label]));
     const statusById = new Map((statusesRes.data ?? []).map((row) => [row.id, row]));
-    const professionalName = new Map(
-      ((professionalsRes.data ?? []) as ProfessionalNameRow[]).map((row) => [
-        row.id,
-        umDe(row.accounts)?.full_name?.trim() || NO_NAME,
-      ]),
-    );
+    const professionalName = namesById((professionalsRes.data ?? []) as ProfessionalNameRow[]);
 
     const appointmentEvents = appointmentRows.map<AppointmentRecordEvent>((row) => {
       const status = row.status_id ? statusById.get(row.status_id) : undefined;
