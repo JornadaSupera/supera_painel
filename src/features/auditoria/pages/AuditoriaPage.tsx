@@ -340,7 +340,7 @@ export function AuditoriaPage() {
           concluir que não há rastro de alguém. */}
       {facetas.data?.truncado && (
         <p className="text-muted-foreground text-[11px]">
-          A janela tem mais registros do que o backend devolve de uma vez: os seletores de usuário
+          A janela tem mais registros do que o sistema devolve de uma vez: os seletores de usuário
           e de paciente podem não listar todo mundo. Estreite o período para fechar a lista.
         </p>
       )}
