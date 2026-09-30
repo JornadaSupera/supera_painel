@@ -155,16 +155,42 @@ export function formatPercent(value: number | null | undefined, decimals = 1): s
   })}%`;
 }
 
-/** "7 min", "1 h 12 min" */
+/**
+ * "7 min", "1 h 12 min", "14 d 21 h"
+ *
+ * From one day up the minutes are dropped: "14 d 21 h 18 min" is precision the
+ * measure does not have, and it is what made "21.438min" unreadable.
+ */
 export function formatDuration(minutes: number | null | undefined): string {
   if (minutes === null || minutes === undefined) return EMPTY;
 
   const total = Math.round(minutes);
   if (total < 60) return `${total} min`;
 
+  if (total >= 1440) {
+    const days = Math.floor(total / 1440);
+    const hours = Math.floor((total % 1440) / 60);
+    return hours === 0 ? `${days} d` : `${days} d ${hours} h`;
+  }
+
   const hours = Math.floor(total / 60);
   const rest = total % 60;
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+/**
+ * A measure ready for a `StatCard`: the value and, when it still needs one, the
+ * unit glued to it.
+ *
+ * Minutes are turned into a duration ("14 d 21 h") and carry no unit, because
+ * the duration already says it. Any other unit goes through unchanged.
+ */
+export function formatMeasure(
+  value: number,
+  unit: string | undefined,
+): { value: string; unit: string | undefined } {
+  if (unit === "min") return { value: formatDuration(value), unit: undefined };
+  return { value: formatNumber(value), unit };
 }
 
 /* -------------------------------------------------------------------- text */
