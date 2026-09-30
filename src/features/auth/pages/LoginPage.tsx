@@ -3,7 +3,6 @@ import { LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import type { Location as RouterLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +18,7 @@ import { AuthLayout } from "@/layouts/AuthLayout";
 import { defaultHomePath } from "@/routes/home-path";
 import { ERROR_CODE } from "@/services/contracts";
 import { AuthErrorAlert } from "../components/AuthErrorAlert";
+import { returnPath } from "../return-path";
 import { CorporateEmailField } from "../components/CorporateEmailField";
 import { PasswordInput } from "../components/PasswordInput";
 import { loginSchema, type LoginForm } from "../schemas";
@@ -41,7 +41,7 @@ export function LoginPage() {
 
   if (isAuthenticated) {
     const destino =
-      (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? defaultHomePath(user);
+      returnPath(location.state) ?? defaultHomePath(user);
     return <Navigate to={destino} replace />;
   }
 

@@ -1,7 +1,6 @@
 import { ArrowLeft, LoaderCircle, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import type { Location as RouterLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { InputOTP, InputOTPGroup, InputOTPSeparator, InputOTPSlot } from "@/components/ui/input-otp";
@@ -10,6 +9,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { defaultHomePath } from "@/routes/home-path";
 import { AuthErrorAlert } from "../components/AuthErrorAlert";
+import { returnPath } from "../return-path";
 
 /**
  * Segundo fator — a verificação de quem tem autenticador.
@@ -79,7 +79,7 @@ export function MfaPage() {
 
   if (isAuthenticated) {
     const destino =
-      (location.state as { from?: RouterLocation } | null)?.from?.pathname ?? defaultHomePath(user);
+      returnPath(location.state) ?? defaultHomePath(user);
     return <Navigate to={destino} replace />;
   }
 
