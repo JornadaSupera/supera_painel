@@ -1,5 +1,6 @@
 import { Gauge, MailCheck, MessageSquareText, Star } from "lucide-react";
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import {
   BarChart,
@@ -23,10 +24,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatNumber, pluralize } from "@/lib/format";
-import { SMALL_BASE } from "@/lib/nps";
+import { NPS_CATEGORY_LABEL, SMALL_BASE } from "@/lib/nps";
+import type { NpsCategory } from "@/types/satisfaction";
 import type { MilestoneSummary } from "@/types/satisfaction";
 import { SatisfactionAnswers } from "../components/SatisfactionAnswers";
-import { EMPTY_FILTERS, useSatisfactionSummary, type AnswerFilters } from "../hooks/useSatisfaction";
+import { useSatisfactionSummary, type AnswerFilters } from "../hooks/useSatisfaction";
 
 /**
  * Satisfação dos pacientes — a pesquisa NPS que o aplicativo abre nos marcos da
@@ -40,6 +42,11 @@ import { EMPTY_FILTERS, useSatisfactionSummary, type AnswerFilters } from "../ho
  * nenhuma das duas tabelas, então esta tela não tem versão clínica. O nome do
  * paciente não aparece: a resposta é atribuível, e o nome se lê na ficha, onde o
  * acesso fica registrado.
+ *
+ * > [!] O recorte vive no endereço
+ * `?dias=90&momento=primeiro_acesso&categoria=detractor&comentario=sim`. É o que
+ * permite a uma linha do relatório de NPS abrir aqui exatamente as respostas que
+ * ela resume, e a um link copiado abrir o mesmo recorte.
  *
  * > [!] O que "período" quer dizer aqui
  * Nota, distribuição, evolução e lista contam as respostas DADAS no período. A
@@ -67,10 +74,35 @@ function monthLabel(month: string): string {
 }
 
 export function SatisfacaoPage() {
-  const [period, setPeriod] = useState("90");
-  const [filters, setFilters] = useState<AnswerFilters>(EMPTY_FILTERS);
+  const [params, setParams] = useSearchParams();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE_DEFAULT);
+
+  const requestedPeriod = params.get("dias");
+  const period = PERIODS.some((item) => item.value === requestedPeriod) ? (requestedPeriod as string) : "90";
+
+  const requestedCategory = params.get("categoria");
+  const filters: AnswerFilters = {
+    category:
+      requestedCategory && requestedCategory in NPS_CATEGORY_LABEL ? (requestedCategory as NpsCategory) : "",
+    milestone: params.get("momento") ?? "",
+    withComment: params.get("comentario") === "sim",
+  };
+
+  /** Writes the address, dropping what is the default so it stays short. */
+  const update = (next: { period?: string; filters?: AnswerFilters }) => {
+    const period = next.period ?? (requestedPeriod && PERIODS.some((item) => item.value === requestedPeriod) ? requestedPeriod : "90");
+    const chosen = next.filters ?? filters;
+
+    const query = new URLSearchParams();
+    if (period !== "90") query.set("dias", period);
+    if (chosen.category) query.set("categoria", chosen.category);
+    if (chosen.milestone) query.set("momento", chosen.milestone);
+    if (chosen.withComment) query.set("comentario", "sim");
+
+    setParams(query, { replace: true });
+    setPage(1);
+  };
 
   const days = PERIODS.find((item) => item.value === period)?.days ?? null;
   const summary = useSatisfactionSummary(days);
@@ -120,13 +152,7 @@ export function SatisfacaoPage() {
         title="Satisfação dos pacientes"
         subtitle="Pesquisa NPS aberta nos marcos da jornada · notas e comentários"
         actions={
-          <Select
-            value={period}
-            onValueChange={(value) => {
-              setPeriod(value);
-              setPage(1);
-            }}
-          >
+          <Select value={period} onValueChange={(value) => update({ period: value })}>
             <SelectTrigger size="sm" aria-label="Período" className="w-44">
               <SelectValue />
             </SelectTrigger>
@@ -272,10 +298,7 @@ export function SatisfacaoPage() {
             days={days}
             milestones={data.by_milestone.map((item) => ({ code: item.code, label: item.label }))}
             filters={filters}
-            onFiltersChange={(next) => {
-              setFilters(next);
-              setPage(1);
-            }}
+            onFiltersChange={(next) => update({ filters: next })}
             page={page}
             pageSize={pageSize}
             onPageChange={setPage}
