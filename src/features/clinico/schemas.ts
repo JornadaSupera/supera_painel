@@ -203,3 +203,13 @@ export function blockToFormValues(block: PersonalBlock | null, defaultDay: strin
     endTime: endsAtMidnight ? "23:59" : timeOfMinutes(end.minutes),
   };
 }
+
+/* -------------------------------------------------------------------------
+   DESIGNAR ALERTA
+   ------------------------------------------------------------------------- */
+
+export const assignAlertSchema = z.object({
+  professionalId: z.string().min(1, "Escolha a quem designar."),
+});
+
+export type AssignAlertForm = z.infer<typeof assignAlertSchema>;

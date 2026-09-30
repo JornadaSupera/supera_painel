@@ -12,8 +12,9 @@ import {
   type CondutaAlerta,
   type Severidade,
 } from "@/lib/enums";
-import { relativeTime } from "@/lib/format";
+import { formatDateTime, relativeTime } from "@/lib/format";
 import type { AlertaClinico } from "@/types/clinico";
+import { DesignarAlertaDialog } from "../components/DesignarAlertaDialog";
 import { DialogResolverAlerta } from "../components/DialogResolverAlerta";
 import { useAlertasClinicos, useAssumirAlerta, useResolverAlerta } from "../hooks/useAlertasClinicos";
 
@@ -26,9 +27,18 @@ import { useAlertasClinicos, useAssumirAlerta, useResolverAlerta } from "../hook
  * inteira e pode assumir um item em aberto — ver PA-07. A base real está com
  * ZERO alertas hoje: nenhum gatilho de criticidade foi cadastrado em
  * Configurações (ver PA-04), então a fila fica honestamente vazia até isso
- * mudar. "Assumir" e "Resolver" exigem a permissão `alerts.triage`, concedida
- * por profissional em Usuários — sem ela, a ação volta com um erro claro em
- * vez de fingir sucesso.
+ * mudar. "Assumir", "Designar" e "Resolver" exigem a permissão `alerts.triage`,
+ * concedida por profissional em Usuários — sem ela, a ação volta com um erro
+ * claro em vez de fingir sucesso.
+ *
+ * > [!] A fila e o histórico são leituras separadas, por estado
+ * `read_alerts` entrega os mais ANTIGOS primeiro, até 200. Numa leitura só, os
+ * resolvidos antigos ocupariam o teto e esconderiam alertas novos em aberto.
+ * Lendo por estado, a fila (pendentes e em atendimento) nunca compete com o
+ * histórico. O histórico, por sua vez, chega ao teto de 200 e para: o parâmetro
+ * de página do banco pede "os anteriores a", e como a lista vem do mais antigo,
+ * não há como buscar os mais novos depois do teto. A tela avisa quando isso
+ * acontece.
  */
 
 const ORDEM_SEVERIDADE: Severidade[] = [
@@ -45,6 +55,11 @@ const TOM_POR_SEVERIDADE: Record<Severidade, "danger" | "warning" | "info" | "ne
   baixa: "neutral",
 };
 
+/** Quantos resolvidos a tela abre de cada vez. */
+const PASSO_HISTORICO = 10;
+/** O teto de `read_alerts`: com isto na mão, pode haver mais do que a tela alcança. */
+const TETO_LEITURA = 200;
+
 /** Cor da faixa esquerda dos cartões — classes reais, não um nome de variável chutado. */
 const BORDA_POR_SEVERIDADE: Record<Severidade, string> = {
   critica: "border-l-danger",
@@ -57,31 +72,42 @@ export function ClinicoAlertasPage() {
   const { user } = useAuth();
   const area = user?.especialidade ? ESPECIALIDADE_LABEL[user.especialidade] : "";
 
-  const alertas = useAlertasClinicos();
+  const pendentes = useAlertasClinicos("pendente");
+  const emAtendimento = useAlertasClinicos("assumido");
+  const historico = useAlertasClinicos("resolvido");
   const assumir = useAssumirAlerta();
   const resolver = useResolverAlerta();
 
   const [emResolucao, setEmResolucao] = useState<AlertaClinico | null>(null);
+  const [emDesignacao, setEmDesignacao] = useState<AlertaClinico | null>(null);
+  const [visiveis, setVisiveis] = useState(PASSO_HISTORICO);
 
-  const lista = alertas.data ?? [];
-  const ativos = lista
-    .filter((alerta) => alerta.status !== "resolvido")
-    .sort((a, b) => {
-      const ordemA = ORDEM_SEVERIDADE.indexOf(a.severidade);
-      const ordemB = ORDEM_SEVERIDADE.indexOf(b.severidade);
-      return ordemA !== ordemB ? ordemA - ordemB : a.criado_em.localeCompare(b.criado_em);
-    });
-  const resolvidos = lista
-    .filter((alerta) => alerta.status === "resolvido")
-    .sort((a, b) => (b.resolvido_em ?? "").localeCompare(a.resolvido_em ?? ""))
-    .slice(0, 10);
+  const fila = {
+    isLoading: pendentes.isLoading || emAtendimento.isLoading,
+    isError: pendentes.isError || emAtendimento.isError,
+    error: pendentes.error ?? emAtendimento.error,
+    refetch: () => void Promise.all([pendentes.refetch(), emAtendimento.refetch()]),
+  };
+
+  const ativos = [...(pendentes.data ?? []), ...(emAtendimento.data ?? [])].sort((a, b) => {
+    const ordemA = ORDEM_SEVERIDADE.indexOf(a.severidade);
+    const ordemB = ORDEM_SEVERIDADE.indexOf(b.severidade);
+    return ordemA !== ordemB ? ordemA - ordemB : a.criado_em.localeCompare(b.criado_em);
+  });
+  const todosResolvidos = [...(historico.data ?? [])].sort((a, b) =>
+    (b.resolvido_em ?? "").localeCompare(a.resolvido_em ?? ""),
+  );
+  const resolvidos = todosResolvidos.slice(0, visiveis);
+  const historicoTruncado = (historico.data?.length ?? 0) >= TETO_LEITURA;
 
   const contagem = ORDEM_SEVERIDADE.map((severidade) => ({
     severidade,
     total: ativos.filter((alerta) => alerta.severidade === severidade).length,
   }));
 
-  const vazio = !alertas.isLoading && !alertas.isError && lista.length === 0;
+  const carregando = fila.isLoading || historico.isLoading;
+  const vazio =
+    !carregando && !fila.isError && !historico.isError && ativos.length === 0 && todosResolvidos.length === 0;
 
   function confirmarResolucao(params: { conduta: CondutaAlerta; notas: string }) {
     if (!emResolucao) return;
@@ -99,11 +125,9 @@ export function ClinicoAlertasPage() {
         subtitle={`${ativos.length} ativos · ordenados por gravidade`}
       />
 
-      {alertas.isLoading && <SkeletonCards count={3} />}
+      {carregando && <SkeletonCards count={3} />}
 
-      {alertas.isError && (
-        <ErrorState error={alertas.error} onRetry={() => void alertas.refetch()} />
-      )}
+      {fila.isError && <ErrorState error={fila.error} onRetry={fila.refetch} />}
 
       {vazio && (
         <EmptyState
@@ -112,7 +136,7 @@ export function ClinicoAlertasPage() {
         />
       )}
 
-      {!alertas.isLoading && !alertas.isError && lista.length > 0 && (
+      {!carregando && !fila.isError && !vazio && (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {contagem.map(({ severidade, total }) => (
@@ -151,6 +175,7 @@ export function ClinicoAlertasPage() {
                     </div>
                     <p className="text-muted-foreground mt-1 text-xs">
                       {alerta.sintoma_label} · grau {alerta.grau} · {relativeTime(alerta.criado_em)}
+                      {alerta.atribuido_a ? ` · com ${alerta.atribuido_a}` : ""}
                     </p>
                   </div>
 
@@ -165,9 +190,14 @@ export function ClinicoAlertasPage() {
                       </Button>
                     )}
                     {alerta.status === "assumido" && (
-                      <Button size="sm" variant="outline" onClick={() => setEmResolucao(alerta)}>
-                        Resolver
-                      </Button>
+                      <>
+                        <Button size="sm" variant="ghost" onClick={() => setEmDesignacao(alerta)}>
+                          Designar
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEmResolucao(alerta)}>
+                          Resolver
+                        </Button>
+                      </>
                     )}
                   </div>
                 </article>
@@ -175,10 +205,17 @@ export function ClinicoAlertasPage() {
             </section>
           )}
 
+          {historico.isError && (
+            <ErrorState compact error={historico.error} onRetry={() => void historico.refetch()} />
+          )}
+
           {resolvidos.length > 0 && (
-            <section className="flex flex-col gap-2">
-              <h2 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
-                Resolvidos recentemente
+            <section className="flex flex-col gap-2" aria-labelledby="historico-alertas">
+              <h2
+                id="historico-alertas"
+                className="text-muted-foreground text-xs font-medium tracking-wider uppercase"
+              >
+                Histórico de resolvidos
               </h2>
 
               {resolvidos.map((alerta) => (
@@ -192,16 +229,43 @@ export function ClinicoAlertasPage() {
                   <p className="text-muted-foreground text-xs">
                     {alerta.sintoma_label} · grau {alerta.grau}
                     {alerta.conduta_tipo ? ` · ${CONDUTA_ALERTA_LABEL[alerta.conduta_tipo]}` : ""}
+                    {alerta.atribuido_a ? ` · responsável: ${alerta.atribuido_a}` : ""}
+                    {alerta.resolvido_em ? ` · ${formatDateTime(alerta.resolvido_em)}` : ""}
                   </p>
                   {alerta.conduta_notas && (
                     <p className="text-muted-foreground text-xs italic">{alerta.conduta_notas}</p>
                   )}
                 </article>
               ))}
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-muted-foreground text-xs">
+                  Mostrando {resolvidos.length} de {todosResolvidos.length}
+                  {historicoTruncado
+                    ? `. O banco entrega no máximo ${TETO_LEITURA} de cada vez, dos mais antigos para os mais novos: pode haver resolvidos mais recentes que não chegam aqui.`
+                    : ""}
+                </p>
+                {resolvidos.length < todosResolvidos.length && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setVisiveis((atual) => atual + PASSO_HISTORICO)}
+                  >
+                    Mostrar mais
+                  </Button>
+                )}
+              </div>
             </section>
           )}
         </>
       )}
+
+      <DesignarAlertaDialog
+        alerta={emDesignacao}
+        open={emDesignacao !== null}
+        onOpenChange={(aberto) => !aberto && setEmDesignacao(null)}
+      />
 
       <DialogResolverAlerta
         alerta={emResolucao}
