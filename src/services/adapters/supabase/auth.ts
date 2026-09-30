@@ -18,7 +18,7 @@ import type {
   Sessao,
   UsuarioAutenticado,
 } from "@/types/auth";
-import { executar, falhaDe, umDe } from "./_helpers";
+import { executar, falhaDe, limparLeiturasCompartilhadas, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
 
@@ -408,6 +408,10 @@ export async function getSession(): Promise<SingleResult<Sessao>> {
  */
 export function subscribe(listener: (evento: EventoDeSessao) => void): () => void {
   const { data } = getSupabaseClient().auth.onAuthStateChange((evento, sessao) => {
+    // Quem entra ou sai pode não ser quem estava: nada lido em nome da sessão
+    // anterior (um nome de paciente, por exemplo) sobrevive à troca.
+    if (evento === "SIGNED_OUT" || evento === "SIGNED_IN") limparLeiturasCompartilhadas();
+
     if (evento === "SIGNED_OUT") {
       listener({ tipo: "encerrada" });
       return;

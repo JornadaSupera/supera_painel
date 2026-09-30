@@ -205,6 +205,60 @@ export function umDe<T>(vinculo: T | T[] | null | undefined): T | null {
 }
 
 /**
+ * LEITURA PEDIDA POR DUAS CONSULTAS DA MESMA TELA.
+ * =============================================================================
+ * O Dashboard lê seus indicadores e seus gráficos em duas consultas, e as duas
+ * precisam da mesma lista de pacientes, dos mesmos catálogos e do mesmo tipo de
+ * compromisso. Cada uma ia ao banco por conta própria: a rede mostrava a mesma
+ * função duas vezes por carga e, pior, a trilha de auditoria registrava duas
+ * leituras onde houve um gesto só. O painel clínico repetia `read_patient` do
+ * mesmo paciente para a agenda e para os alertas.
+ *
+ * Aqui a segunda consulta pega carona na primeira: a mesma chave, dentro de uma
+ * janela curta, devolve a MESMA promessa. A janela é curta de propósito (cinco
+ * segundos para o que muda, alguns minutos para catálogo), porque isto não é um
+ * cache de dados, é a remoção de uma duplicata.
+ *
+ * Nada falho fica guardado: se a leitura rejeitar, ou se `manter` disser que o
+ * valor é uma falha, a entrada sai e a próxima chamada tenta de novo.
+ *
+ * O que está aqui pode ser dado de paciente (um nome), então a memória é
+ * esvaziada quando a sessão muda — ver `limparLeiturasCompartilhadas`.
+ */
+const LEITURAS_COMPARTILHADAS = new Map<string, { expiraEm: number; promessa: Promise<unknown> }>();
+
+export function compartilharLeitura<T>(
+  chave: string,
+  validadeMs: number,
+  carregar: () => Promise<T>,
+  manter: (valor: T) => boolean = () => true,
+): Promise<T> {
+  const agora = Date.now();
+  const existente = LEITURAS_COMPARTILHADAS.get(chave);
+
+  if (existente && existente.expiraEm > agora) return existente.promessa as Promise<T>;
+
+  const promessa = carregar().then(
+    (valor) => {
+      if (!manter(valor)) LEITURAS_COMPARTILHADAS.delete(chave);
+      return valor;
+    },
+    (erro: unknown) => {
+      LEITURAS_COMPARTILHADAS.delete(chave);
+      throw erro;
+    },
+  );
+
+  LEITURAS_COMPARTILHADAS.set(chave, { expiraEm: agora + validadeMs, promessa });
+  return promessa;
+}
+
+/** Esvazia as leituras compartilhadas: outra pessoa pode estar entrando neste navegador. */
+export function limparLeiturasCompartilhadas(): void {
+  LEITURAS_COMPARTILHADAS.clear();
+}
+
+/**
  * Teto de linhas das funções `read_*`. É imposto no servidor — pedir mais não
  * traz mais, e o painel precisa saber disso para não prometer paginação que
  * não existe.
