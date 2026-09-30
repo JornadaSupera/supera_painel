@@ -154,6 +154,11 @@ export const queryKeys = {
     mensagens: (conversaId: string) => ["clinico", "conversas", conversaId, "mensagens"] as const,
     /** Fora de `clinico.all` de propósito: o anexo não muda, e invalidar a fila não deve baixá-lo de novo. */
     anexo: (caminho: string) => ["clinico-anexo", caminho] as const,
+    /** Colleagues a conversation can be handed to. */
+    transferTargets: () => ["clinico", "transfer-targets"] as const,
+    /** Who held a conversation, and when. */
+    assignments: (conversationId: string) =>
+      ["clinico", "conversas", conversationId, "assignments"] as const,
     /** Every patient record on screen — what a new note or flag must refresh, and nothing else. */
     records: () => ["clinico", "record"] as const,
     /** One patient's timeline. `days: null` is the whole history, so it gets its own key. */

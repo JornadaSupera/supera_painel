@@ -293,6 +293,9 @@ export const RESOURCES = {
       "listDiarySymptoms",
       "addSpecialtyNote",
       "raiseDistressFlag",
+      "listTransferTargets",
+      "transferConversation",
+      "listConversationAssignments",
     ],
   },
   catalogos: {

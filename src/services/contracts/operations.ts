@@ -19,6 +19,7 @@ import type {
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type { AlertaClinico, CompromissoAgenda, ConversaClinico, MensagemClinico } from "@/types/clinico";
+import type { ConversationAssignment, TransferTarget } from "@/types/conversation-transfer";
 import type { DiarySymptom, PatientTimeline } from "@/types/patient-record";
 import type {
   ClinicaConfiguracao,
@@ -611,6 +612,25 @@ export interface ClinicoOperations {
    * a sinalização, de qual área e quando — nunca o texto.
    */
   raiseDistressFlag(params: { noteId: string }): Promise<SingleResult<null>>;
+
+  /** Colegas ativos que podem receber uma conversa, sem a própria pessoa. */
+  listTransferTargets(): Promise<ListResult<TransferTarget>>;
+  /**
+   * Encaminha uma conversa da própria área para um colega.
+   *
+   * O banco escolhe a área de destino pela especialidade do colega, fecha a
+   * atribuição atual, abre a nova e grava a mensagem de transição ao paciente —
+   * o painel não escreve nenhuma dessas três coisas. Só quem está na área da
+   * conversa encaminha, e só enquanto ela está aberta.
+   */
+  transferConversation(params: {
+    conversationId: string;
+    toProfessionalId: string;
+  }): Promise<SingleResult<null>>;
+  /** Quem segurou a conversa e quando, do mais antigo ao mais recente. */
+  listConversationAssignments(params: {
+    conversationId: string;
+  }): Promise<ListResult<ConversationAssignment>>;
 }
 
 export interface EstatisticasClinicasOperations {

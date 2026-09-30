@@ -113,3 +113,27 @@ export const mensagensClinicas: MensagemClinicaMock[] = [
     criado_em: horasAtras(96),
   },
 ];
+
+/**
+ * Quem segurou cada conversa e quando — mutável, como o resto: encaminhar no
+ * mock fecha a linha aberta e acrescenta a seguinte.
+ */
+export interface AtribuicaoClinicaMock {
+  id: string;
+  conversa_id: string;
+  profissional_nome: string;
+  especialidade: Especialidade | null;
+  atribuida_em: string;
+  liberada_em: string | null;
+}
+
+export const atribuicoesClinicas: AtribuicaoClinicaMock[] = [
+  {
+    id: "atribuicao-1",
+    conversa_id: conversasClinicas[1]?.id ?? "",
+    profissional_nome: "Juliana Fontana",
+    especialidade: "farmaceutico",
+    atribuida_em: horasAtras(21),
+    liberada_em: null,
+  },
+];
