@@ -7,7 +7,7 @@ import {
   ErrorState,
   PageHeader,
   Pagination,
-  SkeletonCards,
+  SkeletonRows,
   StatusBadge,
 } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -68,11 +68,15 @@ export function ClinicoPacientesPage() {
         eyebrow={area}
         title="Pacientes"
         subtitle={
-          isLoading && total === 0
-            ? "Carteira de pacientes"
-            : filtrada
-              ? `${pluralize(total, "paciente", "pacientes")} no recorte atual`
-              : `${pluralize(total, "paciente", "pacientes")} na base compartilhada da equipe`
+          // A leitura falhou: o total é desconhecido, não zero. "0 pacientes na
+          // base" sobre uma lista que não carregou afirma uma base vazia.
+          isError
+            ? "Não foi possível ler a carteira agora"
+            : isLoading && total === 0
+              ? "Carteira de pacientes"
+              : filtrada
+                ? `${pluralize(total, "paciente", "pacientes")} no recorte atual`
+                : `${pluralize(total, "paciente", "pacientes")} na base compartilhada da equipe`
         }
         actions={
           <Can permission={PERMISSAO.PACIENTES_EXPORT}>
@@ -90,7 +94,7 @@ export function ClinicoPacientesPage() {
 
       <CarteiraFiltros />
 
-      {isLoading && <SkeletonCards count={4} />}
+      {isLoading && <SkeletonRows count={6} />}
 
       {isError && <ErrorState error={error} onRetry={refetch} />}
 

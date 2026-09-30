@@ -122,12 +122,23 @@ export function ClinicoAlertasPage() {
       <PageHeader
         eyebrow={area}
         title="Alertas"
-        subtitle={`${ativos.length} ativos · ordenados por gravidade`}
+        subtitle={
+          // Fila que não carregou não tem "0 ativos": o número é desconhecido.
+          fila.isError
+            ? "Não foi possível ler a fila agora"
+            : `${ativos.length} ativos · ordenados por gravidade`
+        }
       />
 
       {carregando && <SkeletonCards count={3} />}
 
       {fila.isError && <ErrorState error={fila.error} onRetry={fila.refetch} />}
+
+      {/* O histórico falhar sozinho também é erro: sem este aviso a seção
+          simplesmente não aparecia, e a fila parecia completa. */}
+      {!fila.isError && historico.isError && (
+        <ErrorState compact error={historico.error} onRetry={() => void historico.refetch()} />
+      )}
 
       {vazio && (
         <EmptyState
