@@ -76,6 +76,9 @@ const TODAS_PERMISSOES = Object.values(PERMISSAO);
 const PERMISSOES_PROFISSIONAL: Permissao[] = [
   PERMISSAO.DASHBOARD_READ,
   PERMISSAO.PACIENTES_READ,
+  // A lista filtrada sai em CSV (Mapa 2.2.5): o banco aceita o registro da
+  // exportação pelo profissional, e o arquivo leva só dado mascarado.
+  PERMISSAO.PACIENTES_EXPORT,
   PERMISSAO.CONTEUDO_READ,
   PERMISSAO.CONTEUDO_WRITE,
   PERMISSAO.RELATORIOS_READ,
