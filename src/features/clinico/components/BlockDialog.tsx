@@ -136,8 +136,8 @@ export function BlockDialog({
           <DialogFooter className="sm:justify-between">
             {block ? (
               confirmingDelete ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Remover este bloqueio?</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm whitespace-nowrap">Remover este bloqueio?</span>
                   <Button
                     type="button"
                     variant="destructive"
@@ -169,15 +169,19 @@ export function BlockDialog({
               <span />
             )}
 
-            <div className="flex gap-2">
-              <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={busy}>
-                {save.isPending && <LoaderCircle className="animate-spin" />}
-                {save.isPending ? "Salvando…" : "Salvar"}
-              </Button>
-            </div>
+            {/* While the removal is being confirmed the footer belongs to the
+                question: beside Cancelar/Salvar it wrapped onto three lines. */}
+            {!confirmingDelete && (
+              <div className="flex gap-2">
+                <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={busy}>
+                  {save.isPending && <LoaderCircle className="animate-spin" />}
+                  {save.isPending ? "Salvando…" : "Salvar"}
+                </Button>
+              </div>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
