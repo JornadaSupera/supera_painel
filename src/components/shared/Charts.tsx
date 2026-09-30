@@ -182,6 +182,11 @@ export interface BarChartProps<T> extends ChartBaseProps {
   series: Series[];
   stacked?: boolean;
   referenceLines?: ChartReferenceLine[];
+  /**
+   * Ticks only at whole numbers. For counts: a y axis marked 0,25 / 0,75 on a
+   * chart of patients or answers reads as a fraction of a person.
+   */
+  integerAxis?: boolean;
 }
 
 export function BarChart<T>({
@@ -190,6 +195,7 @@ export function BarChart<T>({
   series,
   stacked = false,
   referenceLines = [],
+  integerAxis = false,
   suffix = "",
   height,
   loading,
@@ -202,7 +208,7 @@ export function BarChart<T>({
       <RBarChart data={data} margin={MARGIN}>
         <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis dataKey={xKey} {...AXIS} />
-        <YAxis {...AXIS} tickFormatter={formatValue} />
+        <YAxis {...AXIS} allowDecimals={!integerAxis} tickFormatter={formatValue} />
         <Tooltip content={<ChartTooltip suffix={suffix} />} cursor={{ fill: "var(--muted)", opacity: 0.5 }} />
         {legend && <Legend iconType="circle" iconSize={8} />}
 
