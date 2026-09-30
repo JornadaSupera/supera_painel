@@ -7,6 +7,8 @@ import { call, clinicoApi } from "@/services/apiClient";
 export interface JanelaAgenda {
   de: string;
   ate: string;
+  /** Não hidrata o nome dos pacientes — ver `clinico.getMinhaAgenda`. */
+  semNomes?: boolean;
 }
 
 /**
