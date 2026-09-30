@@ -266,7 +266,9 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
                     )}
                   </div>
                   <span className="text-muted-foreground text-[10px]">
-                    {RESUMO_AUTOR[mensagem.autor]} · {formatDateTime(mensagem.criado_em)}
+                    {RESUMO_AUTOR[mensagem.autor]}
+                    {mensagem.autor_nome ? ` · ${mensagem.autor_nome}` : ""} ·{" "}
+                    {formatDateTime(mensagem.criado_em)}
                   </span>
                 </>
               )}
