@@ -94,7 +94,7 @@ import type { DateRange, ListParams, ListResult, SingleResult } from "./index";
  * adapters, então o tipo derivado dele é necessariamente genérico. As telas
  * consomem daqui, onde os tipos são concretos.
  *
- * Cresce uma seção por fase, junto com o mock correspondente.
+ * Cresce uma seção por fase, junto com o adapter correspondente.
  */
 
 /* ---------------------------------------------------------------- Fase 2 */
@@ -137,7 +137,7 @@ export interface AuthOperations {
 
   signOut(): Promise<SingleResult<null>>;
 
-  /** `null` enquanto a sessão viver só em memória — ver `adapters/mock/auth.ts`. */
+  /** `null` quando não há sessão a restaurar. */
   getSession(): Promise<SingleResult<Sessao>>;
 
   /**
@@ -1072,8 +1072,8 @@ export interface SatisfacaoOperations {
  * `resources.ts` garante que a operação **existe** nos dois adapters; este mapa
  * é o que garante que ela tem a **mesma assinatura** nos dois. A distinção
  * importa: o tipo `Adapter` derivado do inventário declara cada operação como
- * `(...args: never[]) => Promise<unknown>`, que aceita qualquer coisa — mock e
- * Supabase podiam divergir em parâmetro ou em retorno e ainda compilar, e o
+ * `(...args: never[]) => Promise<unknown>`, que aceita qualquer coisa — o
+ * adapter podia divergir em parâmetro ou em retorno e ainda compilar, e o
  * `as unknown as` das fachadas fazia o consumidor confiar numa assinatura
  * garantida apenas por coerção.
  */

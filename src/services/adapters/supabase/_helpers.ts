@@ -4,8 +4,7 @@ import { getSupabaseClient, mapSupabaseError } from "./client";
 /**
  * Infra compartilhada do adapter Supabase.
  *
- * Faz o que `mock/_helpers.ts` faz do outro lado: garante que toda operação
- * responda no formato do contrato, inclusive quando algo estoura. Uma exceção
+ * Garante que toda operação responda no formato do contrato, inclusive quando algo estoura. Uma exceção
  * que escapa daqui vira tela branca; um `{ error }` chega ao `ErrorState`.
  */
 

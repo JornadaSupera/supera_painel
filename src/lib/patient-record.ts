@@ -1,7 +1,7 @@
 import type { TimelineWindow } from "@/types/patient-record";
 
 /**
- * Rules of the patient record that the form, the mock and the Supabase adapter
+ * Rules of the patient record that the form and the Supabase adapter
  * must agree on. Three copies of a limit is how a form accepts what the database
  * refuses.
  */

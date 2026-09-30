@@ -8,10 +8,11 @@ import type {
 } from "@/types/satisfaction";
 
 /**
- * The NPS arithmetic, in one place for both adapters.
+ * The NPS arithmetic, in one place.
  *
- * Mock and Supabase hand over rows; what a promoter is and how the score is
- * rounded is decided here, so the two can never disagree about the same answers.
+ * The data layer hands over rows; what a promoter is and how the score is
+ * rounded is decided here, so the screens and the reports can never disagree
+ * about the same answers.
  */
 
 export const NPS_CATEGORY_LABEL: Record<NpsCategory, string> = {

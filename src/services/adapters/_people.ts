@@ -5,7 +5,7 @@ import { digitsOnly, maskEmail } from "@/lib/mask";
  *
  * Search fields, default ordering and the way a document or a destination is
  * shown are decisions about the screen's answer, not about where the rows come
- * from — so the mock and Supabase take them from the same place.
+ * from — so every screen that lists people takes them from the same place.
  */
 
 /** The prototype lists the team by name. */

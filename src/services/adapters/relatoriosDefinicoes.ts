@@ -1,12 +1,11 @@
 import type { DefinicaoRelatorio } from "@/types/relatorio";
 
 /**
- * AS DOZE DEFINIÇÕES — compartilhadas pelos dois adapters.
+ * AS DOZE DEFINIÇÕES.
  *
- * O catálogo é o mesmo em mock e em Supabase: são os relatórios que o escopo
- * contratou, e essa lista não depende de onde os dados moram. O que muda entre
- * os adapters é QUAIS deles conseguem rodar — e isso vem de `SEM_ORIGEM`, que
- * cada adapter aplica com os seus próprios motivos.
+ * O catálogo são os relatórios que o escopo contratou, e essa lista não depende
+ * de onde os dados moram. O que muda é QUAIS deles conseguem rodar — e isso vem
+ * de `SEM_ORIGEM`, com os motivos de cada um.
  *
  * Numeração e textos são os do protótipo, que é como a clínica se refere a
  * eles ("o relatório 04", "aquele que a Dra. pediu").

@@ -60,11 +60,11 @@ export interface RecordedEvent extends AuditEvent {
 }
 
 /**
- * In-memory queue.
+ * In-memory queue of this session's events.
  *
- * Feeds the audit screen in mock mode, so the panel's own actions can be seen
- * end to end without a backend. It does not persist — and must not: an audit
- * event in `localStorage` is PHI in the browser.
+ * No screen reads it today: the audit screen reads the database, which is the
+ * only record that counts. It is kept for diagnostics and does not persist —
+ * and must not: an audit event in `localStorage` is PHI in the browser.
  */
 const queue: RecordedEvent[] = [];
 const QUEUE_LIMIT = 200;

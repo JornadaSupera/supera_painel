@@ -3,7 +3,7 @@ import type { Periodo } from "@/lib/enums";
 /**
  * Tipos do painel executivo.
  *
- * Ficam aqui, e não no arquivo de mock, porque o **contrato** precisa deles e
+ * Ficam aqui, e não num adapter, porque o **contrato** precisa deles e
  * não pode depender de um adapter — a direção correta é adapter → contrato.
  * Quando o Supabase entrar, `adapters/supabase/dashboard.ts` importa
  * exatamente estes mesmos tipos.

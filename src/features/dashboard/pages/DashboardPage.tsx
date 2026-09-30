@@ -35,7 +35,7 @@ import { useKpis, useRegistrarExportacaoDashboard, useSeries } from "../hooks/us
 /**
  * Ícone e cor de acento de cada indicador.
  *
- * Fica na tela, não no mock: é decisão de apresentação. As cores vêm dos
+ * Fica na tela, não na camada de dados: é decisão de apresentação. As cores vêm dos
  * valores da marca — repetir a primária nos cinco cartões apagaria a distinção
  * entre eles.
  */

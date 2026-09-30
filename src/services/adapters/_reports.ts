@@ -367,8 +367,7 @@ export interface ReportParams {
  * `logExport` is how the Supabase adapter declares the export to
  * `log_data_export` (25/09/2026) without this shared file touching the SDK
  * directly — the architecture guard restricts `@supabase/supabase-js` to
- * `services/adapters/supabase`. The mock adapter passes nothing: there is no
- * trail to write to.
+ * `services/adapters/supabase`.
  */
 export function createReportOperations(
   run: (params: ReportParams) => Promise<SingleResult<ResultadoRelatorio>>,

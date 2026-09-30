@@ -3,7 +3,7 @@
  * =============================================================================
  * Inventário de todos os recursos e operações que a camada de dados expõe.
  *
- *  1. Contrato — mock e Supabase implementam exatamente estas chaves.
+ *  1. Contrato — o adapter implementa exatamente estas chaves.
  *  2. Checklist — o que ainda não foi implementado falha com NOT_IMPLEMENTED,
  *     nunca com `undefined is not a function`.
  *  3. Rastreabilidade — cada recurso aponta para a fase do plano e para a

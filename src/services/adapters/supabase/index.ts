@@ -25,8 +25,7 @@ import * as usuarios from "./usuarios";
 /**
  * ADAPTER SUPABASE.
  *
- * Mesma superfície do mock, verificada em tempo de compilação por
- * `RESOURCES`: operação declarada e não escrita vira stub NOT_IMPLEMENTED, não
+ * A superfície é a de `RESOURCES`, verificada em tempo de compilação: operação declarada e não escrita vira stub NOT_IMPLEMENTED, não
  * `undefined is not a function`.
  *
  * Duas regras do banco valem para tudo que se escrever aqui, e nenhuma delas é

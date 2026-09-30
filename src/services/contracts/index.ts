@@ -1,8 +1,8 @@
 /**
  * CONTRATO DE DADOS
  * =============================================================================
- * Define a forma de TODO request e TODO response da camada de dados. É o único
- * ponto onde o mock e o Supabase precisam concordar.
+ * Define a forma de TODO request e TODO response da camada de dados. É o ponto
+ * em que a tela e o banco se encontram.
  *
  * Desenhado para mapear 1:1 no PostgREST/Supabase:
  *   { page, pageSize }     -> .range(from, to)
@@ -104,7 +104,7 @@ export interface FailResult {
 /* -------------------------------------------------------------------------
    CÓDIGOS DE ERRO
    Estáveis e independentes de backend. O adapter traduz o erro nativo
-   (mock ou PostgREST) para um destes; a tela só conhece estes.
+   (PostgREST) para um destes; a tela só conhece estes.
    ------------------------------------------------------------------------- */
 
 export const ERROR_CODE = {

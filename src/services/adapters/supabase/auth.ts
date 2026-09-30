@@ -26,7 +26,7 @@ import { paraEspecialidade } from "./mapping";
  * Autenticação — Supabase Auth (GoTrue).
  *
  * O fluxo do contrato é `signIn → segundo fator → sessão`, e é o que o painel
- * expõe. O que muda em relação ao mock é de onde vem cada pedaço:
+ * expõe. De onde vem cada pedaço:
  *
  *   signIn      → auth.signInWithPassword + auth.mfa.challenge
  *   verifyMfa   → auth.mfa.verify, e só então o painel considera logado

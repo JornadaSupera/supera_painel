@@ -7,12 +7,11 @@ import type {
 } from "@/types/auditoria";
 
 /**
- * AUDIT TRAIL RULES SHARED BY BOTH ADAPTERS.
+ * AUDIT TRAIL RULES.
  * =============================================================================
- * The mock and Supabase read the trail from different places, but what they
- * answer with has to be the same: the same facet ordering, the same summary
- * shape and the same export columns. Two copies of these rules is how the
- * screen starts telling a different story depending on the backend.
+ * The facet ordering, the summary shape and the export columns are decided here,
+ * not where the rows are read, so the screen and the file the data protection
+ * officer receives tell the same story.
  */
 
 export const AUDIT_DEFAULT_SORT = { field: "criado_em", direction: "desc" } as const;

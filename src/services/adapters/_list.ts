@@ -4,10 +4,6 @@ import { normalizeListParams, ok } from "@/services/contracts";
 /**
  * IN-MEMORY LIST PIPELINE — search, filter, range, sort, paginate.
  * =============================================================================
- * Shared by both adapters, for two different reasons.
- *
- * The mock uses it because it has nothing but arrays.
- *
  * The Supabase adapter uses it because some reads arrive through `read_*`
  * functions that take only `p_limit`/`p_offset` — no search, no filter, no
  * sort, and no total count. Whatever the screen asks beyond that has to be

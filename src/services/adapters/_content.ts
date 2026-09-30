@@ -144,9 +144,9 @@ interface EntryFields {
 }
 
 /**
- * What the form already checks, checked again where the write happens: the two
- * adapters must refuse the same entries, and a mock that accepted what the
- * database rejects would have the screen promise a save that never happens.
+ * What the form already checks, checked again where the write happens: a write
+ * the database would reject is refused here first, with a sentence the person
+ * can act on, instead of a generic failure after the save was promised.
  *
  * Fields that are absent are not checked, so an edit can send only what changed.
  */

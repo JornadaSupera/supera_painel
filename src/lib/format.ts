@@ -2,8 +2,8 @@
  * pt-BR formatting.
  *
  * The data layer works in ISO 8601 UTC and raw numbers. Converting to the
- * Brazilian format happens at render time only — never in the mock, never in
- * the adapter. That keeps sorting, filtering and exporting correct.
+ * Brazilian format happens at render time only — never in the
+ * adapter. That keeps sorting, filtering and exporting correct.
  */
 
 const LOCALE = "pt-BR";
