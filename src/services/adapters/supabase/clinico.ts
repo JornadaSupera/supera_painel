@@ -1,7 +1,5 @@
-import type { StatusTone } from "@/components/shared";
 import { attachmentError, safeAttachmentName } from "@/lib/attachments";
-import { SEVERIDADE } from "@/lib/enums";
-import type { AutorMensagem, CondutaAlerta, Severidade, StatusAlerta, StatusConversa } from "@/lib/enums";
+import type { AutorMensagem, CondutaAlerta, StatusAlerta } from "@/lib/enums";
 import { ERROR_CODE, fail, ok, okOne, type ListResult, type SingleResult } from "@/services/contracts";
 import type {
   AlertaClinico,
@@ -10,6 +8,14 @@ import type {
   ConversaClinico,
   MensagemClinico,
 } from "@/types/clinico";
+import {
+  severidadeDoGrau,
+  STATUS_ALERTA_POR_CODIGO,
+  STATUS_CONVERSA_POR_CODIGO,
+  TOM_POR_CODIGO_STATUS,
+  TOM_POR_STATUS_ALERTA,
+  TOM_POR_STATUS_CONVERSA,
+} from "./_clinicalMaps";
 import { executar, falhaDe, profissionalDaSessao, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
@@ -63,14 +69,6 @@ interface LinhaAppointment {
   location_label: string | null;
   confirmed_at: string | null;
 }
-
-const TOM_POR_CODIGO_STATUS: Record<string, StatusTone> = {
-  scheduled: "info",
-  completed: "success",
-  no_show: "warning",
-  cancelled: "neutral",
-  rescheduled: "neutral",
-};
 
 export async function getMinhaAgenda(params: {
   de: string;
@@ -154,22 +152,10 @@ interface LinhaAlert {
   resolved_at: string | null;
 }
 
-const STATUS_ALERTA_POR_CODIGO: Record<LinhaAlert["status"], StatusAlerta> = {
-  open: "pendente",
-  in_progress: "assumido",
-  resolved: "resolvido",
-};
-
 const CODIGO_POR_STATUS_ALERTA: Record<StatusAlerta, LinhaAlert["status"]> = {
   pendente: "open",
   assumido: "in_progress",
   resolvido: "resolved",
-};
-
-const TOM_POR_STATUS_ALERTA: Record<StatusAlerta, StatusTone> = {
-  pendente: "danger",
-  assumido: "warning",
-  resolvido: "success",
 };
 
 const CONDUTA_POR_CODIGO: Record<NonNullable<LinhaAlert["conduct_kind"]>, CondutaAlerta> = {
@@ -183,14 +169,6 @@ const CODIGO_POR_CONDUTA: Record<CondutaAlerta, NonNullable<LinhaAlert["conduct_
   agendamento: "scheduling",
   encaminhamento: "referral",
 };
-
-/** Limiar simples grau → severidade — não há mapeamento canônico no banco ainda. */
-function severidadeDoGrau(grau: number): Severidade {
-  if (grau >= 5) return SEVERIDADE.CRITICA;
-  if (grau === 4) return SEVERIDADE.ALTA;
-  if (grau >= 2) return SEVERIDADE.MEDIA;
-  return SEVERIDADE.BAIXA;
-}
 
 export async function listAlertas(params?: {
   status?: StatusAlerta;
@@ -295,16 +273,6 @@ interface LinhaConversation {
   last_message_at: string;
   team_last_read_at: string | null;
 }
-
-const STATUS_CONVERSA_POR_CODIGO: Record<LinhaConversation["status"], StatusConversa> = {
-  open: "aberta",
-  resolved: "resolvida",
-};
-
-const TOM_POR_STATUS_CONVERSA: Record<StatusConversa, StatusTone> = {
-  aberta: "info",
-  resolvida: "success",
-};
 
 export async function listConversas(): Promise<ListResult<ConversaClinico>> {
   return executar(async () => {
