@@ -306,6 +306,7 @@ function JanelaRelatorio({
 }) {
   const [visao, setVisao] = useState<"tabela" | "grafico">("tabela");
   const capturaRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   /*
    * O seletor só aparece onde a definição do relatório declara o filtro. É a
@@ -476,6 +477,12 @@ function JanelaRelatorio({
           />
         )}
 
+        {dados?.linhas.some((linha) => typeof linha._destino === "string") && (
+          <p className="text-muted-foreground -mb-1 text-xs">
+            Clique numa linha para abrir os itens que ela resume.
+          </p>
+        )}
+
         {/* O que vai para o PDF: o cabeçalho com o recorte e o resultado. Quem lê o
             arquivo sem a tela precisa saber de que período e de que área são os
             números. */}
@@ -499,6 +506,11 @@ function JanelaRelatorio({
                   caption={`${dados.titulo}. ${dados.resumo}`}
                   label="linhas"
                   density="compact"
+                  // A row that summarizes items opens them; one that does not stays inert.
+                  onRowClick={(linha) => {
+                    if (typeof linha._destino === "string") navigate(linha._destino);
+                  }}
+                  isRowClickable={(linha) => typeof linha._destino === "string"}
                 />
               </div>
             )}

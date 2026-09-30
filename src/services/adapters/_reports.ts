@@ -130,17 +130,28 @@ export function npsReport(summary: SingleResult<SatisfactionSummary>, dias: numb
   const dados = summary.data;
   const dash = "—";
 
-  const linha = (momento: string, abertas: number, respondidas: number, respostas: number, nps: number | null) => ({
+  // Every row opens the answers behind it, on the same period.
+  const linha = (
+    momento: string,
+    abertas: number,
+    respondidas: number,
+    respostas: number,
+    nps: number | null,
+    codigo?: string,
+  ) => ({
     momento,
     abertas,
     respondidas,
     respostas,
     nps: nps ?? dash,
+    _destino: `/satisfacao?dias=${dias}${codigo ? `&momento=${codigo}` : ""}`,
   });
 
   const linhas = dados
     ? [
-        ...dados.by_milestone.map((item) => linha(item.label, item.sent, item.answered, item.responses, item.nps)),
+        ...dados.by_milestone.map((item) =>
+          linha(item.label, item.sent, item.answered, item.responses, item.nps, item.code),
+        ),
         linha("Todos os momentos", dados.surveys_sent, dados.surveys_answered, dados.responses, dados.nps),
       ]
     : [];

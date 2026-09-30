@@ -86,7 +86,14 @@ async function montar(
         linhas: [...porChave.entries()]
           .map(([chave, total]) => {
             const [protocolo = "", fase = ""] = chave.split("|");
-            return { protocolo, fase, total };
+            return {
+              protocolo,
+              fase,
+              total,
+              ...(protocolo === "Sem protocolo"
+                ? {}
+                : { _destino: `/pacientes?status=ativo&protocolo=${encodeURIComponent(protocolo)}` }),
+            };
           })
           .sort((a, b) => b.total - a.total),
         resumo: `${ativos.length} pacientes ativos`,
@@ -128,7 +135,12 @@ async function montar(
           { key: "total", label: "Pacientes", numerica: true },
         ],
         linhas: [...porCid.entries()]
-          .map(([codigo, total]) => ({ codigo, label: NOME_CID.get(codigo) ?? codigo, total }))
+          .map(([codigo, total]) => ({
+            codigo,
+            label: NOME_CID.get(codigo) ?? codigo,
+            total,
+            _destino: `/pacientes?cid=${encodeURIComponent(codigo)}`,
+          }))
           .sort((a, b) => b.total - a.total),
         resumo: `${porCid.size} códigos com pacientes registrados`,
         eixo: "codigo",

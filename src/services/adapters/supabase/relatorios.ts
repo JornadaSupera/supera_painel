@@ -109,7 +109,7 @@ async function pacientesAtivos(): Promise<ReportOutcome> {
 
   if (!("itens" in varredura)) return varredura;
 
-  const porChave = new Map<string, { protocolo: string; fase: string; total: number }>();
+  const porChave = new Map<string, { protocolo: string; fase: string; total: number; _destino?: string }>();
 
   for (const paciente of varredura.itens) {
     // "Sem plano terapêutico" é resultado, não resíduo: enquanto o Gemed
@@ -119,7 +119,15 @@ async function pacientesAtivos(): Promise<ReportOutcome> {
     const fase = paciente.fase ? FASE_TRATAMENTO_LABEL[paciente.fase] : "Sem fase registrada";
 
     const chave = `${protocolo}\u0000${fase}`;
-    const atual = porChave.get(chave) ?? { protocolo, fase, total: 0 };
+    const atual = porChave.get(chave) ?? {
+      protocolo,
+      fase,
+      total: 0,
+      // Sem plano não há protocolo por onde filtrar a lista: a linha não abre.
+      ...(paciente.protocolo_nome === "—"
+        ? {}
+        : { _destino: `/pacientes?status=ativo&protocolo=${encodeURIComponent(paciente.protocolo_nome)}` }),
+    };
 
     atual.total += 1;
     porChave.set(chave, atual);
@@ -156,7 +164,7 @@ async function distribuicaoCid(): Promise<ReportOutcome> {
   const varredura = await varrerLista({}, TETO_VARREDURA);
   if (!("itens" in varredura)) return varredura;
 
-  const porCid = new Map<string, { codigo: string; label: string; total: number }>();
+  const porCid = new Map<string, { codigo: string; label: string; total: number; _destino: string }>();
 
   for (const paciente of varredura.itens) {
     if (!paciente.cid) continue;
@@ -165,6 +173,7 @@ async function distribuicaoCid(): Promise<ReportOutcome> {
       codigo: paciente.cid,
       label: paciente.cid_descricao,
       total: 0,
+      _destino: `/pacientes?cid=${encodeURIComponent(paciente.cid)}`,
     };
 
     atual.total += 1;

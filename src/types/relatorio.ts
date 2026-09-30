@@ -61,6 +61,12 @@ export interface ResultadoRelatorio {
   slug: string;
   titulo: string;
   colunas: ColunaRelatorio[];
+  /**
+   * As linhas. Uma linha pode trazer `_destino`: o endereço interno dos itens que
+   * ela resume ("Primeiro acesso ao app" → as respostas desse momento). A chave
+   * não é coluna, então não aparece na tabela nem no CSV; a tela usa para abrir
+   * a linha.
+   */
   linhas: Record<string, string | number>[];
   /** Frase curta que resume o recorte: "últimos 30 dias · 81 pacientes". */
   resumo: string;
