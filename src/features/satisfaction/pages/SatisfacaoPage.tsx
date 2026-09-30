@@ -257,6 +257,7 @@ export function SatisfacaoPage() {
                       data={data.distribution.map((item) => ({ nota: String(item.score), respostas: item.count }))}
                       xKey="nota"
                       series={[{ key: "respostas", label: "Respostas" }]}
+                      integerAxis
                       height={220}
                     />
                   </ChartCard>
