@@ -7,10 +7,16 @@ import { queryKeys } from "@/lib/queryKeys";
 import { call, clinicoApi } from "@/services/apiClient";
 
 /** A fila de alertas — toda a equipe vê a mesma lista. Ver `clinico.listAlertas`. */
-export function useAlertasClinicos(status?: StatusAlerta) {
+export function useAlertasClinicos(status?: StatusAlerta, opcoes: { semNomes?: boolean } = {}) {
+  const { semNomes = false } = opcoes;
+
   return useQuery({
-    queryKey: queryKeys.clinico.alertas(status),
-    queryFn: async () => (await call(() => clinicoApi.listAlertas(status ? { status } : undefined))).data,
+    // A leitura sem nomes é outra consulta: guardá-la na chave da leitura com
+    // nomes faria uma tela que precisa do nome receber a que não tem.
+    queryKey: [...queryKeys.clinico.alertas(status), ...(semNomes ? ["sem-nomes"] : [])],
+    queryFn: async () =>
+      (await call(() => clinicoApi.listAlertas({ ...(status ? { status } : {}), ...(semNomes ? { semNomes } : {}) })))
+        .data,
     // A fila muda por ação de qualquer pessoa da equipe, não só a sua.
     refetchInterval: 60_000,
   });

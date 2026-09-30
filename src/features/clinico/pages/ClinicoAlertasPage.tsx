@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { EmptyState, ErrorState, PageHeader, SkeletonCards, StatusBadge } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -71,6 +72,7 @@ const BORDA_POR_SEVERIDADE: Record<Severidade, string> = {
 export function ClinicoAlertasPage() {
   const { user } = useAuth();
   const area = user?.especialidade ? ESPECIALIDADE_LABEL[user.especialidade] : "";
+  const base = user?.especialidade ? `/clinico/${user.especialidade}` : "/clinico";
 
   const pendentes = useAlertasClinicos("pendente");
   const emAtendimento = useAlertasClinicos("assumido");
@@ -134,12 +136,6 @@ export function ClinicoAlertasPage() {
 
       {fila.isError && <ErrorState error={fila.error} onRetry={fila.refetch} />}
 
-      {/* O histórico falhar sozinho também é erro: sem este aviso a seção
-          simplesmente não aparecia, e a fila parecia completa. */}
-      {!fila.isError && historico.isError && (
-        <ErrorState compact error={historico.error} onRetry={() => void historico.refetch()} />
-      )}
-
       {vazio && (
         <EmptyState
           title="Nenhum alerta na fila"
@@ -191,6 +187,9 @@ export function ClinicoAlertasPage() {
                   </div>
 
                   <div className="flex shrink-0 gap-2">
+                    <Button asChild size="sm" variant="ghost">
+                      <Link to={`${base}/pacientes/${alerta.paciente_id}`}>Ver ficha</Link>
+                    </Button>
                     {alerta.status === "pendente" && (
                       <Button
                         size="sm"
@@ -232,7 +231,12 @@ export function ClinicoAlertasPage() {
               {resolvidos.map((alerta) => (
                 <article key={alerta.id} className="bg-card flex flex-col gap-1 rounded-2xl border p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-foreground text-sm font-medium">{alerta.paciente_nome}</p>
+                    <Link
+                      to={`${base}/pacientes/${alerta.paciente_id}`}
+                      className="text-foreground text-sm font-medium hover:underline"
+                    >
+                      {alerta.paciente_nome}
+                    </Link>
                     <StatusBadge tone="success" size="sm">
                       Resolvido
                     </StatusBadge>
