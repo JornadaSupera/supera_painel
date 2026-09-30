@@ -10,6 +10,8 @@
 export { BackendPendente } from "./BackendPendente";
 export type { BackendPendenteProps } from "./BackendPendente";
 
+export { CatalogFilterSelect } from "./CatalogFilterSelect";
+
 export { Can } from "./Can";
 
 export { DetailField, DetailSection } from "./DetailBlocks";

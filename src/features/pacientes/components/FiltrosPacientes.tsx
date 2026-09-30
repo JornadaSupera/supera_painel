@@ -1,4 +1,4 @@
-import { FilterPanel, FilterSelect, SearchInput, SourceErrorChip } from "@/components/shared";
+import { CatalogFilterSelect, FilterPanel, FilterSelect, SearchInput } from "@/components/shared";
 import { useCids, useFasesTratamento, useProtocolos } from "@/hooks/useCatalogos";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { RISCO_LABEL, STATUS_PACIENTE_LABEL, toOptions } from "@/lib/enums";
@@ -66,54 +66,46 @@ export function FiltrosPacientes() {
       canClear={hasActiveFilters(busca, filtros)}
       onClear={limparFiltros}
     >
-      {/* Seletor cujo catálogo falhou some e dá lugar ao motivo: uma lista
-          vazia por erro de rede é indistinguível de uma lista vazia legítima, e
-          quem vê "Protocolo: todos" sem opção nenhuma conclui que a clínica não
-          tem protocolo cadastrado. */}
-      {!semProtocolo &&
-        (protocolos.isError ? (
-          <SourceErrorChip
-            label="A lista de protocolos"
-            onRetry={() => void protocolos.refetch()}
-          />
-        ) : (
-          <FilterSelect
-            label="Protocolo"
-            value={filtros.protocolo_id}
-            onChange={aplicar("protocolo_id")}
-            options={opcoesProtocolo}
-            className="w-52"
-          />
-        ))}
-
-      {!semCid &&
-        (cids.isError ? (
-          <SourceErrorChip label="A lista de CIDs" onRetry={() => void cids.refetch()} />
-        ) : (
-          <FilterSelect
-            label="CID"
-            value={filtros.cid}
-            onChange={aplicar("cid")}
-            options={opcoesCid}
-            className="w-40"
-          />
-        ))}
-
-      {/* As fases vêm do cadastro, não do vocabulário do painel: oferecer uma
-          fase que o catálogo não tem é um filtro que só devolve lista vazia, e
-          quem filtra entende "não há paciente nessa fase" em vez de "essa fase
-          não existe aqui". */}
-      {fases.isError ? (
-        <SourceErrorChip label="A lista de fases" onRetry={() => void fases.refetch()} />
-      ) : (
-        <FilterSelect
-          label="Fase"
-          value={filtros.fase}
-          onChange={aplicar("fase")}
-          options={fases.data ?? []}
-          className="w-36"
+      {/* Seletor cujo catálogo falhou dá lugar ao motivo: uma lista vazia por erro
+          de rede é indistinguível de uma lista vazia legítima. */}
+      {!semProtocolo && (
+        <CatalogFilterSelect
+          label="Protocolo"
+          errorLabel="A lista de protocolos"
+          value={filtros.protocolo_id}
+          onChange={aplicar("protocolo_id")}
+          options={opcoesProtocolo}
+          isError={protocolos.isError}
+          onRetry={() => void protocolos.refetch()}
+          className="w-52"
         />
       )}
+
+      {!semCid && (
+        <CatalogFilterSelect
+          label="CID"
+          errorLabel="A lista de CIDs"
+          value={filtros.cid}
+          onChange={aplicar("cid")}
+          options={opcoesCid}
+          isError={cids.isError}
+          onRetry={() => void cids.refetch()}
+          className="w-40"
+        />
+      )}
+
+      {/* As fases vêm do cadastro, não do vocabulário do painel: oferecer uma
+          fase que o catálogo não tem é um filtro que só devolve lista vazia. */}
+      <CatalogFilterSelect
+        label="Fase"
+        errorLabel="A lista de fases"
+        value={filtros.fase}
+        onChange={aplicar("fase")}
+        options={fases.data ?? []}
+        isError={fases.isError}
+        onRetry={() => void fases.refetch()}
+        className="w-36"
+      />
 
       {/* w-36, not w-32: at 128px "Status: todos" was cut to "Status: todo". */}
       {!semRisco && (
