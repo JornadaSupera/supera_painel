@@ -106,3 +106,13 @@ export const specialtyNoteSchema = z.object({
 });
 
 export type SpecialtyNoteForm = z.infer<typeof specialtyNoteSchema>;
+
+/* -------------------------------------------------------------------------
+   ENCAMINHAR CONVERSA
+   ------------------------------------------------------------------------- */
+
+export const transferConversationSchema = z.object({
+  professionalId: z.string().min(1, "Escolha para quem encaminhar."),
+});
+
+export type TransferConversationForm = z.infer<typeof transferConversationSchema>;

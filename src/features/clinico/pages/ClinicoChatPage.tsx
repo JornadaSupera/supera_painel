@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import type { ConversaClinico } from "@/types/clinico";
 import { AnexoDaMensagem } from "../components/AnexoDaMensagem";
 import { ComposerMensagem } from "../components/ComposerMensagem";
+import { ConversationAssignments } from "../components/ConversationAssignments";
+import { TransferConversationDialog } from "../components/TransferConversationDialog";
 import {
   useAssumirConversa,
   useConversasClinicas,
@@ -163,6 +165,7 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
   const assumir = useAssumirConversa();
   const resolver = useResolverConversa();
   const marcarLida = useMarcarConversaLida();
+  const [encaminhando, setEncaminhando] = useState(false);
 
   // Abrir a conversa é o próprio ato de ler — não exige clique à parte. Também
   // vale para a mensagem que chega com ela aberta: sem isso, a atualização
@@ -216,8 +219,17 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
               Marcar resolvida
             </Button>
           )}
+          {/* Same rule as resolving, and the database enforces it: only who is in
+              the area of the conversation hands it over, and only while it is open. */}
+          {aberta && daMinhaEspecialidade && (
+            <Button size="sm" variant="outline" onClick={() => setEncaminhando(true)}>
+              Encaminhar
+            </Button>
+          )}
         </div>
       </header>
+
+      <ConversationAssignments conversationId={conversa.id} />
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {mensagens.isLoading && <Loading compact />}
@@ -264,6 +276,12 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
 
         <div ref={fimRef} />
       </div>
+
+      <TransferConversationDialog
+        conversation={conversa}
+        open={encaminhando}
+        onOpenChange={setEncaminhando}
+      />
 
       <footer className="border-border border-t p-3">
         {aberta ? (
