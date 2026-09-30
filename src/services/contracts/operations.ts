@@ -19,6 +19,7 @@ import type {
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type { AlertaClinico, CompromissoAgenda, ConversaClinico, MensagemClinico } from "@/types/clinico";
+import type { AppointmentTypeOption, BusinessHour, PersonalBlock, PersonalBlockInput } from "@/types/agenda";
 import type { ConversationAssignment, TransferTarget } from "@/types/conversation-transfer";
 import type { DiarySymptom, PatientTimeline } from "@/types/patient-record";
 import type {
@@ -534,7 +535,25 @@ export interface FiltroClinico {
  */
 export interface ClinicoOperations {
   /** Compromissos do profissional logado, na janela informada. */
-  getMinhaAgenda(params: { de: string; ate: string }): Promise<ListResult<CompromissoAgenda>>;
+  getMinhaAgenda(params: {
+    de: string;
+    ate: string;
+    /**
+     * Pula os nomes dos pacientes. Cada nome é uma leitura auditada do paciente,
+     * e a visão de mês desenha só horário e tipo — pedir centenas de nomes para
+     * não mostrar nenhum seria ruído na trilha.
+     */
+    semNomes?: boolean;
+  }): Promise<ListResult<CompromissoAgenda>>;
+  /** Os tipos de compromisso ativos, para filtrar a agenda. */
+  listAppointmentTypes(): Promise<ListResult<AppointmentTypeOption>>;
+  /** O horário de atendimento da clínica, por dia da semana. */
+  listBusinessHours(): Promise<ListResult<BusinessHour>>;
+  /** Os bloqueios pessoais que tocam a janela. Só o dono os enxerga. */
+  listMyBlocks(params: { from: string; to: string }): Promise<ListResult<PersonalBlock>>;
+  createBlock(params: PersonalBlockInput): Promise<SingleResult<PersonalBlock>>;
+  updateBlock(params: PersonalBlockInput & { id: string }): Promise<SingleResult<PersonalBlock>>;
+  deleteBlock(params: { id: string }): Promise<SingleResult<null>>;
 
   /**
    * A fila de alertas — compartilhada pela equipe, não recortada por

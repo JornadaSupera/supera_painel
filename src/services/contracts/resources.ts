@@ -279,6 +279,12 @@ export const RESOURCES = {
     fase: 16, // painel clínico — trilha própria de fases, ver PA-07
     operations: [
       "getMinhaAgenda",
+      "listAppointmentTypes",
+      "listBusinessHours",
+      "listMyBlocks",
+      "createBlock",
+      "updateBlock",
+      "deleteBlock",
       "listAlertas",
       "assumirAlerta",
       "resolverAlerta",

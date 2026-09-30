@@ -73,6 +73,7 @@ interface LinhaAppointment {
 export async function getMinhaAgenda(params: {
   de: string;
   ate: string;
+  semNomes?: boolean;
 }): Promise<ListResult<CompromissoAgenda>> {
   return executar(async () => {
     const supabase = getSupabaseClient();
@@ -95,7 +96,9 @@ export async function getMinhaAgenda(params: {
     ];
 
     const [nomePorPacienteOuFalha, tiposRes, statusRes] = await Promise.all([
-      nomesDePacientes(supabase, idsPacientes),
+      // Cada nome é uma leitura auditada do paciente: quem só desenha horário e
+      // tipo (a visão de mês) não as pede.
+      params.semNomes ? Promise.resolve(new Map<string, string>()) : nomesDePacientes(supabase, idsPacientes),
       idsTipos.length
         ? supabase.from("appointment_types").select("id, label").in("id", idsTipos)
         : Promise.resolve({ data: [] as { id: string; label: string }[], error: null }),

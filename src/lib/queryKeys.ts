@@ -154,6 +154,12 @@ export const queryKeys = {
     mensagens: (conversaId: string) => ["clinico", "conversas", conversaId, "mensagens"] as const,
     /** Fora de `clinico.all` de propósito: o anexo não muda, e invalidar a fila não deve baixá-lo de novo. */
     anexo: (caminho: string) => ["clinico-anexo", caminho] as const,
+    /** Opening hours of the clinic and the kinds of appointment: they change rarely. */
+    businessHours: () => ["clinico", "business-hours"] as const,
+    appointmentTypes: () => ["clinico", "appointment-types"] as const,
+    /** Every window of personal blocks: what saving or removing one must refresh. */
+    blocks: () => ["clinico", "blocks"] as const,
+    blocksIn: (from: string, to: string) => ["clinico", "blocks", from, to] as const,
     /** Colleagues a conversation can be handed to. */
     transferTargets: () => ["clinico", "transfer-targets"] as const,
     /** Who held a conversation, and when. */
