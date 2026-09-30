@@ -13,6 +13,8 @@
  * The caller is responsible for that — see `lib/audit.ts`.
  */
 
+import type { jsPDF } from "jspdf";
+
 export interface ExportOptions {
   /** Element to capture. */
   element: HTMLElement;
@@ -21,6 +23,13 @@ export interface ExportOptions {
   /** Footer text — usually who exported and when. */
   footer?: string;
   orientation?: "portrait" | "landscape";
+  /**
+   * Runs a tall capture over as many pages as it needs, at the width of the
+   * sheet, instead of shrinking it to fit one. Right for a table, where the rows
+   * matter and a shrunken page is unreadable; wrong for a dashboard, where the
+   * comparison between indicators is what would be split.
+   */
+  paginate?: boolean;
 }
 
 /**
@@ -125,6 +134,51 @@ function download(blobUrl: string, fileName: string): void {
   link.remove();
 }
 
+type Pdf = jsPDF;
+
+/**
+ * Slices a tall capture into sheets, each one the height that fits the page at
+ * the width of the sheet. A row cut across two sheets is possible; a report
+ * table is short rows on a light background, and that reads far better than a
+ * one-page thumbnail.
+ */
+function addPaginated({
+  pdf,
+  canvas,
+  margin,
+  usableWidth,
+  usableHeight,
+  footer,
+}: {
+  pdf: Pdf;
+  canvas: HTMLCanvasElement;
+  margin: number;
+  usableWidth: number;
+  usableHeight: number;
+  footer?: string;
+}): void {
+  const scale = usableWidth / canvas.width;
+  const sliceHeight = Math.floor(usableHeight / scale);
+  const pages = Math.max(1, Math.ceil(canvas.height / sliceHeight));
+  const pageHeight = pdf.internal.pageSize.getHeight();
+
+  for (let page = 0; page < pages; page += 1) {
+    if (page > 0) pdf.addPage();
+
+    const top = page * sliceHeight;
+    const height = Math.min(sliceHeight, canvas.height - top);
+
+    const slice = Object.assign(document.createElement("canvas"), { width: canvas.width, height });
+    slice.getContext("2d")?.drawImage(canvas, 0, top, canvas.width, height, 0, 0, canvas.width, height);
+
+    pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", margin, margin, usableWidth, height * scale);
+
+    pdf.setFontSize(8);
+    pdf.setTextColor(120);
+    pdf.text(`${footer ? `${footer} · ` : ""}página ${page + 1} de ${pages}`, margin, pageHeight - margin / 2);
+  }
+}
+
 /** Date and time for the file name: `2026-05-15_1432`. */
 export function timestamp(): string {
   const now = new Date();
@@ -153,6 +207,7 @@ export async function exportPdf({
   name,
   footer,
   orientation = "landscape",
+  paginate = false,
 }: ExportOptions): Promise<void> {
   const [{ default: jsPDF }, canvas] = await Promise.all([
     import("jspdf"),
@@ -173,6 +228,12 @@ export async function exportPdf({
 
   const usableWidth = pageWidth - margin * 2;
   const usableHeight = pageHeight - margin * 2 - footerHeight;
+
+  if (paginate) {
+    addPaginated({ pdf, canvas, margin, usableWidth, usableHeight, footer });
+    pdf.save(`${name}.pdf`);
+    return;
+  }
 
   // Scale by the tightest dimension, preserving the aspect ratio.
   const scale = Math.min(usableWidth / canvas.width, usableHeight / canvas.height);
