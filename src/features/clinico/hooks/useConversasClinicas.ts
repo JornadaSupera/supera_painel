@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { useBlobUrl } from "@/hooks/useBlobUrl";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, clinicoApi } from "@/services/apiClient";
 import { ApiException } from "@/services/contracts";
@@ -80,21 +80,7 @@ export function useAnexoUrl(caminho: string, habilitado = true) {
     retry: false,
   });
 
-  // A URL nasce e morre no MESMO efeito. Criá-la durante a renderização e
-  // revogá-la no cleanup quebra com o dado já em cache: o React remonta o
-  // efeito (sempre em desenvolvimento) e reaproveita a URL que o primeiro
-  // cleanup acabou de revogar, e a imagem fica quebrada.
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!consulta.data) {
-      setUrl(null);
-      return;
-    }
-
-    const criada = URL.createObjectURL(consulta.data);
-    setUrl(criada);
-    return () => URL.revokeObjectURL(criada);
-  }, [consulta.data]);
+  const url = useBlobUrl(consulta.data);
 
   return { url, isLoading: consulta.isLoading, isError: consulta.isError, refetch: consulta.refetch };
 }

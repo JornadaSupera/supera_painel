@@ -1,4 +1,4 @@
-import { MarkdownText, StatusBadge, TONE_CONTENT_STATUS } from "@/components/shared";
+import { DecisionList, MarkdownText, StatusBadge, TONE_CONTENT_STATUS } from "@/components/shared";
 import { ACAO_REVISAO_LABEL, STATUS_CONTEUDO_LABEL, TIPO_CONTEUDO_LABEL } from "@/lib/enums";
 import { formatDateTime } from "@/lib/format";
 import type { ConteudoDetalhe } from "@/types/conteudo";
@@ -60,22 +60,14 @@ export function LeituraDaOrientacao({ orientacao }: { orientacao: ConteudoDetalh
           <h2 id="decisoes" className="text-sm font-medium">
             Decisões do revisor
           </h2>
-          <ul className="flex flex-col gap-2">
-            {orientacao.revisoes.map((revisao) => (
-              <li key={revisao.id} className="bg-card rounded-xl border p-3 text-sm">
-                <p className="text-xs font-medium">
-                  {ACAO_REVISAO_LABEL[revisao.acao]} · {revisao.revisor_nome}
-                  <span className="text-muted-foreground font-normal">
-                    {" "}
-                    · {formatDateTime(revisao.criado_em)}
-                  </span>
-                </p>
-                {revisao.comentario && (
-                  <p className="text-muted-foreground mt-1 whitespace-pre-line">{revisao.comentario}</p>
-                )}
-              </li>
-            ))}
-          </ul>
+          <DecisionList
+            decisions={orientacao.revisoes.map((revisao) => ({
+              id: revisao.id,
+              title: `${ACAO_REVISAO_LABEL[revisao.acao]} · ${revisao.revisor_nome}`,
+              at: revisao.criado_em,
+              comment: revisao.comentario,
+            }))}
+          />
         </section>
       )}
     </div>

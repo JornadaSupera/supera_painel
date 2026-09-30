@@ -1,7 +1,8 @@
 import { FileText, ImageOff, LoaderCircle, Paperclip, Trash2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useSaveWhenReady } from "@/hooks/useBlobUrl";
 import { ATTACHMENT_ACCEPT, formatFileSize, isImageAttachment } from "@/lib/attachments";
 import type { AnexoConteudo } from "@/types/conteudo";
 import {
@@ -141,16 +142,7 @@ function BaixarPdf({ anexo }: { anexo: AnexoConteudo }) {
   const [pedido, setPedido] = useState(false);
   const { url, isLoading, isError } = useAnexoConteudoUrl(anexo.caminho, pedido);
 
-  // O arquivo só existe na memória depois do download: quando chega, entrega.
-  useEffect(() => {
-    if (!pedido || !url) return;
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = anexo.nome;
-    link.click();
-    setPedido(false);
-  }, [pedido, url, anexo.nome]);
+  useSaveWhenReady({ url, pedido, nome: anexo.nome }, () => setPedido(false));
 
   return (
     <Button

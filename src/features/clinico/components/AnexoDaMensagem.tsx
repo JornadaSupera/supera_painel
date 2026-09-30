@@ -1,9 +1,10 @@
 import { Download, FileText, ImageOff, LoaderCircle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { formatFileSize, isImageAttachment } from "@/lib/attachments";
 import { cn } from "@/lib/utils";
 import type { AnexoMensagem } from "@/types/clinico";
+import { useSaveWhenReady } from "@/hooks/useBlobUrl";
 import { useAnexoUrl } from "../hooks/useConversasClinicas";
 
 /**
@@ -59,16 +60,7 @@ function AnexoArquivo({ anexo, daEquipe }: { anexo: AnexoMensagem; daEquipe: boo
   const [pedido, setPedido] = useState(false);
   const { url, isLoading, isError } = useAnexoUrl(anexo.caminho, pedido);
 
-  // O arquivo só existe na memória depois do download: quando chega, entrega.
-  useEffect(() => {
-    if (!pedido || !url) return;
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = anexo.nome;
-    link.click();
-    setPedido(false);
-  }, [pedido, url, anexo.nome]);
+  useSaveWhenReady({ url, pedido, nome: anexo.nome }, () => setPedido(false));
 
   if (isError && pedido) return <AnexoIndisponivel nome={anexo.nome} />;
 
