@@ -39,7 +39,8 @@ export const DEFINICOES: DefinicaoRelatorio[] = [
     categoria: "pacientes",
     titulo: "Distribuição de pacientes por CID",
     descricao: "Mapa de prevalência dos tipos de câncer atendidos. Subsidia decisões estratégicas.",
-    filtros: ["periodo"],
+    // Retrato da base de hoje: o relatório não recorta por período, então não o declara.
+    filtros: [],
     disponivel: true,
   },
 

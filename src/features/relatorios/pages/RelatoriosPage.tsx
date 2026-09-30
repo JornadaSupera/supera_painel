@@ -33,7 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEspecialidades } from "@/hooks/useCatalogos";
-import { formatNumber } from "@/lib/format";
+import { formatDuration, formatNumber } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import {
   CATEGORIA_RELATORIO_LABEL,
@@ -315,6 +315,8 @@ function JanelaRelatorio({
    * recorte que não houve.
    */
   const aceitaEspecialidade = definicao?.filtros.includes("especialidade") ?? false;
+  // Relatório que não recorta por período não deve dizer de que período é.
+  const aplicaPeriodo = definicao?.filtros.includes("periodo") ?? false;
   const especialidades = useEspecialidades();
 
   /*
@@ -363,7 +365,9 @@ function JanelaRelatorio({
       render: (linha) => (
         <span className="text-xs">
           {typeof linha[coluna.key] === "number"
-            ? formatNumber(linha[coluna.key] as number)
+            ? coluna.unidade === "min"
+              ? formatDuration(linha[coluna.key] as number)
+              : formatNumber(linha[coluna.key] as number)
             : String(linha[coluna.key] ?? "—")}
         </span>
       ),
@@ -379,7 +383,9 @@ function JanelaRelatorio({
           <DialogTitle>
             {definicao?.numero} · {definicao?.titulo}
           </DialogTitle>
-          <DialogDescription>{dados?.resumo ?? definicao?.descricao}</DialogDescription>
+          <DialogDescription>
+            {dados ? [aplicaPeriodo ? periodo : null, dados.resumo].filter(Boolean).join(" · ") : definicao?.descricao}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -493,7 +499,8 @@ function JanelaRelatorio({
                 {definicao?.numero} · {definicao?.titulo}
               </p>
               <p className="text-muted-foreground text-xs">
-                {periodo} · {aceitaEspecialidade ? recorteRotulo : "Toda a clínica"} · {dados.resumo}
+                {aplicaPeriodo && `${periodo} · `}
+                {aceitaEspecialidade ? recorteRotulo : "Toda a clínica"} · {dados.resumo}
               </p>
             </div>
 
@@ -526,6 +533,9 @@ function JanelaRelatorio({
                       dados.colunas.find((coluna) => coluna.key === dados.medida)?.label ?? "Valor",
                   },
                 ]}
+                integerAxis={dados.linhas.every((linha) =>
+                  Number.isInteger(linha[dados.medida as string]),
+                )}
                 height={260}
               />
             )}

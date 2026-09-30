@@ -150,7 +150,6 @@ async function montar(
 
     case "efeitos-por-protocolo":
       return effectsByProtocolReport(
-        dias,
         await crossTab({ dias, grauMinimo: 2, apenasAtivos: true }),
       );
 
@@ -169,7 +168,7 @@ async function montar(
           mes: ponto.mes,
           total: Math.round(ponto.total * 0.42),
         })),
-        resumo: `últimos ${dias} dias · taxa de ocupação da sala indisponível (capacidade não é dado do backend)`,
+        resumo: `últimos ${dias} dias · taxa de ocupação da sala de infusão indisponível (a capacidade cadastrada em Metas vale para a clínica toda, não para a sala)`,
         eixo: "mes",
         medida: "total",
       };

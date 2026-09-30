@@ -52,7 +52,6 @@ function percentage(part: number, total: number): number {
 }
 
 export function effectsByProtocolReport(
-  dias: number,
   cruzamento: SingleResult<CruzamentoClinico>,
 ): ReportOutcome {
   if (cruzamento.error) return failWith(cruzamento.error);
@@ -91,6 +90,18 @@ export function effectsByProtocolReport(
     ? "Pacientes"
     : "Pacientes (mínimo)";
 
+  /*
+   * O cabeçalho conta a mesma coisa que a tabela. `pacientes_considerados` é
+   * `null` quando a origem não devolve o total de pacientes do recorte, e
+   * `?? 0` transformava "não sei" em "0 pacientes" sobre uma tabela com
+   * pacientes. Sem o total, o cabeçalho conta os registros, que é o que a
+   * origem sabe — o mesmo texto que a tela de Estatísticas clínicas usa.
+   */
+  const considerados =
+    dados?.pacientes_considerados == null
+      ? pluralize(dados?.registros_considerados ?? 0, "registro", "registros")
+      : pluralize(dados.pacientes_considerados, "paciente", "pacientes");
+
   return {
     slug: "efeitos-por-protocolo",
     titulo: "Efeitos adversos por protocolo e grau",
@@ -109,9 +120,11 @@ export function effectsByProtocolReport(
     linhas: porPercentual
       ? [...linhas].sort((a, b) => b.prevalencia - a.prevalencia)
       : [...linhas].sort((a, b) => b.registros - a.registros),
+    // O período fica por conta do cabeçalho da tela, que já o diz: repeti-lo aqui
+    // dava "Últimos 30 dias · … · últimos 30 dias".
     resumo: porPercentual
-      ? `grau ${grau} ou maior · ${pluralize(dados?.pacientes_considerados ?? 0, "paciente", "pacientes")} · últimos ${dias} dias`
-      : `grau ${grau} ou maior · ${dados?.registros_considerados ?? 0} registros · últimos ${dias} dias · prevalência indisponível: a origem não devolve o total de pacientes por protocolo`,
+      ? `grau ${grau} ou maior · ${considerados}`
+      : `grau ${grau} ou maior · ${considerados} · prevalência indisponível: a origem não devolve o total de pacientes por protocolo`,
     eixo: "efeito",
     medida: porPercentual ? "prevalencia" : "registros",
   };
@@ -159,8 +172,8 @@ export function npsReport(summary: SingleResult<SatisfactionSummary>, dias: numb
   const resumo = !dados
     ? "sem dados"
     : dados.responses === 0
-      ? `últimos ${dias} dias · ${pluralize(dados.surveys_sent, "pesquisa aberta", "pesquisas abertas")}, nenhuma respondida ainda`
-      : `últimos ${dias} dias · ${pluralize(dados.responses, "resposta", "respostas")} · NPS ${dados.nps ?? dash} · nota média ${dados.average ?? dash}${dados.response_rate === null ? "" : ` · ${dados.response_rate}% das pesquisas abertas respondidas`}`;
+      ? `${pluralize(dados.surveys_sent, "pesquisa aberta", "pesquisas abertas")}, nenhuma respondida ainda`
+      : `${pluralize(dados.responses, "resposta", "respostas")} · NPS ${dados.nps ?? dash} · nota média ${dados.average ?? dash}${dados.response_rate === null ? "" : ` · ${dados.response_rate}% das pesquisas abertas respondidas`}`;
 
   return {
     slug: "nps",
@@ -241,7 +254,7 @@ export function chatResponseReport(
     titulo: "Tempo médio de resposta no chat",
     colunas: [
       { key: "indicador", label: "Indicador" },
-      { key: "valor", label: "Minutos", numerica: true },
+      { key: "valor", label: "Tempo médio de resposta", numerica: true, unidade: "min" },
     ],
     linhas:
       indicador?.valor == null ? [] : [{ indicador: "Média da equipe", valor: indicador.valor }],
@@ -330,7 +343,10 @@ function toReportExport(
   return ok(
     dados.linhas.map((linha) =>
       Object.fromEntries(
-        dados.colunas.map((coluna) => [coluna.label, String(linha[coluna.key] ?? "")]),
+        dados.colunas.map((coluna) => [
+          coluna.unidade === "min" ? `${coluna.label} (min)` : coluna.label,
+          String(linha[coluna.key] ?? ""),
+        ]),
       ),
     ),
   );

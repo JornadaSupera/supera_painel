@@ -54,6 +54,12 @@ export interface ColunaRelatorio {
   label: string;
   /** Alinha à direita e usa dígitos tabulares. */
   numerica?: boolean;
+  /**
+   * A coluna guarda minutos. A linha carrega o número cru (o gráfico e o CSV
+   * precisam dele); a tela o desenha como duração ("14 d 21 h"), e o CSV ganha
+   * o sufixo " (min)" no cabeçalho para não deixar dúvida da unidade.
+   */
+  unidade?: "min";
 }
 
 /** O resultado de rodar um relatório: colunas descritas e linhas achatadas. */

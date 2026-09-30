@@ -76,9 +76,9 @@ const TETO_VARREDURA = TETO_READ * 10;
  */
 const SEM_ORIGEM: Record<string, string> = {
   "alertas-ia":
-    "A fila de alertas existe no backend, mas ainda não há um resumo de volume, tempo até conduta e desfecho que não identifique paciente. Sem gatilho de criticidade cadastrado em Configurações → Gatilhos de alerta, além disso, nenhum alerta dispara. Fila priorizada por IA é do nível Completo — fora do escopo contratado.",
+    "A fila de alertas existe, mas ainda não há um resumo de volume, tempo até conduta e desfecho que não identifique paciente. Fila priorizada por IA é do nível Completo — fora do escopo contratado.",
   "engajamento-app":
-    "“Engajamento” não tem definição em fonte nenhuma: sessões abertas, dias com registro no diário, orientações lidas e mensagens enviadas dariam quatro números diferentes, e o escopo não diz qual deles é o indicador. A pergunta está aberta com a clínica. Número calculado sobre definição inventada é pior que indicador ausente.",
+    "“Engajamento” ainda não tem definição acordada com a clínica: sessões abertas, dias com registro no diário, orientações lidas e mensagens enviadas dariam quatro números diferentes. O relatório sai assim que a clínica escolher a medida.",
 };
 
 export async function listDefinitions(): Promise<ListResult<DefinicaoRelatorio>> {
@@ -302,9 +302,12 @@ async function sessoesQuimioterapia(dias: number): Promise<ReportOutcome> {
       { key: "total", label: "Sessões realizadas", numerica: true },
     ],
     linhas,
-    // A taxa de ocupação da sala de infusão exigiria capacidade instalada, que
-    // não é dado do banco. O relatório traz o volume e não finge a taxa.
-    resumo: `${pluralize(total, "sessão realizada", "sessões realizadas")} nos últimos ${dias} dias · taxa de ocupação da sala indisponível: a capacidade instalada não é dado do backend`,
+    // A taxa de ocupação da sala de infusão exigiria a capacidade DA SALA. A que a
+    // administração cadastra em Configurações → Metas (`monthly_appointments_capacity`)
+    // é de atendimentos da clínica toda; dividir as sessões de infusão por ela daria
+    // uma taxa que parece medição e mede outra coisa. O relatório traz o volume e
+    // não finge a taxa.
+    resumo: `${pluralize(total, "sessão realizada", "sessões realizadas")} nos últimos ${dias} dias · taxa de ocupação da sala de infusão indisponível: a capacidade cadastrada em Configurações → Metas vale para os atendimentos da clínica toda, não para a sala de infusão`,
     eixo: "mes",
     medida: "total",
   };
@@ -420,7 +423,6 @@ export async function run(params: ReportParams): Promise<SingleResult<ResultadoR
           return distribuicaoCid();
         case "efeitos-por-protocolo":
           return effectsByProtocolReport(
-            dias,
             await crossTab({ dias, grauMinimo: 2, apenasAtivos: true }),
           );
         case "sessoes-quimioterapia":
