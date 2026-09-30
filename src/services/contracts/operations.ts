@@ -1,5 +1,6 @@
 import type {
   CondutaAlerta,
+  Especialidade,
   FaseTratamento,
   Periodo,
   StatusAlerta,
@@ -18,6 +19,7 @@ import type {
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type { AlertaClinico, CompromissoAgenda, ConversaClinico, MensagemClinico } from "@/types/clinico";
+import type { DiarySymptom, PatientTimeline } from "@/types/patient-record";
 import type {
   ClinicaConfiguracao,
   ConfiguracaoSeguranca,
@@ -575,6 +577,40 @@ export interface ClinicoOperations {
   resolverConversa(params: { id: string }): Promise<SingleResult<null>>;
   /** Registra a leitura da conversa por esta conta. */
   marcarConversaLida(params: { id: string }): Promise<SingleResult<null>>;
+
+  /**
+   * A linha do tempo de um paciente: diário, alertas, conversas, compromissos,
+   * anotações e sinalizações da equipe, do mais recente para trás.
+   *
+   * O que a especialidade de quem pergunta não pode ler simplesmente não vem: o
+   * banco recorta cada fonte, e a tela não tem como saber o que faltou.
+   * `days: null` vai até onde as fontes alcançam (um teto por fonte).
+   */
+  getPatientTimeline(params: {
+    patientId: string;
+    days: number | null;
+  }): Promise<SingleResult<PatientTimeline>>;
+  /** Os sintomas de um registro do diário. Lidos sob demanda: é uma chamada por registro. */
+  listDiarySymptoms(params: { entryId: string }): Promise<ListResult<DiarySymptom>>;
+  /**
+   * Grava uma anotação pontual da própria especialidade — texto livre, sem
+   * caráter de evolução oficial. A anotação não se edita nem se apaga: corrigir
+   * é escrever outra.
+   *
+   * Com `flagDistress`, sinaliza sofrimento logo em seguida. Se a anotação
+   * saiu e a sinalização não, o erro diz isso (`details.noteSaved`).
+   */
+  addSpecialtyNote(params: {
+    patientId: string;
+    specialty: Especialidade;
+    body: string;
+    flagDistress?: boolean;
+  }): Promise<SingleResult<{ note_id: string }>>;
+  /**
+   * Sinaliza sofrimento a partir de uma anotação PRÓPRIA. A equipe vê que houve
+   * a sinalização, de qual área e quando — nunca o texto.
+   */
+  raiseDistressFlag(params: { noteId: string }): Promise<SingleResult<null>>;
 }
 
 export interface EstatisticasClinicasOperations {

@@ -289,6 +289,10 @@ export const RESOURCES = {
       "assumirConversa",
       "resolverConversa",
       "marcarConversaLida",
+      "getPatientTimeline",
+      "listDiarySymptoms",
+      "addSpecialtyNote",
+      "raiseDistressFlag",
     ],
   },
   catalogos: {

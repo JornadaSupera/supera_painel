@@ -154,6 +154,13 @@ export const queryKeys = {
     mensagens: (conversaId: string) => ["clinico", "conversas", conversaId, "mensagens"] as const,
     /** Fora de `clinico.all` de propósito: o anexo não muda, e invalidar a fila não deve baixá-lo de novo. */
     anexo: (caminho: string) => ["clinico-anexo", caminho] as const,
+    /** Every patient record on screen — what a new note or flag must refresh, and nothing else. */
+    records: () => ["clinico", "record"] as const,
+    /** One patient's timeline. `days: null` is the whole history, so it gets its own key. */
+    record: (patientId: string, days: number | null) =>
+      ["clinico", "record", patientId, days ?? "all"] as const,
+    /** Symptoms of one diary entry. Immutable once saved. */
+    diarySymptoms: (entryId: string) => ["clinico", "diary", entryId, "symptoms"] as const,
   },
 
   catalogs: {

@@ -8,6 +8,7 @@ import * as auditoria from "./auditoria";
 import * as auth from "./auth";
 import * as catalogos from "./catalogos";
 import * as clinico from "./clinico";
+import * as patientRecord from "./patientRecord";
 import * as conteudos from "./conteudos";
 import * as configuracoes from "./configuracoes";
 import * as dashboard from "./dashboard";
@@ -46,7 +47,8 @@ const implemented = {
   conteudos,
   aprovacoes,
   auditoria,
-  clinico,
+  // The patient record lives in its own file but answers to the same resource.
+  clinico: { ...clinico, ...patientRecord },
   estatisticasClinicas,
   estatisticasOperacionais,
   configuracoes,
