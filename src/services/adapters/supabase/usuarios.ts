@@ -9,7 +9,7 @@ import {
 } from "@/lib/enums";
 import { maskEmail } from "@/lib/mask";
 import { resolverPermissoes } from "@/lib/rbac";
-import { concedidas } from "@/mocks/permissoes";
+import { concedidas } from "@/lib/permission-catalog";
 import {
   ERROR_CODE,
   fail,

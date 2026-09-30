@@ -1,14 +1,13 @@
 import { PAPEL } from "@/lib/enums";
 import { PERMISSAO, type Permissao } from "@/lib/rbac";
-import { catalogoPermissoes, concedidas, PAPEIS } from "@/mocks/permissoes";
+import { catalogoPermissoes, concedidas, PAPEIS } from "@/lib/permission-catalog";
 import type { MatrizPermissoes } from "@/types/usuario";
 
 /**
- * ROLE × PERMISSION MATRIX, as both adapters expose it.
+ * ROLE × PERMISSION MATRIX, as the adapter exposes it.
  *
- * `mocks/permissoes` is imported here on purpose, and by the Supabase adapter
- * too: it is the RBAC matrix in force — the same source `lib/rbac.ts` uses to
- * decide what `<Can>` shows — not fictional data.
+ * It comes from `lib/permission-catalog`, which derives from `lib/rbac.ts`: the
+ * same source that decides what `<Can>` shows.
  */
 
 /**
