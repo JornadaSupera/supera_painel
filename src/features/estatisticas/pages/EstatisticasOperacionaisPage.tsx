@@ -14,7 +14,7 @@ import {
   StatCard,
   type Column,
 } from "@/components/shared";
-import { formatNumber } from "@/lib/format";
+import { formatMeasure, formatNumber } from "@/lib/format";
 import type { LinhaEspecialidade } from "@/types/estatisticas";
 import { useEstatisticasOperacionais } from "../hooks/useEstatisticas";
 
@@ -52,7 +52,7 @@ const MOTIVO_SEM_PARAMETRO =
   "Meta mensal e capacidade máxima ainda não foram cadastradas. Assim que a administração as definir em Configurações → Metas operacionais, as linhas de referência aparecem no gráfico.";
 
 const MOTIVO_SEM_ALERTAS =
-  "A fila de alertas já existe no backend, mas ainda não há um resumo que a conte sem identificar paciente: a leitura disponível devolve alerta por alerta. Sem gatilho de criticidade cadastrado em Configurações → Gatilhos de alerta nenhum alerta dispara, então o painel não exibe o número enquanto ele não puder ser lido com segurança: “zero alertas” seria lido como tranquilidade.";
+  "A fila de alertas já existe, mas ainda não há um resumo que a conte sem identificar paciente: a leitura disponível devolve alerta por alerta. O painel não exibe o número enquanto ele não puder ser lido com segurança: “zero alertas” seria lido como tranquilidade.";
 
 export function EstatisticasOperacionaisPage() {
   const { data, isLoading, isError, error, refetch } = useEstatisticasOperacionais();
@@ -115,6 +115,8 @@ export function EstatisticasOperacionaisPage() {
           <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {(data?.indicadores ?? []).map((indicador) => {
               const Icone = ICONES[indicador.chave] ?? Activity;
+              const medida =
+                indicador.valor === null ? null : formatMeasure(indicador.valor, indicador.unidade);
 
               return (
                 <StatCard
@@ -123,8 +125,8 @@ export function EstatisticasOperacionaisPage() {
                   // `null` quer dizer "não houve base para calcular" — sem
                   // conversa respondida não existe tempo médio de resposta, e
                   // um zero ali afirmaria atendimento instantâneo.
-                  value={indicador.valor === null ? "—" : formatNumber(indicador.valor)}
-                  unit={indicador.valor === null ? undefined : indicador.unidade}
+                  value={medida?.value ?? "—"}
+                  unit={medida?.unit}
                   context={indicador.valor === null ? "sem base no período" : indicador.contexto}
                   invertColor={indicador.inverter_cor}
                   icon={<Icone />}

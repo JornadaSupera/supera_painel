@@ -101,22 +101,21 @@ const SEM_VOLUME_DE_MENSAGEM = "mensagens_dia";
 /**
  * Por que o volume, o tempo até conduta e o desfecho ainda não aparecem.
  *
- * São DUAS ausências empilhadas, e só a primeira é de configuração:
+ * Não existe resumo agregado de alertas. A leitura que existe devolve os
+ * alertas LINHA A LINHA, com o paciente em cada uma. Calcular a média aqui
+ * traria prontuário para o navegador para virar estatística, numa tela cujo
+ * compromisso é justamente não identificar ninguém — é o que as funções de
+ * resumo vieram substituir nas outras duas telas.
  *
- *  1. Nenhum gatilho de criticidade foi cadastrado, então nenhum alerta
- *     dispara. A fila está vazia por configuração, não por ausência de
- *     ocorrência — e "zero alertas" seria lido como tranquilidade.
- *  2. Não existe resumo agregado de alertas. A leitura que existe devolve os
- *     alertas LINHA A LINHA, com o paciente em cada uma. Calcular a média aqui
- *     traria prontuário para o navegador para virar estatística, numa tela cujo
- *     compromisso é justamente não identificar ninguém — é o que as funções de
- *     resumo vieram substituir nas outras duas telas.
+ * Por isso o painel não estima: o número sai quando houver um resumo do lado do
+ * banco. Pedido registrado com o responsável pelo banco.
  *
- * Por isso o painel não estima: o número sai quando houver regra cadastrada e
- * um resumo do lado do banco. Pedido registrado com o responsável pelo banco.
+ * Havia uma segunda ausência aqui, a de gatilho de criticidade cadastrado. Ela
+ * deixou de valer (existe gatilho ativo), e o texto não a repete: afirmar que
+ * nenhum alerta dispara contradiz a tela de Configurações.
  */
 const ALERTAS_SEM_REGRA =
-  "O backend ainda não resume os alertas em volume, tempo até conduta e desfecho. A leitura disponível devolve alerta por alerta, com o paciente em cada linha, e somar isso aqui traria prontuário para uma tela que não identifica ninguém. E sem gatilho de criticidade cadastrado em Configurações → Gatilhos de alerta nenhum alerta dispara.";
+  "Ainda não existe um resumo dos alertas em volume, tempo até conduta e desfecho. A leitura disponível devolve alerta por alerta, com o paciente em cada linha, e somar isso aqui traria prontuário para uma tela que não identifica ninguém.";
 
 /**
  * A chave da especialidade, a partir do código do painel.
