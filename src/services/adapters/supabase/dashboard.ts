@@ -32,8 +32,8 @@ import { varrerLista } from "./pacientes";
  * | Tempo de resposta   | ✅ `summarize_chat_response_times` |
  * | Pacientes por CID   | ✅ `read_patient_list`, que projeta o CID principal |
  * | Engajamento do app  | ❌ sem definição em fonte nenhuma — não é falta de dado |
- * | NPS                 | ❌ nenhuma pesquisa é aberta: não há resposta para contar |
- * | Alertas ativos      | ❌ nenhum gatilho de criticidade cadastrado |
+ * | NPS                 | ⏳ existe (tela Satisfação); o cartão do Dashboard ainda não o lê |
+ * | Alertas ativos      | ❌ sem resumo agregado de alertas que não identifique paciente |
  *
  * Os sem fonte são **omitidos**, não zerados. Um cartão marcando zero afirma
  * que a clínica não teve nenhuma sessão no mês — informação falsa, e pior do

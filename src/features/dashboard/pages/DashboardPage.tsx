@@ -16,7 +16,7 @@ import {
 } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Periodo } from "@/lib/enums";
-import { formatLongDate, formatNumber } from "@/lib/format";
+import { formatLongDate, formatMeasure } from "@/lib/format";
 import { BotaoExportar } from "../components/BotaoExportar";
 import { PeriodoToggle } from "../components/PeriodoToggle";
 import { useKpis, useSeries } from "../hooks/useDashboard";
@@ -171,13 +171,14 @@ export function DashboardPage() {
                 : kpis.data?.kpis.map((kpi) => {
                     const visual = APRESENTACAO[kpi.id];
                     const Icone = visual?.icone;
+                    const medida = formatMeasure(kpi.valor, kpi.unidade);
 
                     return (
                       <StatCard
                         key={kpi.id}
                         label={kpi.label}
-                        value={formatNumber(kpi.valor)}
-                        unit={kpi.unidade}
+                        value={medida.value}
+                        unit={medida.unit}
                         delta={kpi.variacao}
                         deltaUnit={kpi.variacao_unidade}
                         period={kpi.variacao_periodo}
@@ -207,7 +208,7 @@ export function DashboardPage() {
               {!kpis.isLoading && (kpis.data?.kpis.length ?? 0) < TOTAL_INDICADORES && (
                 <BackendPendente
                   className="sm:col-span-2 lg:col-span-3 xl:col-span-4"
-                  motivo="Engajamento no app, NPS e alertas de sintoma crítico ainda não têm indicador: o primeiro não tem definição acordada, o segundo depende de pesquisa aberta e o terceiro, de um resumo de alertas que o backend ainda não entrega (e de gatilho de criticidade cadastrado em Configurações)."
+                  motivo="Engajamento no app, NPS e alertas de sintoma crítico ainda não têm indicador aqui: o primeiro aguarda a definição com a clínica, o segundo já pode ser lido na tela Satisfação e o terceiro depende de um resumo de alertas que ainda não está disponível."
                 />
               )}
             </div>
