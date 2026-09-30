@@ -1,6 +1,6 @@
 import { Activity, ShieldAlert, Star, TrendingUp, UserPlus, Users } from "lucide-react";
 import { useRef, useState, type ComponentType, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
   BackendPendente,
@@ -16,7 +16,7 @@ import {
 } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Periodo } from "@/lib/enums";
-import { formatLongDate, formatMeasure } from "@/lib/format";
+import { formatLongDate, formatMeasure, formatTime } from "@/lib/format";
 import { BotaoExportar } from "../components/BotaoExportar";
 import { PeriodoToggle } from "../components/PeriodoToggle";
 import { useKpis, useSeries } from "../hooks/useDashboard";
@@ -48,15 +48,29 @@ const APRESENTACAO: Record<string, { icone: ComponentType; acento: string }> = {
   alertas_ativos: { icone: ShieldAlert, acento: "bg-destructive/10 text-destructive" },
 };
 
-const SERIES_EFEITOS = [
-  { key: "nausea", label: "Náusea" },
-  { key: "fadiga", label: "Fadiga" },
-  { key: "neuropatia", label: "Neuropatia" },
-  { key: "diarreia", label: "Diarreia" },
+/**
+ * Os seis indicadores do protótipo, na ordem em que aparecem, com o motivo de
+ * cada um estar ausente. Quando o backend em uso não alimenta um deles, a
+ * camada de dados o OMITE em vez de zerar: um cartão marcando zero afirmaria
+ * que a clínica não teve nenhuma sessão de quimioterapia no mês. O espaço que
+ * sobra diz QUAIS faltam e por quê — só os que faltam, não uma lista fixa.
+ */
+const INDICADORES_DO_PROTOTIPO: { id: string; label: string; motivo: string }[] = [
+  { id: "pacientes_ativos", label: "Pacientes ativos", motivo: "sem leitura disponível" },
+  { id: "novos_pacientes", label: "Novos pacientes", motivo: "sem leitura disponível" },
+  {
+    id: "sessoes_quimio",
+    label: "Sessões de quimioterapia",
+    motivo: "a agenda ainda não registra infusões realizadas no período",
+  },
+  {
+    id: "engajamento_app",
+    label: "Engajamento no app",
+    motivo: "aguarda a definição da medida com a clínica",
+  },
+  { id: "nps", label: "NPS", motivo: "sem leitura disponível" },
+  { id: "alertas_ativos", label: "Alertas ativos", motivo: "sem leitura disponível" },
 ];
-
-/** Indicadores que o protótipo mostra. */
-const TOTAL_INDICADORES = 6;
 
 const ALTURA_GRAFICO = 220;
 
@@ -72,7 +86,7 @@ const SEM_FONTE: Record<string, string> = {
     "Nenhuma infusão foi registrada como realizada nos últimos sete meses. O gráfico volta assim que a agenda tiver movimento.",
   cid: "Nenhuma ficha ativa tem diagnóstico registrado. A distribuição volta assim que houver CID nas fichas.",
   efeitos:
-    "O cruzamento entre protocolo e efeito adverso tem tela própria, em Estatísticas clínicas, onde os filtros que o recorte exige existem. Aqui ele apareceria sem eles.",
+    "Nenhum protocolo com pacientes ativos tem efeito adverso de grau 2 ou mais relatado nos últimos 90 dias. O gráfico volta assim que houver relato.",
   engajamento:
     "“Engajamento” não tem definição acordada: sessões abertas, dias com registro no diário, orientações lidas e mensagens enviadas dariam quatro números diferentes. A pergunta está aberta com a clínica.",
 };
@@ -128,6 +142,15 @@ export function DashboardPage() {
   const kpis = useKpis(periodo);
   const series = useSeries(periodo);
 
+  // A hora da última leitura que chegou, e não a hora em que a tela abriu: é o
+  // que diz se o painel está vivo. Só aparece depois da primeira resposta.
+  const atualizadoEm = kpis.dataUpdatedAt
+    ? formatTime(new Date(kpis.dataUpdatedAt).toISOString())
+    : null;
+
+  const presentes = new Set((kpis.data?.kpis ?? []).map((kpi) => kpi.id));
+  const ausentes = INDICADORES_DO_PROTOTIPO.filter((item) => !presentes.has(item.id));
+
   const erroSeries = series.isError ? series.error : null;
 
   // "Sem série" só é uma afirmação depois que a resposta chegou e não falhou.
@@ -146,6 +169,7 @@ export function DashboardPage() {
             {formatLongDate(new Date().toISOString())} ·{" "}
             <span className="text-muted-foreground">
               todos os números são agregados anonimizados
+              {atualizadoEm && ` · atualizado às ${atualizadoEm}`}
             </span>
           </>
         }
@@ -180,7 +204,7 @@ export function DashboardPage() {
                         value={medida.value}
                         unit={medida.unit}
                         delta={kpi.variacao}
-                        deltaUnit={kpi.variacao_unidade}
+                        deltaUnit={kpi.variacao_unidade ?? ""}
                         period={kpi.variacao_periodo}
                         context={kpi.contexto}
                         invertColor={kpi.inverter_cor}
@@ -198,17 +222,11 @@ export function DashboardPage() {
                     );
                   })}
 
-              {/*
-                O protótipo tem seis indicadores. Quando o backend em uso não
-                alimenta todos, os que faltam são OMITIDOS pela camada de dados,
-                não zerados — um cartão marcando zero afirmaria que a clínica não
-                teve nenhuma sessão de quimioterapia no mês. O espaço que sobra
-                diz o que falta.
-              */}
-              {!kpis.isLoading && (kpis.data?.kpis.length ?? 0) < TOTAL_INDICADORES && (
+              {/* Só os indicadores que de fato faltam, cada um com o seu motivo. */}
+              {!kpis.isLoading && ausentes.length > 0 && (
                 <BackendPendente
                   className="sm:col-span-2 lg:col-span-3 xl:col-span-4"
-                  motivo="Engajamento no app, NPS e alertas de sintoma crítico ainda não têm indicador aqui: o primeiro aguarda a definição com a clínica, o segundo já pode ser lido na tela Satisfação e o terceiro depende de um resumo de alertas que ainda não está disponível."
+                  motivo={ausentes.map((item) => `${item.label}: ${item.motivo}`).join(" · ")}
                 />
               )}
             </div>
@@ -275,13 +293,28 @@ export function DashboardPage() {
           <ChartCard
             wide
             title="Efeitos adversos por protocolo"
-            description="% de pacientes com grau 2+ · pergunta levantada na reunião com a Dra."
+            description={
+              <>
+                % de pacientes ativos com grau 2+ nos últimos 90 dias · n = pacientes do protocolo ·{" "}
+                <Link
+                  to="/estatisticas/clinicas"
+                  className="text-primary underline-offset-2 hover:underline"
+                >
+                  ver com filtros
+                </Link>
+              </>
+            }
           >
-            <ComSerie titulo="Efeitos adversos por protocolo" motivo={SEM_FONTE.efeitos!} vazio={semSerie(series.data?.efeitos_por_protocolo)}>
+            <ComSerie
+              titulo="Efeitos adversos por protocolo"
+              motivo={SEM_FONTE.efeitos!}
+              vazio={semSerie(series.data?.efeitos_por_protocolo)}
+              variant="semDados"
+            >
               <BarChart
                 data={series.data?.efeitos_por_protocolo ?? []}
                 xKey="protocolo"
-                series={SERIES_EFEITOS}
+                series={series.data?.efeitos ?? []}
                 suffix="%"
                 legend
                 loading={series.isLoading}

@@ -1,6 +1,14 @@
 import { PERIODO, STATUS_PACIENTE, type Periodo } from "@/lib/enums";
-import { okOne, type SingleResult } from "@/services/contracts";
-import type { FatiaCid, Kpi, KpisResposta, PontoSessoes, SeriesResposta } from "@/types/dashboard";
+import { pluralize } from "@/lib/format";
+import { failWith, okOne, type SingleResult } from "@/services/contracts";
+import type {
+  EfeitoPorProtocolo,
+  FatiaCid,
+  Kpi,
+  KpisResposta,
+  PontoSessoes,
+  SeriesResposta,
+} from "@/types/dashboard";
 import type { PacienteListItem } from "@/types/paciente";
 import { TETO_READ, compartilharLeitura, executar, falhaDe, logarExportacao } from "./_helpers";
 import {
@@ -12,8 +20,11 @@ import {
   resumirChat,
   rotuloDoMes,
 } from "./_summaries";
+import { contarFilaDeAlertas } from "./_alertQueue";
 import { getSupabaseClient } from "./client";
+import { crossTab } from "./estatisticasClinicas";
 import { varrerLista } from "./pacientes";
+import { getSummary as getSatisfactionSummary } from "./satisfacao";
 
 /**
  * Painel executivo.
@@ -62,6 +73,15 @@ const ROTULO_PERIODO: Record<Periodo, string> = {
 };
 
 const BALDES_HISTORICO = 7;
+
+/** O NPS é lido numa janela fixa: ver o comentário onde ele entra nos indicadores. */
+const NPS_JANELA_DIAS = 90;
+
+/** O recorte padrão do gráfico de efeitos: o mesmo que a tela de Estatísticas clínicas abre. */
+const EFEITOS_DIAS = 90;
+const EFEITOS_GRAU_MINIMO = 2;
+const EFEITOS_NO_GRAFICO = 4;
+const PROTOCOLOS_NO_GRAFICO = 6;
 const UM_DIA = 24 * 60 * 60 * 1000;
 
 /** Instante de cadastro de um item da listagem, ou `null` quando ausente. */
@@ -292,92 +312,124 @@ export async function getKpis(
 
     const atendidas = chat.linhas.filter((linha) => linha.answered_count > 0);
 
-    if (atendidas.length > 0) {
-      /*
-       * Média ponderada pelo número de conversas, não média das médias: um
-       * balde com uma conversa e outro com quarenta pesariam igual, e o
-       * indicador passaria a descrever o dia fraco.
-       *
-       * A mediana seria melhor leitura, e o resumo a devolve — mas medianas de
-       * baldes diferentes não se combinam, e combiná-las daria um número que
-       * não é mediana de nada.
-       */
-      /**
-       * Minutos médios até a primeira resposta, na fatia pedida.
-       *
-       * `first_response_avg_seconds` é nulo no balde em que ninguém respondeu.
-       * Somá-lo como zero puxaria a média para baixo e faria a clínica parecer
-       * mais rápida justamente nos dias em que ela não respondeu.
-       *
-       * `null` quando não houve conversa respondida na fatia — que é diferente
-       * de zero minuto, e é o que impede o cartão de anunciar resposta
-       * instantânea num período sem atendimento.
-       */
-      const minutosEntre = (de: number, ate: number): number | null => {
-        const medidos = atendidas.filter((linha) => {
-          if (linha.first_response_avg_seconds === null) return false;
-          const instante = Date.parse(`${linha.bucket_start}T12:00:00Z`);
-          return instante > de && instante <= ate;
-        });
+    /*
+     * Média ponderada pelo número de conversas, não média das médias: um
+     * balde com uma conversa e outro com quarenta pesariam igual, e o
+     * indicador passaria a descrever o dia fraco.
+     *
+     * A mediana seria melhor leitura, e o resumo a devolve — mas medianas de
+     * baldes diferentes não se combinam, e combiná-las daria um número que
+     * não é mediana de nada.
+     */
+    /**
+     * Minutos médios até a primeira resposta, na fatia pedida.
+     *
+     * `first_response_avg_seconds` é nulo no balde em que ninguém respondeu.
+     * Somá-lo como zero puxaria a média para baixo e faria a clínica parecer
+     * mais rápida justamente nos dias em que ela não respondeu.
+     *
+     * `null` quando não houve conversa respondida na fatia — que é diferente
+     * de zero minuto, e é o que impede o cartão de anunciar resposta
+     * instantânea num período sem atendimento.
+     */
+    const minutosEntre = (de: number, ate: number): number | null => {
+      const medidos = atendidas.filter((linha) => {
+        if (linha.first_response_avg_seconds === null) return false;
+        const instante = Date.parse(`${linha.bucket_start}T12:00:00Z`);
+        return instante > de && instante <= ate;
+      });
 
-        const conversas = medidos.reduce((soma, linha) => soma + linha.answered_count, 0);
-        if (conversas === 0) return null;
+      const conversas = medidos.reduce((soma, linha) => soma + linha.answered_count, 0);
+      if (conversas === 0) return null;
 
-        const segundos = medidos.reduce(
-          (soma, linha) => soma + (linha.first_response_avg_seconds ?? 0) * linha.answered_count,
-          0,
-        );
+      const segundos = medidos.reduce(
+        (soma, linha) => soma + (linha.first_response_avg_seconds ?? 0) * linha.answered_count,
+        0,
+      );
 
-        return Math.round(segundos / conversas / 60);
-      };
+      return Math.round(segundos / conversas / 60);
+    };
 
-      const minutos = minutosEntre(corte, agora);
-      const anterior = minutosEntre(corteAnterior, corte);
+    const minutos = minutosEntre(corte, agora);
+    const anterior = minutosEntre(corteAnterior, corte);
 
-      if (minutos !== null) {
-        kpis.push({
-          id: "tempo_resposta",
-          label: "Tempo de resposta no chat",
-          valor: minutos,
-          unidade: "min",
-          // Sem período anterior medido não há variação: zero seria lido como
-          // "estável", e estável é uma afirmação que ninguém apurou.
-          variacao: anterior === null ? 0 : minutos - anterior,
-          variacao_unidade: "",
-          variacao_periodo: anterior === null ? "sem base anterior" : rotulo,
-          contexto: "até a primeira resposta da equipe",
-          // Cair é bom: o cartão fica verde quando o tempo diminui.
-          inverter_cor: true,
-          historico: Array.from({ length: BALDES_HISTORICO }, (_, indice) => {
-            const fim = agora - (BALDES_HISTORICO - 1 - indice) * dias * UM_DIA;
-            return minutosEntre(fim - dias * UM_DIA, fim) ?? 0;
-          }),
-          relatorio_slug: "tempo-resposta-chat",
-        });
-      }
-    }
+    /*
+     * O cartão fica no lugar mesmo sem conversa respondida no período: trocar
+     * para "Diário" fazia o indicador sumir, e o número parecia ter deixado de
+     * existir em vez de não ter base naquele dia. `null` vira um traço, com a
+     * razão escrita embaixo.
+     */
+    kpis.push({
+      id: "tempo_resposta",
+      label: "Tempo de resposta no chat",
+      valor: minutos,
+      unidade: "min",
+      // Sem período anterior medido não há variação: zero seria lido como
+      // "estável", e estável é uma afirmação que ninguém apurou.
+      ...(minutos !== null && anterior !== null
+        ? { variacao: minutos - anterior, variacao_unidade: "" as const, variacao_periodo: rotulo }
+        : {}),
+      contexto:
+        minutos === null
+          ? "nenhuma conversa respondida neste período"
+          : "até a primeira resposta da equipe",
+      // Cair é bom: o cartão fica verde quando o tempo diminui.
+      inverter_cor: true,
+      historico: Array.from({ length: BALDES_HISTORICO }, (_, indice) => {
+        const fim = agora - (BALDES_HISTORICO - 1 - indice) * dias * UM_DIA;
+        return minutosEntre(fim - dias * UM_DIA, fim) ?? 0;
+      }),
+      relatorio_slug: "tempo-resposta-chat",
+    });
+
+    /* ------------------------------------------------------------------ NPS */
+
+    /*
+     * Janela própria, e não a do seletor: o NPS é uma pergunta aberta em marcos
+     * da jornada, e num dia ou numa semana quase nunca há resposta. Amarrá-lo ao
+     * seletor faria o cartão sumir ou virar traço a cada troca. A janela vem
+     * escrita embaixo do número.
+     *
+     * É a MESMA leitura da tela Satisfação e do relatório 10 (`getSummary`), não
+     * uma conta paralela: os três não podem discordar.
+     */
+    const satisfacao = await getSatisfactionSummary({ days: NPS_JANELA_DIAS });
+    if (satisfacao.error) return failWith(satisfacao.error);
+
+    const pesquisa = satisfacao.data;
+
+    kpis.push({
+      id: "nps",
+      label: "NPS",
+      valor: pesquisa?.nps ?? null,
+      contexto:
+        !pesquisa || pesquisa.responses === 0
+          ? `sem respostas em ${NPS_JANELA_DIAS} dias`
+          : `${pluralize(pesquisa.responses, "resposta", "respostas")} · ${NPS_JANELA_DIAS} dias${pesquisa.partial ? " (parcial)" : ""}`,
+      historico: [],
+      relatorio_slug: "nps",
+    });
+
+    /* ------------------------------------------------------------- alertas */
+
+    const fila = await contarFilaDeAlertas();
+    if (!("pendentes" in fila)) return fila;
+
+    kpis.push({
+      id: "alertas_ativos",
+      label: "Alertas ativos",
+      valor: fila.pendentes + fila.em_atendimento,
+      // Teto da leitura: o número é um mínimo, e dizer "200+" é mais honesto do
+      // que um total que parece exato. Ver `_alertQueue`.
+      contexto: `${fila.pendentes} pendentes · ${fila.em_atendimento} em atendimento${fila.limitado ? " · leitura limitada, pode haver mais" : ""}`,
+      inverter_cor: true,
+      historico: [],
+    });
 
     return okOne<KpisResposta>({ periodo, kpis, atualizado_em: new Date().toISOString() });
   });
 }
 
-/**
- * Séries dos gráficos.
- *
- * Duas têm fonte e duas não, e a diferença entre elas não é de volume de dado:
- *
- * - **Sessões** sai de `summarize_appointments`, em baldes mensais.
- * - **Pacientes por CID** sai de `read_patient_list`, que já projeta o CID
- *   principal em cada linha — uma leitura, não uma por paciente.
- * - **Efeitos por protocolo** existe no banco, mas na tela de Estatísticas
- *   clínicas, com os filtros que o recorte exige. Repeti-lo aqui sem os
- *   filtros mostraria um número que ninguém sabe interpretar.
- * - **Engajamento** não tem definição em fonte nenhuma. Não é falta de dado: é
- *   falta de decisão sobre qual dos quatro números possíveis é o indicador.
- *
- * As sem fonte vêm vazias e bem formadas, para a tela exibir o motivo em vez de
- * um gráfico sem eixo.
- */
 /**
  * A captura do painel saiu do ambiente controlado: a trilha precisa saber.
  * `log_data_export` aceita escopo só em minúsculas, dígitos e sublinhado, e o
@@ -392,6 +444,25 @@ export async function registrarExportacao(params: {
   });
 }
 
+/**
+ * Séries dos gráficos.
+ *
+ * Duas têm fonte e duas não, e a diferença entre elas não é de volume de dado:
+ *
+ * - **Sessões** sai de `summarize_appointments`, em baldes mensais.
+ * - **Pacientes por CID** sai de `read_patient_list`, que já projeta o CID
+ *   principal em cada linha — uma leitura, não uma por paciente.
+ * - **Efeitos por protocolo** sai do mesmo cruzamento da tela de Estatísticas
+ *   clínicas, no recorte padrão que ela abre (90 dias, grau 2 ou mais, só
+ *   ativos). Cada barra diz quantos pacientes o protocolo tem: sem isso, 100 %
+ *   sobre um paciente se lê como metade da clínica. Quem quiser outro recorte
+ *   abre a tela própria, onde os filtros existem.
+ * - **Engajamento** não tem definição em fonte nenhuma. Não é falta de dado: é
+ *   falta de decisão sobre qual dos quatro números possíveis é o indicador.
+ *
+ * As sem fonte vêm vazias e bem formadas, para a tela exibir o motivo em vez de
+ * um gráfico sem eixo.
+ */
 export async function getSeries(
   params: { periodo?: Periodo } = {},
 ): Promise<SingleResult<SeriesResposta>> {
@@ -402,6 +473,7 @@ export async function getSeries(
       periodo,
       meta_sessoes: 0,
       ocupacao_percentual: 0,
+      efeitos: [],
       efeitos_por_protocolo: [],
       engajamento: [],
       atualizado_em: new Date().toISOString(),
@@ -452,6 +524,62 @@ export async function getSeries(
       .map(([nome, dados]) => ({ nome, valor: dados.valor, descricao: dados.descricao }))
       .sort((a, b) => b.valor - a.valor);
 
-    return okOne<SeriesResposta>({ ...vazio, sessoes, pacientes_por_cid });
+    /* ------------------------------------------------ efeitos por protocolo */
+
+    const cruzamento = await crossTab({
+      dias: EFEITOS_DIAS,
+      grauMinimo: EFEITOS_GRAU_MINIMO,
+      apenasAtivos: true,
+    });
+    if (cruzamento.error) return failWith(cruzamento.error);
+
+    // Só entra no gráfico o que tem denominador: "sem plano terapêutico" não é um
+    // conjunto que a janela delimite, e um percentual sobre ele seria inventado.
+    const celulas = (cruzamento.data?.celulas ?? []).filter(
+      (celula) => celula.percentual !== null && celula.pacientes_total !== null,
+    );
+
+    const maiorPrevalencia = new Map<string, { label: string; maximo: number }>();
+    for (const celula of celulas) {
+      const atual = maiorPrevalencia.get(celula.sintoma_id);
+      const percentual = celula.percentual ?? 0;
+      if (!atual || percentual > atual.maximo) {
+        maiorPrevalencia.set(celula.sintoma_id, { label: celula.sintoma_label, maximo: percentual });
+      }
+    }
+
+    const efeitos = [...maiorPrevalencia.entries()]
+      .sort(([, a], [, b]) => b.maximo - a.maximo)
+      .slice(0, EFEITOS_NO_GRAFICO)
+      .map(([key, { label }]) => ({ key, label }));
+
+    const tamanhoDoProtocolo = new Map<string, number>();
+    for (const celula of celulas) {
+      tamanhoDoProtocolo.set(celula.protocolo, celula.pacientes_total ?? 0);
+    }
+
+    const efeitos_por_protocolo = [...tamanhoDoProtocolo.entries()]
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, PROTOCOLOS_NO_GRAFICO)
+      .map(([protocolo, pacientes]) => {
+        const barra: EfeitoPorProtocolo = { protocolo: `${protocolo} (n=${pacientes})` };
+
+        for (const efeito of efeitos) {
+          const celula = celulas.find(
+            (item) => item.protocolo === protocolo && item.sintoma_id === efeito.key,
+          );
+          barra[efeito.key] = celula?.percentual ?? 0;
+        }
+
+        return barra;
+      });
+
+    return okOne<SeriesResposta>({
+      ...vazio,
+      sessoes,
+      pacientes_por_cid,
+      efeitos: efeitos_por_protocolo.length > 0 ? efeitos : [],
+      efeitos_por_protocolo,
+    });
   });
 }

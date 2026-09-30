@@ -21,6 +21,14 @@ import { simulate } from "./_helpers";
  * navegador só para somá-la.
  */
 
+/** As séries de efeito que o mock desenha: as mesmas chaves de `efeitosPorProtocolo`. */
+const EFEITOS_DO_MOCK = [
+  { key: "nausea", label: "Náusea" },
+  { key: "fadiga", label: "Fadiga" },
+  { key: "neuropatia", label: "Neuropatia" },
+  { key: "diarreia", label: "Diarreia" },
+];
+
 export async function getKpis({
   periodo = "mensal",
 }: {
@@ -54,6 +62,7 @@ export async function getSeries({
       meta_sessoes: META_SESSOES_MES,
       ocupacao_percentual: OCUPACAO_PERCENTUAL,
       pacientes_por_cid: pacientesPorCid,
+      efeitos: EFEITOS_DO_MOCK,
       efeitos_por_protocolo: efeitosPorProtocolo,
       // O engajamento é sempre semanal — é assim que o protótipo o apresenta,
       // e é o recorte em que a métrica faz sentido.
