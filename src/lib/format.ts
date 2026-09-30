@@ -91,14 +91,25 @@ export function formatLongDate(iso: IsoDate): string {
  *
  * Past seven days it falls back to the absolute date: "há 43 dias" helps
  * nobody locate an event.
+ *
+ * It describes something that already happened, so a timestamp a few minutes
+ * AHEAD of this machine's clock is read as "just now", not "em 4 minutos": the
+ * server stamps the event, and a computer whose clock runs behind would
+ * otherwise announce it in the future. Pass `future: true` for what is truly
+ * yet to come (the next run of a schedule).
  */
-export function relativeTime(iso: IsoDate): string {
+const CLOCK_SKEW_TOLERANCE_SECONDS = 600;
+
+export function relativeTime(iso: IsoDate, options: { future?: boolean } = {}): string {
   if (!iso) return EMPTY;
 
   const seconds = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
   const abs = Math.abs(seconds);
 
   if (abs < 60) return "agora há pouco";
+  if (!options.future && seconds > 0 && seconds <= CLOCK_SKEW_TOLERANCE_SECONDS) {
+    return "agora há pouco";
+  }
 
   const rtf = new Intl.RelativeTimeFormat(LOCALE, { numeric: "auto" });
 
