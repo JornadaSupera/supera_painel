@@ -1,4 +1,4 @@
-import { Bell, LogOut, Menu, Monitor, Moon, Search, ShieldCheck, Sun } from "lucide-react";
+import { LogOut, Menu, Monitor, Moon, ShieldCheck, Sun } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { UserAvatar } from "@/components/shared";
@@ -13,7 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/auth-context";
 import { ESPECIALIDADE_LABEL, PAPEL_LABEL } from "@/lib/enums";
 import { panelAreaOf } from "@/routes/home-path";
@@ -23,9 +22,13 @@ import { useThemeStore, type Theme } from "@/stores/theme";
 /**
  * Top bar.
  *
- * Global search, theme, notifications and the user menu. The search gets its
- * real implementation once there is something to search; it already takes the
- * right spot here so the layout does not shift later.
+ * Theme and the user menu.
+ *
+ * The global search and the notifications bell are NOT here on purpose. Both
+ * sat in the bar as disabled controls, and a control that does nothing and does
+ * not say why reads as a broken screen. They come back with the feature behind
+ * them: the search once it reaches patients, professionals and content; the bell
+ * once there is a source of notifications to list.
  */
 
 const THEME_ICON: Record<Theme, typeof Sun> = {
@@ -70,23 +73,6 @@ export function Topbar() {
         <Menu />
       </Button>
 
-      {/* ------------------------------------------------------- search */}
-      <div className="relative hidden max-w-90 flex-1 items-center sm:flex">
-        <Search
-          size={16}
-          aria-hidden="true"
-          className="text-muted-foreground pointer-events-none absolute left-3"
-        />
-        <Input
-          type="search"
-          placeholder="Buscar paciente, profissional ou conteúdo…"
-          aria-label="Busca global"
-          // The global search lands once there is data to search.
-          disabled
-          className="pl-9"
-        />
-      </div>
-
       <div className="ml-auto flex items-center gap-1">
         {/* ------------------------------------------------------ theme */}
         <DropdownMenu>
@@ -117,11 +103,6 @@ export function Topbar() {
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
-
-        {/* ----------------------------------------------- notifications */}
-        <Button variant="ghost" size="icon" aria-label="Notificações" disabled>
-          <Bell />
-        </Button>
 
         {/* -------------------------------------------------------- user */}
         {user && (
