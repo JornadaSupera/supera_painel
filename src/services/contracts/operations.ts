@@ -18,7 +18,13 @@ import type {
 } from "@/types/auth";
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
-import type { AlertaClinico, CompromissoAgenda, ConversaClinico, MensagemClinico } from "@/types/clinico";
+import type {
+  AlertaClinico,
+  CarteiraResumo,
+  CompromissoAgenda,
+  ConversaClinico,
+  MensagemClinico,
+} from "@/types/clinico";
 import type { SatisfactionResponse, SatisfactionSummary } from "@/types/satisfaction";
 import type { AppointmentTypeOption, BusinessHour, PersonalBlock, PersonalBlockInput } from "@/types/agenda";
 import type { ConversationAssignment, TransferTarget } from "@/types/conversation-transfer";
@@ -544,6 +550,13 @@ export interface FiltroClinico {
  * via.
  */
 export interface ClinicoOperations {
+  /**
+   * A carteira de quem está logado nos últimos `dias`: pacientes atendidos por
+   * fase, compromissos, alertas tratados e quem pede atenção. Só o que as
+   * leituras atuais sustentam; ver `CarteiraResumo`.
+   */
+  getCarteira(params: { dias: number }): Promise<SingleResult<CarteiraResumo>>;
+
   /** Compromissos do profissional logado, na janela informada. */
   getMinhaAgenda(params: {
     de: string;

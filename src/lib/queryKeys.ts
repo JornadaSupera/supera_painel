@@ -149,6 +149,7 @@ export const queryKeys = {
     all: ["clinico"] as const,
     agenda: <R extends QueryKeyParams<R>>(range?: R | null) => ["clinico", "agenda", range ?? {}] as const,
     /** Sem status = a fila inteira; `undefined` vira `"todos"`, para a chave não colidir com "sem filtro nenhum". */
+    carteira: (dias: number) => ["clinico", "carteira", dias] as const,
     alertas: (status?: string) => ["clinico", "alertas", status ?? "todos"] as const,
     conversas: () => ["clinico", "conversas"] as const,
     mensagens: (conversaId: string) => ["clinico", "conversas", conversaId, "mensagens"] as const,

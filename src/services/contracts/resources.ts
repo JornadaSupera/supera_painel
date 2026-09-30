@@ -278,6 +278,7 @@ export const RESOURCES = {
     table: null, // RPCs escopadas ao profissional da própria sessão
     fase: 16, // painel clínico — trilha própria de fases, ver PA-07
     operations: [
+      "getCarteira",
       "getMinhaAgenda",
       "listAppointmentTypes",
       "listBusinessHours",
