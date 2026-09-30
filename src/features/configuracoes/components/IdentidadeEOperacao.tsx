@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { ClinicaConfiguracao, IntervaloAtendimento, SlideOnboarding } from "@/types/configuracao";
+import { PreviewIdentidade } from "./PreviewIdentidade";
 import {
   useClinica,
   useSalvarHorario,
@@ -84,133 +85,143 @@ function FormIdentidade({ dados }: { dados: ClinicaConfiguracao }) {
         </p>
       </header>
 
-      <div className="flex flex-col gap-4">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cor-primaria" className="text-xs">
-              Cor primária
-            </Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                aria-label="Escolher cor primária"
-                value={corPrimariaValida ? corPrimaria : CORES_PADRAO.primaria}
-                onChange={(evento) => setCorPrimaria(evento.target.value)}
-                className="border-input h-9 w-11 shrink-0 rounded-md border p-1"
-              />
-              <Input
-                id="cor-primaria"
-                value={corPrimaria}
-                maxLength={7}
-                aria-invalid={!corPrimariaValida}
-                className="font-mono text-xs"
-                onChange={(evento) => setCorPrimaria(evento.target.value.toLowerCase())}
-              />
-            </div>
-            {!corPrimariaValida && (
-              <p className="text-destructive text-[11px]">Formato esperado: #rrggbb</p>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cor-secundaria" className="text-xs">
-              Cor secundária
-            </Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                aria-label="Escolher cor secundária"
-                value={corSecundariaValida ? corSecundaria : CORES_PADRAO.secundaria}
-                onChange={(evento) => setCorSecundaria(evento.target.value)}
-                className="border-input h-9 w-11 shrink-0 rounded-md border p-1"
-              />
-              <Input
-                id="cor-secundaria"
-                value={corSecundaria}
-                maxLength={7}
-                aria-invalid={!corSecundariaValida}
-                className="font-mono text-xs"
-                onChange={(evento) => setCorSecundaria(evento.target.value.toLowerCase())}
-              />
-            </div>
-            {!corSecundariaValida && (
-              <p className="text-destructive text-[11px]">Formato esperado: #rrggbb</p>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label className="text-xs">Logo</Label>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="bg-muted/40 border-border flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
-              {logo.url ? (
-                <img src={logo.url} alt="Logo da clínica" className="h-full w-full object-contain" />
-              ) : (
-                <span className="text-muted-foreground text-[10px]">Sem logo</span>
+      <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
+        <div className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cor-primaria" className="text-xs">
+                Cor primária
+              </Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  aria-label="Escolher cor primária"
+                  value={corPrimariaValida ? corPrimaria : CORES_PADRAO.primaria}
+                  onChange={(evento) => setCorPrimaria(evento.target.value)}
+                  className="border-input h-9 w-11 shrink-0 rounded-md border p-1"
+                />
+                <Input
+                  id="cor-primaria"
+                  value={corPrimaria}
+                  maxLength={7}
+                  aria-invalid={!corPrimariaValida}
+                  className="font-mono text-xs"
+                  onChange={(evento) => setCorPrimaria(evento.target.value.toLowerCase())}
+                />
+              </div>
+              {!corPrimariaValida && (
+                <p className="text-destructive text-[11px]">Formato esperado: #rrggbb</p>
               )}
             </div>
 
-            <input
-              ref={inputArquivoRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              aria-label="Escolher a imagem do logo"
-              className="sr-only"
-              onChange={(evento) => {
-                const arquivo = evento.target.files?.[0];
-                evento.target.value = "";
-                if (!arquivo) return;
-
-                upload.mutate(arquivo, {
-                  onSuccess: (resultado) => {
-                    if (resultado) setLogo({ path: resultado.path, url: resultado.url });
-                  },
-                });
-              }}
-            />
-
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={upload.isPending}
-              onClick={() => inputArquivoRef.current?.click()}
-            >
-              <ImageUp />
-              {upload.isPending ? "Enviando…" : "Enviar logo"}
-            </Button>
-
-            {logo.url && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="text-destructive hover:text-destructive"
-                onClick={() => setLogo({ path: null, url: null })}
-              >
-                <Trash2 />
-                Remover
-              </Button>
-            )}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="cor-secundaria" className="text-xs">
+                Cor secundária
+              </Label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  aria-label="Escolher cor secundária"
+                  value={corSecundariaValida ? corSecundaria : CORES_PADRAO.secundaria}
+                  onChange={(evento) => setCorSecundaria(evento.target.value)}
+                  className="border-input h-9 w-11 shrink-0 rounded-md border p-1"
+                />
+                <Input
+                  id="cor-secundaria"
+                  value={corSecundaria}
+                  maxLength={7}
+                  aria-invalid={!corSecundariaValida}
+                  className="font-mono text-xs"
+                  onChange={(evento) => setCorSecundaria(evento.target.value.toLowerCase())}
+                />
+              </div>
+              {!corSecundariaValida && (
+                <p className="text-destructive text-[11px]">Formato esperado: #rrggbb</p>
+              )}
+            </div>
           </div>
 
-          <p className="text-muted-foreground text-[11px]">
-            PNG, JPEG ou WebP, até 2 MB. Fica público — é a mesma imagem que aparece antes do login.
-          </p>
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-xs">Logo</Label>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="bg-muted/40 border-border flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border">
+                {logo.url ? (
+                  <img src={logo.url} alt="Logo da clínica" className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-muted-foreground text-[10px]">Sem logo</span>
+                )}
+              </div>
+
+              <input
+                ref={inputArquivoRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                aria-label="Escolher a imagem do logo"
+                className="sr-only"
+                onChange={(evento) => {
+                  const arquivo = evento.target.files?.[0];
+                  evento.target.value = "";
+                  if (!arquivo) return;
+
+                  upload.mutate(arquivo, {
+                    onSuccess: (resultado) => {
+                      if (resultado) setLogo({ path: resultado.path, url: resultado.url });
+                    },
+                  });
+                }}
+              />
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={upload.isPending}
+                onClick={() => inputArquivoRef.current?.click()}
+              >
+                <ImageUp />
+                {upload.isPending ? "Enviando…" : "Enviar logo"}
+              </Button>
+
+              {logo.url && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setLogo({ path: null, url: null })}
+                >
+                  <Trash2 />
+                  Remover
+                </Button>
+              )}
+            </div>
+
+            <p className="text-muted-foreground text-[11px]">
+              PNG, JPEG ou WebP, até 2 MB. Fica público — é a mesma imagem que aparece antes do login.
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              disabled={!podeSalvar || salvar.isPending}
+              onClick={() =>
+                salvar.mutate({ corPrimaria, corSecundaria, logoPath: logo.path })
+              }
+            >
+              {salvar.isPending ? "Salvando…" : "Salvar identidade"}
+            </Button>
+          </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button
-            size="sm"
-            disabled={!podeSalvar || salvar.isPending}
-            onClick={() =>
-              salvar.mutate({ corPrimaria, corSecundaria, logoPath: logo.path })
-            }
-          >
-            {salvar.isPending ? "Salvando…" : "Salvar identidade"}
-          </Button>
-        </div>
+        {/* Mostra o que está no formulário, não o que está salvo: é para conferir
+            antes de salvar. Cor fora do formato cai no padrão, sem quebrar o desenho. */}
+        <PreviewIdentidade
+          corPrimaria={corPrimariaValida ? corPrimaria : CORES_PADRAO.primaria}
+          corSecundaria={corSecundariaValida ? corSecundaria : CORES_PADRAO.secundaria}
+          logoUrl={logo.url}
+        />
       </div>
     </section>
   );
