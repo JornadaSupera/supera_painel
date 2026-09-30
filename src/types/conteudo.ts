@@ -41,12 +41,11 @@ export interface ConteudoListItem {
    */
   especialidade: Especialidade | null;
   /**
-   * Conteúdo de área sob sigilo profissional (Psicologia).
+   * A orientação é de uma área sob sigilo profissional (Psicologia).
    *
-   * A tela usa isto para não renderizar o texto a quem não tem
-   * `sigilo:psicologia` — nem ao administrador, que não herda o sigilo pelo
-   * papel. O título e o autor continuam visíveis: sem eles não há fila de
-   * aprovação, e o que o sigilo protege é o conteúdo, não a existência.
+   * Descreve a área, e não restringe a leitura da orientação: quem a revisa é o
+   * administrador, e o sigilo da Psicologia protege o que é dito em atendimento
+   * (anotações, conversas, compromissos), não um material educativo.
    */
   confidencial: boolean;
   autor_nome: string;

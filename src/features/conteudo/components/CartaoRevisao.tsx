@@ -1,4 +1,4 @@
-import { Check, EyeOff, PenLine, X } from "lucide-react";
+import { Check, PenLine, X } from "lucide-react";
 
 import { StatusBadge, UserAvatar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -15,12 +15,16 @@ import type { ConteudoListItem } from "@/types/conteudo";
  * o resumo abaixo, a autoria numa linha com avatar, área e tempo de espera, e
  * as três ações à direita.
  *
- * > [!] Sigilo profissional
- * Conteúdo de Psicologia não mostra o texto a quem não tem
- * `sigilo:psicologia` — e o administrador NÃO herda esse sigilo pelo papel. O
- * que continua visível é o título, a autoria e o tempo de espera: sem eles não
- * há fila, e o que o sigilo protege é o conteúdo, não a existência do item.
- * Quem não pode ler também não pode decidir — as ações somem junto.
+ * > [!] Orientação de Psicologia também é revisada aqui
+ * Só a administração decide a publicação (`review_content_version` recusa
+ * qualquer outra conta), e o Mapa põe "revisão pelo administrador antes da
+ * publicação" para toda orientação. Esconder o texto de Psicologia dela deixava
+ * a orientação sem ninguém que pudesse aprová-la, devolvê-la ou recusá-la.
+ *
+ * O sigilo profissional da Psicologia protege o que é DITO em atendimento: as
+ * anotações, as conversas e os compromissos, que o banco esconde por regra. Uma
+ * orientação é material educativo que, aprovado, chega a todos os pacientes
+ * elegíveis; o rascunho dela não é conteúdo de sessão.
  */
 
 export interface CartaoRevisaoProps {
@@ -34,8 +38,7 @@ export interface CartaoRevisaoProps {
 export function CartaoRevisao({ conteudo, onDecidir, onAbrir, ocupado }: CartaoRevisaoProps) {
   const { can } = useAuth();
 
-  const podeLer = !conteudo.confidencial || can(PERMISSAO.SIGILO_PSICOLOGIA);
-  const podeDecidir = can(PERMISSAO.CONTEUDO_APPROVE) && podeLer;
+  const podeDecidir = can(PERMISSAO.CONTEUDO_APPROVE);
 
   return (
     <article className="bg-card flex flex-col gap-3 rounded-2xl border p-4 md:flex-row md:items-start md:justify-between md:gap-6">
@@ -44,8 +47,7 @@ export function CartaoRevisao({ conteudo, onDecidir, onAbrir, ocupado }: CartaoR
           <button
             type="button"
             onClick={() => onAbrir(conteudo)}
-            disabled={!podeLer}
-            className="text-foreground hover:text-primary truncate text-sm font-medium disabled:cursor-not-allowed disabled:hover:text-current"
+            className="text-foreground hover:text-primary truncate text-sm font-medium"
           >
             {conteudo.titulo}
           </button>
@@ -59,16 +61,9 @@ export function CartaoRevisao({ conteudo, onDecidir, onAbrir, ocupado }: CartaoR
           </span>
         </div>
 
-        {podeLer ? (
-          <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs leading-relaxed">
-            {conteudo.resumo}
-          </p>
-        ) : (
-          <p className="text-muted-foreground mt-1.5 flex items-center gap-1.5 text-xs">
-            <EyeOff size={13} aria-hidden="true" />
-            Conteúdo de Psicologia — sob sigilo profissional. A revisão é de quem atua na área.
-          </p>
-        )}
+        <p className="text-muted-foreground mt-1.5 line-clamp-2 text-xs leading-relaxed">
+          {conteudo.resumo}
+        </p>
 
         <div className="text-muted-foreground mt-3 flex items-center gap-2 text-[11px]">
           <UserAvatar name={conteudo.autor_nome} size="xs" colorful />

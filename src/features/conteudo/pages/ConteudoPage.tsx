@@ -1,4 +1,3 @@
-import { EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -17,7 +16,6 @@ import {
   type Column,
 } from "@/components/shared";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/contexts/auth-context";
 import {
   ACAO_REVISAO,
   ESPECIALIDADE_LABEL,
@@ -53,8 +51,6 @@ import { useConteudos, useFilaRevisao, useRevisarConteudo } from "../hooks/useCo
  */
 
 export function ConteudoPage() {
-  const { can } = useAuth();
-
   const [emDecisao, setEmDecisao] = useState<ConteudoListItem | null>(null);
   const [acao, setAcao] = useState<AcaoRevisao | null>(null);
 
@@ -109,14 +105,7 @@ export function ConteudoPage() {
         <div className="max-w-[60ch] min-w-48 whitespace-normal">
           <p className="text-foreground line-clamp-2 text-sm font-medium">{conteudo.titulo}</p>
 
-          {conteudo.confidencial && !can(PERMISSAO.SIGILO_PSICOLOGIA) ? (
-            <p className="text-muted-foreground mt-0.5 flex items-center gap-1 text-[11px]">
-              <EyeOff size={11} aria-hidden="true" />
-              Sob sigilo profissional
-            </p>
-          ) : (
-            <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[11px]">{conteudo.resumo}</p>
-          )}
+          <p className="text-muted-foreground mt-0.5 line-clamp-2 text-[11px]">{conteudo.resumo}</p>
         </div>
       ),
     },
