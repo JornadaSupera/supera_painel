@@ -155,6 +155,7 @@ function FormIdentidade({ dados }: { dados: ClinicaConfiguracao }) {
               ref={inputArquivoRef}
               type="file"
               accept="image/png,image/jpeg,image/webp"
+              aria-label="Escolher a imagem do logo"
               className="sr-only"
               onChange={(evento) => {
                 const arquivo = evento.target.files?.[0];
