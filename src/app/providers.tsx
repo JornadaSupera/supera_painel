@@ -41,11 +41,16 @@ function createQueryClient() {
         // screen read that as an empty list: "0 patients", "no appointments".
         // Always fetching lets the failure reach the error state and its retry.
         networkMode: "always",
+        // Uma segunda tentativa cobre o soluço de rede; duas e o recuo padrão
+        // (1 s, 2 s, 4 s…) seguravam a tela em "carregando" por tempo demais
+        // antes de admitir que a leitura falhou. O recuo fixo de 1 s mantém a
+        // espera previsível.
         retry: (failureCount, error) => {
           const codigo = (error as { code?: ErrorCode }).code;
           if (codigo && NAO_RETENTAVEL.includes(codigo)) return false;
-          return failureCount < 2;
+          return failureCount < 1;
         },
+        retryDelay: 1000,
       },
       mutations: {
         // Escrita nunca é repetida sozinha: pode duplicar registro clínico,
