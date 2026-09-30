@@ -163,7 +163,7 @@ function FormularioMotivo({ onPronto }: { onPronto: () => void }) {
         />
         <p id="motivo-codigo-ajuda" className="text-muted-foreground text-[11px]">
           {codigoInvalido
-            ? "Só minúsculas, dígitos e underscore — é o formato que o backend aceita."
+            ? "Só minúsculas, dígitos e underscore — é o formato aceito."
             : "Identificador fixo do motivo. Não muda depois, porque os relatórios antigos apontam para ele."}
         </p>
       </div>

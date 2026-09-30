@@ -442,7 +442,7 @@ export function ConfiguracoesPage() {
               {(dados?.sem_origem ?? []).map((chave) => (
                 <BackendPendente
                   key={chave}
-                  motivo={MOTIVOS_SEM_ORIGEM[chave] ?? `Configuração "${chave}" sem origem no backend.`}
+                  motivo={MOTIVOS_SEM_ORIGEM[chave] ?? "Esta configuração ainda não pode ser alterada pelo painel."}
                 />
               ))}
             </div>
@@ -451,7 +451,7 @@ export function ConfiguracoesPage() {
           <Footnote>
             Rótulo, ordem e o estado ativo/retirado dos catálogos acima mudam por aqui, com
             auditoria a cada edição. O código de cada termo continua fixo — é ele que o diário, os
-            relatórios e os gatilhos de alerta usam para apontar para o mesmo item, e o backend
+            relatórios e os gatilhos de alerta usam para apontar para o mesmo item, e o sistema
             recusa qualquer tentativa de trocá-lo. Cadastrar um termo novo continua exigindo
             migração revisada, pela mesma razão. As regras de permissão por papel ficam em{" "}
             <strong>Usuários → Permissões por papel</strong>.
