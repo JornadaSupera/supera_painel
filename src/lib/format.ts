@@ -197,9 +197,11 @@ export function formatDuration(minutes: number | null | undefined): string {
  * the duration already says it. Any other unit goes through unchanged.
  */
 export function formatMeasure(
-  value: number,
+  value: number | null,
   unit: string | undefined,
 ): { value: string; unit: string | undefined } {
+  // No base to calculate from: a dash, and no unit glued to nothing.
+  if (value === null) return { value: EMPTY, unit: undefined };
   if (unit === "min") return { value: formatDuration(value), unit: undefined };
   return { value: formatNumber(value), unit };
 }
