@@ -1,9 +1,11 @@
-import { BarChart3, Download, Lock, Play, Table2, TriangleAlert } from "lucide-react";
-import { useState } from "react";
+import { BarChart3, Download, FileText, Link2, Lock, Play, Table2, TriangleAlert } from "lucide-react";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   BarChart,
+  Can,
   type Column,
   DataTable,
   EmptyState,
@@ -32,13 +34,19 @@ import {
 } from "@/components/ui/select";
 import { useEspecialidades } from "@/hooks/useCatalogos";
 import { formatNumber } from "@/lib/format";
+import { PERMISSAO } from "@/lib/rbac";
 import {
   CATEGORIA_RELATORIO_LABEL,
   FILTRO_RELATORIO_LABEL,
   type CategoriaRelatorio,
   type DefinicaoRelatorio,
 } from "@/types/relatorio";
-import { useDefinicoes, useExportarRelatorio, useRelatorio } from "../hooks/useRelatorios";
+import {
+  useDefinicoes,
+  useExportarRelatorio,
+  useExportarRelatorioPdf,
+  useRelatorio,
+} from "../hooks/useRelatorios";
 import { AgendamentosRelatorio } from "../components/AgendamentosRelatorio";
 
 /**
@@ -55,15 +63,21 @@ import { AgendamentosRelatorio } from "../components/AgendamentosRelatorio";
  *    (25/09/2026) entrega por notificação in-app, nunca por e-mail: o provedor
  *    transacional não está contratado, e o aviso com link mantém o dado dentro
  *    do ambiente controlado. Ver `AgendamentosRelatorio`.
- *  - **"Exportar todos" e link compartilhável não existem**: o segundo
- *    exigiria tabela de token com expiração, que ainda não existe — e é outro
- *    caminho por onde dado clínico sairia da clínica sem passar pela trilha.
+ *  - **"Exportar todos" não existe**: cada relatório sai com o seu recorte, e
+ *    cada saída é uma linha na trilha.
+ *  - **O link é interno, não público.** O escopo pede um endereço que leve a
+ *    quem o receber ao mesmo resultado, e isso é a própria URL do relatório com
+ *    o recorte nela. Só abre para quem tem sessão e permissão de relatórios;
+ *    sem sessão, o login devolve ao mesmo endereço, com o recorte. Um link com
+ *    token que abrisse sem sessão seria um caminho novo para dado clínico sair
+ *    da clínica, e não é o que se pede.
  *  - **Três cartões marcados como indisponíveis**: alertas de IA, NPS e
  *    engajamento no app não têm origem no banco. O cartão fica, com o
  *    motivo: o conjunto de doze é contratado, e escondê-los mascararia o que
  *    ainda falta.
  *  - **Exportação em Excel**: sai em CSV, que o Excel abre. Uma planilha
- *    binária exigiria uma dependência fora da lista contratada.
+ *    binária exigiria uma dependência fora da lista contratada. O PDF é uma
+ *    captura do resultado aberto, em retrato e em quantas páginas couber.
  */
 
 const ORDEM: CategoriaRelatorio[] = ["pacientes", "clinico", "operacional", "qualidade"];
@@ -95,7 +109,11 @@ export function RelatoriosPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const dias = searchParams.get("dias") ?? "30";
+  // Um período que a tela não oferece (um link antigo, um endereço digitado)
+  // volta para o padrão, em vez de rodar o relatório com um número qualquer.
+  const diasPedidos = searchParams.get("dias");
+  const dias = PERIODOS.some((periodo) => periodo.value === diasPedidos) ? (diasPedidos as string) : "30";
+  const especialidadePedida = searchParams.get("especialidade");
   const definicoes = useDefinicoes();
 
   const porCategoria = (categoria: CategoriaRelatorio) =>
@@ -113,13 +131,26 @@ export function RelatoriosPage() {
    */
   const slugDesconhecido = Boolean(slug) && !definicoes.isLoading && !aberto;
 
+  // O recorte inteiro vive no endereço: é ele que faz do link algo que se manda.
+  // O período vai sempre, mesmo o padrão, para o link dizer o que mostra.
   const abrir = (definicao: DefinicaoRelatorio) =>
     navigate(`/relatorios/${definicao.slug}?dias=${dias}`);
 
   const fechar = () => navigate(`/relatorios?dias=${dias}`);
 
-  const trocarPeriodo = (valor: string) =>
-    setSearchParams(valor === "30" ? {} : { dias: valor }, { replace: true });
+  const trocarPeriodo = (valor: string) => {
+    const proximo = new URLSearchParams(searchParams);
+    if (valor === "30") proximo.delete("dias");
+    else proximo.set("dias", valor);
+    setSearchParams(proximo, { replace: true });
+  };
+
+  const trocarEspecialidade = (valor: string | null) => {
+    const proximo = new URLSearchParams(searchParams);
+    if (valor) proximo.set("especialidade", valor);
+    else proximo.delete("especialidade");
+    setSearchParams(proximo, { replace: true });
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -196,6 +227,8 @@ export function RelatoriosPage() {
       <JanelaRelatorio
         definicao={aberto}
         dias={Number(dias)}
+        especialidade={especialidadePedida}
+        onEspecialidadeChange={trocarEspecialidade}
         onOpenChange={(estaAberta) => !estaAberta && fechar()}
       />
     </div>
@@ -260,14 +293,19 @@ function CartaoRelatorio({
 function JanelaRelatorio({
   definicao,
   dias,
+  especialidade,
+  onEspecialidadeChange,
   onOpenChange,
 }: {
   definicao: DefinicaoRelatorio | null;
   dias: number;
+  /** O recorte que veio do endereço, ainda sem conferir contra o catálogo. */
+  especialidade: string | null;
+  onEspecialidadeChange: (valor: string | null) => void;
   onOpenChange: (aberto: boolean) => void;
 }) {
   const [visao, setVisao] = useState<"tabela" | "grafico">("tabela");
-  const [especialidade, setEspecialidade] = useState(TODAS);
+  const capturaRef = useRef<HTMLDivElement>(null);
 
   /*
    * O seletor só aparece onde a definição do relatório declara o filtro. É a
@@ -278,10 +316,40 @@ function JanelaRelatorio({
   const aceitaEspecialidade = definicao?.filtros.includes("especialidade") ?? false;
   const especialidades = useEspecialidades();
 
-  const recorte = aceitaEspecialidade && especialidade !== TODAS ? especialidade : null;
+  /*
+   * O recorte do endereço só vale se o catálogo o conhece e o relatório o aceita.
+   * Enquanto o catálogo carrega, o relatório espera: rodá-lo sem recorte e
+   * refazê-lo em seguida mostraria por um instante um resultado que não é o do
+   * link.
+   */
+  const aguardandoCatalogo = aceitaEspecialidade && Boolean(especialidade) && especialidades.isLoading;
+  const recorteConhecido = (especialidades.data ?? []).find((area) => area.value === especialidade);
+  const recorte = aceitaEspecialidade && recorteConhecido ? recorteConhecido.value : null;
 
-  const relatorio = useRelatorio(definicao?.slug, dias, recorte);
+  const relatorio = useRelatorio(aguardandoCatalogo ? undefined : definicao?.slug, dias, recorte);
   const exportar = useExportarRelatorio();
+  const exportarPdf = useExportarRelatorioPdf();
+
+  const periodo = PERIODOS.find((item) => item.value === String(dias))?.label ?? `${dias} dias`;
+  const recorteRotulo = recorteConhecido?.label ?? "Todas as especialidades";
+
+  const copiarLink = async () => {
+    if (!definicao) return;
+    const endereco = new URL(`/relatorios/${definicao.slug}`, window.location.origin);
+    endereco.searchParams.set("dias", String(dias));
+    if (recorte) endereco.searchParams.set("especialidade", recorte);
+
+    try {
+      await navigator.clipboard.writeText(endereco.toString());
+      toast.success("Link copiado", {
+        description: "Abre este relatório, com este recorte, para quem tiver sessão e permissão de relatórios.",
+      });
+    } catch {
+      // Sem permissão de área de transferência (contexto sem HTTPS, por exemplo):
+      // o endereço da barra já é o link.
+      toast.error("Não foi possível copiar", { description: "Copie o endereço da barra do navegador." });
+    }
+  };
 
   const dados = relatorio.data;
 
@@ -335,7 +403,10 @@ function JanelaRelatorio({
             </Button>
 
             {aceitaEspecialidade && (
-              <Select value={especialidade} onValueChange={setEspecialidade}>
+              <Select
+                value={recorte ?? TODAS}
+                onValueChange={(valor) => onEspecialidadeChange(valor === TODAS ? null : valor)}
+              >
                 <SelectTrigger size="sm" aria-label="Especialidade" className="ml-1.5 w-48">
                   <SelectValue placeholder="Todas as especialidades" />
                 </SelectTrigger>
@@ -351,17 +422,45 @@ function JanelaRelatorio({
             )}
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={exportar.isPending || (dados?.linhas.length ?? 0) === 0}
-            onClick={() =>
-              definicao && exportar.mutate({ slug: definicao.slug, dias, especialidade: recorte })
-            }
-          >
-            <Download />
-            Exportar CSV
-          </Button>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button size="sm" variant="ghost" onClick={() => void copiarLink()}>
+              <Link2 />
+              Copiar link
+            </Button>
+
+            <Can permission={PERMISSAO.RELATORIOS_EXPORT}>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={exportarPdf.isPending || (dados?.linhas.length ?? 0) === 0}
+                onClick={() => {
+                  const elemento = capturaRef.current;
+                  if (!definicao || !dados || !elemento) return;
+                  exportarPdf.mutate({
+                    slug: definicao.slug,
+                    element: elemento,
+                    linhas: dados.linhas.length,
+                    filtros: { dias, especialidade: recorte },
+                  });
+                }}
+              >
+                <FileText />
+                {exportarPdf.isPending ? "Gerando…" : "Exportar PDF"}
+              </Button>
+
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={exportar.isPending || (dados?.linhas.length ?? 0) === 0}
+                onClick={() =>
+                  definicao && exportar.mutate({ slug: definicao.slug, dias, especialidade: recorte })
+                }
+              >
+                <Download />
+                Exportar CSV
+              </Button>
+            </Can>
+          </div>
         </div>
 
         {relatorio.isLoading && <SkeletonTable columns={4} />}
@@ -377,32 +476,48 @@ function JanelaRelatorio({
           />
         )}
 
-        {dados && dados.linhas.length > 0 && visao === "tabela" && (
-          <div className="overflow-hidden rounded-xl border">
-            <DataTable
-              columns={colunas}
-              data={dados.linhas}
-              getRowId={(linha) => String(linha[dados.colunas[0]?.key ?? ""] ?? Math.random())}
-              caption={`${dados.titulo}. ${dados.resumo}`}
-              label="linhas"
-              density="compact"
-            />
-          </div>
-        )}
+        {/* O que vai para o PDF: o cabeçalho com o recorte e o resultado. Quem lê o
+            arquivo sem a tela precisa saber de que período e de que área são os
+            números. */}
+        {dados && dados.linhas.length > 0 && (
+          <div ref={capturaRef} className="bg-background flex flex-col gap-3">
+            <div>
+              <p className="text-sm font-medium">
+                {definicao?.numero} · {definicao?.titulo}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {periodo} · {aceitaEspecialidade ? recorteRotulo : "Toda a clínica"} · {dados.resumo}
+              </p>
+            </div>
 
-        {dados && podeGraficar && visao === "grafico" && (
-          <BarChart
-            data={dados.linhas}
-            xKey={dados.eixo as string}
-            series={[
-              {
-                key: dados.medida as string,
-                label:
-                  dados.colunas.find((coluna) => coluna.key === dados.medida)?.label ?? "Valor",
-              },
-            ]}
-            height={260}
-          />
+            {dados && dados.linhas.length > 0 && visao === "tabela" && (
+              <div className="overflow-hidden rounded-xl border">
+                <DataTable
+                  columns={colunas}
+                  data={dados.linhas}
+                  getRowId={(linha) => String(linha[dados.colunas[0]?.key ?? ""] ?? Math.random())}
+                  caption={`${dados.titulo}. ${dados.resumo}`}
+                  label="linhas"
+                  density="compact"
+                />
+              </div>
+            )}
+
+            {dados && podeGraficar && visao === "grafico" && (
+              <BarChart
+                data={dados.linhas}
+                xKey={dados.eixo as string}
+                series={[
+                  {
+                    key: dados.medida as string,
+                    label:
+                      dados.colunas.find((coluna) => coluna.key === dados.medida)?.label ?? "Valor",
+                  },
+                ]}
+                height={260}
+              />
+            )}
+          </div>
         )}
       </DialogContent>
     </Dialog>

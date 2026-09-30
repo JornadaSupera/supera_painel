@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { useAuth } from "@/contexts/auth-context";
 import { audit } from "@/lib/audit";
 import { downloadFile, nameWithDate, toCsv } from "@/lib/csv";
+import { formatDateTime } from "@/lib/format";
+import { exportPdf, timestamp } from "@/lib/pdf";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, relatoriosApi } from "@/services/apiClient";
 import type { AgendamentoRelatorioEntrada } from "@/types/relatorio";
@@ -59,6 +62,56 @@ export function useExportarRelatorio() {
         description: `${linhas} linhas em CSV. A exportação foi registrada na auditoria.`,
       }),
     onError: (erro) => toast.error("Não foi possível exportar", { description: erro.message }),
+  });
+}
+
+/**
+ * Exporta o resultado aberto como PDF: uma captura da própria tela, em retrato,
+ * em quantas páginas couber.
+ *
+ * O rodapé diz QUEM exportou e QUANDO — um PDF de dado clínico que circula sem
+ * procedência é um problema de rastreabilidade. A trilha é gravada depois de o
+ * arquivo existir: até lá nada saiu do painel, e um PDF que falha no meio não
+ * deve constar como exportado.
+ */
+export function useExportarRelatorioPdf() {
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      slug,
+      element,
+      linhas,
+      filtros,
+    }: {
+      slug: string;
+      element: HTMLElement;
+      linhas: number;
+      filtros: Record<string, string | number | null>;
+    }) => {
+      const rodape = user
+        ? `Jornada Supera · exportado por ${user.nome} em ${formatDateTime(new Date().toISOString())}`
+        : undefined;
+
+      await exportPdf({
+        element,
+        name: `relatorio-${slug}_${timestamp()}`,
+        footer: rodape,
+        orientation: "portrait",
+        paginate: true,
+      });
+
+      audit.export(RECURSO, { relatorio: slug, formato: "pdf", linhas, ...filtros });
+      await call(() => relatoriosApi.registrarExportacao({ slug, linhas, formato: "pdf" }));
+    },
+    onSuccess: () =>
+      toast.success("Relatório exportado em PDF", {
+        description: "A exportação foi registrada na auditoria.",
+      }),
+    onError: () =>
+      toast.error("Não foi possível gerar o PDF", {
+        description: "Tente novamente. Se persistir, avise o suporte.",
+      }),
   });
 }
 
