@@ -16,6 +16,7 @@ import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
 import { AreaRoute } from "./AreaRoute";
 import { HomeRedirect } from "./HomeRedirect";
+import { NotFoundRoute } from "./NotFoundRoute";
 import { PermissionRoute } from "./PermissionRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
 
@@ -315,7 +316,7 @@ export function AppRoutes() {
 
           {/* ------------------------------------------------------ default */}
           <Route path="/" element={<HomeRedirect />} />
-          <Route path="*" element={<HomeRedirect />} />
+          <Route path="*" element={<NotFoundRoute />} />
         </Routes>
       </Suspense>
     </>

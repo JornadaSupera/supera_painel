@@ -5,7 +5,8 @@ import { useAuth } from "@/contexts/auth-context";
 import { defaultHomePath } from "./home-path";
 
 /**
- * Where "/" and an unknown address send someone.
+ * Where "/" sends someone. An address the panel does not have goes to
+ * `NotFoundRoute` instead, which says so.
  *
  * Signed in, the destination is `defaultHomePath(user)` — see `home-path.ts`.
  *
