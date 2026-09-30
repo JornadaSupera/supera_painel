@@ -62,7 +62,7 @@ export { ScrollableTabsList } from "./ScrollableTabsList";
 
 export { SearchInput } from "./SearchInput";
 
-export { SkeletonCards, SkeletonChart, SkeletonForm, SkeletonTable } from "./Skeletons";
+export { SkeletonCards, SkeletonChart, SkeletonForm, SkeletonRows, SkeletonTable } from "./Skeletons";
 
 export { SourceErrorAlert, SourceErrorChip } from "./SourceError";
 export type { SourceErrorProps } from "./SourceError";

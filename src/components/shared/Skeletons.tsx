@@ -71,6 +71,28 @@ export function SkeletonCards({ count = 4, className }: { count?: number; classN
   );
 }
 
+/**
+ * A list of rows, not of cards: the shape of a screen that lists people one per
+ * line. A card grid in the skeleton followed by rows in the content made the
+ * page rearrange itself when the data arrived.
+ */
+export function SkeletonRows({ count = 6, className }: { count?: number; className?: string }) {
+  return (
+    <div className={cn("flex flex-col gap-2", className)} aria-busy="true">
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="bg-card flex items-center gap-4 rounded-2xl border p-4">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <Skeleton className="h-3.5 w-2/5" />
+            <Skeleton className="h-2.5 w-3/5" />
+          </div>
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+      ))}
+      <span className="sr-only">Carregando registros</span>
+    </div>
+  );
+}
+
 export function SkeletonChart({ bars = 7, className }: { bars?: number; className?: string }) {
   return (
     <div className={cn("flex h-55 items-end gap-3 p-5", className)} aria-busy="true">
