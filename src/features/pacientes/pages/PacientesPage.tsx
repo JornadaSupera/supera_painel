@@ -200,9 +200,12 @@ export function PacientesPage() {
         eyebrow="Gestão"
         title="Pacientes"
         subtitle={
-          isLoading && total === 0
-            ? "Carregando cadastro…"
-            : `${filtrada ? `${pluralize(total, "paciente", "pacientes")} no recorte atual` : pluralize(total, "paciente cadastrado", "pacientes cadastrados")} · convite por SMS no cadastro`
+          // A leitura falhou: o total é desconhecido, não zero.
+          isError
+            ? "Não foi possível ler o cadastro agora"
+            : isLoading && total === 0
+              ? "Carregando cadastro…"
+              : `${filtrada ? `${pluralize(total, "paciente", "pacientes")} no recorte atual` : pluralize(total, "paciente cadastrado", "pacientes cadastrados")} · convite por SMS no cadastro`
         }
         actions={
           <>
