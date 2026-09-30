@@ -5,6 +5,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   BackendPendente,
   BarChart,
+  BotaoExportarCaptura,
   ChartCard,
   DonutChart,
   EmptyState,
@@ -17,9 +18,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Periodo } from "@/lib/enums";
 import { formatLongDate, formatMeasure, formatTime } from "@/lib/format";
-import { BotaoExportar } from "../components/BotaoExportar";
 import { PeriodoToggle } from "../components/PeriodoToggle";
-import { useKpis, useSeries } from "../hooks/useDashboard";
+import { useKpis, useRegistrarExportacaoDashboard, useSeries } from "../hooks/useDashboard";
 
 /**
  * Painel executivo.
@@ -139,6 +139,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const areaCaptura = useRef<HTMLDivElement>(null);
 
+  const registrarExportacao = useRegistrarExportacaoDashboard();
   const kpis = useKpis(periodo);
   const series = useSeries(periodo);
 
@@ -176,7 +177,12 @@ export function DashboardPage() {
         actions={
           <div className="flex items-center gap-2">
             <PeriodoToggle valor={periodo} onChange={setPeriodo} className="no-print" />
-            <BotaoExportar alvo={areaCaptura} nomeBase="painel-executivo" />
+            <BotaoExportarCaptura
+              alvo={areaCaptura}
+              nomeBase="painel-executivo"
+              recurso="dashboard"
+              onExportado={registrarExportacao.mutate}
+            />
           </div>
         }
       />
