@@ -79,7 +79,7 @@ const implemented = {
  */
 export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "pacientes.list.risco":
-    "Não há classificação de risco no backend, e não vai haver nesta fase: “risco” são as etiquetas da sistematização de enfermagem do Gemed, que estão fora do escopo de leitura contratado. Calcular no painel seria inferência clínica no front-end.",
+    "Não há classificação de risco disponível, e não vai haver nesta fase: “risco” são as etiquetas da sistematização de enfermagem do Gemed, que estão fora do escopo de leitura contratado. Calcular no painel seria inferência clínica no front-end.",
   "usuarios.setMfa":
     "O segundo fator é gerenciado pela própria pessoa, no aplicativo autenticador dela.",
   "auditoria.summary.exportacao":
