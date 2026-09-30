@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 
-import { ErrorState, PageHeader, SkeletonCards } from "@/components/shared";
+import { ErrorState, PageHeader, SkeletonCards, StatCard } from "@/components/shared";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/auth-context";
+import { useNow } from "@/hooks/useNow";
 import {
   addDays,
   AGENDA_VIEW,
@@ -16,10 +17,11 @@ import {
   type AgendaView,
 } from "@/lib/agenda";
 import { ESPECIALIDADE_LABEL } from "@/lib/enums";
-import { pluralize } from "@/lib/format";
+import { formatNumber, pluralize } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import type { PersonalBlock } from "@/types/agenda";
 import { buildAgendaDays } from "../agenda-days";
+import { resumoDoPeriodo } from "../agenda-resumo";
 import { AgendaMonthView } from "../components/AgendaMonthView";
 import { AgendaTimeGrid } from "../components/AgendaTimeGrid";
 import { ALL_TYPES, AgendaToolbar } from "../components/AgendaToolbar";
@@ -51,7 +53,10 @@ export function ClinicoAgendaPage() {
   const { especialidade } = useParams<{ especialidade: string }>();
   const [params, setParams] = useSearchParams();
 
-  const today = todayKey();
+  // A hora corrente, renovada a cada minuto com a aba visível: move a linha do
+  // "agora" e faz o dia de hoje virar sozinho à meia-noite.
+  const now = useNow();
+  const today = todayKey(now);
   const viewParam = params.get("visao");
   const view: AgendaView = viewParam && VIEWS.includes(viewParam) ? (viewParam as AgendaView) : AGENDA_VIEW.WEEK;
   const dayParam = params.get("data");
@@ -101,6 +106,9 @@ export function ClinicoAgendaPage() {
   const [editing, setEditing] = useState<{ block: PersonalBlock | null } | null>(null);
 
   const total = days.reduce((sum, entry) => sum + entry.appointments.length, 0);
+  const resumo = resumoDoPeriodo(
+    days.flatMap((entry) => entry.appointments.map((item) => item.appointment)),
+  );
   const newBlockDay =
     view === AGENDA_VIEW.DAY ? day : today >= range.from && today < range.to ? today : range.from;
 
@@ -127,6 +135,20 @@ export function ClinicoAgendaPage() {
         onTypeChange={(next) => go({ tipo: next })}
         onNewBlock={() => setEditing({ block: null })}
       />
+
+      {agenda.data && (
+        <section aria-label="Resumo do período" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <StatCard label="Compromissos" value={formatNumber(resumo.total)} context="neste período" />
+          <StatCard label="Realizados" value={formatNumber(resumo.realizados)} context="com desfecho registrado" />
+          <StatCard label="Faltas" value={formatNumber(resumo.faltas)} context="paciente não compareceu" invertColor />
+          <StatCard
+            label="Reagendados ou cancelados"
+            value={formatNumber(resumo.reagendados + resumo.cancelados)}
+            context={`${pluralize(resumo.reagendados, "reagendado", "reagendados")} · ${pluralize(resumo.cancelados, "cancelado", "cancelados")}`}
+            invertColor
+          />
+        </section>
+      )}
 
       {agenda.isLoading && <SkeletonCards count={3} />}
 
@@ -162,6 +184,7 @@ export function ClinicoAgendaPage() {
         <AgendaTimeGrid
           days={days}
           today={today}
+          now={now}
           recordHref={recordHref}
           onOpenDay={view === AGENDA_VIEW.WEEK ? (key) => go({ visao: AGENDA_VIEW.DAY, data: key }) : undefined}
           onEditBlock={(block) => setEditing({ block })}

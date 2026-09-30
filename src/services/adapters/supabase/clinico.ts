@@ -150,6 +150,7 @@ export async function getMinhaAgenda(params: {
         paciente_nome: nomePorPaciente.get(linha.patient_id) ?? "Paciente",
         tipo_label: (linha.appointment_type_id && labelPorTipo.get(linha.appointment_type_id)) || "Compromisso",
         status_label: situacao.label,
+        status_codigo: status?.code ?? null,
         status_tom: situacao.tom,
         inicio: linha.starts_at,
         fim: linha.ends_at,

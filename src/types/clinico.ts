@@ -24,6 +24,12 @@ export interface CompromissoAgenda {
   paciente_nome: string;
   tipo_label: string;
   status_label: string;
+  /**
+   * O código da situação no catálogo (`scheduled`, `completed`, `no_show`,
+   * `cancelled`, `rescheduled`). É o que se CONTA; o rótulo é o que se lê, e
+   * muda — "Sem desfecho registrado" não é uma situação do catálogo.
+   */
+  status_codigo?: string | null;
   /** Reaproveita o vocabulário de `StatusBadge` — nenhum tom novo a manter. */
   status_tom: StatusTone;
   inicio: string;

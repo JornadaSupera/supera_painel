@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 
 import { StatusBadge } from "@/components/shared";
 import {
+  instantParts,
   placeOverlaps,
   timeOfMinutes,
   weekdayShort,
@@ -53,12 +54,15 @@ function visibleRange(days: AgendaDay[]): { from: number; to: number } {
 export function AgendaTimeGrid({
   days,
   today,
+  now,
   recordHref,
   onOpenDay,
   onEditBlock,
 }: {
   days: AgendaDay[];
   today: string;
+  /** O instante de agora: a linha que marca a hora corrente, no dia de hoje. */
+  now: Date;
   /** Where an appointment leads, or `null` when the person cannot open records. */
   recordHref: ((patientId: string) => string) | null;
   /** Makes the day heading a way into the day view. Omitted in the day view itself. */
@@ -70,6 +74,7 @@ export function AgendaTimeGrid({
   const hours = Array.from({ length: (to - from) / 60 }, (_, index) => from + index * 60);
 
   const top = (minutes: number) => ((minutes - from) / 60) * HOUR_PX;
+  const minutesNow = instantParts(now.toISOString()).minutes;
 
   return (
     <div className="bg-card overflow-x-auto rounded-2xl border">
@@ -166,6 +171,19 @@ export function AgendaTimeGrid({
                 <span className="text-muted-foreground absolute inset-x-0 top-2 text-center text-[11px]">
                   Clínica fechada
                 </span>
+              )}
+
+              {/* The current time, only today and only while it falls inside the
+                  visible hours. A decoration for the eye: it carries no
+                  information a screen reader would miss. */}
+              {day.key === today && minutesNow >= from && minutesNow <= to && (
+                <div
+                  aria-hidden="true"
+                  className="bg-destructive pointer-events-none absolute inset-x-0 z-10 h-px"
+                  style={{ top: top(minutesNow) }}
+                >
+                  <span className="bg-destructive absolute -top-1 -left-1 size-2 rounded-full" />
+                </div>
               )}
 
               {day.blocks.flatMap(({ block, start: rawStart, end: rawEnd, continues }) => {
