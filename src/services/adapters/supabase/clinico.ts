@@ -12,7 +12,7 @@ import {
   severidadeDoGrau,
   STATUS_ALERTA_POR_CODIGO,
   STATUS_CONVERSA_POR_CODIGO,
-  TOM_POR_CODIGO_STATUS,
+  situacaoDoCompromisso,
   TOM_POR_STATUS_ALERTA,
   TOM_POR_STATUS_CONVERSA,
 } from "./_clinicalMaps";
@@ -142,14 +142,15 @@ export async function getMinhaAgenda(params: {
 
     const compromissos: CompromissoAgenda[] = linhas.map((linha) => {
       const status = linha.status_id ? statusPorId.get(linha.status_id) : undefined;
+      const situacao = situacaoDoCompromisso(status, linha.ends_at);
 
       return {
         id: linha.id,
         paciente_id: linha.patient_id,
         paciente_nome: nomePorPaciente.get(linha.patient_id) ?? "Paciente",
         tipo_label: (linha.appointment_type_id && labelPorTipo.get(linha.appointment_type_id)) || "Compromisso",
-        status_label: status?.label ?? "—",
-        status_tom: (status && TOM_POR_CODIGO_STATUS[status.code]) || "neutral",
+        status_label: situacao.label,
+        status_tom: situacao.tom,
         inicio: linha.starts_at,
         fim: linha.ends_at,
         local: linha.location_label,
@@ -199,6 +200,7 @@ const CODIGO_POR_CONDUTA: Record<CondutaAlerta, NonNullable<LinhaAlert["conduct_
 
 export async function listAlertas(params?: {
   status?: StatusAlerta;
+  semNomes?: boolean;
 }): Promise<ListResult<AlertaClinico>> {
   return executar(async () => {
     const supabase = getSupabaseClient();
@@ -224,7 +226,9 @@ export async function listAlertas(params?: {
     ];
 
     const [nomePorPacienteOuFalha, sintomasRes, responsaveisRes] = await Promise.all([
-      nomesDePacientes(supabase, idsPacientes),
+      // Quem só conta os alertas não precisa dos nomes, e cada nome é uma leitura
+      // de paciente gravada na trilha.
+      params?.semNomes ? Promise.resolve(new Map<string, string>()) : nomesDePacientes(supabase, idsPacientes),
       idsSintomas.length
         ? supabase.from("symptoms").select("id, label").in("id", idsSintomas)
         : Promise.resolve({ data: [] as { id: string; label: string }[], error: null }),
@@ -434,6 +438,8 @@ export async function listConversas(): Promise<ListResult<ConversaClinico>> {
 interface LinhaMessage {
   id: string;
   author_kind: "patient" | "caregiver" | "professional" | "system";
+  /** Quem da equipe escreveu. `null` nas mensagens de quem não é da equipe. */
+  author_professional_id: string | null;
   body: string;
   created_at: string;
 }
@@ -494,10 +500,31 @@ export async function listMensagens(params: {
       .slice()
       .sort((a, b) => a.created_at.localeCompare(b.created_at));
 
+    /*
+     * `read_messages` já entrega quem da equipe escreveu cada mensagem
+     * (`author_professional_id`). Sem o nome, o paciente e o colega que assume a
+     * conversa leem só "Equipe" e não sabem com quem a conversa esteve.
+     */
+    const idsDeAutores = [
+      ...new Set(
+        linhas.map((linha) => linha.author_professional_id).filter((id): id is string => Boolean(id)),
+      ),
+    ];
+
+    let nomePorAutor = new Map<string, string>();
+    if (idsDeAutores.length > 0) {
+      const autoresRes = await professionalNamesQuery(supabase, idsDeAutores);
+      if (autoresRes.error) return falhaDe(autoresRes.error);
+      nomePorAutor = namesById((autoresRes.data ?? []) as ProfessionalNameRow[]);
+    }
+
     return ok(
       linhas.map<MensagemClinico>((linha) => ({
         id: linha.id,
         autor: AUTOR_POR_CODIGO[linha.author_kind],
+        autor_nome: linha.author_professional_id
+          ? (nomePorAutor.get(linha.author_professional_id) ?? null)
+          : null,
         corpo: linha.body,
         criado_em: linha.created_at,
         anexos: anexosPorMensagem.get(linha.id) ?? [],

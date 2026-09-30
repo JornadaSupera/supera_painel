@@ -18,7 +18,7 @@ import {
   severidadeDoGrau,
   STATUS_ALERTA_POR_CODIGO,
   STATUS_CONVERSA_POR_CODIGO,
-  TOM_POR_CODIGO_STATUS,
+  situacaoDoCompromisso,
   TOM_POR_STATUS_ALERTA,
   TOM_POR_STATUS_CONVERSA,
   type AlertRowStatus,
@@ -214,14 +214,15 @@ export async function getPatientTimeline(params: {
 
     const appointmentEvents = appointmentRows.map<AppointmentRecordEvent>((row) => {
       const status = row.status_id ? statusById.get(row.status_id) : undefined;
+      const situacao = situacaoDoCompromisso(status, row.ends_at);
       return {
         kind: "appointment",
         id: row.id,
         occurred_at: row.starts_at,
         specialty: specialtyOf(row.origin_specialty_id),
         type_label: (row.appointment_type_id && typeLabel.get(row.appointment_type_id)) || "Compromisso",
-        status_label: status?.label ?? "—",
-        status_tone: (status && TOM_POR_CODIGO_STATUS[status.code]) || "neutral",
+        status_label: situacao.label,
+        status_tone: situacao.tom,
         ends_at: row.ends_at,
         location: row.location_label,
       };

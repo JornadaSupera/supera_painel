@@ -78,6 +78,7 @@ function projetarAlerta(alerta: AlertaClinicoMock): AlertaClinico {
 
 export async function listAlertas(params?: {
   status?: StatusAlerta;
+  semNomes?: boolean;
 }): Promise<ListResult<AlertaClinico>> {
   return simulate(() => {
     const linhas = alertasClinicos

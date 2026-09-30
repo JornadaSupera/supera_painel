@@ -19,6 +19,28 @@ export const TOM_POR_CODIGO_STATUS: Record<string, StatusTone> = {
   rescheduled: "neutral",
 };
 
+/**
+ * What an appointment's situation reads on screen.
+ *
+ * A past appointment still marked "scheduled" is not scheduled anymore: nobody
+ * recorded whether it happened. "Agendado" on a September date read as if it
+ * were still to come. The panel neither creates nor changes appointments, so it
+ * says what it knows — that it passed with no outcome — and leaves the outcome
+ * to whoever records it.
+ */
+export function situacaoDoCompromisso(
+  status: { code: string; label: string } | undefined,
+  fim: string,
+): { label: string; tom: StatusTone } {
+  if (!status) return { label: "—", tom: "neutral" };
+
+  if (status.code === "scheduled" && new Date(fim).getTime() < Date.now()) {
+    return { label: "Sem desfecho registrado", tom: "warning" };
+  }
+
+  return { label: status.label, tom: TOM_POR_CODIGO_STATUS[status.code] ?? "neutral" };
+}
+
 export const STATUS_ALERTA_POR_CODIGO: Record<AlertRowStatus, StatusAlerta> = {
   open: "pendente",
   in_progress: "assumido",

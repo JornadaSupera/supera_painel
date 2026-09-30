@@ -94,6 +94,11 @@ export interface AnexoMensagem {
 export interface MensagemClinico {
   id: string;
   autor: AutorMensagem;
+  /**
+   * Quem da equipe escreveu. `null` quando a mensagem não é da equipe ou a
+   * origem dos dados não informa.
+   */
+  autor_nome?: string | null;
   corpo: string;
   criado_em: string;
   anexos: AnexoMensagem[];

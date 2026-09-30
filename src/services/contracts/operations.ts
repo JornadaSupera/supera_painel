@@ -569,7 +569,14 @@ export interface ClinicoOperations {
    * A fila de alertas — compartilhada pela equipe, não recortada por
    * profissional. `status` filtra; sem ele vêm todos.
    */
-  listAlertas(params?: { status?: StatusAlerta }): Promise<ListResult<AlertaClinico>>;
+  listAlertas(params?: {
+    status?: StatusAlerta;
+    /**
+     * Não resolve o nome do paciente. Para quem só CONTA os alertas: cada nome é
+     * uma leitura de paciente gravada na trilha, e contar não precisa de nenhum.
+     */
+    semNomes?: boolean;
+  }): Promise<ListResult<AlertaClinico>>;
   /** Assume um alerta em aberto. Exige a permissão `alerts.triage`. */
   assumirAlerta(params: { id: string }): Promise<SingleResult<null>>;
   /**
