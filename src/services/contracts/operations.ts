@@ -998,8 +998,16 @@ export interface RelatoriosOperations {
   /** As últimas gerações — a prova de que a rotina agendada rodou de fato. */
   listExecucoes(): Promise<ListResult<ExecucaoRelatorio>>;
 
-  /** Continua sem tabela de token no banco: link compartilhável não existe. */
-  createShareLink(params: { slug: string }): Promise<SingleResult<never>>;
+  /**
+   * Registra na trilha uma exportação que o navegador acabou de gerar sozinho
+   * (o PDF é uma captura da tela, não passa pelo banco). O CSV se registra na
+   * própria `export`.
+   */
+  registrarExportacao(params: {
+    slug: string;
+    linhas: number;
+    formato: "pdf";
+  }): Promise<SingleResult<null>>;
 }
 
 /* -------------------------------------------------------------------------

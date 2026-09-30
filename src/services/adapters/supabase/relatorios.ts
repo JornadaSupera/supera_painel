@@ -454,10 +454,18 @@ function slugDoCodigo(codigo: string): string {
   return codigo.replace(/^report_/, "").replace(/_/g, "-");
 }
 
-/** Exportação (com trilha) e compartilhamento (sem backend). Ver `createReportOperations`. */
-export const { exportar, createShareLink } = createReportOperations(
+/**
+ * Exportação, com trilha: o CSV e o PDF. Ver `createReportOperations`. O PDF
+ * tem escopo próprio (`report_faltas_pdf`), para a trilha dizer em que formato o
+ * dado saiu.
+ */
+export const { exportar, registrarExportacao } = createReportOperations(
   run,
-  ({ slug, rowCount }) => logarExportacao({ escopo: codigoDoRelatorio(slug), linhas: rowCount }),
+  ({ slug, rowCount, format }) =>
+    logarExportacao({
+      escopo: format ? `${codigoDoRelatorio(slug)}_${format}` : codigoDoRelatorio(slug),
+      linhas: rowCount,
+    }),
 );
 
 /* -------------------------------------------------------------------------

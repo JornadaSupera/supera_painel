@@ -1,9 +1,8 @@
 import { pluralize } from "@/lib/format";
 import {
-  ERROR_CODE,
-  fail,
   failWith,
   ok,
+  okOne,
   type FailResult,
   type ListResult,
   type SingleResult,
@@ -274,19 +273,6 @@ function toReportExport(
   );
 }
 
-/**
- * Sharing still has no backend.
- *
- * An internal share link needs a token table with expiry, and that is a way
- * clinical data leaves the clinic — not something to improvise on the
- * client. Scheduling used to sit here too: `report_schedules` (25/09/2026)
- * gave it a real backend, and each adapter implements it its own way now —
- * see `listAgendamentos`/`criarAgendamento` in `supabase/relatorios.ts` and
- * `mock/relatorios.ts`.
- */
-const NO_SHARE_LINK =
-  "Gerar link compartilhável depende de uma tabela de token com expiração no backend, que ainda não existe. Um link assim faz dado clínico sair da clínica sem passar pela trilha de auditoria — não é algo para improvisar no painel.";
-
 export interface ReportParams {
   slug: string;
   dias?: number;
@@ -307,7 +293,7 @@ export interface ReportParams {
  */
 export function createReportOperations(
   run: (params: ReportParams) => Promise<SingleResult<ResultadoRelatorio>>,
-  logExport?: (params: { slug: string; rowCount: number }) => void | Promise<void>,
+  logExport?: (params: { slug: string; rowCount: number; format?: "pdf" }) => void | Promise<void>,
 ) {
   return {
     exportar: async (params: ReportParams) => {
@@ -316,7 +302,13 @@ export function createReportOperations(
       return resultado;
     },
 
-    createShareLink: async (): Promise<SingleResult<never>> =>
-      fail(ERROR_CODE.NOT_IMPLEMENTED, NO_SHARE_LINK),
+    registrarExportacao: async (params: {
+      slug: string;
+      linhas: number;
+      formato: "pdf";
+    }): Promise<SingleResult<null>> => {
+      await logExport?.({ slug: params.slug, rowCount: params.linhas, format: params.formato });
+      return okOne(null);
+    },
   };
 }

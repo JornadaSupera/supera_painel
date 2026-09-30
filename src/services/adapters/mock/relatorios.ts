@@ -226,7 +226,7 @@ export async function run(params: ReportParams): Promise<SingleResult<ResultadoR
   return simulate(() => okOne(resultado));
 }
 
-export const { exportar, createShareLink } = createReportOperations(run);
+export const { exportar, registrarExportacao } = createReportOperations(run);
 
 export { exportar as export };
 

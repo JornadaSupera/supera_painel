@@ -187,7 +187,7 @@ export const RESOURCES = {
       "atualizarAgendamento",
       "setAgendamentoAtivo",
       "listExecucoes",
-      "createShareLink",
+      "registrarExportacao",
     ],
   },
   estatisticasClinicas: {
