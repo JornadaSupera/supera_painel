@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { audit } from "@/lib/audit";
@@ -126,34 +125,5 @@ export function useRemoverAnexo(versaoId: string) {
   });
 }
 
-/**
- * O conteúdo de um anexo, como URL `blob:`.
- *
- * O navegador só carrega imagem de `blob:` (a política de conteúdo do painel não
- * libera o domínio do armazenamento). A URL nasce e morre no mesmo efeito, e por
- * isso não é criada durante a renderização: com o arquivo já em cache, o React
- * remonta o efeito e reaproveitaria uma URL que o primeiro cleanup revogou.
- */
-export function useAnexoConteudoUrl(caminho: string, habilitado = true) {
-  const consulta = useQuery({
-    queryKey: queryKeys.contents.attachment(caminho),
-    enabled: habilitado,
-    queryFn: async () => (await call(() => conteudosApi.downloadAttachment({ caminho }))).data,
-    staleTime: Infinity,
-    retry: false,
-  });
-
-  const [url, setUrl] = useState<string | null>(null);
-  useEffect(() => {
-    if (!consulta.data) {
-      setUrl(null);
-      return;
-    }
-
-    const criada = URL.createObjectURL(consulta.data);
-    setUrl(criada);
-    return () => URL.revokeObjectURL(criada);
-  }, [consulta.data]);
-
-  return { url, isLoading: consulta.isLoading, isError: consulta.isError };
-}
+/** O arquivo de um anexo, como URL `blob:`. Ver `hooks/useContentAttachmentUrl`. */
+export { useContentAttachmentUrl as useAnexoConteudoUrl } from "@/hooks/useContentAttachmentUrl";

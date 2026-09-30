@@ -21,6 +21,7 @@ import {
 import { formatDateTime } from "@/lib/format";
 import type { ConteudoListItem } from "@/types/conteudo";
 import { useComparacao } from "../hooks/useConteudos";
+import { DetalheDaOrientacao } from "./DetalheDaOrientacao";
 
 /**
  * Confirmação de uma decisão de revisão.
@@ -108,27 +109,21 @@ export function DialogRevisao({
             />
           )}
 
-          {atual && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <TextoDaVersao
-                titulo={`Versão ${atual.versao} · em revisão`}
-                corpo={atual.corpo}
-                atualizadoEm={atual.atualizado_em}
-                destaque
-              />
+          {atual && <DetalheDaOrientacao versao={atual} />}
 
-              {anterior ? (
+          {atual && anterior && (
+            <details className="bg-muted/40 rounded-xl border p-3">
+              <summary className="cursor-pointer text-xs font-medium">
+                Comparar com a versão {anterior.versao} (anterior)
+              </summary>
+              <div className="mt-3">
                 <TextoDaVersao
                   titulo={`Versão ${anterior.versao} · anterior`}
                   corpo={anterior.corpo}
                   atualizadoEm={anterior.atualizado_em}
                 />
-              ) : (
-                <div className="border-border/70 text-muted-foreground flex items-center justify-center rounded-xl border border-dashed p-4 text-center text-xs">
-                  Primeira versão desta orientação — não há texto anterior para comparar.
-                </div>
-              )}
-            </div>
+              </div>
+            </details>
           )}
 
           <div className="flex flex-col gap-1.5">
@@ -199,23 +194,15 @@ function TextoDaVersao({
   titulo,
   corpo,
   atualizadoEm,
-  destaque,
 }: {
   titulo: string;
   corpo: string;
   atualizadoEm: string;
-  destaque?: boolean;
 }) {
   return (
-    <section
-      className={
-        destaque
-          ? "border-primary/30 bg-primary/5 rounded-xl border p-3"
-          : "bg-muted/40 rounded-xl border p-3"
-      }
-    >
+    <section className="bg-background rounded-xl border p-3">
       <header className="mb-2 flex items-center justify-between gap-2">
-        <StatusBadge tone={destaque ? "primary" : "neutral"} size="sm">
+        <StatusBadge tone="neutral" size="sm">
           {titulo}
         </StatusBadge>
         <time className="text-muted-foreground text-[11px] tabular-nums" dateTime={atualizadoEm}>

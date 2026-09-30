@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { useAuth } from "@/contexts/auth-context";
+
 import {
   BackendPendente,
   Can,
@@ -31,6 +33,7 @@ import { useConteudosStore } from "@/stores/conteudos";
 import { hasActiveFilters } from "@/stores/listStore";
 import type { ConteudoListItem } from "@/types/conteudo";
 import { CartaoRevisao } from "../components/CartaoRevisao";
+import { DialogDetalhe } from "../components/DialogDetalhe";
 import { DialogRevisao } from "../components/DialogRevisao";
 import { useConteudos, useFilaRevisao, useRevisarConteudo } from "../hooks/useConteudos";
 
@@ -51,8 +54,10 @@ import { useConteudos, useFilaRevisao, useRevisarConteudo } from "../hooks/useCo
  */
 
 export function ConteudoPage() {
+  const { can } = useAuth();
   const [emDecisao, setEmDecisao] = useState<ConteudoListItem | null>(null);
   const [acao, setAcao] = useState<AcaoRevisao | null>(null);
+  const [emLeitura, setEmLeitura] = useState<ConteudoListItem | null>(null);
 
   const fila = useFilaRevisao();
   const publicados = useConteudos();
@@ -220,7 +225,7 @@ export function ConteudoPage() {
             conteudo={conteudo}
             ocupado={revisar.isPending}
             onDecidir={abrirDecisao}
-            onAbrir={(item) => abrirDecisao(item, ACAO_REVISAO.APROVAR)}
+            onAbrir={setEmLeitura}
           />
         ))}
       </section>
@@ -289,6 +294,7 @@ export function ConteudoPage() {
             sort={sort}
             onSortChange={setSort}
             filtered={filtrada}
+            onRowClick={setEmLeitura}
             pagination={{
               page,
               pageSize,
@@ -314,6 +320,17 @@ export function ConteudoPage() {
           <BackendPendente titulo="Contagem de acessos" motivo={semContagemDeAcessos} />
         )}
       </section>
+
+      <DialogDetalhe
+        conteudo={emLeitura}
+        aberto={emLeitura !== null}
+        onOpenChange={(aberto) => !aberto && setEmLeitura(null)}
+        podeDecidir={can(PERMISSAO.CONTEUDO_APPROVE)}
+        onDecidir={(conteudo, proximaAcao) => {
+          setEmLeitura(null);
+          abrirDecisao(conteudo, proximaAcao);
+        }}
+      />
 
       <DialogRevisao
         conteudo={emDecisao}
