@@ -1,5 +1,6 @@
 import { Download, UserPlus } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   Can,
@@ -38,8 +39,37 @@ import { useExportarPacientes, usePacientes } from "../hooks/usePacientes";
  * O CPF nasce mascarado e revelá-lo é uma requisição própria, auditada. Ver
  * `components/CampoSensivel`.
  */
+/**
+ * Filtros que chegam no endereço (`?cid=C50&protocolo=FOLFOX&status=ativo`), vindos
+ * de uma linha de relatório. Entram no store uma vez e saem do endereço: o store
+ * é a fonte da tela, e um endereço que continuasse mandando refiltraria a lista
+ * a cada visita, por cima do que a pessoa mudou.
+ */
+const PARAMETROS_DE_FILTRO = { cid: "cid", protocolo: "protocolo_id", status: "status" } as const;
+
+function useFiltrosDoEndereco() {
+  const [params, setParams] = useSearchParams();
+
+  useEffect(() => {
+    const pedidos = Object.entries(PARAMETROS_DE_FILTRO).flatMap(([parametro, campo]) => {
+      const valor = params.get(parametro);
+      return valor ? [[campo, valor] as const] : [];
+    });
+    if (pedidos.length === 0) return;
+
+    const estado = usePacientesStore.getState();
+    estado.limparFiltros();
+    for (const [campo, valor] of pedidos) estado.setFiltro(campo, valor);
+
+    setParams({}, { replace: true });
+    // Uma vez por chegada: depois disso o store manda.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+}
+
 export function PacientesPage() {
   const navigate = useNavigate();
+  useFiltrosDoEndereco();
 
   const { pacientes, total, isLoading, isError, error, refetch, params } = usePacientes();
 
