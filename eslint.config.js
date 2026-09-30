@@ -16,17 +16,17 @@ import tseslint from "typescript-eslint";
  *
  * | Barreira | O que evita |
  * |---|---|
- * | ninguém importa `mocks/` fora de `services` | dado fictício vazando para a tela, e para a build |
+ * | ninguém importa `mocks/` | o projeto não tem dado fictício, e esta barreira impede que ele volte |
  * | `@supabase/supabase-js` só em `services/adapters/supabase` | o resto do projeto passar a depender de um SDK que o adapter existe para esconder |
  * | feature não importa feature | dois domínios que só compilam juntos; o comum sobe para `shared/` ou `lib/` |
  * | `components/`, `lib/`, `hooks/`, `stores/` não importam feature | camada compartilhada que só funciona dentro de um domínio |
  * | `components/ui/` não importa `services/` | primitivo do shadcn falando com a camada de dados |
  */
 
-/** Não importar mock: vale para todo mundo fora de `services`. */
+/** Não existe mock neste projeto, e nenhum código pode voltar a criar um. */
 const SEM_MOCKS = {
-  group: ["**/mocks/*", "@/mocks/*"],
-  message: "Página/componente nunca importa mock direto. Use @/services/apiClient.",
+  group: ["**/mocks/*", "@/mocks/*", "**/adapters/mock/*", "**/adapters/mock"],
+  message: "Este projeto não usa dado fictício nem adapter de mentira. Leia do banco, por @/services/apiClient.",
 };
 
 /** O SDK do Supabase só existe dentro do adapter que o esconde. */
@@ -138,13 +138,13 @@ export default tseslint.config(
     },
   },
 
-  // A camada de dados PODE tocar mocks — é o trabalho dela. O SDK do Supabase,
-  // não: ele fica restrito ao adapter que o esconde, e essa era a brecha
-  // anterior (a regra estava desligada para `services/**` inteiro).
+  // O SDK do Supabase fica restrito ao adapter que o esconde — era a brecha
+  // anterior, com a regra desligada para `services/**` inteiro. Mock não entra
+  // em lugar nenhum, a camada de dados inclusive.
   {
     files: ["src/services/**/*.ts"],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [SEM_SUPABASE, SEM_FEATURES] }],
+      "no-restricted-imports": ["error", { patterns: [SEM_MOCKS, SEM_SUPABASE, SEM_FEATURES] }],
     },
   },
 

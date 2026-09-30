@@ -7,11 +7,9 @@
  *
  * Existe por causa de uma armadilha especifica: as variaveis `VITE_*` sao
  * embutidas no bundle em tempo de BUILD, nao lidas em tempo de execucao. Um
- * `npm run build` com `VITE_API_MODE=mock` publica um painel de dados falsos
- * com cara de producao, e nada no ar denuncia isso — as telas funcionam.
- *
- * O outro caso que ele pega e o oposto: modo supabase sem a anon key, que
- * derruba a aplicacao no boot com um erro que parece defeito de codigo.
+ * build sem a URL ou sem a anon key derruba a aplicacao no boot com um erro
+ * que parece defeito de codigo, e uma chave errada (a service_role, por
+ * exemplo) vai para o bundle publico.
  */
 
 import { readFileSync, existsSync } from "node:fs";
@@ -56,7 +54,6 @@ for (const arquivo of arquivos) {
 
 const valor = (chave) => process.env[chave] ?? doArquivo[chave] ?? "";
 
-const modo = valor("VITE_API_MODE") || "mock";
 const url = valor("VITE_SUPABASE_URL");
 const chave = valor("VITE_SUPABASE_ANON_KEY");
 
@@ -64,22 +61,12 @@ const problemas = [];
 const avisos = [];
 
 console.log(`\n${CINZA}Origem: ${arquivos.filter((a) => existsSync(resolve(raiz, a))).join(", ") || "somente variaveis de ambiente"}${RESET}`);
-console.log(`\n  VITE_API_MODE          ${modo}`);
-console.log(`  VITE_SUPABASE_URL      ${url || `${CINZA}(vazia)${RESET}`}`);
+console.log(`\n  VITE_SUPABASE_URL      ${url || `${CINZA}(vazia)${RESET}`}`);
 console.log(
   `  VITE_SUPABASE_ANON_KEY ${chave ? `${chave.slice(0, 12)}… (${chave.length} caracteres)` : `${CINZA}(vazia)${RESET}`}`,
 );
 
-if (modo === "mock") {
-  const recado =
-    "O painel esta em modo mock: le dados falsos, e contas reais do banco NAO conseguem entrar.";
-  if (exigeProducao) problemas.push(recado);
-  else avisos.push(recado);
-} else if (modo !== "supabase") {
-  problemas.push(`VITE_API_MODE="${modo}" nao existe. Use "mock" ou "supabase".`);
-}
-
-if (modo === "supabase") {
+{
   if (!url) problemas.push("VITE_SUPABASE_URL vazia: a aplicacao falha no boot.");
   if (!chave) problemas.push("VITE_SUPABASE_ANON_KEY vazia: a aplicacao falha no boot.");
 
@@ -116,7 +103,7 @@ for (const aviso of avisos) console.log(`${AMARELO}  aviso  ${RESET}${aviso}`);
 for (const problema of problemas) console.log(`${VERMELHO}  erro   ${RESET}${problema}`);
 
 if (problemas.length === 0 && avisos.length === 0) {
-  console.log(`${VERDE}  tudo certo${RESET} — modo ${modo}.\n`);
+  console.log(`${VERDE}  tudo certo${RESET}.\n`);
 } else if (problemas.length === 0) {
   console.log("");
 }
