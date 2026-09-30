@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/lib/queryKeys";
 import { call, estatisticasClinicasApi, estatisticasOperacionaisApi } from "@/services/apiClient";
@@ -44,6 +44,18 @@ export function useOpcoesDoCruzamento(dias: number) {
     queryKey: [...queryKeys.statistics.clinical({ dias }), "opcoes"],
     queryFn: async () => (await call(() => estatisticasClinicasApi.crossTab({ dias }))).data,
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Registra na trilha a exportação da captura. Falhar aqui não desfaz um arquivo
+ * que já foi baixado, então a tela não trata o erro como falha da exportação.
+ */
+export function useRegistrarExportacaoEstatisticasClinicas(linhas: number) {
+  return useMutation({
+    mutationFn: async (formato: "pdf" | "png") => {
+      await call(() => estatisticasClinicasApi.registrarExportacao({ formato, linhas }));
+    },
   });
 }
 

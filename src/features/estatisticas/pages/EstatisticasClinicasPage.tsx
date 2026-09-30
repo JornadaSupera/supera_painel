@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   BarChart,
+  BotaoExportarCaptura,
   ChartCard,
   EmptyState,
   ErrorState,
@@ -25,10 +26,12 @@ import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { FiltroClinico } from "@/services/contracts/operations";
 import { MapaDeCalor } from "../components/MapaDeCalor";
+import { TAMANHO_MINIMO_DO_GRUPO, destaquesDoCruzamento } from "../destaques";
 import {
   useComparacaoProtocolos,
   useCruzamentoClinico,
   useOpcoesDoCruzamento,
+  useRegistrarExportacaoEstatisticasClinicas,
 } from "../hooks/useEstatisticas";
 
 /**
@@ -36,12 +39,15 @@ import {
  *
  * Protótipo: https://strawti.com.br/prototipos/jornada-supera/admin/estatisticas/clinicas/
  *
- * > [!] Os cartões de "Atenção" do protótipo NÃO são reproduzidos.
+ * > [!] Os cartões de "Atenção" do protótipo aparecem SEM a recomendação.
  * Lá eles dizem coisas como "vale revisar plano de fisioterapia preventiva".
- * Isso é conduta clínica sugerida por software, e o painel não a emite — ele
- * mostra a prevalência e deixa a leitura com quem tem formação para fazê-la. O
- * mesmo mapa continua respondendo à pergunta que originou a tela; o que não
- * acontece é o painel responder no lugar da equipe.
+ * Isso é conduta clínica sugerida por software, e o painel não a emite. Os
+ * destaques daqui só descrevem o dado ("maior prevalência no período", "mais
+ * relatado"), para grupos que não identificam ninguém (ver `destaques.ts`), e
+ * deixam a leitura com quem tem formação para fazê-la.
+ *
+ * A exportação (Médio §6, "para apresentações, congressos e auditorias") leva a
+ * tela como está, com os filtros à vista, e fica registrada na trilha.
  */
 
 const PERIODOS = [
@@ -68,6 +74,7 @@ const TODOS = "todos";
 const GRAU_PADRAO = "2";
 
 export function EstatisticasClinicasPage() {
+  const areaCaptura = useRef<HTMLDivElement>(null);
   const [dias, setDias] = useState("90");
   const [grauMinimo, setGrauMinimo] = useState(GRAU_PADRAO);
   const [apenasAtivos, setApenasAtivos] = useState(true);
@@ -117,6 +124,8 @@ export function EstatisticasClinicasPage() {
   const cidsDisponiveis = cids.data ?? [];
 
   const dados = cruzamento.data;
+  const destaques = dados ? destaquesDoCruzamento(dados) : null;
+  const registrarExportacao = useRegistrarExportacaoEstatisticasClinicas(dados?.celulas.length ?? 0);
   const porPercentual = dados?.prevalencia_disponivel ?? true;
   const filtroIgnorado = dados?.filtros_ignorados?.includes("apenasAtivos") ?? false;
 
@@ -128,12 +137,20 @@ export function EstatisticasClinicasPage() {
     !cruzamento.isLoading && !cruzamento.isError && (dados?.protocolos.length ?? 0) === 0;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div ref={areaCaptura} className="bg-background flex flex-col gap-5">
       <PageHeader
         eyebrow="Estatísticas"
         title="Estatísticas clínicas"
         level="Médio"
         subtitle="Cruzamento Protocolo × Efeito × Grau · todos os números agregados, sem identificação"
+        actions={
+          <BotaoExportarCaptura
+            alvo={areaCaptura}
+            nomeBase="estatisticas-clinicas"
+            recurso="estatisticas_clinicas"
+            onExportado={registrarExportacao.mutate}
+          />
+        }
       />
 
       {/* ---------------------------------------------------------- filtros */}
@@ -271,6 +288,27 @@ export function EstatisticasClinicasPage() {
           registros do período e o cruzamento considera apenas parte da base. Estreite o período
           antes de usar estes números para decidir.
         </div>
+      )}
+
+      {/* ------------------------------------------------------- destaques */}
+      {destaques && destaques.itens.length > 0 && (
+        <section aria-label="Destaques do recorte" className="grid gap-3 sm:grid-cols-2">
+          {destaques.itens.map((destaque) => (
+            <div key={destaque.chave} className="bg-card rounded-2xl border p-4">
+              <p className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+                {destaque.titulo}
+              </p>
+              <p className="mt-0.5 text-base font-semibold">{destaque.combinacao}</p>
+              <p className="text-muted-foreground text-xs">{destaque.detalhe}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {destaques?.ocultosPorTamanho && (
+        <p className="text-muted-foreground -mt-2 text-[11px]">
+          `Nenhum grupo tem pelo menos ${TAMANHO_MINIMO_DO_GRUPO} pacientes, então os destaques não aparecem: com grupo menor, a combinação apontaria uma pessoa.`
+        </p>
       )}
 
       {/* ---------------------------------------------------- mapa de calor */}
