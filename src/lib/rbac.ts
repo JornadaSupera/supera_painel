@@ -44,6 +44,9 @@ export const PERMISSAO = {
   RELATORIOS_EXPORT: "relatorios:export",
   RELATORIOS_SCHEDULE: "relatorios:schedule",
 
+  /** Notas e comentários da pesquisa de satisfação. Só a administração os lê. */
+  SATISFACAO_READ: "satisfacao:read",
+
   ESTATISTICAS_CLINICAS_READ: "estatisticas:clinicas:read",
   /** Indicadores de todos os profissionais, nominais. */
   ESTATISTICAS_READ_ALL: "estatisticas:read:all",
@@ -191,6 +194,7 @@ export const PERMISSAO_LABEL: Record<Permissao, string> = {
   "relatorios:read": "Ver relatórios",
   "relatorios:export": "Exportar relatórios",
   "relatorios:schedule": "Agendar envio de relatórios",
+  "satisfacao:read": "Ver a satisfação dos pacientes",
   "estatisticas:clinicas:read": "Ver estatísticas clínicas",
   "estatisticas:read:all": "Ver indicadores de todos os profissionais",
   "estatisticas:read:self": "Ver os próprios indicadores",

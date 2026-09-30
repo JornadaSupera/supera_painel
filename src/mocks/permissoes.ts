@@ -16,6 +16,7 @@ const GRUPOS: { titulo: string; prefixos: string[] }[] = [
   { titulo: "Usuários e acesso", prefixos: ["usuarios:", "permissoes:"] },
   { titulo: "Conteúdo", prefixos: ["conteudo:"] },
   { titulo: "Relatórios", prefixos: ["relatorios:"] },
+  { titulo: "Satisfação", prefixos: ["satisfacao:"] },
   { titulo: "Estatísticas", prefixos: ["estatisticas:"] },
   { titulo: "Auditoria", prefixos: ["auditoria:"] },
   { titulo: "Configurações", prefixos: ["configuracoes:"] },
