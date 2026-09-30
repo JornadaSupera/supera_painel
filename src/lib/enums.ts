@@ -96,11 +96,11 @@ export const FASE_TRATAMENTO = {
 export type FaseTratamento = (typeof FASE_TRATAMENTO)[keyof typeof FASE_TRATAMENTO];
 
 export const FASE_TRATAMENTO_LABEL: Record<FaseTratamento, string> = {
-  ativo: "ativo",
-  seguimento: "seguimento",
-  manutencao: "manutenção",
-  remissao: "remissão",
-  finalizacao: "finalização",
+  ativo: "Ativo",
+  seguimento: "Seguimento",
+  manutencao: "Manutenção",
+  remissao: "Remissão",
+  finalizacao: "Finalização",
 };
 
 export const RISCO = {
@@ -306,17 +306,34 @@ export const RECURSO_AUDITORIA_LABEL: Record<string, string> = {
   data_subject_requests: "Pedido do titular (LGPD)",
   caregiver_invitations: "Convite de acompanhante",
   patient_caregivers: "Vínculo de acompanhante",
+  message_attachments: "Anexo do chat",
+  specialty_flags: "Sinalização de sofrimento",
+  conversation_assignments: "Encaminhamento de conversa",
+  clinic_business_hours: "Horário da clínica",
+  clinic_settings: "Configuração da clínica",
+  professional_blocks: "Bloqueio de agenda",
+  content_attachments: "Anexo de orientação",
+  report_schedules: "Agendamento de relatório",
+  nps_surveys: "Pesquisa de satisfação",
+  nps_responses: "Resposta de satisfação",
+  pacientes_lista: "Lista de pacientes",
 };
 
 /**
  * Rótulo de um recurso da trilha. Os relatórios se registram como
- * `report_<slug>` — um por relatório —, então não cabem no mapa; ficam
- * "Relatório". O que não for reconhecido aparece com o nome cru.
+ * `report_<slug>` — um por relatório — e a captura do Dashboard como
+ * `dashboard_<formato>`, então não cabem no mapa: ficam "Relatório" e
+ * "Captura do Dashboard".
+ *
+ * O que não for reconhecido aparece como "Outro recurso", nunca com o nome de
+ * tabela cru: o registro continua na lista, só não expõe nome técnico a quem
+ * lê a trilha. O nome cru segue no dado (`recurso`) e no CSV/JSON do DPO.
  */
 export function rotuloDoRecurso(recurso: string): string {
-  return (
-    RECURSO_AUDITORIA_LABEL[recurso] ?? (recurso.startsWith("report_") ? "Relatório" : recurso)
-  );
+  if (recurso in RECURSO_AUDITORIA_LABEL) return RECURSO_AUDITORIA_LABEL[recurso] ?? "Outro recurso";
+  if (recurso.startsWith("report_")) return "Relatório";
+  if (recurso.startsWith("dashboard")) return "Captura do Dashboard";
+  return "Outro recurso";
 }
 
 /** Origem do registro — inclui a integração Gemed (nível Médio). */
