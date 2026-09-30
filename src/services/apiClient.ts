@@ -1,5 +1,3 @@
-import { API_MODE } from "@/lib/env";
-import { INDISPONIVEIS as INDISPONIVEIS_MOCK, mockAdapter } from "./adapters/mock";
 import { INDISPONIVEIS as INDISPONIVEIS_SUPABASE, supabaseAdapter } from "./adapters/supabase";
 import { throwIfError, type ApiError } from "./contracts";
 import type {
@@ -23,19 +21,14 @@ import type {
 /**
  * apiClient — ÚNICO ponto de entrada de dados do painel.
  * =============================================================================
- * Nenhuma página, componente ou hook fala com `mocks/` ou com `supabase`
- * diretamente. Todos falam com este arquivo. O ESLint recusa o contrário.
+ * Nenhuma página, componente ou hook fala com `supabase` diretamente. Todos
+ * falam com este arquivo. O ESLint recusa o contrário.
  *
- * A troca de backend (Fase 15) é literalmente a linha abaixo:
- *
- *     VITE_API_MODE=mock  →  VITE_API_MODE=supabase
- *
- * Nenhuma tela é tocada.
+ * Não existe adapter de mentira: o painel lê e escreve no banco, e quando o
+ * banco não responde a tela mostra o erro, em vez de inventar um dado.
  */
 
-const adapter = API_MODE === "supabase" ? supabaseAdapter : mockAdapter;
-
-export const apiMode = API_MODE;
+const adapter = supabaseAdapter;
 
 /**
  * Superfície pública. Espelha `RESOURCES`.
@@ -56,7 +49,7 @@ export const api = adapter;
    linha some de um lugar só e todos os botões voltam sozinhos.
    ------------------------------------------------------------------------- */
 
-const indisponiveis = API_MODE === "supabase" ? INDISPONIVEIS_SUPABASE : INDISPONIVEIS_MOCK;
+const indisponiveis = INDISPONIVEIS_SUPABASE;
 
 /** `"pacientes.create"` → motivo, ou `null` quando a operação está disponível. */
 export function motivoIndisponivel(operacao: string): string | null {
@@ -88,8 +81,8 @@ export async function call<T extends { error: ApiError | null }>(
    conversão acontece — as telas consomem já tipado.
 
    O `as unknown as` abaixo era o elo fraco: ele fazia o consumidor confiar numa
-   assinatura garantida só por coerção, e mock e Supabase podiam divergir em
-   parâmetro ou em retorno sem que nada reclamasse. A coerção continua — é o
+   assinatura garantida só por coerção, e o adapter podia divergir do
+   contrato em parâmetro ou em retorno sem que nada reclamasse. A coerção continua — é o
    preço de montar o adapter em runtime —, mas agora ela é **verificada na
    origem**: cada adapter aplica `satisfies PartialAdapterModules` no próprio
    bloco `implemented`, então uma divergência falha na compilação do adapter,

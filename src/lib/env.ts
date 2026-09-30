@@ -14,20 +14,7 @@ function num(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export type ApiMode = "mock" | "supabase";
-
-export const API_MODE: ApiMode = raw.VITE_API_MODE === "supabase" ? "supabase" : "mock";
-
-export const IS_MOCK = API_MODE === "mock";
 export const IS_DEV = raw.DEV;
-
-/** Backend simulation — only has an effect in mock mode. */
-export const MOCK = {
-  delayMin: num(raw.VITE_MOCK_DELAY_MIN, 300),
-  delayMax: num(raw.VITE_MOCK_DELAY_MAX, 800),
-  /** 0 to 100. Above 0, a share of the calls fails on purpose. */
-  errorRate: num(raw.VITE_MOCK_ERROR_RATE, 0),
-} as const;
 
 /**
  * Supabase.
@@ -82,10 +69,10 @@ export const SESSION_EXPIRES = SESSION.idleMinutes > 0;
  * Fails loud and early instead of breaking halfway through a clinical screen.
  */
 export function assertEnv(): void {
-  if (API_MODE === "supabase" && (!SUPABASE.url || !SUPABASE.anonKey)) {
-    throw new Error(
-      "[env] VITE_API_MODE=supabase exige VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.",
-    );
+  // There is one backend and no stand-in for it: without these two values the
+  // panel has nothing to read, and saying so at boot beats an empty screen.
+  if (!SUPABASE.url || !SUPABASE.anonKey) {
+    throw new Error("[env] Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.");
   }
 
   // Guard against the most expensive mistake available: leaking the service

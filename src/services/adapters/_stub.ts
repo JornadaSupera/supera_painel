@@ -5,8 +5,7 @@ import { RESOURCES, type Adapter, type ResourceName } from "@/services/contracts
 /**
  * Montagem de adapter a partir do inventário de RESOURCES.
  *
- * Garante que os dois adapters — mock e supabase — tenham exatamente a mesma
- * superfície. Operação ainda não escrita não vira `undefined is not a
+ * Garante que o adapter tenha exatamente a superfície do inventário. Operação ainda não escrita não vira `undefined is not a
  * function` no meio de uma tela: vira um erro do contrato, com código estável,
  * que o `ErrorState` sabe renderizar.
  *
@@ -16,7 +15,7 @@ import { RESOURCES, type Adapter, type ResourceName } from "@/services/contracts
 type Implemented = Partial<Record<ResourceName, Record<string, unknown>>>;
 
 export interface BuildAdapterConfig {
-  name: "mock" | "supabase";
+  name: "supabase";
   implemented?: Implemented;
 }
 

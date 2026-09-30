@@ -4,10 +4,7 @@ import { SUPABASE } from "@/lib/env";
 import { ERROR_CODE, type ErrorCode } from "@/services/contracts";
 
 /**
- * Cliente Supabase — criado sob demanda, apenas quando `VITE_API_MODE=supabase`.
- *
- * Enquanto o modo for `mock`, este arquivo não instancia nada: nenhuma
- * conexão, nenhum listener, nenhum custo. É só o contrato aguardando a Fase 15.
+ * Cliente Supabase — criado sob demanda, na primeira leitura.
  */
 
 let client: SupabaseClient | null = null;
@@ -28,7 +25,7 @@ export function getSupabaseClient(): SupabaseClient {
 
   if (!SUPABASE.url || !SUPABASE.anonKey) {
     throw new Error(
-      "[supabase] Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY antes de usar VITE_API_MODE=supabase.",
+      "[supabase] Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY antes de usar o painel.",
     );
   }
 

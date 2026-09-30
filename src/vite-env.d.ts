@@ -8,12 +8,6 @@
  * interface e em `lib/env.ts` — nunca só no `.env`.
  */
 interface ImportMetaEnv {
-  readonly VITE_API_MODE?: "mock" | "supabase";
-
-  readonly VITE_MOCK_DELAY_MIN?: string;
-  readonly VITE_MOCK_DELAY_MAX?: string;
-  readonly VITE_MOCK_ERROR_RATE?: string;
-
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_ANON_KEY?: string;
 
