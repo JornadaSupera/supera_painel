@@ -11,7 +11,7 @@ import {
   User,
   UsersRound,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
@@ -119,11 +119,17 @@ export interface PacienteFichaPageProps {
   basePath?: string;
   /** Small label above the title. */
   eyebrow?: string;
+  /** Buttons that belong to the panel embedding the record, ahead of the ones the record owns. */
+  extraActions?: ReactNode;
+  /** Sections the embedding panel adds under the record — the clinical timeline, for one. */
+  children?: ReactNode;
 }
 
 export function PacienteFichaPage({
   basePath = "/pacientes",
   eyebrow = "Gestão",
+  extraActions,
+  children,
 }: PacienteFichaPageProps = {}) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -258,6 +264,7 @@ export function PacienteFichaPage({
         }
         actions={
           <>
+            {extraActions}
             <Can permission={PERMISSAO.PACIENTES_WRITE}>
               <Button
                 variant="outline"
@@ -523,6 +530,8 @@ export function PacienteFichaPage({
           <CuidadoresVinculados pacienteId={paciente.id} />
         </DetailSection>
       </div>
+
+      {children}
 
       <DeactivatePatientDialog
         paciente={paciente}
