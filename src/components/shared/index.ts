@@ -27,6 +27,9 @@ export { ConfirmDialog } from "./ConfirmDialog";
 export type { ConfirmDialogProps } from "./ConfirmDialog";
 
 export { DataTable } from "./DataTable";
+
+export { DecisionList } from "./DecisionList";
+export type { Decision } from "./DecisionList";
 export type { Column, DataTableProps } from "./DataTable";
 
 export { ClearFiltersButton, FilterSelect } from "./FilterBar";
