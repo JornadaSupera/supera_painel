@@ -152,6 +152,17 @@ export function FormularioOrientacao({
     else if (!orientacao) navigate(`${basePath}/${id}`, { replace: true });
   });
 
+  /**
+   * Confere o formulário ANTES de perguntar se a pessoa quer enviar. O diálogo
+   * abria com o formulário vazio e só depois do "sim" os campos apontavam o que
+   * faltava — a confirmação de um ato que ia falhar. Com erro, o foco vai para o
+   * primeiro campo inválido e a pergunta não aparece.
+   */
+  const pedirConfirmacaoDeEnvio = async () => {
+    const valido = await form.trigger(undefined, { shouldFocus: true });
+    if (valido) setConfirmandoEnvio(true);
+  };
+
   const comentarioDeDevolucao =
     orientacao?.revisoes[0]?.acao === ACAO_REVISAO.DEVOLVER ? orientacao.revisoes[0] : null;
 
@@ -352,7 +363,7 @@ export function FormularioOrientacao({
               type="button"
               variant="outline"
               disabled={ocupado}
-              onClick={() => setConfirmandoEnvio(true)}
+              onClick={() => void pedirConfirmacaoDeEnvio()}
             >
               {enviar.isPending ? <LoaderCircle className="animate-spin" /> : <Send />}
               Enviar para revisão
