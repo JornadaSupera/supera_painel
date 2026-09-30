@@ -25,6 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   CONSELHO_POR_ESPECIALIDADE,
   ESPECIALIDADE_LABEL,
@@ -217,15 +218,21 @@ export function UsuarioFormPage() {
           <Card>
             <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
               {edicao ? (
-                <FormItem className="sm:col-span-2">
-                  <FormLabel>Conta</FormLabel>
-                  <FormControl>
-                    <Input value={`${usuario?.nome} · ${usuario?.email}`} disabled readOnly />
-                  </FormControl>
-                  <FormDescription>
+                // Read-only and not a form field: the form parts need a `FormField`
+                // around them and would throw here, so it is a plain label + input.
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="conta-do-usuario">Conta</Label>
+                  <Input
+                    id="conta-do-usuario"
+                    aria-describedby="conta-do-usuario-descricao"
+                    value={`${usuario?.nome} · ${usuario?.email}`}
+                    disabled
+                    readOnly
+                  />
+                  <p id="conta-do-usuario-descricao" className="text-muted-foreground text-sm">
                     Nome e e-mail são da conta, e quem os corrige é a própria pessoa.
-                  </FormDescription>
-                </FormItem>
+                  </p>
+                </div>
               ) : (
                 <FormField
                   control={form.control}
