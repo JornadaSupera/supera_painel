@@ -16,12 +16,21 @@ import {
   TOM_POR_STATUS_ALERTA,
   TOM_POR_STATUS_CONVERSA,
 } from "./_clinicalMaps";
-import { executar, falhaDe, profissionalDaSessao, umDe } from "./_helpers";
+import {
+  compartilharLeitura,
+  executar,
+  falhaDe,
+  profissionalDaSessao,
+  umDe,
+} from "./_helpers";
 import { namesById, professionalNamesQuery, type ProfessionalNameRow } from "./_professionalNames";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
 
 type SupabaseClientLike = ReturnType<typeof getSupabaseClient>;
+
+/** Quanto tempo uma segunda consulta da mesma tela ainda aproveita o nome já lido. */
+const NOME_DE_PACIENTE_VALIDADE_MS = 30_000;
 
 /** `read_patient` por id distinto — N é sempre pequeno (uma janela, uma fila). */
 async function nomesDePacientes(
@@ -30,7 +39,21 @@ async function nomesDePacientes(
 ): Promise<Map<string, string> | ReturnType<typeof falhaDe>> {
   const nomes = new Map<string, string>();
 
-  const resultados = await Promise.all(ids.map((id) => supabase.rpc("read_patient", { p_patient_id: id })));
+  /*
+   * `read_patient` grava uma leitura na trilha por paciente, e a agenda e a fila
+   * de alertas da mesma tela pedem os mesmos pacientes. A segunda leitura pega
+   * carona na primeira (ver `compartilharLeitura`): um gesto, uma leitura.
+   */
+  const resultados = await Promise.all(
+    ids.map((id) =>
+      compartilharLeitura(
+        `read_patient:${id}`,
+        NOME_DE_PACIENTE_VALIDADE_MS,
+        async () => supabase.rpc("read_patient", { p_patient_id: id }),
+        (resposta) => !resposta.error,
+      ),
+    ),
+  );
 
   for (const resultado of resultados) {
     if (resultado.error) return falhaDe(resultado.error);

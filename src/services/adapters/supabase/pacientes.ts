@@ -26,7 +26,15 @@ import type {
   StatusConvite,
 } from "@/types/paciente";
 import { PATIENT_DEFAULT_SORT, normalizePatientSearch } from "../_people";
-import { TETO_READ, executar, falhaDe, logarExportacao, paraIso, umDe } from "./_helpers";
+import {
+  TETO_READ,
+  compartilharLeitura,
+  executar,
+  falhaDe,
+  logarExportacao,
+  paraIso,
+  umDe,
+} from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { codigoExibidoDoPaciente, paraCodigoDeFase, paraFase } from "./mapping";
 
@@ -150,17 +158,30 @@ interface Fases {
   idPorCodigo: Map<string, string>;
 }
 
+/**
+ * As fases de tratamento são catálogo: mudam por migração, não por uso. Toda
+ * varredura da lista as relia, e uma tela com duas varreduras as lia duas vezes.
+ */
+const FASES_VALIDADE_MS = 10 * 60_000;
+
 async function carregarFases(): Promise<Fases | ReturnType<typeof falhaDe>> {
-  const { data, error } = await getSupabaseClient().from("treatment_phases").select("id, code");
+  return compartilharLeitura(
+    "treatment_phases",
+    FASES_VALIDADE_MS,
+    async () => {
+      const { data, error } = await getSupabaseClient().from("treatment_phases").select("id, code");
 
-  if (error) return falhaDe(error);
+      if (error) return falhaDe(error);
 
-  const linhas = (data ?? []) as { id: string; code: string }[];
+      const linhas = (data ?? []) as { id: string; code: string }[];
 
-  return {
-    porId: new Map(linhas.map((linha) => [linha.id, linha.code])),
-    idPorCodigo: new Map(linhas.map((linha) => [linha.code, linha.id])),
-  };
+      return {
+        porId: new Map(linhas.map((linha) => [linha.id, linha.code])),
+        idPorCodigo: new Map(linhas.map((linha) => [linha.code, linha.id])),
+      };
+    },
+    (resultado) => "porId" in resultado,
+  );
 }
 
 async function carregarCatalogos(): Promise<Catalogos | ReturnType<typeof falhaDe>> {
