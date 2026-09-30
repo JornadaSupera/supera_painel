@@ -35,12 +35,12 @@ import {
  * "sem permissão" em vez de "nenhum registro".
  *
  * > [!] Dois vocabulários não coincidem, e a diferença é informação.
- * O banco registra quatro verbos (`read`, `create`, `update`, `delete`); o
- * protótipo mostra sete categorias. "Sigiloso" deixou de ser uma delas: virou
- * marca da própria linha (`is_restricted_material`), então é contável e
- * filtrável. "Exportação" continua sem origem — é um evento que acontece no
- * navegador e nunca chega ao banco. Ela é declarada em `sem_origem`, não
- * zerada.
+ * O banco registra cinco verbos (`read`, `create`, `update`, `delete`,
+ * `export`); o protótipo mostra sete categorias. "Sigiloso" deixou de ser uma
+ * delas: virou marca da própria linha (`is_restricted_material`), então é
+ * contável e filtrável. "Exportação" tem origem desde que o painel passou a
+ * declará-la (`log_data_export`); login e logout continuam sem origem, porque
+ * o ciclo de sessão não escreve nesta tabela.
  */
 
 /* -------------------------------------------------------------------------
@@ -461,6 +461,10 @@ const CONTAVEIS: AcaoAuditoria[] = [
 /** Categorias do protótipo sem origem na trilha. Nenhuma, desde 25/09/2026. */
 const SEM_ORIGEM: AcaoAuditoria[] = [];
 
+type ContagemDaCategoria =
+  | { ok: true; categoria: AcaoAuditoria; total: number }
+  | { ok: false; falha: ReturnType<typeof falhaDe> };
+
 export async function getSummary(params: {
   janelaHoras?: number;
 } = {}): Promise<SingleResult<ResumoAuditoria>> {
@@ -468,32 +472,58 @@ export async function getSummary(params: {
     const janela_horas = params.janelaHoras ?? 24;
     const desde = new Date(Date.now() - janela_horas * 3_600_000).toISOString();
 
-    // Duas colunas: a contagem não precisa de nome de pessoa nem de paciente,
-    // e trazer os vínculos aqui seria puxar dado pessoal para desenhar quatro
-    // números.
-    const { data, error } = await getSupabaseClient()
-      .from("audit_log")
-      .select("action, is_restricted_material")
-      .gte("occurred_at", desde)
-      .limit(10_000);
+    /*
+     * UMA CONTAGEM EXATA POR CATEGORIA, FEITA NO BANCO.
+     * =========================================================================
+     * Antes, o cartão trazia as linhas da janela e as contava aqui. O servidor
+     * devolve no máximo um número fixo de linhas por resposta (o `limit` do
+     * cliente não passa dele), e numa janela de 30 dias a trilha já tem mais de
+     * quatro mil: as linhas que chegavam eram as MAIS ANTIGAS, e uma exportação
+     * de hoje ficava de fora. O cartão dizia 1 onde a lista, pela mesma
+     * janela, achava 9.
+     *
+     * Agora cada cartão é um `count` pedido ao banco, com a MESMA tradução de
+     * categoria que a lista usa (`filtroDeAcao`): não há duas definições de
+     * "exportação" para divergir. `head: true` não traz linha nenhuma, então a
+     * contagem também não puxa nome de pessoa nem de paciente.
+     *
+     * Uma leitura de material restrito conta nos DOIS cartões, e é o
+     * comportamento certo: ela é uma leitura, e é uma leitura sob sigilo.
+     * Descontá-la de "Leitura" faria o total de leituras da janela não bater com
+     * o número de linhas lidas, e quem confere uma trilha confere exatamente
+     * isso.
+     */
+    const contagens = await Promise.all(
+      CONTAVEIS.map(async (categoria): Promise<ContagemDaCategoria> => {
+        const filtro = filtroDeAcao(categoria);
+        if (filtro === null || filtro === RECORTE_IMPOSSIVEL) {
+          return { ok: true, categoria, total: 0 };
+        }
 
-    if (error) return falhaDe(error);
+        let consulta = getSupabaseClient()
+          .from("audit_log")
+          .select("id", { count: "exact", head: true })
+          .gte("occurred_at", desde);
 
-    const linhas = data as unknown as { action: string; is_restricted_material: boolean | null }[];
+        if ("verbos" in filtro) consulta = consulta.in("action", filtro.verbos);
+        if ("restrito" in filtro) consulta = consulta.is("is_restricted_material", true);
+
+        const { count, error } = await consulta;
+        if (error) return { ok: false, falha: falhaDe(error) };
+
+        return { ok: true, categoria, total: count ?? 0 };
+      }),
+    );
+
+    const totais = new Map<AcaoAuditoria, number>();
+    for (const contagem of contagens) {
+      if (!contagem.ok) return contagem.falha;
+      totais.set(contagem.categoria, contagem.total);
+    }
 
     return okOne(
       summarizeAudit({
-        /**
-         * Uma leitura de material restrito conta nos DOIS cartões, e é o
-         * comportamento certo: ela é uma leitura, e é uma leitura sob sigilo.
-         * Descontá-la de "Leitura" faria o total de leituras da janela não
-         * bater com o número de linhas lidas, e quem confere uma trilha
-         * confere exatamente isso.
-         */
-        actions: linhas.flatMap((linha) => [
-          paraAcaoAuditoria(linha.action),
-          ...(linha.is_restricted_material ? [ACAO_AUDITORIA.SIGILOSO] : []),
-        ]),
+        totals: totais,
         countable: CONTAVEIS,
         windowHours: janela_horas,
         withoutSource: SEM_ORIGEM,

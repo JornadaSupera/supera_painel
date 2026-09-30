@@ -45,20 +45,29 @@ export function buildFacetOptions(entries: (FacetEntry | null)[]): OpcaoFiltroAu
   );
 }
 
-/** Window counters in the prototype order, with the categories that have no source. */
+/**
+ * Window counters in the prototype order, with the categories that have no source.
+ *
+ * Give either the rows' actions (`actions`, counted here) or the totals already
+ * counted by the source (`totals`). The second exists because counting rows that
+ * travelled to the browser is only right while the window fits in one reply;
+ * past that, the source has to do the counting.
+ */
 export function summarizeAudit({
   actions,
+  totals: counted,
   countable,
   windowHours,
   withoutSource,
 }: {
-  actions: Iterable<AcaoAuditoria>;
+  actions?: Iterable<AcaoAuditoria>;
+  totals?: ReadonlyMap<AcaoAuditoria, number>;
   countable: AcaoAuditoria[];
   windowHours: number;
   withoutSource: AcaoAuditoria[];
 }): ResumoAuditoria {
-  const totals = new Map<AcaoAuditoria, number>();
-  for (const action of actions) totals.set(action, (totals.get(action) ?? 0) + 1);
+  const totals = new Map<AcaoAuditoria, number>(counted ?? []);
+  for (const action of actions ?? []) totals.set(action, (totals.get(action) ?? 0) + 1);
 
   return {
     janela_horas: windowHours,
@@ -94,6 +103,10 @@ export function toAuditExport(
       acao: ACAO_AUDITORIA_LABEL[registro.acao],
       usuario: registro.usuario_nome,
       recurso: registro.recurso_label,
+      // The plain name hides the table; an investigation still needs to know
+      // exactly which one was reached, and a resource nobody named reads only as
+      // "Outro recurso" above.
+      recurso_tecnico: registro.recurso,
       registro_id: registro.recurso_id ?? "",
       paciente: registro.paciente_nome ?? "",
       linhas_alcancadas: registro.linhas === null ? "" : String(registro.linhas),

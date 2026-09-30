@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { toListQuery } from "@/hooks/listQuery";
@@ -13,15 +13,10 @@ import { janelaComoRange, useAuditoriaStore } from "@/stores/auditoria";
 /**
  * Leitura da trilha de auditoria.
  *
- * > [!] O ato de exportar ainda NÃO chega ao backend.
- * `audit_log` é append-only e as linhas nascem de gatilho dentro do banco. A
- * leitura que antecede a exportação fica registrada; o download em si acontece
- * no navegador, sobre o que já estava na tela, e não passa por lá. O que
- * `lib/audit.ts` guarda é o evento do cliente, que se perde ao recarregar.
- *
- * Na prática, a trilha distingue quem consultou — não distingue quem levou o
- * arquivo embora. Fechar essa distinção depende de um caminho no backend para
- * a aplicação declarar a exportação.
+ * A exportação da própria trilha é declarada ao banco (`log_data_export`), como
+ * a de relatórios e a da lista de pacientes: a trilha distingue quem consultou de
+ * quem levou o arquivo embora. Como isso cria um registro novo, a lista e os
+ * contadores são relidos depois de exportar.
  */
 
 const RECURSO = "auditoria";
@@ -106,6 +101,7 @@ export type FormatoExportacao = "csv" | "json";
  */
 export function useExportarTrilha() {
   const params = useParametros();
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (formato: FormatoExportacao) => {
@@ -131,12 +127,18 @@ export function useExportarTrilha() {
 
       return { formato, linhas, restantes: Math.max(0, count - linhas) };
     },
-    onSuccess: ({ formato, linhas, restantes }) =>
+    onSuccess: ({ formato, linhas, restantes }) => {
+      // A exportação acabou de gravar uma linha na trilha: sem reler, a lista e o
+      // cartão de exportação ficam um registro atrás do que o banco já tem.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.audit.lists() });
+      void queryClient.invalidateQueries({ queryKey: [...queryKeys.audit.all, "summary"] });
+
       toast.success(`Trilha exportada em ${formato.toUpperCase()}`, {
         description: restantes
           ? `${linhas} registros no arquivo — os mais recentes do recorte. Outros ${restantes} ficaram de fora: estreite o período para levá-los.`
           : `${linhas} registros do recorte atual.`,
-      }),
+      });
+    },
     onError: (erro) => toast.error("Não foi possível exportar", { description: erro.message }),
   });
 }

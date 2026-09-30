@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ACAO_AUDITORIA_LABEL, ORIGEM_AUDITORIA_LABEL } from "@/lib/enums";
+import { ACAO_AUDITORIA, ACAO_AUDITORIA_LABEL, ORIGEM_AUDITORIA_LABEL } from "@/lib/enums";
 import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import type { AuditoriaListItem } from "@/types/auditoria";
 
@@ -125,7 +125,9 @@ export function DetalheAcesso({ registro, carregando, aberto, onFechar }: Detalh
                 ajuda={
                   registro.recurso_id
                     ? undefined
-                    : "Leitura de lista: alcançou vários registros, não um específico."
+                    : registro.acao === ACAO_AUDITORIA.EXPORTACAO
+                      ? "Exportação: o arquivo reuniu vários registros, não um específico."
+                      : "Leitura de lista: alcançou vários registros, não um específico."
                 }
               />
 
