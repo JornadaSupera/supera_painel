@@ -8,7 +8,7 @@ import { useGarantiaDaSessao } from "@/hooks/useGarantiaDaSessao";
 import { MobileMenu } from "./MobileMenu";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
-import { navItemByPath, navTrailByPath } from "./navigation";
+import { extraRouteTitle, navItemByPath, navTrailByPath } from "./navigation";
 
 /**
  * Panel frame: sidebar + topbar + content area.
@@ -43,7 +43,7 @@ export function AdminLayout() {
      `document.title` effect, so only one mechanism restores the previous
      title when it changes. */
   const itemAtual = navItemByPath(location.pathname);
-  const nomeDaTela = itemAtual?.title ?? itemAtual?.label;
+  const nomeDaTela = extraRouteTitle(location.pathname) ?? itemAtual?.title ?? itemAtual?.label;
   useDocumentTitle(nomeDaTela ? `${nomeDaTela} · Jornada Supera` : "Jornada Supera · Administração");
 
   /* Changing pages puts the scroll back at the top. Without it, landing in the

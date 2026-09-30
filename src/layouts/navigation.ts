@@ -177,6 +177,23 @@ export function navItemByPath(
     .sort((a, b) => b.to.length - a.to.length)[0];
 }
 
+/**
+ * Title of a screen that is a route but not a menu item: the account security
+ * page, and a patient record inside the clinical panel. Without it the tab
+ * borrowed the nearest menu item's name ("Painel do dia" on the security page,
+ * "Carteira de pacientes" on a record).
+ *
+ * `prefix` is the panel's base path: empty for the administrative panel,
+ * `/clinico/<specialty>` for the clinical one. A patient record has its own
+ * title only in the clinical panel; in the administrative one the list's name
+ * is already the right one.
+ */
+export function extraRouteTitle(pathname: string, prefix = ""): string | undefined {
+  if (pathname === `${prefix}/seguranca`) return "Segurança da conta";
+  if (prefix && pathname.startsWith(`${prefix}/pacientes/`)) return "Ficha do paciente";
+  return undefined;
+}
+
 /** Navigation trail for the current path. */
 export function navTrailByPath(pathname: string): NavItem[] {
   const trail: NavItem[] = [];

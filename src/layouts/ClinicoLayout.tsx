@@ -9,7 +9,7 @@ import { MobileMenu } from "./MobileMenu";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { clinicoNavItems } from "./clinico-navigation";
-import { navItemByPath } from "./navigation";
+import { extraRouteTitle, navItemByPath } from "./navigation";
 
 /**
  * Clinical panel frame: sidebar + topbar + content area.
@@ -51,7 +51,10 @@ export function ClinicoLayout() {
   const homePath = area ? `/clinico/${area}` : "";
 
   const itemAtual = area ? navItemByPath(location.pathname, items) : undefined;
-  const nomeDaTela = itemAtual?.title ?? itemAtual?.label;
+  const nomeDaTela =
+    (area ? extraRouteTitle(location.pathname, `/clinico/${area}`) : undefined) ??
+    itemAtual?.title ??
+    itemAtual?.label;
 
   useDocumentTitle(
     area
