@@ -14,6 +14,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useAuth } from "@/contexts/auth-context";
+import { MFA_REQUIRED } from "@/lib/env";
 import { AuthLayout } from "@/layouts/AuthLayout";
 import { defaultHomePath } from "@/routes/home-path";
 import { ERROR_CODE } from "@/services/contracts";
@@ -71,7 +72,11 @@ export function LoginPage() {
   return (
     <AuthLayout
       title="Entrar no painel"
-      description="Use seu e-mail corporativo. Depois da senha, pediremos o código de verificação."
+      description={
+        MFA_REQUIRED
+          ? "Use seu e-mail corporativo. Depois da senha, pediremos o código de verificação."
+          : "Use seu e-mail corporativo e a sua senha."
+      }
       footer={
         <>
           <p>

@@ -30,6 +30,20 @@ export function SegurancaContaPage() {
 
   const admin = user?.papel === PAPEL.ADMIN;
 
+  /*
+   * DUAS COISAS DIFERENTES, QUE A TELA CONFUNDIA.
+   *
+   *  - O LOGIN pede o código? Decide o ambiente (`MFA_REQUIRED`).
+   *  - O BANCO exige segundo fator do administrador? É a configuração de
+   *    Configurações → Segurança, lida em `garantia.exigido`.
+   *
+   * Cada frase desta tela afirma só o fato da própria fonte. "Exigido para o
+   * acesso administrativo" era dito mesmo com a exigência desligada no banco,
+   * enquanto Configurações dizia "Não exigido" — e as duas telas ficavam lado a
+   * lado na mesma sessão.
+   */
+  const bancoExige = garantia.data?.exigido ?? null;
+
   // Remover o fator de quem o painel exige só trocaria a conta por um bloqueio:
   // no próximo acesso a moldura recusaria abrir e levaria ao cadastro de novo.
   const exigido = admin && (garantia.data?.exigido === true || MFA_REQUIRED);
@@ -52,7 +66,11 @@ export function SegurancaContaPage() {
               <h2 className="text-foreground text-sm font-semibold">Aplicativo autenticador</h2>
               <p className="text-muted-foreground text-xs">
                 {admin
-                  ? "Exigido para o acesso administrativo."
+                  ? bancoExige === true
+                    ? "Exigido para o acesso administrativo."
+                    : bancoExige === false
+                      ? "Ainda não exigido neste ambiente, mas o acesso administrativo passa a exigir. Cadastre agora para não ser barrado quando a exigência for ligada."
+                      : "Não foi possível confirmar se a exigência está ligada neste ambiente."
                   : MFA_REQUIRED
                     ? "Opcional. Com ele, o login passa a pedir o código do aplicativo depois da senha."
                     : "Opcional. O login ainda não pede o código neste ambiente."}
