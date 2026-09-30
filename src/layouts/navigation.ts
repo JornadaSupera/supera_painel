@@ -2,6 +2,7 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  MessageSquareHeart,
   ScrollText,
   Settings,
   TrendingUp,
@@ -84,6 +85,14 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ClipboardList,
     permission: PERMISSAO.RELATORIOS_READ,
     subtitle: "12 relatórios pré-definidos",
+  },
+  {
+    label: "Satisfação",
+    to: "/satisfacao",
+    icon: MessageSquareHeart,
+    permission: PERMISSAO.SATISFACAO_READ,
+    title: "Satisfação dos pacientes",
+    subtitle: "Pesquisa NPS · notas e comentários",
   },
   {
     label: "Estatísticas",

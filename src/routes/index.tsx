@@ -45,6 +45,7 @@ const UsuarioFormPage = lazy(() => import("@/features/usuarios/pages/UsuarioForm
 const UsuarioDetalhePage = lazy(() => import("@/features/usuarios/pages/UsuarioDetalhePage"));
 const ConteudoPage = lazy(() => import("@/features/conteudo/pages/ConteudoPage"));
 const RelatoriosPage = lazy(() => import("@/features/relatorios/pages/RelatoriosPage"));
+const SatisfacaoPage = lazy(() => import("@/features/satisfaction/pages/SatisfacaoPage"));
 const EstatisticasClinicasPage = lazy(
   () => import("@/features/estatisticas/pages/EstatisticasClinicasPage"),
 );
@@ -236,6 +237,10 @@ export function AppRoutes() {
                     endereço — é o "link interno" do escopo, que transforma um
                     resultado em algo que se manda para alguém. */}
                 <Route path="/relatorios/:slug" element={<RelatoriosPage />} />
+              </Route>
+
+              <Route element={<PermissionRoute permission={PERMISSAO.SATISFACAO_READ} />}>
+                <Route path="/satisfacao" element={<SatisfacaoPage />} />
               </Route>
 
               <Route
