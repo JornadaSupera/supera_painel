@@ -19,6 +19,7 @@ import type {
 import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/types/auditoria";
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type { AlertaClinico, CompromissoAgenda, ConversaClinico, MensagemClinico } from "@/types/clinico";
+import type { SatisfactionResponse, SatisfactionSummary } from "@/types/satisfaction";
 import type { AppointmentTypeOption, BusinessHour, PersonalBlock, PersonalBlockInput } from "@/types/agenda";
 import type { ConversationAssignment, TransferTarget } from "@/types/conversation-transfer";
 import type { DiarySymptom, PatientTimeline } from "@/types/patient-record";
@@ -1010,6 +1011,30 @@ export interface RelatoriosOperations {
   }): Promise<SingleResult<null>>;
 }
 
+/**
+ * Satisfação dos pacientes: a pesquisa NPS e o que foi respondido.
+ *
+ * Leitura direta das tabelas da pesquisa, que só a administração enxerga. Nada
+ * aqui devolve o nome do paciente: a resposta é atribuível por construção, e
+ * quem precisa de mais abre a ficha, onde a leitura fica registrada.
+ */
+export interface SatisfacaoOperations {
+  /**
+   * O resumo de um período: nota, distribuição, taxa de resposta e o recorte por
+   * momento da jornada. `days: null` vai até onde o banco entrega.
+   */
+  getSummary(params: { days: number | null }): Promise<SingleResult<SatisfactionSummary>>;
+
+  /**
+   * As respostas, da mais recente para a mais antiga.
+   *
+   * Filtros: `category` (promoter, passive, detractor), `milestone` (código do
+   * momento) e `with_comment` (`"yes"`). O período vai em `range`, pela data da
+   * resposta.
+   */
+  list(params?: ListParams): Promise<ListResult<SatisfactionResponse>>;
+}
+
 /* -------------------------------------------------------------------------
    O QUE LIGA O INVENTÁRIO ÀS ASSINATURAS
    ------------------------------------------------------------------------- */
@@ -1040,6 +1065,7 @@ export interface ResourceOperations {
   estatisticasOperacionais: EstatisticasOperacionaisOperations;
   configuracoes: ConfiguracoesOperations;
   relatorios: RelatoriosOperations;
+  satisfacao: SatisfacaoOperations;
 }
 
 /**

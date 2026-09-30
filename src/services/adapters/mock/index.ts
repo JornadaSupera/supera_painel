@@ -19,6 +19,7 @@ import * as estatisticasOperacionais from "./estatisticasOperacionais";
 import * as pacientes from "./pacientes";
 import * as permissoes from "./permissoes";
 import * as relatorios from "./relatorios";
+import * as satisfacao from "./satisfacao";
 import * as usuarios from "./usuarios";
 
 /**
@@ -49,6 +50,7 @@ const implemented = {
   estatisticasOperacionais, // Fase 13
   configuracoes, // Fase 9
   relatorios, // Fase 8
+  satisfacao,
 } satisfies PartialAdapterModules;
 // jscpd:ignore-end
 

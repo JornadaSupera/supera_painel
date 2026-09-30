@@ -15,6 +15,7 @@ import type {
   EstatisticasOperacionaisOperations,
   PacientesOperations,
   RelatoriosOperations,
+  SatisfacaoOperations,
   PermissoesOperations,
   UsuariosOperations,
 } from "./contracts/operations";
@@ -109,5 +110,6 @@ export const estatisticasClinicasApi = api.estatisticasClinicas as unknown as Es
 export const estatisticasOperacionaisApi = api.estatisticasOperacionais as unknown as EstatisticasOperacionaisOperations;
 export const configuracoesApi = api.configuracoes as unknown as ConfiguracoesOperations;
 export const relatoriosApi = api.relatorios as unknown as RelatoriosOperations;
+export const satisfacaoApi = api.satisfacao as unknown as SatisfacaoOperations;
 
 export default api;

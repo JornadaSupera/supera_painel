@@ -305,6 +305,11 @@ export const RESOURCES = {
       "listConversationAssignments",
     ],
   },
+  satisfacao: {
+    table: "nps_responses",
+    fase: 17,
+    operations: ["getSummary", "list"],
+  },
   catalogos: {
     table: "catalogos",
     fase: 5,

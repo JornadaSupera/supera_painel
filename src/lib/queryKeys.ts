@@ -174,6 +174,13 @@ export const queryKeys = {
     diarySymptoms: (entryId: string) => ["clinico", "diary", entryId, "symptoms"] as const,
   },
 
+  /** Satisfação dos pacientes — a pesquisa NPS. */
+  satisfaction: {
+    all: ["satisfaction"] as const,
+    summary: (days: number | null) => ["satisfaction", "summary", days ?? "all"] as const,
+    list: <P extends QueryKeyParams<P>>(params: P) => ["satisfaction", "list", params] as const,
+  },
+
   catalogs: {
     all: ["catalogs"] as const,
     cids: () => ["catalogs", "cids"] as const,
