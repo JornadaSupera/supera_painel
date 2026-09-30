@@ -111,6 +111,7 @@ export function ComposerMensagem({
               ref={seletorRef}
               type="file"
               accept={ATTACHMENT_ACCEPT}
+              aria-label="Escolher arquivo para anexar à mensagem"
               className="sr-only"
               tabIndex={-1}
               aria-hidden

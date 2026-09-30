@@ -69,6 +69,7 @@ export function AnexosDaOrientacao({
             ref={seletorRef}
             type="file"
             accept={ATTACHMENT_ACCEPT}
+            aria-label="Escolher arquivo para anexar à orientação"
             className="sr-only"
             tabIndex={-1}
             aria-hidden
