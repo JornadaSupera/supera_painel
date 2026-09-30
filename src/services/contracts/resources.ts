@@ -53,7 +53,7 @@ export const RESOURCES = {
   dashboard: {
     table: "vw_dashboard_metricas",
     fase: 4,
-    operations: ["getKpis", "getSeries"],
+    operations: ["getKpis", "getSeries", "registrarExportacao"],
   },
   pacientes: {
     table: "pacientes",

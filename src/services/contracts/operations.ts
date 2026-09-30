@@ -221,6 +221,14 @@ export type EventoDeSessao =
 export interface DashboardOperations {
   getKpis(params?: { periodo?: Periodo }): Promise<SingleResult<KpisResposta>>;
   getSeries(params?: { periodo?: Periodo }): Promise<SingleResult<SeriesResposta>>;
+  /**
+   * Declara à trilha que a captura do painel foi exportada, DEPOIS de o arquivo
+   * já ter sido gerado no navegador. É o mesmo pedágio que relatórios e lista de
+   * pacientes pagam: sem ele a exportação aconteceria e a auditoria não
+   * saberia. Uma captura não alcança linha de paciente, então a trilha guarda
+   * zero linhas.
+   */
+  registrarExportacao(params: { formato: "pdf" | "png" }): Promise<SingleResult<null>>;
 }
 
 /* ---------------------------------------------------------------- Fase 5 */

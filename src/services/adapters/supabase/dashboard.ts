@@ -2,7 +2,7 @@ import { PERIODO, STATUS_PACIENTE, type Periodo } from "@/lib/enums";
 import { okOne, type SingleResult } from "@/services/contracts";
 import type { FatiaCid, Kpi, KpisResposta, PontoSessoes, SeriesResposta } from "@/types/dashboard";
 import type { PacienteListItem } from "@/types/paciente";
-import { TETO_READ, executar, falhaDe } from "./_helpers";
+import { TETO_READ, compartilharLeitura, executar, falhaDe, logarExportacao } from "./_helpers";
 import {
   SITUACAO,
   falhou,
@@ -100,16 +100,43 @@ function historico(
    varredura foi de um tipo de compromisso, e não da agenda inteira.
    ------------------------------------------------------------------------- */
 
+/**
+ * A lista de pacientes que os indicadores e os gráficos leem.
+ *
+ * Indicadores e gráficos são duas consultas, e as duas partem da MESMA lista: os
+ * gráficos filtram os ativos por cima dela. Lida duas vezes, a trilha registrava
+ * dois acessos à lista de pacientes por abertura do painel (ver
+ * `compartilharLeitura`).
+ */
+function listaDePacientesDoPainel() {
+  return compartilharLeitura(
+    "dashboard:lista-de-pacientes",
+    5_000,
+    () => varrerLista({}, TETO_READ),
+    (resultado) => "itens" in resultado,
+  );
+}
+
+/** O tipo de infusão é catálogo: dez minutos bastam para as duas consultas e para as trocas de período. */
+const INFUSAO_VALIDADE_MS = 10 * 60_000;
+
 /** Id do tipo de compromisso de infusão, ou `null` quando o catálogo não o tem. */
 async function idDaInfusao(): Promise<string | null | ReturnType<typeof falhaDe>> {
-  const { data, error } = await getSupabaseClient()
-    .from("appointment_types")
-    .select("id")
-    .eq("code", "infusion")
-    .limit(1);
+  return compartilharLeitura(
+    "appointment_types:infusion",
+    INFUSAO_VALIDADE_MS,
+    async () => {
+      const { data, error } = await getSupabaseClient()
+        .from("appointment_types")
+        .select("id")
+        .eq("code", "infusion")
+        .limit(1);
 
-  if (error) return falhaDe(error);
-  return (data as { id: string }[])[0]?.id ?? null;
+      if (error) return falhaDe(error);
+      return (data as { id: string }[])[0]?.id ?? null;
+    },
+    (resultado) => resultado === null || typeof resultado === "string",
+  );
 }
 
 /** Sessões realizadas por balde, na janela pedida. Chave = `bucket_start`. */
@@ -152,7 +179,7 @@ export async function getKpis(
     const dias = DIAS_POR_PERIODO[periodo];
     const rotulo = ROTULO_PERIODO[periodo];
 
-    const varredura = await varrerLista({}, TETO_READ);
+    const varredura = await listaDePacientesDoPainel();
     if (!("itens" in varredura)) return varredura;
 
     const ativos = varredura.itens.filter((item) => item.status === STATUS_PACIENTE.ATIVO);
@@ -351,6 +378,20 @@ export async function getKpis(
  * As sem fonte vêm vazias e bem formadas, para a tela exibir o motivo em vez de
  * um gráfico sem eixo.
  */
+/**
+ * A captura do painel saiu do ambiente controlado: a trilha precisa saber.
+ * `log_data_export` aceita escopo só em minúsculas, dígitos e sublinhado, e o
+ * formato entra nele para a trilha dizer em que arquivo o dado saiu.
+ */
+export async function registrarExportacao(params: {
+  formato: "pdf" | "png";
+}): Promise<SingleResult<null>> {
+  return executar(async () => {
+    await logarExportacao({ escopo: `dashboard_${params.formato}`, linhas: 0 });
+    return okOne(null);
+  });
+}
+
 export async function getSeries(
   params: { periodo?: Periodo } = {},
 ): Promise<SingleResult<SeriesResposta>> {
@@ -389,12 +430,12 @@ export async function getSeries(
 
     /* --------------------------------------------- pacientes por CID */
 
-    const varredura = await varrerLista({ filters: { status: STATUS_PACIENTE.ATIVO } }, TETO_READ);
-    if (!("itens" in varredura)) return varredura;
+    const lista = await listaDePacientesDoPainel();
+    if (!("itens" in lista)) return lista;
 
     const porCid = new Map<string, { valor: number; descricao: string }>();
 
-    for (const paciente of varredura.itens) {
+    for (const paciente of lista.itens.filter((item) => item.status === STATUS_PACIENTE.ATIVO)) {
       // Ficha sem diagnóstico registrado entra no próprio balde: omiti-la faria
       // a soma das fatias não bater com o total de pacientes ativos, e ninguém
       // confere a soma de um gráfico de pizza.

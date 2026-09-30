@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { audit } from "@/lib/audit";
 import { formatDateTime } from "@/lib/format";
 import { timestamp, exportPdf, exportPng } from "@/lib/pdf";
+import { useRegistrarExportacaoDashboard } from "../hooks/useDashboard";
 
 /**
  * Exportação da captura do dashboard (MVP §5).
@@ -31,6 +32,7 @@ export function BotaoExportar({
   nomeBase: string;
 }) {
   const { user } = useAuth();
+  const registrar = useRegistrarExportacaoDashboard();
   const [exportando, setExportando] = useState<"pdf" | "png" | null>(null);
 
   const exportar = async (formato: "pdf" | "png") => {
@@ -52,6 +54,8 @@ export function BotaoExportar({
       }
 
       audit.export("dashboard", { formato, arquivo: nome });
+      // O arquivo já saiu: a trilha do banco é avisada em segundo plano.
+      registrar.mutate(formato);
       toast.success(`Captura exportada em ${formato.toUpperCase()}`);
     } catch {
       toast.error("Não foi possível exportar", {

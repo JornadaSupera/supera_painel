@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type { Periodo } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
@@ -25,6 +25,18 @@ export function useKpis(periodo: Periodo) {
     // Fase 15: trocar por subscription do Supabase Realtime — a chave de cache
     // e o formato do dado continuam os mesmos.
     refetchInterval: INTERVALO_ATUALIZACAO,
+  });
+}
+
+/**
+ * Registra na trilha a exportação da captura. Falhar aqui não desfaz um arquivo
+ * que já foi baixado, então a tela não trata o erro como falha da exportação.
+ */
+export function useRegistrarExportacaoDashboard() {
+  return useMutation({
+    mutationFn: async (formato: "pdf" | "png") => {
+      await call(() => dashboardApi.registrarExportacao({ formato }));
+    },
   });
 }
 

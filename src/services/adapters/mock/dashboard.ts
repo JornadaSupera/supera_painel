@@ -35,6 +35,13 @@ export async function getKpis({
   );
 }
 
+/** O mock não tem trilha para onde escrever: a exportação só é confirmada. */
+export async function registrarExportacao(_params: {
+  formato: "pdf" | "png";
+}): Promise<SingleResult<null>> {
+  return simulate(() => okOne(null));
+}
+
 export async function getSeries({
   periodo = "mensal",
 }: {
