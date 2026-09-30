@@ -1,5 +1,6 @@
 import {
   BellRing,
+  BarChart3,
   CalendarDays,
   FileText,
   LayoutDashboard,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 
 import type { Especialidade } from "@/lib/enums";
+import { PERMISSAO } from "@/lib/rbac";
 import type { NavItem } from "./navigation";
 
 /**
@@ -53,6 +55,13 @@ export function clinicoNavItems(especialidade: Especialidade): NavItem[] {
       to: `${base}/alertas`,
       icon: BellRing as LucideIcon,
       title: "Fila de alertas",
+    },
+    {
+      label: "Carteira",
+      to: `${base}/carteira`,
+      icon: BarChart3,
+      permission: PERMISSAO.ESTATISTICAS_READ_SELF,
+      title: "Carteira do profissional",
     },
     {
       label: "Conteúdo",
