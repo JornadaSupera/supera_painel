@@ -3,6 +3,7 @@ import { toast } from "sonner";
 
 import { audit } from "@/lib/audit";
 import { downloadCsv } from "@/lib/csv";
+import { formatNumber } from "@/lib/format";
 import { call, pacientesApi } from "@/services/apiClient";
 import type { ListParams } from "@/services/contracts";
 
@@ -31,7 +32,7 @@ export function useExportarPacientes(params: ListParams) {
         toast.info("Nada para exportar", { description: "Nenhum paciente corresponde ao recorte." });
         return;
       }
-      toast.success(`${quantidade} paciente(s) exportado(s)`, {
+      toast.success(quantidade === 1 ? "1 paciente exportado" : `${formatNumber(quantidade)} pacientes exportados`, {
         description: "CPF, telefone e e-mail saem mascarados no arquivo.",
       });
     },

@@ -150,7 +150,8 @@ export function PacientesPage() {
       // No protocol yet is a dash, like every other empty cell. An empty
       // badge drew a green pill with nothing in it.
       render: (paciente) =>
-        paciente.protocolo_nome ? (
+        // The adapter fills a missing protocol with "—"; that is still no protocol.
+        paciente.protocolo_nome && paciente.protocolo_nome !== "—" ? (
           <Badge variant="secondary" className="text-[11px] font-normal">
             {paciente.protocolo_nome}
           </Badge>
