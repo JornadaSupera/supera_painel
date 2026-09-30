@@ -98,6 +98,11 @@ export interface DataTableProps<T> {
     actions?: ReactNode;
   };
   onRowClick?: (row: T) => void;
+  /**
+   * Which rows respond to `onRowClick`. Defaults to all of them. A row that leads
+   * nowhere must not look like it does: no pointer, no focus stop, no click.
+   */
+  isRowClickable?: (row: T) => boolean;
   density?: "comfortable" | "compact";
   pagination?: Omit<PaginationProps, "label">;
   emptyState?: ReactNode;
@@ -120,6 +125,7 @@ export function DataTable<T>({
   onSortChange,
   selection,
   onRowClick,
+  isRowClickable = () => true,
   density = "comfortable",
   pagination,
   emptyState,
@@ -210,7 +216,7 @@ export function DataTable<T>({
   );
 
   const rowActivation = (row: T) =>
-    onRowClick
+    onRowClick && isRowClickable(row)
       ? {
           onClick: () => onRowClick(row),
           // A clickable row has to be reachable without a mouse.
@@ -233,8 +239,9 @@ export function DataTable<T>({
         }
       : {};
 
-  const rowFocus =
+  const rowFocus = (row: T) =>
     onRowClick &&
+    isRowClickable(row) &&
     "cursor-pointer focus-visible:outline-primary focus-visible:-outline-offset-2 focus-visible:outline-2";
 
   const cell = (column: Column<T>, row: T) =>
@@ -273,7 +280,7 @@ export function DataTable<T>({
                 className={cn(
                   "flex flex-col gap-3 px-4",
                   density === "compact" ? "py-2.5" : "py-3.5",
-                  rowFocus,
+                  rowFocus(row),
                   isSelected && "bg-primary/8",
                 )}
               >
@@ -403,7 +410,7 @@ export function DataTable<T>({
                   key={id}
                   {...rowActivation(row)}
                   className={cn(
-                    rowFocus,
+                    rowFocus(row),
                     // A selected row has a background AND a checked box —
                     // colour is not the only signal.
                     isSelected && "bg-primary/8 hover:bg-primary/12",
