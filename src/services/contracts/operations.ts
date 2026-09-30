@@ -683,6 +683,13 @@ export interface EstatisticasClinicasOperations {
   heatmap(params?: FiltroClinico): Promise<SingleResult<CruzamentoClinico>>;
 
   compareProtocolos(params?: FiltroClinico): Promise<ListResult<ComparacaoProtocolo>>;
+
+  /**
+   * Declara à trilha que a captura da tela saiu, DEPOIS de o arquivo já ter sido
+   * gerado no navegador — o mesmo pedágio de relatórios, lista de pacientes e
+   * Dashboard. `linhas` é o tamanho do cruzamento que a captura mostrava.
+   */
+  registrarExportacao(params: { formato: "pdf" | "png"; linhas: number }): Promise<SingleResult<null>>;
 }
 
 /**

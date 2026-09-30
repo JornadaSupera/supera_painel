@@ -333,6 +333,7 @@ export function rotuloDoRecurso(recurso: string): string {
   if (recurso in RECURSO_AUDITORIA_LABEL) return RECURSO_AUDITORIA_LABEL[recurso] ?? "Outro recurso";
   if (recurso.startsWith("report_")) return "Relatório";
   if (recurso.startsWith("dashboard")) return "Captura do Dashboard";
+  if (recurso.startsWith("estatisticas_clinicas")) return "Captura das estatísticas clínicas";
   return "Outro recurso";
 }
 

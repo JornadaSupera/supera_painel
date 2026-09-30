@@ -114,6 +114,14 @@ function montar(params: Parametros): CruzamentoClinico {
   };
 }
 
+/** O mock não tem trilha para onde escrever: a exportação só é confirmada. */
+export async function registrarExportacao(_params: {
+  formato: "pdf" | "png";
+  linhas: number;
+}): Promise<SingleResult<null>> {
+  return simulate(() => okOne(null));
+}
+
 export async function crossTab(params: Parametros = {}): Promise<SingleResult<CruzamentoClinico>> {
   return simulate(() => okOne(montar(params)));
 }

@@ -5,7 +5,7 @@ import type {
   ComparacaoProtocolo,
   CruzamentoClinico,
 } from "@/types/estatisticas";
-import { executar } from "./_helpers";
+import { executar, logarExportacao } from "./_helpers";
 import {
   SEM_PROTOCOLO_LABEL,
   falhou,
@@ -184,6 +184,20 @@ async function cruzar(params: Parametros): Promise<SingleResult<CruzamentoClinic
     if (falhou(resumo)) return resumo;
 
     return okOne(montar(resumo.linhas, params.grauMinimo ?? 2));
+  });
+}
+
+/** A captura saiu do ambiente controlado: a trilha precisa saber. Ver `logarExportacao`. */
+export async function registrarExportacao(params: {
+  formato: "pdf" | "png";
+  linhas: number;
+}): Promise<SingleResult<null>> {
+  return executar(async () => {
+    await logarExportacao({
+      escopo: `estatisticas_clinicas_${params.formato}`,
+      linhas: params.linhas,
+    });
+    return okOne(null);
   });
 }
 

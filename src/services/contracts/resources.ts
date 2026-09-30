@@ -193,7 +193,7 @@ export const RESOURCES = {
   estatisticasClinicas: {
     table: null,
     fase: 12, // MÉDIO
-    operations: ["crossTab", "heatmap", "compareProtocolos"],
+    operations: ["crossTab", "heatmap", "compareProtocolos", "registrarExportacao"],
   },
   estatisticasOperacionais: {
     table: null,
