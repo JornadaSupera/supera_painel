@@ -1,9 +1,18 @@
+import { Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { EmptyState, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/shared";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
 import { AUTOR_MENSAGEM, ESPECIALIDADE_LABEL, STATUS_CONVERSA_LABEL } from "@/lib/enums";
 import { formatDateTime, relativeTime } from "@/lib/format";
@@ -13,6 +22,14 @@ import { AnexoDaMensagem } from "../components/AnexoDaMensagem";
 import { ComposerMensagem } from "../components/ComposerMensagem";
 import { ConversationAssignments } from "../components/ConversationAssignments";
 import { TransferConversationDialog } from "../components/TransferConversationDialog";
+import {
+  LIMITE_DA_LEITURA,
+  TODOS_OS_ASSUNTOS,
+  assuntosDaLista,
+  filtrarConversas,
+  type FiltroDeConversas,
+  type RecorteDeConversas,
+} from "../filtroDeConversas";
 import {
   useAssumirConversa,
   useConversasClinicas,
@@ -119,6 +136,12 @@ export function ClinicoChatPage() {
   );
 }
 
+const RECORTES: { value: RecorteDeConversas; label: string }[] = [
+  { value: "todas", label: "Todas" },
+  { value: "nao_resolvidas", label: "Não resolvidas" },
+  { value: "da_minha_area", label: "Da minha área" },
+];
+
 function ListaConversas({
   conversas,
   selecionadaId,
@@ -128,33 +151,113 @@ function ListaConversas({
   selecionadaId: string | null;
   onSelecionar: (id: string) => void;
 }) {
+  const { user } = useAuth();
+  const [filtro, setFiltro] = useState<FiltroDeConversas>({
+    busca: "",
+    recorte: "todas",
+    assunto: TODOS_OS_ASSUNTOS,
+  });
+
+  const assuntos = assuntosDaLista(conversas);
+  const visiveis = filtrarConversas(conversas, filtro, user?.especialidade ?? null);
+  const filtrando =
+    filtro.busca.trim() !== "" || filtro.recorte !== "todas" || filtro.assunto !== TODOS_OS_ASSUNTOS;
+
   return (
-    <div className="bg-card flex max-h-[70vh] flex-col overflow-y-auto rounded-2xl border">
-      {conversas.map((conversa) => (
-        <button
-          key={conversa.id}
-          type="button"
-          onClick={() => onSelecionar(conversa.id)}
-          className={cn(
-            "border-border/60 flex flex-col gap-1 border-b p-3 text-left transition-colors last:border-b-0",
-            conversa.id === selecionadaId ? "bg-primary/10" : "hover:bg-muted/60",
-          )}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-foreground truncate text-sm font-medium">{conversa.paciente_nome}</p>
-            {conversa.nao_lida_pela_equipe && (
-              <span className="bg-primary size-2 shrink-0 rounded-full" aria-label="Não lida" />
+    <div className="bg-card flex max-h-[70vh] flex-col overflow-hidden rounded-2xl border">
+      <div className="border-border flex flex-col gap-2 border-b p-3">
+        <div className="relative">
+          <Search
+            size={14}
+            aria-hidden="true"
+            className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
+          />
+          <Input
+            type="search"
+            value={filtro.busca}
+            onChange={(evento) => setFiltro({ ...filtro, busca: evento.target.value })}
+            placeholder="Buscar paciente"
+            aria-label="Buscar conversa por paciente"
+            className="h-8 pl-8 text-xs"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Select
+            value={filtro.recorte}
+            onValueChange={(valor) => setFiltro({ ...filtro, recorte: valor as RecorteDeConversas })}
+          >
+            <SelectTrigger size="sm" aria-label="Mostrar conversas" className="w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {RECORTES.map((recorte) => (
+                <SelectItem key={recorte.value} value={recorte.value}>
+                  {recorte.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filtro.assunto} onValueChange={(valor) => setFiltro({ ...filtro, assunto: valor })}>
+            <SelectTrigger size="sm" aria-label="Assunto" className="w-full text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={TODOS_OS_ASSUNTOS}>Todos os assuntos</SelectItem>
+              {assuntos.map((assunto) => (
+                <SelectItem key={assunto} value={assunto}>
+                  {assunto}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Filtrar é escolher entre o que chegou. Com a leitura no teto, pode haver
+            conversa que nem chegou, e a lista filtrada não deve parecer completa. */}
+        {(filtrando || conversas.length >= LIMITE_DA_LEITURA) && (
+          <p className="text-muted-foreground text-[11px]" role="status">
+            {`${visiveis.length} de ${conversas.length} conversas carregadas${
+              conversas.length >= LIMITE_DA_LEITURA ? ". A leitura entrega no máximo 200: pode haver mais." : ""
+            }`}
+          </p>
+        )}
+      </div>
+
+      <div className="flex flex-col overflow-y-auto">
+        {visiveis.length === 0 && (
+          <p className="text-muted-foreground p-4 text-center text-xs">
+            Nenhuma conversa corresponde à busca e aos filtros.
+          </p>
+        )}
+
+        {visiveis.map((conversa) => (
+          <button
+            key={conversa.id}
+            type="button"
+            onClick={() => onSelecionar(conversa.id)}
+            className={cn(
+              "border-border/60 flex flex-col gap-1 border-b p-3 text-left transition-colors last:border-b-0",
+              conversa.id === selecionadaId ? "bg-primary/10" : "hover:bg-muted/60",
             )}
-          </div>
-          <div className="flex items-center gap-2">
-            <StatusBadge tone={conversa.status_tom} size="sm">
-              {STATUS_CONVERSA_LABEL[conversa.status]}
-            </StatusBadge>
-            <span className="text-muted-foreground truncate text-xs">{conversa.assunto_label}</span>
-          </div>
-          <p className="text-muted-foreground text-[11px]">{relativeTime(conversa.ultima_mensagem_em)}</p>
-        </button>
-      ))}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-foreground truncate text-sm font-medium">{conversa.paciente_nome}</p>
+              {conversa.nao_lida_pela_equipe && (
+                <span className="bg-primary size-2 shrink-0 rounded-full" aria-label="Não lida" />
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <StatusBadge tone={conversa.status_tom} size="sm">
+                {STATUS_CONVERSA_LABEL[conversa.status]}
+              </StatusBadge>
+              <span className="text-muted-foreground truncate text-xs">{conversa.assunto_label}</span>
+            </div>
+            <p className="text-muted-foreground text-[11px]">{relativeTime(conversa.ultima_mensagem_em)}</p>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
