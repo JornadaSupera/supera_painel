@@ -308,7 +308,7 @@ export function AgendamentosRelatorio() {
                     </div>
                     <p className="text-muted-foreground truncate text-[11px]">
                       {descricaoFrequencia(agendamento)}
-                      {agendamento.ativo && ` · próximo ${relativeTime(agendamento.proxima_em)}`}
+                      {agendamento.ativo && ` · próximo ${relativeTime(agendamento.proxima_em, { future: true })}`}
                       {agendamento.ultima_em &&
                         ` · última vez ${formatDateTime(agendamento.ultima_em)}`}
                     </p>
@@ -367,7 +367,7 @@ export function AgendamentosRelatorio() {
 
       <Footnote>
         O aviso traz uma referência de período, nunca o arquivo — quem quiser o dado abre o painel,
-        e o acesso fica na trilha de auditoria. Só relatórios com origem no backend podem ser
+        e o acesso fica na trilha de auditoria. Só relatórios que já têm origem de dados podem ser
         agendados.
       </Footnote>
 

@@ -234,7 +234,7 @@ export function bySpecialtyReport(
       remarcacoes: linha.remarcacoes,
       taxa_falta: percentage(linha.faltas, linha.volume),
     })),
-    resumo: "motivos de falta indisponíveis: o catálogo de motivos está vazio no backend",
+    resumo: "motivos de falta indisponíveis: o catálogo de motivos ainda está vazio",
     eixo: "especialidade",
     medida: "faltas",
   };

@@ -279,7 +279,7 @@ function CartaoRelatorio({
         // saber por que ele não roda, não descobrir isso ao clicar.
         <p className="border-border/70 text-muted-foreground flex items-start gap-1.5 rounded-lg border border-dashed px-3 py-2 text-[11px] leading-relaxed">
           <Lock size={12} aria-hidden="true" className="mt-0.5 shrink-0" />
-          {definicao.motivo ?? "Sem origem de dados no backend."}
+          {definicao.motivo ?? "Este relatório ainda não tem origem de dados."}
         </p>
       )}
     </article>
