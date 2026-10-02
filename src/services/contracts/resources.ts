@@ -280,6 +280,8 @@ export const RESOURCES = {
       "getSolicitacoesTitular",
       "decidirSolicitacaoTitular",
       "completarSolicitacaoTitular",
+      /** O que o paciente escreveu no pedido de correção — lido só ao abrir o pedido. */
+      "getTextoSolicitacaoTitular",
       /** Quem aceitou qual versão de termo — a prova do que a publicação criou. */
       "getConsentimentos",
     ],

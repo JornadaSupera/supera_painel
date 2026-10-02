@@ -1072,6 +1072,18 @@ export interface ConfiguracoesOperations {
     id: string;
     observacao?: string;
   }): Promise<SingleResult<SolicitacaoTitular>>;
+
+  /**
+   * O texto que o paciente escreveu ao pedir a correção, ou `texto: null` quando
+   * veio vazio (pedido antigo, ou app desatualizado).
+   *
+   * > [!] Nunca entra na listagem. O texto pode trazer o celular ou o CPF
+   * corretos; só a tela de um pedido o pede, e só quando é aberta. Falha com
+   * NOT_IMPLEMENTED enquanto o banco não tiver a coluna.
+   */
+  getTextoSolicitacaoTitular(params: {
+    id: string;
+  }): Promise<SingleResult<{ texto: string | null }>>;
 }
 
 /* ---------------------------------------------------------------- Fase 8 */

@@ -1031,8 +1031,11 @@ export async function getConsentimentos(): Promise<ListResult<Consentimento>> {
    - Correção pede um passo do painel: `complete_data_subject_request` marca
      como cumprida, e só aceita `granted` + `rectification` — qualquer outro
      caso devolve `request_not_completable`.
-   - Acesso e portabilidade não passam por `executed`: o titular baixa o
-     pacote sozinho, por `export_my_data`, direto no app.
+   - Acesso e portabilidade o painel só decide. Deferido, o titular baixa o
+     pacote sozinho por `export_my_data`, direto no app, durante 15 dias a
+     contar de `decided_at`; o primeiro download grava `executed`/`executed_at`.
+     Passado o prazo o banco recusa (`export_window_closed`) e o pedido segue
+     `granted` — "prazo encerrado" é conta da tela, não um estado do banco.
    ------------------------------------------------------------------------- */
 
 const TIPO_SOLICITACAO_LABEL: Record<string, string> = {
@@ -1056,10 +1059,12 @@ const ABERTOS = new Set(["requested", "under_review"]);
 
 interface LinhaSolicitacao {
   id: string;
+  account_id: string;
   request_type: string;
   status: string;
   created_at: string;
   decided_at: string | null;
+  executed_at: string | null;
   decision_note: string | null;
   execution_error: string | null;
   accounts: { full_name: string | null; email: string } | { full_name: string | null; email: string }[] | null;
@@ -1072,6 +1077,7 @@ function projetarSolicitacao(linha: LinhaSolicitacao): SolicitacaoTitular {
 
   return {
     id: linha.id,
+    conta_id: linha.account_id,
     pessoa: titular?.full_name?.trim() || titular?.email || "Não identificado",
     tipo: linha.request_type,
     tipo_label: TIPO_SOLICITACAO_LABEL[linha.request_type] ?? linha.request_type,
@@ -1080,6 +1086,7 @@ function projetarSolicitacao(linha: LinhaSolicitacao): SolicitacaoTitular {
     criado_em: paraIso(linha.created_at) ?? linha.created_at,
     decidido_em: paraIso(linha.decided_at),
     decidido_por: decisor?.full_name?.trim() || decisor?.email || null,
+    executado_em: paraIso(linha.executed_at),
     observacao: linha.decision_note,
     aberto: ABERTOS.has(linha.status),
     // `complete_data_subject_request` só aceita esta combinação — replicar a
@@ -1091,7 +1098,7 @@ function projetarSolicitacao(linha: LinhaSolicitacao): SolicitacaoTitular {
 
 /** Colunas de `data_subject_requests` que a tela precisa, com os dois joins de nome. */
 const SELECT_SOLICITACAO =
-  "id, request_type, status, created_at, decided_at, decision_note, execution_error, accounts:account_id ( full_name, email ), decisor:decided_by ( full_name, email )";
+  "id, account_id, request_type, status, created_at, decided_at, executed_at, decision_note, execution_error, accounts:account_id ( full_name, email ), decisor:decided_by ( full_name, email )";
 
 export async function getSolicitacoesTitular(): Promise<ListResult<SolicitacaoTitular>> {
   return executar(async () => {
@@ -1110,6 +1117,46 @@ export async function getSolicitacoesTitular(): Promise<ListResult<SolicitacaoTi
     return ok(
       solicitacoes.sort((a, b) => Number(b.aberto) - Number(a.aberto) || b.criado_em.localeCompare(a.criado_em)),
     );
+  });
+}
+
+/**
+ * O que o paciente escreveu ao pedir a correção (`requester_note`).
+ *
+ * > [!] Fica fora de `SELECT_SOLICITACAO` de propósito. O texto pode trazer o
+ * celular ou o CPF corretos, então só sai do banco quando alguém abre o pedido —
+ * nunca na lista, que também alimenta contagens e telas de outro assunto.
+ *
+ * A coluna é pedida ao responsável pelo banco e ainda pode não existir. O
+ * PostgREST responde `42703` (coluna inexistente) e isso vira NOT_IMPLEMENTED
+ * com o motivo escrito, não texto vazio: "o paciente não descreveu" e "o banco
+ * ainda não guarda" são situações diferentes para quem decide.
+ */
+export async function getTextoSolicitacaoTitular({
+  id,
+}: {
+  id: string;
+}): Promise<SingleResult<{ texto: string | null }>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("data_subject_requests")
+      .select("requester_note")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error?.code === "42703") {
+      return fail(
+        ERROR_CODE.NOT_IMPLEMENTED,
+        "O banco ainda não guarda o que o paciente quer corrigir.",
+      );
+    }
+
+    if (error) return falhaDe(error);
+    if (!data) return fail(ERROR_CODE.NOT_FOUND, "Pedido não encontrado.");
+
+    const texto = (data as unknown as { requester_note: string | null }).requester_note?.trim();
+
+    return okOne({ texto: texto || null });
   });
 }
 

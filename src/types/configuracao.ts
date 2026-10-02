@@ -231,6 +231,8 @@ export interface ClinicaConfiguracao {
  */
 export interface SolicitacaoTitular {
   id: string;
+  /** A conta do titular. Serve para cruzar os pedidos da mesma pessoa; não é exibida. */
+  conta_id: string;
   /** Quem pediu. Nome da conta, ou o e-mail quando o nome não está preenchido. */
   pessoa: string;
   /** `access`, `rectification`, `portability`, `consent_revocation`, `deletion`. */
@@ -243,6 +245,11 @@ export interface SolicitacaoTitular {
   criado_em: string;
   decidido_em: string | null;
   decidido_por: string | null;
+  /**
+   * Quando o pedido foi cumprido. Em acesso e portabilidade é o primeiro
+   * download do paciente; em correção, o "marcar como cumprida" do painel.
+   */
+  executado_em: string | null;
   /** A justificativa da decisão, que o backend guarda junto. */
   observacao: string | null;
   /** `true` enquanto o pedido aceita decisão. */
