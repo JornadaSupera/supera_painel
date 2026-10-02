@@ -63,6 +63,8 @@ export const CONSELHO_POR_ESPECIALIDADE: Record<Especialidade, string> = {
 export const STATUS_USUARIO = {
   ATIVO: "ativo",
   INATIVO: "inativo",
+  /** Convidada por e-mail, ainda não abriu o link: o perfil existe e não vale nada. */
+  PENDENTE: "pendente",
 } as const;
 
 export type StatusUsuario = (typeof STATUS_USUARIO)[keyof typeof STATUS_USUARIO];
@@ -70,6 +72,7 @@ export type StatusUsuario = (typeof STATUS_USUARIO)[keyof typeof STATUS_USUARIO]
 export const STATUS_USUARIO_LABEL: Record<StatusUsuario, string> = {
   ativo: "Ativo",
   inativo: "Inativo",
+  pendente: "Convite pendente",
 };
 
 export const STATUS_PACIENTE = {

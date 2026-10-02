@@ -11,6 +11,7 @@ import * as clinico from "./clinico";
 import * as conversationTransfer from "./conversationTransfer";
 import * as patientRecord from "./patientRecord";
 import * as personalAgenda from "./personalAgenda";
+import * as scheduling from "./scheduling";
 import * as conteudos from "./conteudos";
 import * as configuracoes from "./configuracoes";
 import * as dashboard from "./dashboard";
@@ -49,8 +50,8 @@ const implemented = {
   conteudos,
   aprovacoes,
   auditoria,
-  // The record, the transfer and the personal calendar live in their own files but answer to the same resource.
-  clinico: { ...clinico, ...patientRecord, ...conversationTransfer, ...personalAgenda },
+  // The record, the transfer, the personal calendar and the scheduling live in their own files but answer to the same resource.
+  clinico: { ...clinico, ...patientRecord, ...conversationTransfer, ...personalAgenda, ...scheduling },
   estatisticasClinicas,
   estatisticasOperacionais,
   configuracoes,
@@ -79,8 +80,6 @@ const implemented = {
 export const INDISPONIVEIS: Readonly<Record<string, string>> = {
   "pacientes.list.risco":
     "Não há classificação de risco disponível, e não vai haver nesta fase: “risco” são as etiquetas da sistematização de enfermagem do Gemed, que estão fora do escopo de leitura contratado. Calcular no painel seria inferência clínica no front-end.",
-  "usuarios.setMfa":
-    "O segundo fator é gerenciado pela própria pessoa, no aplicativo autenticador dela.",
   "auditoria.summary.exportacao":
     "Exportação não gera linha na trilha: baixar um CSV do que já está na tela acontece no navegador, sem passar pelo banco.",
 };

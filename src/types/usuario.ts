@@ -33,6 +33,15 @@ export interface UsuarioListItem {
   avatar_url: string | null;
   status: StatusUsuario;
   /**
+   * O perfil nasceu de um convite por e-mail que ainda não foi aceito.
+   *
+   * Vale também para o convite desistido (conta desativada), que aparece como
+   * inativo: o que muda é o que a tela oferece — reenviar ou reativar o convite
+   * em vez de "devolver acesso", que o banco recusa enquanto o e-mail não for
+   * confirmado.
+   */
+  convite_pendente: boolean;
+  /**
    * `null` quando a origem dos dados não expõe o segundo fator de terceiros —
    * "não sabemos", que é diferente de `false` e não deve virar alerta na tela.
    */
@@ -86,6 +95,34 @@ export interface UsuarioEntrada {
   /** A área que agrupa a carteira. Na omissão, a primeira da lista. */
   especialidade_principal?: Especialidade | null;
   registro?: string | null;
+}
+
+/**
+ * Cadastro de pessoa NOVA na equipe, por convite.
+ *
+ * Diferente de `UsuarioEntrada`: aqui a conta ainda não existe. Quem a cria é a
+ * Edge Function, e quem define a senha é a própria pessoa, pelo link que chega
+ * por e-mail — nenhuma senha passa pelo painel.
+ */
+export interface ConviteEquipeEntrada {
+  email: string;
+  nome: string;
+  papel: Papel;
+  /** Áreas vigentes. Vazio para administrador. */
+  especialidades: Especialidade[];
+  especialidade_principal?: Especialidade | null;
+  registro?: string | null;
+}
+
+export interface ConviteEnviado {
+  account_id: string;
+  papel: Papel;
+}
+
+/** O que a redefinição do segundo fator de outra pessoa fez, para a tela dizer. */
+export interface RedefinicaoDeFator {
+  fatores_removidos: number;
+  sessoes_encerradas: number;
 }
 
 /**

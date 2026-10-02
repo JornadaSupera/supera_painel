@@ -13,6 +13,7 @@ import { concedidas } from "@/lib/permission-catalog";
 import {
   ERROR_CODE,
   fail,
+  failWith,
   ok,
   okOne,
   type ListParams,
@@ -20,16 +21,20 @@ import {
   type SingleResult,
 } from "@/services/contracts";
 import type {
+  ConviteEnviado,
+  ConviteEquipeEntrada,
   ContaDisponivel,
   DistribuicaoEspecialidade,
   LogAcesso,
   PermissaoRestrita,
+  RedefinicaoDeFator,
   UsuarioDetalhe,
   UsuarioEntrada,
   UsuarioListItem,
 } from "@/types/usuario";
 import { paginate } from "../_list";
 import { USER_DEFAULT_SORT, USER_SEARCH_FIELDS } from "../_people";
+import { chamarFuncao } from "./_edge";
 import { executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
 import { paraAcaoAuditoria, paraEspecialidade } from "./mapping";
@@ -64,10 +69,11 @@ const SELECT_USUARIO = `
   email,
   is_active,
   created_at,
-  admins ( id, is_active ),
+  admins ( id, is_active, pending_confirmation ),
   professionals (
     id,
     is_active,
+    pending_confirmation,
     council_registration,
     professional_specialties ( is_primary, ended_at, specialties ( code ) )
   )
@@ -86,10 +92,11 @@ interface LinhaConta {
   is_active: boolean;
   created_at: string;
   // Objeto, não array: `account_id` é único nas duas tabelas. Ver `umDe`.
-  admins: { id: string; is_active: boolean } | null;
+  admins: { id: string; is_active: boolean; pending_confirmation: boolean } | null;
   professionals: {
     id: string;
     is_active: boolean;
+    pending_confirmation: boolean;
     council_registration: string | null;
     professional_specialties: VinculoEspecialidade[] | null;
   } | null;
@@ -129,8 +136,18 @@ function projetar(linha: LinhaConta): UsuarioListItem | null {
   // A regra dos dois `is_active`: a conta precisa estar ativa E o perfil
   // também. Desligar a conta revoga tudo de uma vez, em todos os perfis.
   const perfilAtivo = admin ? admin.is_active : (profissional?.is_active ?? false);
-  const status: StatusUsuario =
-    linha.is_active && perfilAtivo ? STATUS_USUARIO.ATIVO : STATUS_USUARIO.INATIVO;
+
+  // Convite ainda não aceito: o perfil existe, inativo, e a confirmação do
+  // e-mail o ativa sozinha. É diferente de "desativado" — o que se oferece é
+  // reenviar o convite, não devolver um acesso que a pessoa nunca teve. Com a
+  // conta desativada o convite foi desistido, e aparece como inativo.
+  const convitePendente = Boolean(admin ? admin.pending_confirmation : profissional?.pending_confirmation);
+
+  const status: StatusUsuario = convitePendente && linha.is_active
+    ? STATUS_USUARIO.PENDENTE
+    : linha.is_active && perfilAtivo
+      ? STATUS_USUARIO.ATIVO
+      : STATUS_USUARIO.INATIVO;
 
   return {
     id: linha.id,
@@ -145,6 +162,7 @@ function projetar(linha: LinhaConta): UsuarioListItem | null {
     registro: profissional?.council_registration ?? null,
     avatar_url: null,
     status,
+    convite_pendente: convitePendente,
     // O segundo fator de OUTRA pessoa não é legível pelo cliente: o GoTrue só
     // expõe os fatores da sessão em curso. `null` significa "não sabemos", e é
     // diferente de `false` — que faria a tela acusar ausência de MFA em quem o
@@ -664,11 +682,99 @@ export async function update({
   });
 }
 
-export async function setMfa(): Promise<SingleResult<UsuarioDetalhe>> {
-  return fail(
-    ERROR_CODE.NOT_IMPLEMENTED,
-    "O segundo fator é gerenciado pela própria pessoa, no aplicativo autenticador dela.",
-  );
+/* -------------------------------------------------------------------------
+   CONVITE E SEGUNDO FATOR (Edge Functions)
+   -------------------------------------------------------------------------
+   As três operações abaixo vão por Edge Function porque tocam o Auth — criar a
+   conta, mandar o convite, apagar fatores — e isso exige a chave de serviço,
+   que só existe no servidor. O painel entra com o JWT do administrador, e as
+   funções repetem as conferências do banco antes de agir.
+
+   > [!] As três exigem a sessão com o segundo fator verificado (aal2), com ou
+   > sem a exigência do login ligada. Quem chama já pediu o código — ver
+   > `authApi.elevarSessao` e `useReforcoDaSessao`. Se mesmo assim a sessão
+   > estiver abaixo, a resposta é `MFA_REQUIRED`, e a tela pede o código.
+   ------------------------------------------------------------------------- */
+
+/** O nome do papel na Edge Function, que fala em inglês como o banco. */
+const PAPEL_NA_FUNCAO: Record<Papel, "professional" | "admin"> = {
+  [PAPEL.ADMIN]: "admin",
+  [PAPEL.PROFISSIONAL]: "professional",
+};
+
+/**
+ * Cadastra pessoa nova e envia o convite.
+ *
+ * A função cria a conta SEM e-mail confirmado e SEM senha, concede o perfil
+ * pendente e só então manda o convite — se o cadastro for recusado (registro em
+ * branco, área inválida), a conta é desfeita e nenhum e-mail sai. Quem define a
+ * senha é a própria pessoa, pelo link, e o perfil só passa a valer quando ela o
+ * abre.
+ */
+export async function convidar(entrada: ConviteEquipeEntrada): Promise<SingleResult<ConviteEnviado>> {
+  return executar(async () => {
+    const corpo: Record<string, unknown> = {
+      email: entrada.email.trim().toLowerCase(),
+      full_name: entrada.nome.trim(),
+      role: PAPEL_NA_FUNCAO[entrada.papel],
+    };
+
+    if (entrada.papel === PAPEL.PROFISSIONAL) {
+      const ids = await idsDasEspecialidades(entrada.especialidades);
+      if (!(ids instanceof Map)) return ids;
+
+      const principal = entrada.especialidade_principal ?? entrada.especialidades[0] ?? null;
+
+      corpo.council_registration = entrada.registro ?? "";
+      corpo.specialty_ids = entrada.especialidades.map((especialidade) => ids.get(especialidade));
+      if (principal) corpo.primary_specialty_id = ids.get(principal);
+    }
+
+    const resposta = await chamarFuncao<{ account_id: string; role: string }>("create-staff-account", corpo);
+    if (resposta.error) return failWith(resposta.error);
+
+    return okOne<ConviteEnviado>({
+      account_id: (resposta.data as { account_id: string }).account_id,
+      papel: entrada.papel,
+    });
+  });
+}
+
+/** Manda de novo o convite de quem ainda não o aceitou. */
+export async function reenviarConvite({ id }: { id: string }): Promise<SingleResult<null>> {
+  return executar(async () => {
+    const resposta = await chamarFuncao<{ account_id: string; resent: true }>("create-staff-account", {
+      resend: true,
+      account_id: id,
+    });
+    if (resposta.error) return failWith(resposta.error);
+
+    return okOne(null);
+  });
+}
+
+/**
+ * Redefine o segundo fator de outra pessoa da equipe.
+ *
+ * Os fatores saem, as sessões da pessoa caem e a trilha registra — a função
+ * faz as três coisas, nessa ordem, e repetir termina o que faltou. Não há
+ * "ligar o fator de alguém": ele só nasce no aparelho da própria pessoa.
+ */
+export async function resetMfa({ id }: { id: string }): Promise<SingleResult<RedefinicaoDeFator>> {
+  return executar(async () => {
+    const resposta = await chamarFuncao<{ factors_removed: number; sessions_ended: number }>(
+      "reset-mfa-factor",
+      { account_id: id },
+    );
+    if (resposta.error) return failWith(resposta.error);
+
+    const dados = resposta.data as { factors_removed: number; sessions_ended: number };
+
+    return okOne<RedefinicaoDeFator>({
+      fatores_removidos: dados.factors_removed,
+      sessoes_encerradas: dados.sessions_ended,
+    });
+  });
 }
 
 /* -------------------------------------------------------------------------

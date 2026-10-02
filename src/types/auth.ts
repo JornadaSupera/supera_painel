@@ -71,6 +71,19 @@ export type ResultadoLogin =
  *
  * Sem esta checagem, quem operasse o painel concluiria que perdeu os dados.
  */
+/**
+ * O nível em que a sessão está agora, sem consultar o banco.
+ *
+ * Existe para a pergunta que antecede uma ação que exige o segundo fator:
+ * "preciso pedir o código antes?". `GarantiaDaSessao` responde outra coisa — se
+ * o painel todo abre — e custa leituras; esta custa nenhuma.
+ */
+export interface NivelDaSessao {
+  nivel: "aal1" | "aal2";
+  /** A conta tem autenticador verificado, ou seja, tem como subir de nível. */
+  fator_cadastrado: boolean;
+}
+
 export interface GarantiaDaSessao {
   /** `aal1` = só senha. `aal2` = segundo fator verificado nesta sessão. */
   nivel: "aal1" | "aal2";

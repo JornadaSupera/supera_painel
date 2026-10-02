@@ -13,6 +13,7 @@ import type { StatusTone } from "./StatusBadge";
 export const TONE_USER_STATUS: Record<string, StatusTone> = {
   ativo: "success",
   inativo: "neutral",
+  pendente: "warning",
 };
 
 export const TONE_PATIENT_STATUS: Record<string, StatusTone> = {

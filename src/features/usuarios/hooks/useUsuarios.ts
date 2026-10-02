@@ -7,8 +7,9 @@ import { audit } from "@/lib/audit";
 import { STATUS_USUARIO, STATUS_USUARIO_LABEL, type StatusUsuario } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, permissoesApi, usuariosApi } from "@/services/apiClient";
+import { ApiException, ERROR_CODE } from "@/services/contracts";
 import { useUsuariosStore } from "@/stores/usuarios";
-import type { UsuarioEntrada } from "@/types/usuario";
+import type { ConviteEquipeEntrada, UsuarioEntrada } from "@/types/usuario";
 
 /**
  * Acesso a Usuários e à matriz de permissões.
@@ -159,13 +160,19 @@ export function useAlterarStatus() {
 }
 
 /**
- * Desativa a CONTA — todos os perfis, o aplicativo e o push de uma vez.
- *
- * Separada de `useAlterarStatus` porque as duas perguntas têm respostas
- * diferentes: "esta pessoa ainda opera o painel?" não é "esta pessoa ainda usa
- * a plataforma?". Um botão só para as duas escolhe a errada metade das vezes.
+ * Liga ou desliga a CONTA, que é o ato por trás de dois botões diferentes:
+ * desativar a conta inteira e desistir de um convite. O que muda entre eles é o
+ * texto — a operação, o aviso de sucesso e o de falha —, e por isso o mecanismo
+ * é um só.
  */
-export function useDesativarConta() {
+interface TextosDaConta {
+  /** Como o ato aparece na trilha do painel. */
+  operacao: (ativa: boolean) => string;
+  sucesso: (ativa: boolean) => { titulo: string; descricao: string };
+  falha: string;
+}
+
+function useMudarConta(textos: TextosDaConta) {
   const invalidar = useInvalidarUsuarios();
 
   return useMutation({
@@ -175,22 +182,42 @@ export function useDesativarConta() {
       // O motivo fica no registro do painel: `audit_log` não tem coluna de
       // justificativa, e o texto não chega ao backend. Ver a lista de
       // operações indisponíveis.
-      audit.update(RECURSO, id, { operacao: "conta", ativa, motivo });
+      audit.update(RECURSO, id, { operacao: textos.operacao(ativa), ativa, motivo });
 
       return data;
     },
-    onSuccess: async (usuario) => {
+    onSuccess: async (_usuario, { ativa }) => {
       await invalidar();
 
-      toast.success(usuario?.status === STATUS_USUARIO.ATIVO ? "Conta reativada" : "Conta desativada", {
-        description:
-          usuario?.status === STATUS_USUARIO.ATIVO
-            ? "A pessoa volta a acessar a plataforma com os perfis que tinha."
-            : "A pessoa perdeu o acesso a todos os perfis e ao aplicativo, e os aparelhos registrados foram invalidados.",
-      });
+      const { titulo, descricao } = textos.sucesso(ativa);
+      toast.success(titulo, { description: descricao });
     },
-    onError: (erro) =>
-      toast.error("Não foi possível alterar a conta", { description: erro.message }),
+    onError: (erro) => avisarFalha(textos.falha, erro),
+  });
+}
+
+/**
+ * Desativa a CONTA — todos os perfis, o aplicativo e o push de uma vez.
+ *
+ * Separada de `useAlterarStatus` porque as duas perguntas têm respostas
+ * diferentes: "esta pessoa ainda opera o painel?" não é "esta pessoa ainda usa
+ * a plataforma?". Um botão só para as duas escolhe a errada metade das vezes.
+ */
+export function useDesativarConta() {
+  return useMudarConta({
+    operacao: () => "conta",
+    sucesso: (ativa) =>
+      ativa
+        ? {
+            titulo: "Conta reativada",
+            descricao: "A pessoa volta a acessar a plataforma com os perfis que tinha.",
+          }
+        : {
+            titulo: "Conta desativada",
+            descricao:
+              "A pessoa perdeu o acesso a todos os perfis e ao aplicativo, e os aparelhos registrados foram invalidados.",
+          },
+    falha: "Não foi possível alterar a conta",
   });
 }
 
@@ -209,21 +236,120 @@ export function useResetarSenha() {
   });
 }
 
-/** Ligar ou desligar o segundo fator. Desligar exige motivo — o backend cobra. */
-export function useAlterarMfa() {
+/* -------------------------------------------------------------------------
+   CONVITE E SEGUNDO FATOR
+   -------------------------------------------------------------------------
+   Três ações que o banco só aceita com a sessão em dois fatores. A tela pede o
+   código ANTES (`useReforcoDaSessao`); se mesmo assim a resposta for
+   `MFA_REQUIRED` — a sessão caiu de nível no meio —, o aviso diz o que fazer em
+   vez de mostrar um erro genérico.
+   ------------------------------------------------------------------------- */
+
+function avisarFalha(titulo: string, erro: Error) {
+  if (erro instanceof ApiException && erro.code === ERROR_CODE.MFA_REQUIRED) {
+    toast.error("Confirme o segundo fator", {
+      description: "A sessão perdeu a verificação do segundo fator. Repita a ação e informe o código.",
+    });
+    return;
+  }
+
+  toast.error(titulo, { description: erro.message });
+}
+
+/** Cadastra pessoa nova e envia o convite por e-mail. */
+export function useConvidarUsuario() {
   const invalidar = useInvalidarUsuarios();
 
   return useMutation({
-    mutationFn: async ({ id, ativo, motivo }: { id: string; ativo: boolean; motivo?: string }) => {
-      const { data } = await call(() => usuariosApi.setMfa({ id, ativo, motivo }));
-      audit.update(RECURSO, id, { operacao: "mfa", ativo, motivo });
+    mutationFn: async (entrada: ConviteEquipeEntrada) => {
+      const { data } = await call(() => usuariosApi.convidar(entrada));
       return data;
     },
-    onSuccess: async (usuario) => {
+    onSuccess: async (convite, entrada) => {
+      if (convite) {
+        audit.update(RECURSO, convite.account_id, { operacao: "convite", papel: convite.papel });
+      }
       await invalidar();
-      toast.success(usuario?.mfa_ativo ? "Segundo fator ativado" : "Segundo fator desativado");
+
+      toast.success("Convite enviado", {
+        description: `${entrada.nome} recebe um e-mail para criar a senha. O acesso vale quando ela abrir o link.`,
+      });
     },
-    onError: (erro) => toast.error("Não foi possível alterar o segundo fator", { description: erro.message }),
+    onError: async (erro) => {
+      // A conta e o perfil ficaram criados e só o e-mail não saiu: a lista tem
+      // a linha, com "Reenviar convite". Sem isto, a pessoa tentaria cadastrar
+      // de novo e bateria em "já existe uma conta com este e-mail".
+      if (erro instanceof ApiException && (erro.details as { sentinela?: string } | undefined)?.sentinela === "invite_failed") {
+        await invalidar();
+      }
+      avisarFalha("Não foi possível enviar o convite", erro);
+    },
+  });
+}
+
+/** Manda de novo o convite de quem ainda não o aceitou. */
+export function useReenviarConvite() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await call(() => usuariosApi.reenviarConvite({ id }));
+      audit.update(RECURSO, id, { operacao: "reenvio_convite" });
+    },
+    onSuccess: () =>
+      toast.success("Convite reenviado", {
+        description: "A pessoa deve usar o e-mail mais recente: o link do anterior pode deixar de valer.",
+      }),
+    onError: (erro) => avisarFalha("Não foi possível reenviar o convite", erro),
+  });
+}
+
+/**
+ * Desiste do convite, ou o retoma.
+ *
+ * O banco não tem "cancelar convite": o perfil pendente não pode ser desligado
+ * (`staff_invitation_pending`), e o caminho oficial é desativar a conta — mesmo
+ * que a pessoa abra o link depois, a conta desativada não entra. Retomar é
+ * reativar a conta, e o convite volta a ficar pendente.
+ */
+export function useCancelarConvite() {
+  return useMudarConta({
+    operacao: (ativa) => (ativa ? "convite_retomado" : "convite_cancelado"),
+    sucesso: (ativa) =>
+      ativa
+        ? { titulo: "Convite retomado", descricao: "Reenvie o e-mail se a pessoa ainda não tiver o link." }
+        : {
+            titulo: "Convite cancelado",
+            descricao: "Mesmo que a pessoa abra o link, a conta desativada não entra.",
+          },
+    falha: "Não foi possível alterar o convite",
+  });
+}
+
+/**
+ * Redefine o segundo fator de outra pessoa da equipe.
+ *
+ * A pessoa perde os fatores e as sessões, e entra só com a senha até cadastrar
+ * outro autenticador. Com a exigência do administrador ligada no banco, quem
+ * teve o fator redefinido fica sem o acesso administrativo até recadastrar.
+ */
+export function useRedefinirFator() {
+  const invalidar = useInvalidarUsuarios();
+
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; motivo?: string }) => {
+      const { data } = await call(() => usuariosApi.resetMfa({ id }));
+      return data;
+    },
+    onSuccess: async (resultado, { id, motivo }) => {
+      audit.update(RECURSO, id, { operacao: "mfa_redefinido", motivo });
+      await invalidar();
+
+      toast.success("Segundo fator redefinido", {
+        description: resultado
+          ? `${resultado.fatores_removidos} autenticador(es) removido(s) e ${resultado.sessoes_encerradas} sessão(ões) encerrada(s). A pessoa cadastra outro ao entrar.`
+          : undefined,
+      });
+    },
+    onError: (erro) => avisarFalha("Não foi possível redefinir o segundo fator", erro),
   });
 }
 

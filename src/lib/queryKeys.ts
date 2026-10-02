@@ -148,6 +148,12 @@ export const queryKeys = {
   clinico: {
     all: ["clinico"] as const,
     agenda: <R extends QueryKeyParams<R>>(range?: R | null) => ["clinico", "agenda", range ?? {}] as const,
+    /** Every window of the agenda: what booking, moving or closing an appointment must refresh. */
+    agendaAll: () => ["clinico", "agenda"] as const,
+    /** Whether this professional manages the schedule — asked once, it does not change in a session. */
+    schedulingAccess: () => ["clinico", "scheduling-access"] as const,
+    /** When people on the team cannot take appointments, in a window. */
+    busyIn: (from: string, to: string) => ["clinico", "busy", from, to] as const,
     /** Sem status = a fila inteira; `undefined` vira `"todos"`, para a chave não colidir com "sem filtro nenhum". */
     carteira: (dias: number) => ["clinico", "carteira", dias] as const,
     alertas: (status?: string) => ["clinico", "alertas", status ?? "todos"] as const,

@@ -39,6 +39,9 @@ export const RESOURCES = {
        * clínica em branco e ninguém saberia por quê.
        */
       "getGarantia",
+      /** O nível da sessão agora e o que sobe a sessão de nível, sem novo login. */
+      "getNivelDaSessao",
+      "elevarSessao",
       "getSegundoFator",
       "iniciarCadastroTotp",
       "confirmarCadastroTotp",
@@ -108,7 +111,14 @@ export const RESOURCES = {
       "update",
       "setStatus",
       "resetPassword",
-      "setMfa",
+      /**
+       * Pessoa nova na equipe, por convite por e-mail, e a redefinição do
+       * autenticador de quem o perdeu. As três exigem a sessão com o segundo
+       * fator verificado.
+       */
+      "convidar",
+      "reenviarConvite",
+      "resetMfa",
       "listAccessLogs",
       /**
        * Contagem por especialidade, que é o que a faixa do topo da tela mostra.
@@ -286,6 +296,12 @@ export const RESOURCES = {
       "createBlock",
       "updateBlock",
       "deleteBlock",
+      /** Agendar, remarcar e registrar o desfecho — só quem gere a agenda. */
+      "getSchedulingAccess",
+      "listBusyIntervals",
+      "scheduleAppointment",
+      "rescheduleAppointment",
+      "setAppointmentStatus",
       "listAlertas",
       "assumirAlerta",
       "designarAlerta",

@@ -14,6 +14,7 @@ import type {
   DesafioMfa,
   EstadoSegundoFator,
   GarantiaDaSessao,
+  NivelDaSessao,
   ResultadoLogin,
   Sessao,
   UsuarioAutenticado,
@@ -547,6 +548,77 @@ export async function getGarantia(): Promise<SingleResult<GarantiaDaSessao>> {
   });
 }
 
+/**
+ * O nível da sessão agora, lido do próprio token.
+ *
+ * `getAuthenticatorAssuranceLevel` decodifica o JWT que o cliente já tem, e
+ * `nextLevel` vem da lista de fatores da sessão: nenhuma das duas chamadas vai
+ * ao banco. Por isso dá para perguntar a cada clique, em vez de confiar numa
+ * resposta que ficou quente desde o login.
+ */
+export async function getNivelDaSessao(): Promise<SingleResult<NivelDaSessao>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const { data: sessao } = await supabase.auth.getSession();
+    if (!sessao.session) return fail(ERROR_CODE.UNAUTHORIZED, "Entre novamente.");
+
+    const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (error) return falhaDe(error);
+
+    return okOne<NivelDaSessao>({
+      nivel: data?.currentLevel === "aal2" ? "aal2" : "aal1",
+      fator_cadastrado: data?.nextLevel === "aal2",
+    });
+  });
+}
+
+/**
+ * Verifica o código do autenticador JÁ cadastrado e sobe a sessão para `aal2`.
+ *
+ * É o mesmo ato do segundo passo do login, feito no momento da ação que o
+ * exige. O token novo substitui o atual no cliente, e a próxima chamada — RPC
+ * ou Edge Function — já segue com o nível certo.
+ */
+export async function elevarSessao({ codigo }: { codigo: string }): Promise<SingleResult<null>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const { data: fatores, error: erroFatores } = await supabase.auth.mfa.listFactors();
+    if (erroFatores) return falhaDe(erroFatores);
+
+    // `totp` já vem só com os verificados: um fator pendente não prova nada.
+    const fator = fatores?.totp?.[0];
+    if (!fator) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "Esta conta ainda não tem aplicativo autenticador. Cadastre um na tela Segurança.",
+      );
+    }
+
+    const { error } = await supabase.auth.mfa.challengeAndVerify({
+      factorId: fator.id,
+      code: codigo.trim(),
+    });
+
+    if (error) {
+      if (error.status === 429) return fail(ERROR_CODE.RATE_LIMITED);
+
+      // Código errado ou vencido — o aplicativo troca de código a cada 30 s.
+      if (codigoRecusado(error)) {
+        return fail(
+          ERROR_CODE.VALIDATION,
+          "Código inválido ou vencido. Digite o código que o aplicativo mostra agora.",
+        );
+      }
+
+      return falhaDe(error);
+    }
+
+    return okOne(null);
+  });
+}
+
 /* -------------------------------------------------------------------------
    AUTENTICADOR DA PRÓPRIA CONTA
    -------------------------------------------------------------------------
@@ -732,12 +804,15 @@ async function exchangeCredential(
 
   switch (credential.kind) {
     case "token_hash":
-      return supabase.auth.verifyOtp({ token_hash: credential.token_hash, type: "recovery" });
+      return supabase.auth.verifyOtp({
+        token_hash: credential.token_hash,
+        type: credential.type ?? "recovery",
+      });
     case "otp":
       return supabase.auth.verifyOtp({
         email: credential.email,
         token: credential.token,
-        type: "recovery",
+        type: credential.type ?? "recovery",
       });
     case "session":
       return supabase.auth.setSession({

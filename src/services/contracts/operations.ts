@@ -13,6 +13,7 @@ import type {
   DesafioMfa,
   EstadoSegundoFator,
   GarantiaDaSessao,
+  NivelDaSessao,
   ResultadoLogin,
   Sessao,
 } from "@/types/auth";
@@ -26,7 +27,17 @@ import type {
   MensagemClinico,
 } from "@/types/clinico";
 import type { SatisfactionResponse, SatisfactionSummary } from "@/types/satisfaction";
-import type { AppointmentTypeOption, BusinessHour, PersonalBlock, PersonalBlockInput } from "@/types/agenda";
+import type {
+  AppointmentInput,
+  AppointmentOutcome,
+  AppointmentTypeOption,
+  BusinessHour,
+  BusyInterval,
+  PersonalBlock,
+  PersonalBlockInput,
+  SavedBlock,
+  SchedulingAccess,
+} from "@/types/agenda";
 import type { ConversationAssignment, TransferTarget } from "@/types/conversation-transfer";
 import type { DiarySymptom, PatientTimeline } from "@/types/patient-record";
 import type {
@@ -79,11 +90,14 @@ import type {
   ResultadoConvite,
 } from "@/types/paciente";
 import type {
+  ConviteEnviado,
+  ConviteEquipeEntrada,
   ContaDisponivel,
   DistribuicaoEspecialidade,
   LogAcesso,
   MatrizPermissoes,
   PermissaoRestrita,
+  RedefinicaoDeFator,
   UsuarioDetalhe,
   UsuarioEntrada,
   UsuarioListItem,
@@ -126,9 +140,18 @@ export interface PasswordResetRequest {
  * that fails in exactly the same way.
  */
 export type RecoveryCredential =
-  | { kind: "token_hash"; token_hash: string }
-  | { kind: "otp"; email: string; token: string }
+  | { kind: "token_hash"; token_hash: string; type?: RecoveryLinkType }
+  | { kind: "otp"; email: string; token: string; type?: RecoveryLinkType }
   | { kind: "session"; access_token: string; refresh_token: string };
+
+/**
+ * Para que o link foi emitido: trocar a senha de quem já tinha acesso, ou criar
+ * a primeira de quem acabou de ser convidado para a equipe.
+ *
+ * A prova é verificada com o MESMO tipo com que foi emitida — o convite
+ * verificado como `recovery` falha, e a tela diz que o link expirou.
+ */
+export type RecoveryLinkType = "recovery" | "invite";
 
 export interface PasswordRecoveryInput {
   credential: RecoveryCredential;
@@ -155,6 +178,21 @@ export interface AuthOperations {
    * as telas de uma vez.
    */
   getGarantia(): Promise<SingleResult<GarantiaDaSessao>>;
+
+  /** O nível da sessão neste instante, lido do próprio token. Não consulta o banco. */
+  getNivelDaSessao(): Promise<SingleResult<NivelDaSessao>>;
+
+  /**
+   * Sobe a sessão para dois fatores, com o código do autenticador já cadastrado.
+   *
+   * É o que as ações que o banco só aceita em `aal2` exigem — cadastrar alguém
+   * da equipe e redefinir o fator de outra pessoa —, e é feito no momento da
+   * ação, não no login: o login continua sem pedir o código.
+   *
+   * Códigos de erro: VALIDATION → o código foi recusado (ou a conta não tem
+   * autenticador); RATE_LIMITED → tentativas demais.
+   */
+  elevarSessao(params: { codigo: string }): Promise<SingleResult<null>>;
 
   /**
    * O autenticador (TOTP) da própria conta.
@@ -373,8 +411,30 @@ export interface UsuariosOperations {
   /** Dispara o e-mail de redefinição. O painel nunca escolhe senha de ninguém. */
   resetPassword(params: { id: string }): Promise<SingleResult<{ enviado: true; destino: string }>>;
 
-  /** Liga ou desliga o segundo fator. Desligar exige justificativa. */
-  setMfa(params: { id: string; ativo: boolean; motivo?: string }): Promise<SingleResult<UsuarioDetalhe>>;
+  /**
+   * Cadastra pessoa NOVA na equipe: cria a conta, concede o perfil PENDENTE e
+   * envia o convite por e-mail. A pessoa define a própria senha pelo link.
+   *
+   * Exige a sessão com o segundo fator verificado — o banco recusa sem ela
+   * (`MFA_REQUIRED`), mesmo com a exigência do login desligada. Quem chama
+   * precisa ter pedido o código antes (`authApi.elevarSessao`).
+   *
+   * Falha com `details.account_id` quando a conta e o perfil ficaram criados e
+   * só o e-mail não saiu: o caminho é `reenviarConvite`, não cadastrar de novo.
+   */
+  convidar(params: ConviteEquipeEntrada): Promise<SingleResult<ConviteEnviado>>;
+
+  /** Manda de novo o convite de quem ainda não o aceitou. Mesma exigência de sessão. */
+  reenviarConvite(params: { id: string }): Promise<SingleResult<null>>;
+
+  /**
+   * Redefine o segundo fator de OUTRA pessoa da equipe, que perdeu o
+   * autenticador: remove todos os fatores e derruba as sessões dela.
+   *
+   * Não existe "ligar o fator de alguém" — o fator nasce no aparelho da pessoa.
+   * Mesma exigência de sessão. A própria conta é recusada (`FORBIDDEN`).
+   */
+  resetMfa(params: { id: string }): Promise<SingleResult<RedefinicaoDeFator>>;
 
   listAccessLogs(params: { id: string } & ListParams): Promise<ListResult<LogAcesso>>;
 
@@ -574,9 +634,35 @@ export interface ClinicoOperations {
   listBusinessHours(): Promise<ListResult<BusinessHour>>;
   /** Os bloqueios pessoais que tocam a janela. Só o dono os enxerga. */
   listMyBlocks(params: { from: string; to: string }): Promise<ListResult<PersonalBlock>>;
-  createBlock(params: PersonalBlockInput): Promise<SingleResult<PersonalBlock>>;
-  updateBlock(params: PersonalBlockInput & { id: string }): Promise<SingleResult<PersonalBlock>>;
+  /**
+   * Cria ou move o próprio bloqueio e devolve os compromissos que já estavam no
+   * intervalo. O bloqueio é aceito mesmo com conflito: nada é cancelado, e o
+   * aviso é da tela.
+   */
+  createBlock(params: PersonalBlockInput): Promise<SingleResult<SavedBlock>>;
+  updateBlock(params: PersonalBlockInput & { id: string }): Promise<SingleResult<SavedBlock>>;
   deleteBlock(params: { id: string }): Promise<SingleResult<null>>;
+
+  /**
+   * Quem gere a agenda e quem é, como profissional. O profissional não lê as
+   * próprias concessões: a resposta vem de perguntar à única chamada que as
+   * exige. Decide só se os botões aparecem — a barreira é o banco.
+   */
+  getSchedulingAccess(): Promise<SingleResult<SchedulingAccess>>;
+  /**
+   * Quando cada pessoa da equipe está indisponível, sem rótulo. Janela de até 62
+   * dias. Para pintar "indisponível" antes de o banco recusar com `slot_blocked`.
+   */
+  listBusyIntervals(params: { from: string; to: string }): Promise<ListResult<BusyInterval>>;
+  /** Marca um compromisso. Devolve o id. Recusa o horário bloqueado (`CONFLICT`). */
+  scheduleAppointment(params: AppointmentInput): Promise<SingleResult<{ id: string }>>;
+  /**
+   * Remarca: nasce um compromisso novo (outro id) e o antigo fica "remarcado".
+   * Quem o altera precisa VÊ-LO — sessão de outra área responde `NOT_FOUND`.
+   */
+  rescheduleAppointment(params: { id: string; starts_at: string; ends_at: string }): Promise<SingleResult<{ id: string }>>;
+  /** Registra o desfecho: realizado, faltou ou cancelado. */
+  setAppointmentStatus(params: { id: string; outcome: AppointmentOutcome }): Promise<SingleResult<null>>;
 
   /**
    * A fila de alertas — compartilhada pela equipe, não recortada por
