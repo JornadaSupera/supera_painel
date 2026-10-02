@@ -49,10 +49,22 @@ export function useSaveBlock() {
         : await call(() => clinicoApi.createBlock(input));
       return result.data;
     },
-    onSuccess: async (block, params) => {
-      if (block) audit.update("professional_blocks", block.id, { operation: params.id ? "update" : "create" });
+    onSuccess: async (saved, params) => {
+      if (saved) audit.update("professional_blocks", saved.id, { operation: params.id ? "update" : "create" });
       await queryClient.invalidateQueries({ queryKey: queryKeys.clinico.blocks() });
       toast.success(params.id ? "Bloqueio atualizado" : "Horário bloqueado");
+
+      // The block is accepted where appointments already are, and none is
+      // cancelled. Say so, or the person reads the block as having cleared them.
+      const conflicts = saved?.conflicts.length ?? 0;
+      if (conflicts > 0) {
+        toast.warning(
+          conflicts === 1
+            ? "Você tem 1 compromisso neste intervalo"
+            : `Você tem ${conflicts} compromissos neste intervalo`,
+          { description: "Eles continuam marcados. Remarque ou cancele pela agenda." },
+        );
+      }
     },
     onError: (error) => toast.error("Não foi possível salvar o bloqueio", { description: error.message }),
   });

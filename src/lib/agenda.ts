@@ -209,6 +209,34 @@ export function timeOfMinutes(minutes: number): string {
 
 export const BLOCK_LABEL_MAX = 80;
 
+/**
+ * Whether `[startsAt, endsAt)` touches a stretch when `professionalId` cannot take
+ * appointments.
+ *
+ * Half-open on both sides, as the database counts it: a block that ends at 12:00
+ * and an appointment that starts at 12:00 do not collide. This only lets the form
+ * say "unavailable" before the database refuses — the database stays the judge,
+ * and answers `slot_blocked` either way.
+ */
+export function overlapsBusy(
+  intervals: { professional_id: string; starts_at: string; ends_at: string }[],
+  professionalId: string | null,
+  startsAt: string,
+  endsAt: string,
+): boolean {
+  if (!professionalId) return false;
+
+  const start = new Date(startsAt).getTime();
+  const end = new Date(endsAt).getTime();
+
+  return intervals.some(
+    (interval) =>
+      interval.professional_id === professionalId &&
+      new Date(interval.starts_at).getTime() < end &&
+      new Date(interval.ends_at).getTime() > start,
+  );
+}
+
 /** The reason a block cannot be saved, or `null`. The database checks the period too. */
 export function blockError(input: { label: string | null; starts_at: string; ends_at: string }): string | null {
   const start = new Date(input.starts_at).getTime();

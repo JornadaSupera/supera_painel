@@ -205,6 +205,59 @@ export function blockToFormValues(block: PersonalBlock | null, defaultDay: strin
 }
 
 /* -------------------------------------------------------------------------
+   COMPROMISSO
+   ------------------------------------------------------------------------- */
+
+const TITLE_MAX = 120;
+const LOCATION_MAX = 120;
+const PATIENT_NOTES_MAX = 500;
+
+/** The wall-clock window of an appointment, as the form fills it in. */
+interface AppointmentWindow {
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+/** The form is in the clinic's wall clock; the database stores instants. */
+export function appointmentWindow(values: AppointmentWindow): { starts_at: string; ends_at: string } {
+  return {
+    starts_at: zonedInstant(values.date, minutesOfTime(values.startTime)),
+    ends_at: zonedInstant(values.date, minutesOfTime(values.endTime)),
+  };
+}
+
+function checkWindow(values: AppointmentWindow, ctx: z.RefinementCtx) {
+  if (minutesOfTime(values.endTime) <= minutesOfTime(values.startTime)) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endTime"], message: "O fim precisa ser depois do início." });
+  }
+}
+
+export const appointmentSchema = z
+  .object({
+    patientId: z.string().min(1, "Escolha o paciente."),
+    typeId: z.string().min(1, "Escolha o tipo de compromisso."),
+    title: z.string().trim().min(1, "Informe o título.").max(TITLE_MAX, `O título tem no máximo ${TITLE_MAX} caracteres.`),
+    date: DATE_FIELD,
+    startTime: TIME_FIELD,
+    endTime: TIME_FIELD,
+    location: z.string().trim().min(1, "Informe o local.").max(LOCATION_MAX, `O local tem no máximo ${LOCATION_MAX} caracteres.`),
+    /** `"me"` or a professional id. */
+    professional: z.string().min(1),
+    notes: z.string().trim().max(PATIENT_NOTES_MAX, `O recado tem no máximo ${PATIENT_NOTES_MAX} caracteres.`),
+  })
+  .superRefine(checkWindow);
+
+export type AppointmentForm = z.infer<typeof appointmentSchema>;
+
+/** Moving an appointment changes when, nothing else. */
+export const rescheduleSchema = z
+  .object({ date: DATE_FIELD, startTime: TIME_FIELD, endTime: TIME_FIELD })
+  .superRefine(checkWindow);
+
+export type RescheduleForm = z.infer<typeof rescheduleSchema>;
+
+/* -------------------------------------------------------------------------
    DESIGNAR ALERTA
    ------------------------------------------------------------------------- */
 

@@ -1,3 +1,4 @@
+import { MoreHorizontal } from "lucide-react";
 import { useMemo, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 
@@ -11,6 +12,7 @@ import {
 } from "@/lib/agenda";
 import { cn } from "@/lib/utils";
 import type { PersonalBlock } from "@/types/agenda";
+import type { CompromissoAgenda } from "@/types/clinico";
 import type { AgendaDay } from "../agenda-days";
 import { APPOINTMENT_CARD_TONE, BLOCK_PATTERN } from "../agenda-tones";
 
@@ -58,6 +60,7 @@ export function AgendaTimeGrid({
   recordHref,
   onOpenDay,
   onEditBlock,
+  onManage,
 }: {
   days: AgendaDay[];
   today: string;
@@ -68,6 +71,11 @@ export function AgendaTimeGrid({
   /** Makes the day heading a way into the day view. Omitted in the day view itself. */
   onOpenDay?: (key: string) => void;
   onEditBlock: (block: PersonalBlock) => void;
+  /**
+   * Opens what can be done with an appointment — move it, record how it ended.
+   * Omitted for someone who does not run the schedule, and the cards stay links.
+   */
+  onManage?: (appointment: CompromissoAgenda) => void;
 }) {
   const { from, to } = useMemo(() => visibleRange(days), [days]);
   const height = ((to - from) / 60) * HOUR_PX;
@@ -239,6 +247,35 @@ export function AgendaTimeGrid({
                   width: `calc(${width}% - 4px)`,
                 };
                 const title = `${timeOfMinutes(start)} a ${timeOfMinutes(end)} · ${appointment.paciente_nome} · ${appointment.tipo_label} · ${appointment.status_label}`;
+
+                // Only an appointment still scheduled can be moved or closed: the
+                // database does not take one out of a terminal state.
+                if (onManage && appointment.status_codigo === "scheduled") {
+                  // The card is a link and the menu a button, side by side: a
+                  // button inside a link is not valid, and it would swallow the click.
+                  return (
+                    <div key={appointment.id} className={cn(className, "p-0")} style={style} title={title}>
+                      {recordHref ? (
+                        <Link
+                          to={recordHref(appointment.paciente_id)}
+                          className="focus-visible:ring-ring block h-full px-1.5 py-0.5 pr-6 focus-visible:ring-2 focus-visible:outline-none"
+                        >
+                          {card}
+                        </Link>
+                      ) : (
+                        <div className="h-full px-1.5 py-0.5 pr-6">{card}</div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onManage(appointment)}
+                        aria-label={`Gerenciar o compromisso de ${appointment.paciente_nome}`}
+                        className="focus-visible:ring-ring absolute top-0.5 right-0.5 rounded p-0.5 hover:bg-black/10 focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-white/10"
+                      >
+                        <MoreHorizontal size={14} aria-hidden="true" />
+                      </button>
+                    </div>
+                  );
+                }
 
                 return recordHref ? (
                   <Link

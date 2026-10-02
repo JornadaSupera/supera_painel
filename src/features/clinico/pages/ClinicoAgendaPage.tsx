@@ -20,14 +20,18 @@ import { ESPECIALIDADE_LABEL } from "@/lib/enums";
 import { formatNumber, pluralize } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import type { PersonalBlock } from "@/types/agenda";
+import type { CompromissoAgenda } from "@/types/clinico";
 import { buildAgendaDays } from "../agenda-days";
 import { resumoDoPeriodo } from "../agenda-resumo";
 import { AgendaMonthView } from "../components/AgendaMonthView";
 import { AgendaTimeGrid } from "../components/AgendaTimeGrid";
 import { ALL_TYPES, AgendaToolbar } from "../components/AgendaToolbar";
+import { AppointmentActionsDialog } from "../components/AppointmentActionsDialog";
+import { AppointmentFormDialog } from "../components/AppointmentFormDialog";
 import { BlockDialog } from "../components/BlockDialog";
 import { useAgendaClinica } from "../hooks/useAgendaClinica";
 import { useAppointmentTypes, useBusinessHours, useMyBlocks } from "../hooks/usePersonalAgenda";
+import { useSchedulingAccess } from "../hooks/useScheduling";
 
 /**
  * Agenda pessoal do profissional: mês, semana e dia, com filtro por tipo, o
@@ -41,9 +45,15 @@ import { useAppointmentTypes, useBusinessHours, useMyBlocks } from "../hooks/use
  * navegador desfaz a navegação pelo calendário, e um endereço copiado abre a
  * mesma agenda. O padrão (semana de hoje, todos os tipos) fica fora do endereço.
  *
- * > [!] Bloqueio não cancela nem impede compromisso
- * O agendamento no banco ainda não consulta os bloqueios. Eles marcam o tempo
- * como indisponível para a própria pessoa; o diálogo diz isso.
+ * > [!] Bloqueio impede marcar, mas não cancela o que já está marcado
+ * O agendamento recusa o horário que colide com um bloqueio (`slot_blocked`), sem
+ * dizer o motivo: só o dono lê o rótulo. O que já estava marcado continua
+ * marcado, e salvar o bloqueio avisa quantos compromissos ficaram dentro dele.
+ *
+ * > [!] Marcar, remarcar e registrar o desfecho são de quem gere a agenda
+ * O banco confere a permissão a cada chamada. A tela só pergunta uma vez
+ * (`useSchedulingAccess`) para decidir se desenha os botões; sem a resposta, a
+ * agenda é só de leitura.
  */
 
 const VIEWS = Object.values(AGENDA_VIEW) as string[];
@@ -105,6 +115,12 @@ export function ClinicoAgendaPage() {
 
   const [editing, setEditing] = useState<{ block: PersonalBlock | null } | null>(null);
 
+  const access = useSchedulingAccess();
+  const canSchedule = access.data?.allowed === true;
+  const [booking, setBooking] = useState(false);
+  const [managing, setManaging] = useState<CompromissoAgenda | null>(null);
+  const [moving, setMoving] = useState<CompromissoAgenda | null>(null);
+
   const total = days.reduce((sum, entry) => sum + entry.appointments.length, 0);
   const resumo = resumoDoPeriodo(
     days.flatMap((entry) => entry.appointments.map((item) => item.appointment)),
@@ -134,6 +150,7 @@ export function ClinicoAgendaPage() {
         types={types.data ?? []}
         onTypeChange={(next) => go({ tipo: next })}
         onNewBlock={() => setEditing({ block: null })}
+        onNewAppointment={canSchedule ? () => setBooking(true) : undefined}
       />
 
       {agenda.data && (
@@ -188,12 +205,37 @@ export function ClinicoAgendaPage() {
           recordHref={recordHref}
           onOpenDay={view === AGENDA_VIEW.WEEK ? (key) => go({ visao: AGENDA_VIEW.DAY, data: key }) : undefined}
           onEditBlock={(block) => setEditing({ block })}
+          onManage={canSchedule ? setManaging : undefined}
         />
       )}
 
       <p className="text-muted-foreground text-xs">
-        Áreas sombreadas: clínica fechada. Listras: horário que você bloqueou.
+        Áreas sombreadas: clínica fechada. Listras: horário que você bloqueou, onde ninguém marca compromisso.
       </p>
+
+      <AppointmentFormDialog
+        open={booking || moving !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setBooking(false);
+            setMoving(null);
+          }
+        }}
+        appointment={moving}
+        defaultDay={newBlockDay}
+        access={access.data ?? null}
+        area={user?.especialidade ?? null}
+      />
+
+      <AppointmentActionsDialog
+        appointment={managing}
+        onOpenChange={(open) => !open && setManaging(null)}
+        onReschedule={(appointment) => {
+          setManaging(null);
+          setMoving(appointment);
+        }}
+        recordHref={recordHref}
+      />
 
       <BlockDialog
         open={editing !== null}

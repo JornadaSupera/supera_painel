@@ -22,9 +22,10 @@ import { blockFormToInput, blockSchema, blockToFormValues, type BlockForm } from
 /**
  * Create, edit or remove a personal block.
  *
- * A block marks time as unavailable for the professional. It does not cancel an
- * appointment that is already there, and the scheduling side does not consult it
- * yet — the dialog says so, instead of letting the block read as a guarantee.
+ * A block marks time as unavailable: nobody can book an appointment with the
+ * professional inside it. It does not cancel an appointment that is already there
+ * — saving says how many are — and the dialog tells that, instead of letting the
+ * block read as having cleared the day.
  */
 export function BlockDialog({
   open,
@@ -71,8 +72,8 @@ export function BlockDialog({
           <DialogHeader>
             <DialogTitle>{block ? "Editar bloqueio" : "Bloquear horário"}</DialogTitle>
             <DialogDescription>
-              O bloqueio marca o período como indisponível na sua agenda. Só você o vê, e ele não cancela
-              compromissos que já estão marcados.
+              Ninguém marca compromisso com você dentro deste período. Só você lê o motivo: quem agenda vê apenas
+              que o horário está indisponível. Compromissos que já estão marcados continuam marcados.
             </DialogDescription>
           </DialogHeader>
 

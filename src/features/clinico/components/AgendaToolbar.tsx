@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, LockKeyhole } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, LockKeyhole } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -35,6 +35,7 @@ export function AgendaToolbar({
   types,
   onTypeChange,
   onNewBlock,
+  onNewAppointment,
 }: {
   view: AgendaView;
   day: string;
@@ -45,6 +46,8 @@ export function AgendaToolbar({
   types: AppointmentTypeOption[];
   onTypeChange: (type: string) => void;
   onNewBlock: () => void;
+  /** Omitted for someone who does not run the schedule: there is nothing to book with. */
+  onNewAppointment?: () => void;
 }) {
   const period = { mes: "mês", semana: "semana", dia: "dia" }[view];
 
@@ -86,7 +89,14 @@ export function AgendaToolbar({
             ))}
           </div>
 
-          <Button type="button" onClick={onNewBlock}>
+          {onNewAppointment && (
+            <Button type="button" onClick={onNewAppointment}>
+              <CalendarPlus />
+              Nova consulta
+            </Button>
+          )}
+
+          <Button type="button" variant={onNewAppointment ? "outline" : "default"} onClick={onNewBlock}>
             <LockKeyhole />
             Bloquear horário
           </Button>
