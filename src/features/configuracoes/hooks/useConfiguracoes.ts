@@ -434,6 +434,33 @@ export function useSolicitacoesTitular() {
 }
 
 /**
+ * O que o paciente escreveu no pedido de correção.
+ *
+ * > [!] Pode trazer dado pessoal (o celular ou o CPF corretos), então não fica
+ * guardado: `gcTime: 0` apaga o texto do cache assim que o pedido é fechado, e
+ * a chave não passa por `queryKeys.settings.dataSubjectRequests()`, que a lista
+ * invalida e reidrata. Só a tela de um pedido chama este hook.
+ */
+export function useTextoSolicitacao(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...queryKeys.settings.dataSubjectRequests(), "text", id] as const,
+    queryFn: async () => {
+      const { data } = await call(() => configuracoesApi.getTextoSolicitacaoTitular({ id }));
+
+      // Ler o que o titular escreveu é acesso a dado pessoal. Registra o fato,
+      // nunca o conteúdo.
+      if (data?.texto) audit.confidential(RECURSO, id);
+
+      return data;
+    },
+    enabled,
+    gcTime: 0,
+    staleTime: 0,
+    retry: false,
+  });
+}
+
+/**
  * Defere ou recusa um pedido do titular.
  *
  * O aviso lembra que decidir **não é cumprir**: exclusão e revogação de
@@ -462,9 +489,11 @@ export function useDecidirSolicitacao() {
         description:
           solicitacao?.status === "granted"
             ? solicitacao.tipo === "rectification"
-              ? "Corrija o dado fora do painel e volte aqui para marcar como cumprido."
-              : "A execução acontece sozinha, em até 5 minutos — a tela mostra se ela falhar."
-            : "A recusa fica registrada com a justificativa.",
+              ? "Corrija o dado na ficha do paciente e volte aqui para marcar como cumprida."
+              : solicitacao.tipo === "access" || solicitacao.tipo === "portability"
+                ? "O paciente já pode baixar os dados pelo app, por 15 dias."
+                : "A execução acontece sozinha, em até 5 minutos — a tela mostra se ela falhar."
+            : "A recusa fica registrada, e o paciente lê o motivo no app.",
       });
     },
     onError: (erro) =>
@@ -474,7 +503,7 @@ export function useDecidirSolicitacao() {
 
 /**
  * Marca um pedido de correção como cumprido, depois de o dado já ter sido
- * corrigido fora do painel. Só existe para pedido deferido do tipo correção —
+ * corrigido na ficha do paciente. Só existe para pedido deferido do tipo correção —
  * `completavel` já vem calculado pelo adapter, e é o que a tela usa para
  * mostrar o botão.
  */
