@@ -36,6 +36,19 @@ export interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   loading?: boolean;
+  /** Highlighted block under the description, for what must not be skimmed past. */
+  notice?: string;
+  /** Wording of the text field. The defaults describe an audit-trail reason. */
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+  reasonHint?: string;
+  /**
+   * The text is not a justification but a note someone else will read, so it may
+   * be left empty. `onConfirm` then receives an empty `reason`.
+   */
+  reasonOptional?: boolean;
+  /** Non-blocking caution shown under the field while the typed text matches. */
+  reasonCaution?: (text: string) => string | null;
 }
 
 const MIN_REASON_LENGTH = 5;
@@ -50,6 +63,12 @@ export function ConfirmDialog({
   confirmLabel = "Confirmar",
   cancelLabel = "Cancelar",
   loading = false,
+  notice,
+  reasonLabel = "Motivo",
+  reasonPlaceholder = "Descreva o motivo desta ação",
+  reasonHint,
+  reasonOptional = false,
+  reasonCaution,
 }: ConfirmDialogProps) {
   const reasonId = useId();
   const [reason, setReason] = useState("");
@@ -60,7 +79,8 @@ export function ConfirmDialog({
     if (open) setReason("");
   }, [open]);
 
-  const reasonIsValid = reason.trim().length >= MIN_REASON_LENGTH;
+  const reasonIsValid = reasonOptional || reason.trim().length >= MIN_REASON_LENGTH;
+  const caution = reasonCaution?.(reason) ?? null;
 
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -84,17 +104,36 @@ export function ConfirmDialog({
           </div>
         </AlertDialogHeader>
 
-        {/* A justificativa não é opcional, e por isso não há prop para
-            desligá-la. `onConfirm` sempre exigiu `{ reason }`, e todos os usos
-            já pediam o campo: a bandeira só permitia um quarto estado em que o
-            diálogo entregava string vazia para a trilha de auditoria. */}
+        {notice && (
+          <p
+            role="alert"
+            className={cn(
+              "rounded-lg border p-3 text-sm leading-relaxed font-medium",
+              tone === "warning"
+                ? "border-warning/40 bg-warning-bg text-foreground"
+                : "border-danger/40 bg-danger-bg text-foreground",
+            )}
+          >
+            {notice}
+          </p>
+        )}
+
+        {/* The justification is required unless the caller says the field is a
+            note for someone else (`reasonOptional`). Only that opt-in can hand an
+            empty string to `onConfirm`; the audit-trail uses never do. */}
         <div className="flex flex-col gap-2">
           <Label htmlFor={reasonId}>
-            Motivo
-            <span className="text-destructive" aria-hidden="true">
-              *
-            </span>
-            <span className="sr-only">(obrigatório)</span>
+            {reasonLabel}
+            {reasonOptional ? (
+              <span className="text-muted-foreground font-normal">(opcional)</span>
+            ) : (
+              <>
+                <span className="text-destructive" aria-hidden="true">
+                  *
+                </span>
+                <span className="sr-only">(obrigatório)</span>
+              </>
+            )}
           </Label>
 
           <Textarea
@@ -103,13 +142,20 @@ export function ConfirmDialog({
             onChange={(event) => setReason(event.target.value)}
             maxLength={280}
             rows={3}
-            placeholder="Descreva o motivo desta ação"
+            placeholder={reasonPlaceholder}
             aria-describedby={`${reasonId}-hint`}
           />
 
           <p id={`${reasonId}-hint`} className="text-muted-foreground text-xs">
-            Registrado na trilha de auditoria. Mínimo de {MIN_REASON_LENGTH} caracteres.
+            {reasonHint ??
+              `Registrado na trilha de auditoria. Mínimo de ${MIN_REASON_LENGTH} caracteres.`}
           </p>
+
+          {caution && (
+            <p role="status" className="text-warning text-xs font-medium">
+              {caution}
+            </p>
+          )}
         </div>
 
         <AlertDialogFooter>
