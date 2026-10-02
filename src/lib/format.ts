@@ -206,6 +206,21 @@ export function formatMeasure(
   return { value: formatNumber(value), unit };
 }
 
+/**
+ * The change of a measure read the same way as the measure itself: a change in
+ * minutes is a duration ("-19 d 14 h"), not "-28.207". Other units return
+ * `undefined`, and the card formats the number as it always did.
+ */
+export function formatMeasureDelta(
+  delta: number | undefined,
+  unit: string | undefined,
+): string | undefined {
+  if (unit !== "min" || delta === undefined || !Number.isFinite(delta)) return undefined;
+
+  const sign = delta > 0 ? "+" : delta < 0 ? "-" : "";
+  return `${sign}${formatDuration(Math.abs(delta))}`;
+}
+
 /* -------------------------------------------------------------------- text */
 
 /**

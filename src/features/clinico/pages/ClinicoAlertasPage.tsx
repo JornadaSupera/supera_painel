@@ -13,7 +13,7 @@ import {
   type CondutaAlerta,
   type Severidade,
 } from "@/lib/enums";
-import { formatDateTime, relativeTime } from "@/lib/format";
+import { formatDateTime, pluralize, relativeTime } from "@/lib/format";
 import type { AlertaClinico } from "@/types/clinico";
 import { DesignarAlertaDialog } from "../components/DesignarAlertaDialog";
 import { DialogResolverAlerta } from "../components/DialogResolverAlerta";
@@ -128,7 +128,7 @@ export function ClinicoAlertasPage() {
           // Fila que não carregou não tem "0 ativos": o número é desconhecido.
           fila.isError
             ? "Não foi possível ler a fila agora"
-            : `${ativos.length} ativos · ordenados por gravidade`
+            : `${pluralize(ativos.length, "ativo", "ativos")} · ordenados por gravidade`
         }
       />
 

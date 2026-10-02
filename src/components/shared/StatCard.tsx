@@ -36,6 +36,8 @@ export interface StatCardProps {
    * mistake — hence the explicit distinction.
    */
   deltaUnit?: string;
+  /** The delta already written out, for a format the card does not know (a duration). */
+  deltaText?: string;
   /** Comparison basis, shown inside the pill: "mês", "semana". */
   period?: string;
   /** Line under the value: "em tratamento". */
@@ -64,6 +66,7 @@ export function StatCard({
   unit,
   delta,
   deltaUnit = "%",
+  deltaText,
   period,
   context,
   invertColor = false,
@@ -124,9 +127,13 @@ export function StatCard({
             )}
           >
             <TrendIcon aria-hidden="true" />
-            {delta > 0 ? "+" : ""}
-            {delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
-            {deltaUnit}
+            {deltaText ?? (
+              <>
+                {delta > 0 ? "+" : ""}
+                {delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}
+                {deltaUnit}
+              </>
+            )}
             {period && ` ${period}`}
           </span>
         )}
