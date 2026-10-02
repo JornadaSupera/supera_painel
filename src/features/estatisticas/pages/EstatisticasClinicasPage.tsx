@@ -307,7 +307,8 @@ export function EstatisticasClinicasPage() {
 
       {destaques?.ocultosPorTamanho && (
         <p className="text-muted-foreground -mt-2 text-[11px]">
-          `Nenhum grupo tem pelo menos ${TAMANHO_MINIMO_DO_GRUPO} pacientes, então os destaques não aparecem: com grupo menor, a combinação apontaria uma pessoa.`
+          Nenhum grupo tem pelo menos {TAMANHO_MINIMO_DO_GRUPO} pacientes, então os destaques não
+          aparecem: com grupo menor, a combinação apontaria uma pessoa.
         </p>
       )}
 
