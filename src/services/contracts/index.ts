@@ -115,6 +115,8 @@ export const ERROR_CODE = {
   VALIDATION: "VALIDATION",
   CONFLICT: "CONFLICT",
   RATE_LIMITED: "RATE_LIMITED",
+  /** A ação exige a sessão com o segundo fator verificado (aal2). */
+  MFA_REQUIRED: "MFA_REQUIRED",
   NOT_IMPLEMENTED: "NOT_IMPLEMENTED",
   UNKNOWN: "UNKNOWN",
 } as const;
@@ -129,6 +131,7 @@ export const ERROR_MESSAGE: Record<ErrorCode, string> = {
   VALIDATION: "Verifique os dados informados.",
   CONFLICT: "Este registro foi alterado por outra pessoa.",
   RATE_LIMITED: "Muitas tentativas. Aguarde alguns instantes.",
+  MFA_REQUIRED: "Esta ação exige a verificação do segundo fator.",
   NOT_IMPLEMENTED: "Funcionalidade ainda não disponível.",
   UNKNOWN: "Algo deu errado. Tente novamente.",
 };

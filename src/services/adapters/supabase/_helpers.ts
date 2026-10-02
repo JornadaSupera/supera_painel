@@ -46,6 +46,13 @@ const CODIGO_EXTRA: Record<string, ErrorCode> = {
   // não erro de formulário, mas ainda uma recusa que quem opera pode entender
   // e não repetir.
   "23001": ERROR_CODE.VALIDATION,
+  // `exclusion_violation`. `slot_blocked`: o horário colide com um bloqueio
+  // da agenda de quem atenderia. É conflito de horário, não "alterado por
+  // outra pessoa", que é o que o 409 do PostgREST diria sozinho.
+  "23P01": ERROR_CODE.CONFLICT,
+  // `object_not_in_prerequisite_state`. `staff_invitation_pending`: a ação
+  // espera o convite ser aceito, e nada que a pessoa digite muda isso.
+  "55000": ERROR_CODE.CONFLICT,
 };
 
 /**
@@ -119,10 +126,68 @@ const MENSAGEM_POR_SENTINELA: Record<string, string> = {
   /* ------------------------------------------------------- integração */
   link_not_proposed:
     "Este vínculo já foi conferido por alguém. Recarregue a fila para ver a decisão que está valendo.",
+
+  /* ------------------------------------------- equipe (convite e fator) */
+  mfa_required:
+    "Esta ação exige a verificação do segundo fator. Informe o código do aplicativo autenticador.",
+  invalid_email: "E-mail inválido. Confira o endereço.",
+  invalid_name: "Informe o nome completo.",
+  invalid_role: "Escolha se a pessoa entra como profissional ou como administradora.",
+  email_in_use: "Já existe uma conta com este e-mail.",
+  account_is_patient:
+    "Esta conta é de paciente. A equipe usa conta própria, com e-mail corporativo.",
+  account_is_caregiver:
+    "Esta conta é de acompanhante. A equipe usa conta própria, com e-mail corporativo.",
+  staff_invitation_pending:
+    "O convite ainda não foi aceito. Para desistir dele, desative a conta.",
+  staff_invitation_not_found: "Convite não encontrado. Recarregue a lista.",
+  invite_failed:
+    "A conta foi criada, mas o e-mail do convite não saiu. Use “Reenviar convite” na lista.",
+  cannot_reset_own_factor:
+    "O seu autenticador não é redefinido por aqui. Peça a outro administrador ou use a tela Segurança.",
+  staff_account_not_found: "Esta conta não é de alguém da equipe.",
+  reset_failed:
+    "Não foi possível terminar a redefinição. Tente de novo: a segunda tentativa conclui o que faltou.",
+
+  /* ---------------------------------------------------------- conteúdo */
+  self_approval_not_allowed:
+    "Quem escreveu a orientação não a aprova. Outro administrador precisa aprovar.",
+  content_not_published: "Só se envia orientação que já foi publicada.",
+  directed_send_not_allowed: "Esta área não envia orientação a pacientes.",
+  directed_send_not_found: "Envio não encontrado.",
+
+  /* ------------------------------------------------------------- chat */
+  confidential_specialty_not_routable:
+    "Conversas não vão direto para uma área sigilosa. O caminho até ela é o encaminhamento.",
+  subject_not_found: "Assunto não encontrado. Recarregue a lista.",
+  quick_reply_not_found: "Resposta rápida não encontrada. Recarregue a lista.",
+  invalid_label: "O título precisa ter de 1 a 80 caracteres.",
+  invalid_body: "O texto precisa ter de 1 a 2.000 caracteres.",
+  conversation_not_found: "Conversa não encontrada. Recarregue a lista.",
+
+  /* ----------------------------------------------------------- agenda */
+  appointment_not_found: "Compromisso não encontrado. Recarregue a agenda.",
+  origin_specialty_not_allowed:
+    "A sessão desta área é marcada por quem é da própria área.",
+  professional_profile_required: "Esta ação é de quem tem perfil de profissional ativo.",
+  slot_blocked: "O profissional não está disponível neste horário.",
+  window_too_large: "O período pedido é longo demais. Escolha até 62 dias.",
+  block_not_found: "Bloqueio não encontrado. Recarregue a agenda.",
+  invalid_period: "O fim precisa ser depois do início.",
 };
+
+/** A frase de tela de uma sentinela, ou `undefined` quando não há tradução. */
+export function mensagemDaSentinela(sentinela: string): string | undefined {
+  return MENSAGEM_POR_SENTINELA[sentinela];
+}
 
 export function traduzirErro(erro: ErroPostgrest | null | undefined): ErrorCode {
   if (!erro) return ERROR_CODE.UNKNOWN;
+
+  // O banco responde `42501` tanto para falta de permissão quanto para sessão
+  // sem segundo fator. A tela precisa distinguir: a primeira é uma recusa, a
+  // segunda tem saída (informar o código).
+  if (erro.message === "mfa_required") return ERROR_CODE.MFA_REQUIRED;
 
   const extra = erro.code ? CODIGO_EXTRA[erro.code] : undefined;
   return extra ?? mapSupabaseError(erro) ?? ERROR_CODE.UNKNOWN;
