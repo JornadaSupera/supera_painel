@@ -39,6 +39,10 @@ import { novaSenhaSchema, REGRAS_SENHA, type NovaSenhaForm } from "../schemas";
  * as três formas é `readRecoveryLink`, a mesma função que atende os pacientes
  * em `/redefinir-senha`.
  *
+ * O mesmo link serve ao convite de quem acaba de entrar na equipe (`type=invite`):
+ * a prova é outra, a tela é a mesma, e o que muda é o texto — quem foi convidado
+ * não "trocou" nada, está criando a primeira senha.
+ *
  * A lista de requisitos é viva: marca o que já foi cumprido enquanto a pessoa
  * digita. Descobrir a regra só ao errar produz tentativa e erro — e senhas
  * piores, porque a pessoa acaba escolhendo o mínimo que passou.
@@ -53,6 +57,8 @@ export function NovaSenhaPage() {
   const [link] = useState(() => readRecoveryLink(location));
   const [gasto, setGasto] = useState(false);
   const [concluido, setConcluido] = useState(false);
+
+  const convite = link.status === "ready" && link.purpose === "invite";
 
   useEffect(() => {
     // O token não pode ficar na barra de endereços nem no histórico.
@@ -112,8 +118,8 @@ export function NovaSenhaPage() {
   if (concluido) {
     return (
       <AuthLayout
-        title="Senha alterada!"
-        description="Sua nova senha já está valendo."
+        title={convite ? "Senha criada!" : "Senha alterada!"}
+        description={convite ? "Seu acesso ao painel está pronto." : "Sua nova senha já está valendo."}
         footer={
           <Link to="/login" className="text-primary font-medium underline underline-offset-4">
             Entrar no painel agora
@@ -126,13 +132,15 @@ export function NovaSenhaPage() {
           </span>
 
           <p className="text-muted-foreground text-sm leading-relaxed">
-            Você já pode fechar esta página. Da próxima vez que entrar no painel, use a senha
-            que acabou de criar.
+            {convite
+              ? "Entre no painel com o seu e-mail e a senha que acabou de criar."
+              : "Você já pode fechar esta página. Da próxima vez que entrar no painel, use a senha que acabou de criar."}
           </p>
 
           <p className="border-border text-muted-foreground w-full border-t pt-5 text-xs leading-relaxed">
-            Não foi você quem pediu esta troca? Fale com a equipe do Centro de Oncologia o quanto
-            antes.
+            {convite
+              ? "Não esperava este convite? Fale com a equipe do Centro de Oncologia o quanto antes."
+              : "Não foi você quem pediu esta troca? Fale com a equipe do Centro de Oncologia o quanto antes."}
           </p>
         </div>
       </AuthLayout>
@@ -159,7 +167,7 @@ export function NovaSenhaPage() {
           </Link>
         }
       >
-        <AuthErrorAlert message="Peça um link novo e abra-o pelo próprio e-mail, sem copiar e colar o endereço." />
+        <AuthErrorAlert message="Peça um link novo e abra-o pelo próprio e-mail, sem copiar e colar o endereço. Se este era o convite para entrar na equipe, peça a quem administra o painel que o reenvie." />
       </AuthLayout>
     );
   }
@@ -168,8 +176,12 @@ export function NovaSenhaPage() {
 
   return (
     <AuthLayout
-      title="Criar nova senha"
-      description="Escolha uma senha que você não use em outro serviço."
+      title={convite ? "Crie sua senha de acesso" : "Criar nova senha"}
+      description={
+        convite
+          ? "Bem-vindo(a) ao painel. Escolha a senha com que você vai entrar — uma que não use em outro serviço."
+          : "Escolha uma senha que você não use em outro serviço."
+      }
     >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(enviar)} className="flex flex-col gap-5" noValidate>
@@ -241,7 +253,7 @@ export function NovaSenhaPage() {
 
           <Button type="submit" disabled={enviando} className="w-full">
             {enviando && <LoaderCircle className="animate-spin" />}
-            Salvar nova senha
+            {convite ? "Salvar senha" : "Salvar nova senha"}
           </Button>
         </form>
       </Form>
