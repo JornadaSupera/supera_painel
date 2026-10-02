@@ -17,7 +17,7 @@ import {
 } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Periodo } from "@/lib/enums";
-import { formatLongDate, formatMeasure, formatTime } from "@/lib/format";
+import { formatLongDate, formatMeasure, formatMeasureDelta, formatTime } from "@/lib/format";
 import { PeriodoToggle } from "../components/PeriodoToggle";
 import { useKpis, useRegistrarExportacaoDashboard, useSeries } from "../hooks/useDashboard";
 
@@ -211,6 +211,7 @@ export function DashboardPage() {
                         unit={medida.unit}
                         delta={kpi.variacao}
                         deltaUnit={kpi.variacao_unidade ?? ""}
+                        deltaText={formatMeasureDelta(kpi.variacao, kpi.unidade)}
                         period={kpi.variacao_periodo}
                         context={kpi.contexto}
                         invertColor={kpi.inverter_cor}
