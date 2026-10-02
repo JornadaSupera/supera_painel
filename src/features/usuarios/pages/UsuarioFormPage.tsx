@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Info, LoaderCircle, ShieldCheck } from "lucide-react";
+import { Check, Info, LoaderCircle, Send, ShieldCheck } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -26,6 +26,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useReforcoDaSessao } from "@/hooks/useReforcoDaSessao";
 import {
   CONSELHO_POR_ESPECIALIDADE,
   ESPECIALIDADE_LABEL,
@@ -39,20 +41,34 @@ import { motivoIndisponivel } from "@/services/apiClient";
 import {
   useAtualizarUsuario,
   useContasSemPerfil,
+  useConvidarUsuario,
   useCriarUsuario,
   useUsuario,
 } from "../hooks/useUsuarios";
-import { paraEntrada, usuarioSchema, VALORES_INICIAIS, type UsuarioForm as Valores } from "../schemas";
+import {
+  MODO_CADASTRO,
+  paraConvite,
+  paraEntrada,
+  usuarioSchema,
+  VALORES_INICIAIS,
+  type ModoCadastro,
+  type UsuarioForm as Valores,
+} from "../schemas";
 
 /**
- * Concessão e correção de perfil no painel.
+ * Cadastro de equipe e correção de perfil no painel.
  *
- * > [!] Este formulário NÃO cria acesso.
- * Ele concede um perfil a uma conta que já existe. A conta nasce quando a
- * própria pessoa se cadastra — o painel roda no navegador, com chave pública, e
- * criar conta de terceiro exigiria a chave de serviço, que nunca entra num
- * bundle. Além disso, quem escolhe a senha tem que ser o titular: administrador
- * que define senha alheia quebra o não repúdio da trilha.
+ * > [!] Nenhum dos dois caminhos escolhe a senha de ninguém.
+ * **Convidar** manda um e-mail para a pessoa criar a própria senha; a conta é
+ * criada no servidor, por Edge Function, porque criar conta de terceiro exige a
+ * chave de serviço, que nunca entra num bundle. **Conceder** dá o perfil a uma
+ * conta que já existe. Administrador que define senha alheia quebra o não
+ * repúdio da trilha.
+ *
+ * > [!] Convidar exige o segundo fator.
+ * O banco só aceita o cadastro de equipe em sessão com o segundo fator
+ * verificado. O painel pede o código no clique em "Enviar convite", e o convite
+ * segue de onde parou.
  *
  * > [!] Ninguém concede a si mesmo.
  * O backend recusa o ato reflexivo em qualquer operação de perfil profissional.
@@ -105,7 +121,9 @@ export function UsuarioFormPage() {
   const { data: usuario, isLoading, isError, error, refetch } = useUsuario(id);
   const contas = useContasSemPerfil(!edicao);
   const criar = useCriarUsuario();
+  const convidar = useConvidarUsuario();
   const atualizar = useAtualizarUsuario(id ?? "");
+  const { exigir, dialogo } = useReforcoDaSessao();
 
   const form = useForm<Valores>({
     resolver: zodResolver(usuarioSchema),
@@ -119,7 +137,10 @@ export function UsuarioFormPage() {
     if (!usuario) return;
 
     form.reset({
+      modo: MODO_CADASTRO.CONCESSAO,
       account_id: usuario.id,
+      nome: "",
+      email: "",
       papel: usuario.papel === PAPEL.ADMIN ? PAPEL.ADMIN : PAPEL.PROFISSIONAL,
       especialidades: usuario.especialidades,
       especialidade_principal: usuario.especialidade ?? "",
@@ -130,7 +151,9 @@ export function UsuarioFormPage() {
   const papel = form.watch("papel");
   const especialidades = form.watch("especialidades");
   const principal = form.watch("especialidade_principal");
-  const salvando = criar.isPending || atualizar.isPending;
+  const modo = form.watch("modo");
+  const convite = !edicao && modo === MODO_CADASTRO.CONVITE;
+  const salvando = criar.isPending || atualizar.isPending || convidar.isPending;
 
   if (edicao && isLoading) {
     return (
@@ -151,15 +174,17 @@ export function UsuarioFormPage() {
   const cabecalho = (
     <PageHeader
       eyebrow="Gestão"
-      title={edicao ? `Editar ${usuario?.nome}` : "Conceder perfil"}
+      title={edicao ? `Editar ${usuario?.nome}` : "Novo usuário"}
       breadcrumb={[
         { label: "Usuários", to: "/usuarios" },
-        { label: edicao ? (usuario?.nome ?? "Editar") : "Conceder perfil" },
+        { label: edicao ? (usuario?.nome ?? "Editar") : "Novo usuário" },
       ]}
       subtitle={
         edicao
           ? "Alterações de área e registro ficam na trilha de auditoria."
-          : "O perfil é concedido a uma conta que já existe. Quem cria a conta é a própria pessoa."
+          : convite
+            ? "A pessoa recebe um e-mail para criar a própria senha. O acesso vale quando ela abrir o link."
+            : "O perfil é concedido a uma conta que já existe. Nome e e-mail são do titular."
       }
     />
   );
@@ -193,7 +218,30 @@ export function UsuarioFormPage() {
       return;
     }
 
+    if (valores.modo === MODO_CADASTRO.CONVITE) {
+      // O banco só aceita o cadastro de equipe em sessão com o segundo fator
+      // verificado: o código é pedido agora, e o convite segue depois dele.
+      void exigir(() =>
+        convidar.mutate(paraConvite(valores), {
+          onSuccess: () => navigate("/usuarios"),
+          // Conta e perfil ficaram criados e só o e-mail não saiu: a lista tem
+          // a linha, com "Reenviar convite" — ficar aqui convidaria a
+          // cadastrar de novo.
+          onError: (falha) => {
+            const sentinela = (falha as { details?: { sentinela?: string } }).details?.sentinela;
+            if (sentinela === "invite_failed") navigate("/usuarios");
+          },
+        }),
+      );
+      return;
+    }
+
     criar.mutate(entrada, { onSuccess: () => navigate("/usuarios") });
+  };
+
+  const trocarModo = (proximo: string) => {
+    form.clearErrors();
+    form.setValue("modo", proximo as ModoCadastro);
   };
 
   const areaPrincipal = (principal || especialidades[0]) as Especialidade | undefined;
@@ -217,6 +265,22 @@ export function UsuarioFormPage() {
         >
           <Card>
             <CardContent className="grid gap-4 pt-6 sm:grid-cols-2">
+              {!edicao && (
+                <div className="grid gap-2 sm:col-span-2">
+                  <span id="modo-cadastro" className="text-sm leading-none font-medium">
+                    Como a pessoa entra
+                  </span>
+                  <Tabs value={modo} onValueChange={trocarModo}>
+                    <TabsList aria-labelledby="modo-cadastro" className="w-full sm:w-auto">
+                      <TabsTrigger value={MODO_CADASTRO.CONVITE}>Convidar pessoa nova</TabsTrigger>
+                      <TabsTrigger value={MODO_CADASTRO.CONCESSAO}>
+                        Conceder a quem já tem conta
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+              )}
+
               {edicao ? (
                 // Read-only and not a form field: the form parts need a `FormField`
                 // around them and would throw here, so it is a plain label + input.
@@ -233,6 +297,42 @@ export function UsuarioFormPage() {
                     Nome e e-mail são da conta, e quem os corrige é a própria pessoa.
                   </p>
                 </div>
+              ) : convite ? (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="nome"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Nome completo</FormLabel>
+                        <FormControl>
+                          <Input {...field} autoComplete="off" placeholder="Maria da Silva" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>E-mail corporativo</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="email"
+                            autoComplete="off"
+                            placeholder="nome@clinica.com.br"
+                          />
+                        </FormControl>
+                        <FormDescription>O convite é enviado para este endereço.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
               ) : (
                 <FormField
                   control={form.control}
@@ -363,9 +463,9 @@ export function UsuarioFormPage() {
               <div className="border-border bg-muted/40 text-muted-foreground flex gap-2.5 rounded-lg border p-3 text-xs sm:col-span-2">
                 <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
                 <p>
-                  Tratamento, janela de atendimento no chat e segundo fator não são
-                  configurados aqui: os dois primeiros não têm onde ser guardados, e o
-                  terceiro é gerenciado pela própria pessoa, no autenticador dela.
+                  {convite
+                    ? "O perfil nasce pendente e só vale quando a pessoa abre o link do e-mail e cria a senha. Para enviar o convite, o painel pede o código do seu aplicativo autenticador. Tratamento e janela de atendimento no chat não são configurados aqui: não têm onde ser guardados."
+                    : "Tratamento e janela de atendimento no chat não são configurados aqui: não têm onde ser guardados. O segundo fator é cadastrado pela própria pessoa e, se ela o perder, é redefinido na lista de usuários."}
                 </p>
               </div>
             </CardContent>
@@ -398,12 +498,20 @@ export function UsuarioFormPage() {
             </Button>
 
             <Button type="submit" disabled={salvando}>
-              {salvando ? <LoaderCircle className="animate-spin" /> : <Check />}
-              {edicao ? "Salvar alterações" : "Conceder perfil"}
+              {salvando ? (
+                <LoaderCircle className="animate-spin" />
+              ) : convite ? (
+                <Send />
+              ) : (
+                <Check />
+              )}
+              {edicao ? "Salvar alterações" : convite ? "Enviar convite" : "Conceder perfil"}
             </Button>
           </div>
         </form>
       </Form>
+
+      {dialogo}
     </div>
   );
 }
