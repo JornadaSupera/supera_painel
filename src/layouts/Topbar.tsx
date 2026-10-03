@@ -14,7 +14,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/contexts/auth-context";
+import { useScrolled } from "@/hooks/useScrolled";
 import { ESPECIALIDADE_LABEL, PAPEL_LABEL } from "@/lib/enums";
+import { cn } from "@/lib/utils";
 import { panelAreaOf } from "@/routes/home-path";
 import { useLayoutStore } from "@/stores/layout";
 import { useThemeStore, type Theme } from "@/stores/theme";
@@ -51,6 +53,7 @@ export function Topbar() {
   const setMobileMenuOpen = useLayoutStore((s) => s.setMobileMenuOpen);
 
   const ThemeIcon = THEME_ICON[theme];
+  const scrolled = useScrolled();
 
   // The same screen in both panels, inside the frame the person belongs to.
   const area = panelAreaOf(user);
@@ -62,7 +65,14 @@ export function Topbar() {
         : null;
 
   return (
-    <header className="bg-background/80 border-border sticky top-0 z-30 flex h-15 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-sm sm:px-6">
+    <header
+      className={cn(
+        "bg-background/80 sticky top-0 z-30 flex h-15 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-sm sm:px-6",
+        // The edge and the shadow only show once content slides under the bar.
+        "transition-[border-color,box-shadow] duration-200 motion-reduce:transition-none",
+        scrolled ? "border-border shadow-sm" : "border-transparent",
+      )}
+    >
       <Button
         variant="ghost"
         size="icon"
