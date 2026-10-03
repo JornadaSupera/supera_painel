@@ -31,6 +31,16 @@ import { cn } from "@/lib/utils";
  * painel e erraria justamente a página que originou a queixa.
  */
 
+/**
+ * Tone per surface. `marca` is a solid brand-coloured background (the login
+ * side column): the logo goes monochrome white, since teal on teal disappears.
+ */
+const SURFACE_TONE = {
+  auto: "dark:brightness-125",
+  escura: "brightness-125",
+  marca: "brightness-0 invert",
+} as const;
+
 export interface LogoProps {
   /**
    * `wordmark` desenha o lettering da clínica.
@@ -43,9 +53,10 @@ export interface LogoProps {
    * A superfície por trás.
    *
    * `auto` segue o tema — claro no claro, escuro no escuro. `escura` é para
-   * quem é escuro sempre, como o cabeçalho dos documentos legais.
+   * quem é escuro sempre, como o cabeçalho dos documentos legais. `marca` é
+   * para fundo verde da marca, onde o logo sai todo branco.
    */
-  surface?: "auto" | "escura";
+  surface?: "auto" | "escura" | "marca";
   className?: string;
 }
 
@@ -62,7 +73,7 @@ export function Logo({
         alt="Supera Oncologia"
         className={cn(
           "size-8 shrink-0 select-none object-contain",
-          surface === "escura" ? "brightness-125" : "dark:brightness-125",
+          SURFACE_TONE[surface],
           className,
         )}
       />
@@ -82,7 +93,7 @@ export function Logo({
       style={{ height }}
       className={cn(
         "w-auto shrink-0 select-none",
-        surface === "escura" ? "brightness-125" : "dark:brightness-125",
+        SURFACE_TONE[surface],
         className,
       )}
     />
