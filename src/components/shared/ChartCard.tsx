@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { ENTER_CLASS, enterStyle } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,6 +21,8 @@ export interface ChartCardProps {
   actions?: ReactNode;
   /** Spans two columns on the three-column grid. */
   wide?: boolean;
+  /** Delay in ms for the entrance animation; leave out for none. */
+  enterDelay?: number;
   className?: string;
   children: ReactNode;
 }
@@ -29,11 +32,20 @@ export function ChartCard({
   description,
   actions,
   wide = false,
+  enterDelay,
   className,
   children,
 }: ChartCardProps) {
   return (
-    <section className={cn("bg-card rounded-2xl border p-5", wide && "lg:col-span-2", className)}>
+    <section
+      style={enterStyle(enterDelay)}
+      className={cn(
+        "bg-card rounded-2xl border p-5 transition-shadow duration-200 hover:shadow-sm motion-reduce:transition-none",
+        enterDelay !== undefined && ENTER_CLASS,
+        wide && "lg:col-span-2",
+        className,
+      )}
+    >
       <header className="mb-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold">{title}</h2>

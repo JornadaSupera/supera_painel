@@ -2,6 +2,9 @@ import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCountUp } from "@/hooks/useCountUp";
+import { formatNumber, parseFormattedNumber } from "@/lib/format";
+import { ENTER_CLASS, enterStyle } from "@/lib/motion";
 import { LevelBadge } from "./PageHeader";
 import { cn } from "@/lib/utils";
 
@@ -55,10 +58,50 @@ export interface StatCardProps {
   /** Drill-down to the matching report. */
   onClick?: () => void;
   loading?: boolean;
+  /**
+   * Delay in ms for the entrance animation. Pass it (0 included) on cards that
+   * appear together, ordered, so they come in one after the other; leave it out
+   * and the card just appears.
+   */
+  enterDelay?: number;
   className?: string;
 }
 
 const BASE = "bg-card text-card-foreground flex min-w-0 flex-col rounded-2xl border p-4";
+
+/**
+ * The value, climbing from zero when it is a number the card can rebuild
+ * ("1.234", "4,7"). Durations and dashes pass through untouched.
+ *
+ * The animated text is hidden from assistive technology and the final one
+ * announced instead, so a screen reader never reads "37" on the way to "127".
+ */
+function AnimatedValue({ value }: { value?: string | number }) {
+  const parsed =
+    typeof value === "number"
+      ? {
+          value,
+          decimals: Number.isInteger(value) ? 0 : (String(value).split(".")[1]?.length ?? 0),
+        }
+      : typeof value === "string"
+        ? parseFormattedNumber(value)
+        : null;
+
+  const current = useCountUp(parsed?.value ?? 0);
+  if (!parsed) return <>{value}</>;
+
+  return (
+    <>
+      <span aria-hidden="true">
+        {formatNumber(current, {
+          minimumFractionDigits: parsed.decimals,
+          maximumFractionDigits: parsed.decimals,
+        })}
+      </span>
+      <span className="sr-only">{value}</span>
+    </>
+  );
+}
 
 export function StatCard({
   label,
@@ -75,6 +118,7 @@ export function StatCard({
   level,
   onClick,
   loading = false,
+  enterDelay,
   className,
 }: StatCardProps) {
   if (loading) {
@@ -108,7 +152,13 @@ export function StatCard({
     <>
       <div className="flex items-start justify-between gap-2">
         {icon && (
-          <span aria-hidden="true" className={cn("rounded-lg p-1.5 [&_svg]:size-4", accent)}>
+          <span
+            aria-hidden="true"
+            className={cn(
+              "rounded-lg p-1.5 transition-transform duration-200 group-hover:scale-110 motion-reduce:transition-none [&_svg]:size-4",
+              accent,
+            )}
+          >
             {icon}
           </span>
         )}
@@ -144,7 +194,7 @@ export function StatCard({
           {label}
         </p>
         <p className="mt-0.5 text-2xl font-semibold tabular-nums">
-          {value}
+          <AnimatedValue value={value} />
           {unit}
         </p>
         {context && <p className="text-muted-foreground text-[11px]">{context}</p>}
@@ -163,22 +213,33 @@ export function StatCard({
   // `className` silently for `level="mvp"` too, since it is truthy but never
   // gets a wrapper.
   const semWrapperProprio = level !== "medio";
+  const enter = enterDelay === undefined ? undefined : ENTER_CLASS;
+  const enterAt = enterStyle(enterDelay);
 
   const card = onClick ? (
     <button
       type="button"
       onClick={onClick}
+      style={semWrapperProprio ? enterAt : undefined}
       className={cn(
         BASE,
-        "hover:border-primary/40 h-full w-full cursor-pointer text-left transition-[border-color,box-shadow] hover:shadow-sm",
+        // Lifts a few pixels on hover and settles back when pressed: the card
+        // is a link to a report, and should feel like one.
+        "group hover:border-primary/40 h-full w-full cursor-pointer text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:shadow-sm motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         pillRoom,
+        semWrapperProprio && enter,
         semWrapperProprio && className,
       )}
     >
       {content}
     </button>
   ) : (
-    <div className={cn(BASE, "h-full", pillRoom, semWrapperProprio && className)}>{content}</div>
+    <div
+      style={semWrapperProprio ? enterAt : undefined}
+      className={cn(BASE, "h-full", pillRoom, semWrapperProprio && enter, semWrapperProprio && className)}
+    >
+      {content}
+    </div>
   );
 
   if (level !== "medio") return card;
@@ -186,7 +247,7 @@ export function StatCard({
   // The level pill floats over the card corner, as in the reference. The
   // `relative` wrapper exists only to anchor it.
   return (
-    <div className={cn("relative", className)}>
+    <div style={enterAt} className={cn("relative", enter, className)}>
       {card}
       <LevelBadge level="Médio" className="absolute right-2 bottom-2" />
     </div>
