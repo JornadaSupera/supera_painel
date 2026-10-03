@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 /** The six brand values, in the order the identity presents them. */
 const BRAND_RIBBON = [
   "bg-supera-uniao",
@@ -9,9 +11,9 @@ const BRAND_RIBBON = [
 ] as const;
 
 /** Thin strip in the brand colours that opens every public page. Decorative only. */
-export function BrandRibbon() {
+export function BrandRibbon({ className }: { className?: string }) {
   return (
-    <div className="flex h-1.5 w-full" aria-hidden="true">
+    <div className={cn("flex h-1.5 w-full", className)} aria-hidden="true">
       {BRAND_RIBBON.map((color) => (
         <span key={color} className={`${color} flex-1`} />
       ))}
