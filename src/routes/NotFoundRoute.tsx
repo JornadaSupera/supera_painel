@@ -22,15 +22,27 @@ export function NotFoundRoute() {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-2 px-4">
+    <main className="relative isolate flex min-h-svh flex-col items-center justify-center overflow-hidden px-4">
+      <div
+        aria-hidden="true"
+        className="supera-pattern-ink [--pattern-opacity:0.06] [--pattern-w:18rem]"
+      />
+      <p
+        aria-hidden="true"
+        className="text-primary/25 font-mono text-8xl font-semibold tracking-tighter select-none"
+      >
+        404
+      </p>
       <ErrorState
         error={{ code: ERROR_CODE.NOT_FOUND }}
         title="Página não encontrada"
         description="Este endereço não existe no painel. Confira o link ou volte ao início."
+        actions={
+          <Button asChild>
+            <Link to={defaultHomePath(user)}>Voltar ao início</Link>
+          </Button>
+        }
       />
-      <Button asChild>
-        <Link to={defaultHomePath(user)}>Voltar ao início</Link>
-      </Button>
     </main>
   );
 }
