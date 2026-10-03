@@ -2,6 +2,7 @@ import { ChevronDown, ChevronsLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
+import simbolo from "@/assets/images/logo-supera-simbolo.png";
 import { Can, Logo } from "@/components/shared";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { BREAKPOINT, useMediaQuery } from "@/hooks/useMediaQuery";
@@ -97,11 +98,27 @@ function ItemLink({
         cn(ITEM_BASE, isActive ? ITEM_ACTIVE : ITEM_INACTIVE, nested && "text-[13px]")
       }
     >
-      <item.icon size={16} className="shrink-0" aria-hidden="true" />
-      <Label collapsed={collapsed} className="flex-1 text-left">
-        {item.label}
-      </Label>
-      {item.mediumLevel && !nested && <LevelMarker collapsed={collapsed} />}
+      {({ isActive }) => (
+        <>
+          {/* Grows on the item that becomes active while the previous one
+              shrinks, so the mark seems to travel down the list. Nested items
+              draw it over the submenu's guide line instead of the bar edge. */}
+          <span
+            aria-hidden="true"
+            className={cn(
+              "bg-primary absolute inset-y-1.5 rounded-r-full transition-transform motion-reduce:transition-none",
+              MOTION,
+              nested ? "-left-[0.8125rem] w-0.5" : "-left-3 w-[3px]",
+              isActive ? "scale-y-100" : "scale-y-0",
+            )}
+          />
+          <item.icon size={16} className="shrink-0" aria-hidden="true" />
+          <Label collapsed={collapsed} className="flex-1 text-left">
+            {item.label}
+          </Label>
+          {item.mediumLevel && !nested && <LevelMarker collapsed={collapsed} />}
+        </>
+      )}
     </NavLink>
   );
 
@@ -246,6 +263,24 @@ export function Sidebar({
         collapsed ? "w-15" : "w-64",
       )}
     >
+      {/* Brand watermark behind the whole bar (the aside is its own stacking
+          context, so -z-10 sits above its background and under the items). */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 overflow-hidden"
+      >
+        <img
+          src={simbolo}
+          alt=""
+          className={cn(
+            "absolute -right-8 -bottom-10 size-44 -rotate-12 object-contain select-none",
+            "transition-opacity motion-reduce:transition-none",
+            MOTION,
+            collapsed ? "opacity-0" : "opacity-[0.06] dark:opacity-[0.08]",
+          )}
+        />
+      </div>
+
       {/* ------------------------------------------------------------- brand */}
       <div className="border-sidebar-border flex h-15 shrink-0 items-center gap-2.5 border-b px-[0.875rem]">
         {/* Recolhida sobram ~44 px: o lettering sairia com 13 px de altura e
