@@ -17,7 +17,7 @@ import {
 } from "@/components/shared";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Periodo } from "@/lib/enums";
-import { formatLongDate, formatMeasure, formatMeasureDelta, formatTime } from "@/lib/format";
+import { formatMeasure, formatMeasureDelta } from "@/lib/format";
 import { PeriodoToggle } from "../components/PeriodoToggle";
 import { useKpis, useRegistrarExportacaoDashboard, useSeries } from "../hooks/useDashboard";
 
@@ -143,12 +143,6 @@ export function DashboardPage() {
   const kpis = useKpis(periodo);
   const series = useSeries(periodo);
 
-  // A hora da última leitura que chegou, e não a hora em que a tela abriu: é o
-  // que diz se o painel está vivo. Só aparece depois da primeira resposta.
-  const atualizadoEm = kpis.dataUpdatedAt
-    ? formatTime(new Date(kpis.dataUpdatedAt).toISOString())
-    : null;
-
   const presentes = new Set((kpis.data?.kpis ?? []).map((kpi) => kpi.id));
   const ausentes = INDICADORES_DO_PROTOTIPO.filter((item) => !presentes.has(item.id));
 
@@ -165,15 +159,6 @@ export function DashboardPage() {
       <PageHeader
         eyebrow="Painel executivo"
         title="Visão geral"
-        subtitle={
-          <>
-            {formatLongDate(new Date().toISOString())} ·{" "}
-            <span className="text-muted-foreground">
-              todos os números são agregados anonimizados
-              {atualizadoEm && ` · atualizado às ${atualizadoEm}`}
-            </span>
-          </>
-        }
         actions={
           <div className="flex items-center gap-2">
             <PeriodoToggle valor={periodo} onChange={setPeriodo} className="no-print" />
@@ -198,7 +183,7 @@ export function DashboardPage() {
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-6">
               {kpis.isLoading
                 ? Array.from({ length: 6 }, (_, i) => <StatCard key={i} label="" loading />)
-                : kpis.data?.kpis.map((kpi) => {
+                : kpis.data?.kpis.map((kpi, i) => {
                     const visual = APRESENTACAO[kpi.id];
                     const Icone = visual?.icone;
                     const medida = formatMeasure(kpi.valor, kpi.unidade);
@@ -218,6 +203,7 @@ export function DashboardPage() {
                         icon={Icone ? <Icone /> : undefined}
                         accent={visual?.acento}
                         level={kpi.nivel}
+                        enterDelay={i * 50}
                         // Drill-down: cada indicador abre o relatório que o
                         // detalha (Fase 8).
                         onClick={
@@ -244,6 +230,7 @@ export function DashboardPage() {
         <div className="grid gap-4 lg:grid-cols-3">
           <ChartCard
             wide
+            enterDelay={300}
             title="Sessões de quimioterapia"
             description={
               series.data ? (
@@ -276,7 +263,11 @@ export function DashboardPage() {
             </ComSerie>
           </ChartCard>
 
-          <ChartCard title="Pacientes por CID" description="Distribuição atual">
+          <ChartCard
+            enterDelay={360}
+            title="Pacientes por CID"
+            description="Distribuição atual"
+          >
             <ComSerie
               titulo="Pacientes por CID"
               motivo={SEM_FONTE.cid!}
@@ -299,6 +290,7 @@ export function DashboardPage() {
 
           <ChartCard
             wide
+            enterDelay={420}
             title="Efeitos adversos por protocolo"
             description={
               <>
@@ -333,6 +325,7 @@ export function DashboardPage() {
           </ChartCard>
 
           <ChartCard
+            enterDelay={480}
             title="Engajamento ao longo das semanas"
             description="% de pacientes ativos no app"
           >
