@@ -250,3 +250,21 @@ export function truncate(text: string | null | undefined, limit = 80): string {
   const cut = value.lastIndexOf(" ", limit);
   return `${value.slice(0, cut > 0 ? cut : limit)}…`;
 }
+
+/* ------------------------------------------------------------------ parse */
+
+/**
+ * Reads a number written the way `formatNumber` writes it ("1.234", "4,7").
+ * Anything else — a dash, a duration — comes back `null`, so a caller animating
+ * a value never touches text it cannot rebuild.
+ */
+export function parseFormattedNumber(text: string): { value: number; decimals: number } | null {
+  const match = /^(-?\d{1,3}(?:\.\d{3})+|-?\d+)(?:,(\d+))?$/.exec(text.trim());
+  if (!match) return null;
+
+  const [, integer = "", fraction] = match;
+  return {
+    value: Number(`${integer.replace(/\./g, "")}${fraction ? `.${fraction}` : ""}`),
+    decimals: fraction?.length ?? 0,
+  };
+}
