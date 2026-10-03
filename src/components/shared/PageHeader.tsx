@@ -118,7 +118,17 @@ export function PageHeader({
   className,
 }: PageHeaderProps) {
   return (
-    <header className={cn("flex flex-wrap items-start justify-between gap-4", className)}>
+    <header
+      className={cn("relative isolate flex flex-wrap items-start justify-between gap-4", className)}
+    >
+      {/* Brand watermark: the outlined "s" in ink, fading out toward the title. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-0 -z-10 hidden w-1/2 max-w-xl overflow-hidden [mask-image:linear-gradient(to_left,black,transparent)] sm:block"
+      >
+        <div className="supera-pattern-ink [--pattern-opacity:0.14] [--pattern-w:8rem]" />
+      </div>
+
       <div className="flex min-w-0 flex-col">
         {/* Back link and trail used to stack, and both said "Pacientes". One
             per screen size now: the trail on desktop, where it also names the
@@ -159,7 +169,13 @@ export function PageHeader({
           {badge ?? (level && <LevelBadge level={level} />)}
         </div>
 
-        {subtitle && <p className="text-muted-foreground mt-1 text-sm leading-snug">{subtitle}</p>}
+        {/* Short brand stroke under the title; it draws in once per screen. */}
+        <span
+          aria-hidden="true"
+          className="from-primary to-chart-2 mt-2 h-0.5 w-10 rounded-full bg-linear-to-r motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-left-2 motion-safe:duration-500"
+        />
+
+        {subtitle && <p className="text-muted-foreground mt-2 text-sm leading-snug">{subtitle}</p>}
       </div>
 
       {/* The actions wrap instead of holding their row. On a phone the header
