@@ -108,6 +108,25 @@
   }
 }
 
+/* Same tile, but drawn in ink on light surfaces: the white line becomes a mask
+   over a flat colour, so the pattern follows the theme. Static (no drift) and
+   faint by default — it is a watermark, not a background. Parent rules are the
+   same as .supera-pattern. Colour with --pattern-color. */
+@layer components {
+  .supera-pattern-ink {
+    --_w: var(--pattern-w, 16rem);
+    --_h: calc(var(--_w) * 181.2 / 252);
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-color: var(--pattern-color, var(--primary));
+    mask-image: url("../assets/images/pattern-supera.svg");
+    mask-size: var(--_w) var(--_h);
+    opacity: var(--pattern-opacity, 0.1);
+  }
+}
+
 @keyframes supera-pattern-drift {
   to {
     transform: translate3d(var(--_w), var(--_h), 0);
