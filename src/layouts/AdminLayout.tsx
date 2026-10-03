@@ -6,6 +6,7 @@ import { SessaoSemSegundoFator } from "@/features/auth/components/SessaoSemSegun
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useGarantiaDaSessao } from "@/hooks/useGarantiaDaSessao";
 import { MobileMenu } from "./MobileMenu";
+import { PageTransition } from "./PageTransition";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { extraRouteTitle, navItemByPath, navTrailByPath } from "./navigation";
@@ -95,7 +96,9 @@ export function AdminLayout() {
                   />
                 )}
 
-                <Outlet />
+                <PageTransition>
+                  <Outlet />
+                </PageTransition>
               </>
             )}
           </div>

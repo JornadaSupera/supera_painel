@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ESPECIALIDADE, ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
 import { MobileMenu } from "./MobileMenu";
+import { PageTransition } from "./PageTransition";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { clinicoNavItems } from "./clinico-navigation";
@@ -101,7 +102,9 @@ export function ClinicoLayout() {
           className="flex-1 overflow-y-auto focus:outline-none"
         >
           <div className="mx-auto w-full max-w-(--breakpoint-2xl) space-y-6 px-4 py-6 sm:px-6 xl:px-8">
-            <Outlet />
+            <PageTransition>
+              <Outlet />
+            </PageTransition>
           </div>
         </main>
       </div>
