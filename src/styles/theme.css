@@ -108,6 +108,12 @@
   --mood-4: #f16935;
   --mood-5: #d73337;
 
+  /* Brand surface (login side column, mobile band). It is coloured in both
+     themes, so — unlike --supera-* above — these are NOT overridden in .dark:
+     white text on the lightened dark-theme greens would drop below AA. */
+  --brand-panel-from: #00aa92;
+  --brand-panel-to: #017272;
+
   /* Layout do painel. */
   --topbar-height: 60px;
   --content-max-width: 1600px;
@@ -233,6 +239,9 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-brand-panel-from: var(--brand-panel-from);
+  --color-brand-panel-to: var(--brand-panel-to);
 
   --color-supera-uniao: var(--supera-uniao);
   --color-supera-empatia: var(--supera-empatia);
