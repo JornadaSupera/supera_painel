@@ -1,6 +1,5 @@
 import {
   Inbox,
-  LoaderCircle,
   Lock,
   RotateCw,
   SearchX,
@@ -9,6 +8,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
+import simbolo from "@/assets/images/logo-supera-simbolo.png";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ERROR_CODE, type ApiError, type ErrorCode } from "@/services/contracts";
@@ -51,13 +51,20 @@ function StateBlock({
       )}
     >
       {icon && (
+        // The brand tint, a halo drawn from the icon colour and the outlined
+        // "s" faintly behind it. `iconClassName` swaps the tint for states that
+        // carry a meaning of their own (warning, danger).
         <span
           aria-hidden="true"
           className={cn(
-            "bg-muted text-muted-foreground flex size-13 items-center justify-center rounded-full",
+            "bg-primary/10 text-primary relative isolate flex items-center justify-center overflow-hidden rounded-full",
+            "shadow-[0_0_0_8px_color-mix(in_srgb,currentColor_7%,transparent)]",
+            "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:duration-300",
+            compact ? "size-12" : "size-16",
             iconClassName,
           )}
         >
+          <span className="supera-pattern-ink [--pattern-color:currentColor] [--pattern-opacity:0.16] [--pattern-w:2.4rem]" />
           {icon}
         </span>
       )}
@@ -167,6 +174,8 @@ export interface ErrorStateProps {
   onRetry?: () => void;
   title?: string;
   description?: string;
+  /** What the person can do next, beside the retry button when there is one. */
+  actions?: ReactNode;
   compact?: boolean;
 }
 
@@ -185,6 +194,7 @@ export function ErrorState({
   onRetry,
   title,
   description,
+  actions,
   compact = false,
 }: ErrorStateProps) {
   const code: ErrorCode | undefined =
@@ -203,11 +213,16 @@ export function ErrorState({
       title={title ?? copy.title}
       description={description ?? error?.message ?? copy.description}
       actions={
-        canRetry && (
-          <Button variant="outline" onClick={onRetry}>
-            <RotateCw />
-            Tentar novamente
-          </Button>
+        (canRetry || actions) && (
+          <>
+            {canRetry && (
+              <Button variant="outline" onClick={onRetry}>
+                <RotateCw />
+                Tentar novamente
+              </Button>
+            )}
+            {actions}
+          </>
         )
       }
       extra={
@@ -239,7 +254,8 @@ export function Loading({ message = "Carregando…", compact = false }) {
     <StateBlock
       role="status"
       compact={compact}
-      icon={<LoaderCircle size={24} className="text-primary animate-spin" />}
+      // The brand "s" breathing instead of a generic spinner.
+      icon={<img src={simbolo} alt="" className="size-8 object-contain select-none motion-safe:animate-pulse dark:brightness-125" />}
       description={message}
     />
   );
