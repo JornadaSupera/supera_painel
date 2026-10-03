@@ -133,6 +133,78 @@
   }
 }
 
+/* Skeleton: a light sweep over the base colour instead of a pulse. Loading
+   reads as "something is on its way" rather than "something is blinking".
+   Unlayered on purpose: the ui primitive sets `animate-pulse` in the utilities
+   layer, and an unlayered rule wins over every layer without touching the
+   primitive. Still under reduced motion. */
+[data-slot="skeleton"] {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.6) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-position: 150% 0;
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+
+.dark [data-slot="skeleton"] {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.07) 50%,
+    transparent 70%
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot="skeleton"] {
+    animation: none;
+    background-image: none;
+  }
+}
+
+@keyframes skeleton-sweep {
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* Touch and feedback on the shared primitives, kept out of the primitives
+   themselves (they are generated; see the ui rules) by hooking on `data-slot`.
+   Unlayered for the same reason as the skeleton above. */
+
+/* A button dips slightly while pressed. `transition-all` on the primitive
+   already carries the transform. */
+@media (prefers-reduced-motion: no-preference) {
+  [data-slot="button"]:not(:disabled):not([data-variant="link"]):active {
+    transform: scale(0.98);
+  }
+}
+
+/* The focus ring on fields also eases the border colour, not only the ring. */
+[data-slot="input"],
+[data-slot="textarea"],
+[data-slot="select-trigger"] {
+  transition-property: color, box-shadow, border-color;
+  transition-duration: 150ms;
+}
+
+/* Dialog backdrops soften what is behind them. */
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-overlay"] {
+  backdrop-filter: blur(3px);
+}
+
+/* Toasts: a softer, wider shadow. Sonner already slides them in and out and
+   colours them by status (`richColors`). */
+[data-sonner-toast] {
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
 /* Relatórios e dashboards são impressos e exportados. */
 @media print {
   .no-print {
