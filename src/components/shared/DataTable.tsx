@@ -411,6 +411,8 @@ export function DataTable<T>({
                   {...rowActivation(row)}
                   className={cn(
                     rowFocus(row),
+                    // A brand tint instead of grey, eased in.
+                    "hover:bg-primary/5 duration-150",
                     // A selected row has a background AND a checked box —
                     // colour is not the only signal.
                     isSelected && "bg-primary/8 hover:bg-primary/12",
