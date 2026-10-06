@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoaderCircle, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 
+import { DateInput, TimeInput } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -44,7 +45,7 @@ export function BlockDialog({
   const remove = useDeleteBlock();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const { register, handleSubmit, setValue, watch, reset, formState } = useForm<BlockForm>({
+  const { register, handleSubmit, setValue, watch, reset, control, formState } = useForm<BlockForm>({
     resolver: zodResolver(blockSchema),
     defaultValues: blockToFormValues(block, defaultDay),
   });
@@ -103,29 +104,46 @@ export function BlockDialog({
           <div className="grid grid-cols-[1fr_auto] items-end gap-x-3 gap-y-3">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="block-start-date">Início</Label>
-              <Input id="block-start-date" type="date" {...register("startDate")} />
+              <Controller
+                control={control}
+                name="startDate"
+                render={({ field }) => <DateInput id="block-start-date" {...field} />}
+              />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="block-start-time" className={allDay ? "text-muted-foreground" : undefined}>
                 Hora
               </Label>
-              <Input id="block-start-time" type="time" disabled={allDay} {...register("startTime")} />
+              <Controller
+                control={control}
+                name="startTime"
+                render={({ field }) => (
+                  <TimeInput id="block-start-time" className="w-24" disabled={allDay} {...field} />
+                )}
+              />
             </div>
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="block-end-date">Fim</Label>
-              <Input
-                id="block-end-date"
-                type="date"
-                aria-invalid={Boolean(errors.endDate)}
-                {...register("endDate")}
+              <Controller
+                control={control}
+                name="endDate"
+                render={({ field }) => (
+                  <DateInput id="block-end-date" aria-invalid={Boolean(errors.endDate)} {...field} />
+                )}
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="block-end-time" className={allDay ? "text-muted-foreground" : undefined}>
                 Hora
               </Label>
-              <Input id="block-end-time" type="time" disabled={allDay} {...register("endTime")} />
+              <Controller
+                control={control}
+                name="endTime"
+                render={({ field }) => (
+                  <TimeInput id="block-end-time" className="w-24" disabled={allDay} {...field} />
+                )}
+              />
             </div>
           </div>
           {(errors.endDate || errors.startDate) && (

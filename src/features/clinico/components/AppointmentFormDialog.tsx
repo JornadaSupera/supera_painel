@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CalendarX2, LoaderCircle, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useForm, type FieldErrors, type UseFormRegisterReturn } from "react-hook-form";
+import { Controller, useForm, type Control, type FieldErrors } from "react-hook-form";
 
+import { DateInput, TimeInput } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -141,7 +142,7 @@ function RescheduleBody({
 }) {
   const reschedule = useRescheduleAppointment();
 
-  const { register, handleSubmit, watch, formState } = useForm<RescheduleForm>({
+  const { handleSubmit, watch, control, formState } = useForm<RescheduleForm>({
     resolver: zodResolver(rescheduleSchema),
     defaultValues: momentOf(appointment),
   });
@@ -175,7 +176,7 @@ function RescheduleBody({
       </DialogHeader>
 
       <MomentFields
-        fields={{ date: register("date"), startTime: register("startTime"), endTime: register("endTime") }}
+        control={control as unknown as Control<RescheduleForm>}
         errors={errors}
         idPrefix="move"
       />
@@ -218,7 +219,7 @@ function BookBody({
   const [term, setTerm] = useState("");
   const patients = usePatientSearch(patientName ? "" : term);
 
-  const { register, handleSubmit, setValue, watch, formState } = useForm<AppointmentForm>({
+  const { register, handleSubmit, setValue, watch, control, formState } = useForm<AppointmentForm>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
       patientId: "",
@@ -398,7 +399,7 @@ function BookBody({
       </div>
 
       <MomentFields
-        fields={{ date: register("date"), startTime: register("startTime"), endTime: register("endTime") }}
+        control={control as unknown as Control<RescheduleForm>}
         errors={errors}
         idPrefix="book"
       />
@@ -480,11 +481,11 @@ function BookBody({
    ------------------------------------------------------------------------- */
 
 function MomentFields({
-  fields,
+  control,
   errors,
   idPrefix,
 }: {
-  fields: { date: UseFormRegisterReturn; startTime: UseFormRegisterReturn; endTime: UseFormRegisterReturn };
+  control: Control<RescheduleForm>;
   errors: FieldErrors<RescheduleForm>;
   idPrefix: string;
 }) {
@@ -496,15 +497,34 @@ function MomentFields({
       <div className="grid grid-cols-[1fr_auto_auto] items-end gap-3">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={`${idPrefix}-date`}>Dia</Label>
-          <Input id={`${idPrefix}-date`} type="date" {...fields.date} />
+          <Controller
+            control={control}
+            name="date"
+            render={({ field }) => <DateInput id={`${idPrefix}-date`} {...field} />}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={`${idPrefix}-start`}>Início</Label>
-          <Input id={`${idPrefix}-start`} type="time" {...fields.startTime} />
+          <Controller
+            control={control}
+            name="startTime"
+            render={({ field }) => <TimeInput id={`${idPrefix}-start`} className="w-24" {...field} />}
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={`${idPrefix}-end`}>Fim</Label>
-          <Input id={`${idPrefix}-end`} type="time" aria-invalid={Boolean(errors.endTime)} {...fields.endTime} />
+          <Controller
+            control={control}
+            name="endTime"
+            render={({ field }) => (
+              <TimeInput
+                id={`${idPrefix}-end`}
+                className="w-24"
+                aria-invalid={Boolean(errors.endTime)}
+                {...field}
+              />
+            )}
+          />
         </div>
       </div>
       {message && (
