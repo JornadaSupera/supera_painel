@@ -55,6 +55,23 @@ export const pacienteSchema = z.object({
     .string()
     .refine((valor) => !valor || isValidPastDate(valor), "Data inválida ou no futuro."),
 
+  /** Outros diagnósticos, além do principal. Só os novos: os já gravados não voltam aqui. */
+  diagnosticos_adicionais: z
+    .array(
+      z.object({
+        cid: z.string().min(1, "Selecione o CID."),
+        estadiamento: z.string().max(20, "Estadiamento muito longo."),
+        tnm: z.string().max(40, "Classificação TNM muito longa."),
+        diagnostico_em: z
+          .string()
+          .refine((valor) => !valor || isValidPastDate(valor), "Data inválida ou no futuro."),
+      }),
+    )
+    .refine(
+      (lista) => new Set(lista.map((item) => item.cid)).size === lista.length,
+      "Há o mesmo CID em mais de um diagnóstico.",
+    ),
+
   protocolo_nome: z.string().max(80, "Nome do protocolo muito longo."),
   ciclos_previstos: z
     .string()
@@ -116,6 +133,7 @@ export const VALORES_INICIAIS: PacienteForm = {
   estadiamento: "",
   tnm: "",
   diagnostico_em: "",
+  diagnosticos_adicionais: [],
   protocolo_nome: "",
   ciclos_previstos: "",
   intencao: "",
@@ -169,6 +187,14 @@ export function paraClinica(valores: PacienteForm): PacienteClinicaEntrada | nul
     estadiamento: texto(valores.estadiamento),
     tnm: texto(valores.tnm),
     diagnostico_em: texto(valores.diagnostico_em),
+    diagnosticos_adicionais: valores.diagnosticos_adicionais.length
+      ? valores.diagnosticos_adicionais.map((item) => ({
+          cid: item.cid,
+          estadiamento: texto(item.estadiamento),
+          tnm: texto(item.tnm),
+          diagnostico_em: texto(item.diagnostico_em),
+        }))
+      : undefined,
     protocolo_nome: texto(valores.protocolo_nome),
     ciclos_previstos: valores.ciclos_previstos.trim()
       ? Number(valores.ciclos_previstos)
@@ -210,6 +236,7 @@ export const ETAPAS = [
       "estadiamento",
       "tnm",
       "diagnostico_em",
+      "diagnosticos_adicionais",
       "protocolo_nome",
       "ciclos_previstos",
       "intencao",

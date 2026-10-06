@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ArrowRight, Check, Info, LoaderCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Info, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useForm, useFormContext } from "react-hook-form";
+import { useFieldArray, useForm, useFormContext } from "react-hook-form";
 
 import { DateInput, SourceErrorAlert } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useCids, useEfeitosAdversos, useFasesTratamento } from "@/hooks/useCatalogos";
+import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import type { DiagnosticoPaciente } from "@/types/paciente";
 import { applyCpfMask, applyPhoneMask } from "@/lib/validation";
 import {
   ETAPAS,
@@ -114,6 +116,8 @@ export interface PacienteFormProps {
   modo: "criacao" | "edicao";
   /** Na edição, o contato atual mascarado — aparece como placeholder. */
   contatoAtual?: { telefone: string; email: string };
+  /** Na edição, os diagnósticos que a ficha já tem. Aparecem sem poder ser retirados. */
+  diagnosticosRegistrados?: DiagnosticoPaciente[];
   salvando?: boolean;
   onSubmit: (valores: Valores) => void;
   onCancelar: () => void;
@@ -123,6 +127,7 @@ export function PacienteForm({
   valoresIniciais,
   modo,
   contatoAtual,
+  diagnosticosRegistrados = [],
   salvando = false,
   onSubmit,
   onCancelar,
@@ -135,6 +140,16 @@ export function PacienteForm({
     defaultValues: valoresIniciais,
     mode: "onBlur",
   });
+
+  const adicionais = useFieldArray({ control: form.control, name: "diagnosticos_adicionais" });
+  const cidPrincipal = form.watch("cid");
+  const cidsEscolhidos = form.watch("diagnosticos_adicionais").map((item) => item.cid);
+  // O que a ficha já tem, ou está sendo escolhido agora, não volta a ser oferecido.
+  const cidsOcupados = new Set([
+    cidPrincipal,
+    ...diagnosticosRegistrados.map((diagnostico) => diagnostico.cid),
+    ...cidsEscolhidos,
+  ]);
 
   const efeitos = useEfeitosAdversos();
   const cids = useCids();
@@ -433,6 +448,159 @@ export function PacienteForm({
                   rotulo="Data do diagnóstico"
                   descricao="Quando o laudo saiu, não quando a ficha foi aberta."
                 />
+
+                {/* ------------------------------ outros diagnósticos */}
+                <fieldset className="flex flex-col gap-3 sm:col-span-2">
+                  <legend className="text-sm font-medium">Outros diagnósticos</legend>
+                  <p className="text-muted-foreground -mt-1 text-xs">
+                    Além do principal, acima. Cada um fica registrado com o seu estadiamento. Depois de
+                    salvo, não dá para editar nem apagar: corrigir é registrar o seguinte.
+                  </p>
+
+                  {diagnosticosRegistrados.length > 0 && (
+                    <ul className="flex flex-col gap-1.5" aria-label="Diagnósticos já registrados">
+                      {diagnosticosRegistrados.map((diagnostico) => (
+                        <li
+                          key={diagnostico.cid}
+                          className="bg-muted/40 flex flex-wrap items-baseline gap-x-2 rounded-lg border px-3 py-2 text-sm"
+                        >
+                          <span className="font-mono text-xs">{diagnostico.cid}</span>
+                          <span>{diagnostico.cid_descricao}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {[
+                              diagnostico.estadiamento,
+                              diagnostico.tnm,
+                              diagnostico.diagnostico_em ? formatDate(diagnostico.diagnostico_em) : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {adicionais.fields.map((campo, indice) => {
+                    const meuCid = form.watch(`diagnosticos_adicionais.${indice}.cid`);
+
+                    return (
+                      <div
+                        key={campo.id}
+                        className="grid items-start gap-3 rounded-lg border p-3 sm:grid-cols-2"
+                      >
+                        <FormField
+                          control={form.control}
+                          name={`diagnosticos_adicionais.${indice}.cid`}
+                          render={({ field }) => (
+                            <FormItem className="sm:col-span-2">
+                              <FormLabel>Diagnóstico (CID-10)</FormLabel>
+                              <Select value={field.value} onValueChange={field.onChange}>
+                                <FormControl>
+                                  <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Selecione o código" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  {(cids.data ?? [])
+                                    .filter((cid) => cid.codigo === meuCid || !cidsOcupados.has(cid.codigo))
+                                    .map((cid) => (
+                                      <SelectItem key={cid.codigo} value={cid.codigo}>
+                                        <span className="font-mono text-xs">{cid.codigo}</span>
+                                        {" · "}
+                                        {cid.descricao}
+                                      </SelectItem>
+                                    ))}
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`diagnosticos_adicionais.${indice}.estadiamento`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Estadiamento</FormLabel>
+                              <FormControl>
+                                <Input {...field} autoComplete="off" placeholder="IIIA" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`diagnosticos_adicionais.${indice}.tnm`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>TNM</FormLabel>
+                              <FormControl>
+                                <Input {...field} autoComplete="off" placeholder="T2 N1 M0" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`diagnosticos_adicionais.${indice}.diagnostico_em`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Data do diagnóstico</FormLabel>
+                              <FormControl>
+                                <DateInput {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex items-end justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground"
+                            onClick={() => adicionais.remove(indice)}
+                          >
+                            <Trash2 />
+                            Retirar
+                          </Button>
+                        </div>
+
+                      </div>
+                    );
+                  })}
+
+                  {typeof form.formState.errors.diagnosticos_adicionais?.message === "string" && (
+                    <p role="alert" className="text-destructive text-xs">
+                      {form.formState.errors.diagnosticos_adicionais.message}
+                    </p>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit"
+                    disabled={!cidPrincipal && diagnosticosRegistrados.length === 0}
+                    onClick={() =>
+                      adicionais.append({ cid: "", estadiamento: "", tnm: "", diagnostico_em: "" })
+                    }
+                  >
+                    <Plus />
+                    Adicionar diagnóstico
+                  </Button>
+                  {!cidPrincipal && diagnosticosRegistrados.length === 0 && (
+                    <p className="text-muted-foreground -mt-1 text-xs">
+                      Escolha o diagnóstico principal primeiro.
+                    </p>
+                  )}
+                </fieldset>
 
                 <FormField
                   control={form.control}

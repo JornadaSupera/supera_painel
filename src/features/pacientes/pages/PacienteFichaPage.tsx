@@ -166,6 +166,7 @@ export function PacienteFichaPage({
   }
 
   const inativo = paciente.status === STATUS_PACIENTE.INATIVO;
+  const outrosDiagnosticos = paciente.diagnosticos.filter((diagnostico) => !diagnostico.principal);
 
   /* ------------------------------------------------------------ edição */
 
@@ -195,6 +196,7 @@ export function PacienteFichaPage({
             telefone: paciente.telefone_mascarado,
             email: paciente.email_mascarado,
           }}
+          diagnosticosRegistrados={outrosDiagnosticos}
           salvando={atualizar.isPending}
           onCancelar={sairDaEdicao}
           onSubmit={(valores) => {
@@ -367,7 +369,7 @@ export function PacienteFichaPage({
 
         <DetailSection titulo="Diagnóstico e tratamento" icone={<Stethoscope size={15} />}>
           <dl className="grid grid-cols-2 gap-4">
-            <DetailField rotulo="CID-10">
+            <DetailField rotulo={outrosDiagnosticos.length > 0 ? "Diagnóstico principal" : "CID-10"}>
               <span className="tabular-nums">{paciente.cid}</span>
               <p className="text-muted-foreground text-xs">{paciente.cid_descricao}</p>
             </DetailField>
@@ -400,6 +402,32 @@ export function PacienteFichaPage({
             </DetailField>
 
             <DetailField rotulo="Médico responsável">{paciente.medico_responsavel_nome ?? "—"}</DetailField>
+
+            {outrosDiagnosticos.length > 0 && (
+              <div className="col-span-2">
+                <DetailField rotulo="Outros diagnósticos">
+                  <ul className="flex flex-col gap-1.5">
+                    {outrosDiagnosticos.map((diagnostico) => (
+                      <li key={diagnostico.cid}>
+                        <span className="font-mono text-xs">{diagnostico.cid}</span>{" "}
+                        <span>{diagnostico.cid_descricao}</span>
+                        <p className="text-muted-foreground text-xs">
+                          {[
+                            diagnostico.estadiamento ? `estadiamento ${diagnostico.estadiamento}` : null,
+                            diagnostico.tnm,
+                            diagnostico.diagnostico_em
+                              ? `em ${formatDate(diagnostico.diagnostico_em)}`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "sem detalhamento registrado"}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </DetailField>
+              </div>
+            )}
 
             <div className="col-span-2">
               <DetailField rotulo="Protocolo">
