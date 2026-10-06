@@ -84,7 +84,6 @@ export function ClinicoCarteiraPage() {
       <PageHeader
         eyebrow={area}
         title="Carteira"
-        level="Médio"
         subtitle={`Pacientes que você atendeu nos últimos ${dias} dias, pela sua agenda`}
         actions={
           <Select value={periodo} onValueChange={trocarPeriodo}>
