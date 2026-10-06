@@ -1,4 +1,4 @@
-import { LogOut, Menu, Monitor, Moon, ShieldCheck, Sun } from "lucide-react";
+import { LogOut, Menu, Monitor, Moon, ShieldCheck, Sun, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { UserAvatar } from "@/components/shared";
@@ -63,6 +63,9 @@ export function Topbar() {
       : area === "clinico" && user?.especialidade
         ? `/clinico/${user.especialidade}/seguranca`
         : null;
+
+  const profilePath =
+    area === "clinico" && user?.especialidade ? `/clinico/${user.especialidade}/perfil` : null;
 
   return (
     <header
@@ -142,6 +145,15 @@ export function Topbar() {
               </DropdownMenuLabel>
 
               <DropdownMenuSeparator />
+
+              {profilePath && (
+                <DropdownMenuItem asChild>
+                  <Link to={profilePath}>
+                    <UserRound />
+                    Meu perfil
+                  </Link>
+                </DropdownMenuItem>
+              )}
 
               {securityPath && (
                 <DropdownMenuItem asChild>

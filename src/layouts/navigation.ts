@@ -184,6 +184,7 @@ export function navItemByPath(
  */
 export function extraRouteTitle(pathname: string, prefix = ""): string | undefined {
   if (pathname === `${prefix}/seguranca`) return "Segurança da conta";
+  if (prefix && pathname === `${prefix}/perfil`) return "Meu perfil";
   if (prefix && pathname.startsWith(`${prefix}/pacientes/`)) return "Ficha do paciente";
   return undefined;
 }
