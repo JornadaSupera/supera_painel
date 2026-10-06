@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Check, Info, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm, useFormContext } from "react-hook-form";
 
-import { SourceErrorAlert } from "@/components/shared";
+import { DateInput, SourceErrorAlert } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -77,7 +77,7 @@ function CampoData({
         <FormItem>
           <FormLabel>{rotulo}</FormLabel>
           <FormControl>
-            <Input {...field} type="date" />
+            <DateInput {...field} />
           </FormControl>
           {descricao && <FormDescription>{descricao}</FormDescription>}
           <FormMessage />
