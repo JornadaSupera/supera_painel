@@ -32,8 +32,6 @@ export interface NavItem {
   permission?: Permissao;
   /** One of the permissions is enough (logical OR). Use instead of `permission`. */
   anyOf?: readonly Permissao[];
-  /** Contract level Médio — flagged in the interface. */
-  mediumLevel?: boolean;
   /**
    * The screen exists as a route but has not been built yet.
    *
@@ -98,7 +96,6 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Estatísticas",
     to: "/estatisticas",
     icon: TrendingUp,
-    mediumLevel: true,
     anyOf: [
       PERMISSAO.ESTATISTICAS_CLINICAS_READ,
       PERMISSAO.ESTATISTICAS_READ_ALL,
@@ -110,7 +107,6 @@ export const NAV_ITEMS: NavItem[] = [
         to: "/estatisticas/clinicas",
         icon: TrendingUp,
         permission: PERMISSAO.ESTATISTICAS_CLINICAS_READ,
-        mediumLevel: true,
         title: "Estatísticas clínicas",
         subtitle: "Cruzamento Protocolo × Efeito × Grau",
       },
@@ -119,7 +115,6 @@ export const NAV_ITEMS: NavItem[] = [
         to: "/estatisticas/operacionais",
         icon: TrendingUp,
         anyOf: [PERMISSAO.ESTATISTICAS_READ_ALL, PERMISSAO.ESTATISTICAS_READ_SELF],
-        mediumLevel: true,
         title: "Estatísticas operacionais",
         subtitle: "Operação da clínica",
       },
@@ -130,7 +125,6 @@ export const NAV_ITEMS: NavItem[] = [
     to: "/auditoria",
     icon: ScrollText,
     permission: PERMISSAO.AUDITORIA_READ,
-    mediumLevel: true,
     title: "Auditoria & logs",
     subtitle: "Rastro de acesso a dados sensíveis · retenção de 5 anos",
   },

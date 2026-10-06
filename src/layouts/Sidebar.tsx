@@ -67,16 +67,6 @@ function Label({
   );
 }
 
-function LevelMarker({ collapsed }: { collapsed: boolean }) {
-  return (
-    <Label collapsed={collapsed}>
-      <span className="bg-supera-uniao/15 text-supera-uniao ml-1 rounded-full px-1.5 py-px text-[11px] font-semibold tracking-wide">
-        Médio
-      </span>
-    </Label>
-  );
-}
-
 function ItemLink({
   item,
   collapsed,
@@ -116,7 +106,6 @@ function ItemLink({
           <Label collapsed={collapsed} className="flex-1 text-left">
             {item.label}
           </Label>
-          {item.mediumLevel && !nested && <LevelMarker collapsed={collapsed} />}
         </>
       )}
     </NavLink>
@@ -183,7 +172,6 @@ function Group({
         <Label collapsed={collapsed} className="flex-1 text-left">
           {item.label}
         </Label>
-        {item.mediumLevel && <LevelMarker collapsed={collapsed} />}
         <ChevronDown
           size={14}
           aria-hidden="true"
