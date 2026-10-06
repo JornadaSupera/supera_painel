@@ -208,7 +208,6 @@ export function AuditoriaPage() {
       <PageHeader
         eyebrow="Compliance LGPD"
         title="Auditoria & logs"
-        level="Médio"
         subtitle="Trilha imutável de acesso a dados sensíveis · retenção de 5 anos"
         actions={
           <div className="flex items-center gap-2">
