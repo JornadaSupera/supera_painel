@@ -128,7 +128,7 @@ export function MapaDeCalor({ dados }: MapaDeCalorProps) {
           <details className="border-border bg-muted/40 text-muted-foreground rounded-xl border px-4 py-3 text-[11px] leading-relaxed">
             <summary className="cursor-pointer">
               <strong className="text-foreground font-medium">{AVISO_CONTAGEM}</strong>{" "}
-              <span className="text-primary">Por quê?</span>
+              <span className="text-primary-ink">Por quê?</span>
             </summary>
             <p className="mt-2">{dados.motivo_sem_prevalencia}</p>
           </details>

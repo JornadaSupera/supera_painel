@@ -30,7 +30,7 @@ export function ConversaSemResposta({
       <div className="flex items-center gap-3 px-3 py-2 text-sm">
         <Link
           to={chatHref}
-          className="hover:text-primary flex min-w-0 flex-1 items-center gap-3 transition-colors"
+          className="hover:text-primary-ink flex min-w-0 flex-1 items-center gap-3 transition-colors"
         >
           <span className="min-w-0 flex-1 truncate">{conversa.paciente_nome}</span>
           <span className="text-muted-foreground shrink-0 text-xs">

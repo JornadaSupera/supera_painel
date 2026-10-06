@@ -163,7 +163,7 @@ export function SelecaoDeCatalogo({
             className={cn(
               "focus-visible:ring-ring/50 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none",
               ativa
-                ? "border-primary/30 bg-primary/10 text-primary font-medium"
+                ? "border-primary/30 bg-primary/10 text-primary-ink font-medium"
                 : "text-muted-foreground hover:bg-muted border-border",
               gravada && "cursor-default opacity-90",
             )}

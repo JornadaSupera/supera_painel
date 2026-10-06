@@ -62,7 +62,7 @@ function AnswerCard({ answer }: { answer: SatisfactionResponse }) {
         <Can permission={PERMISSAO.PACIENTES_READ}>
           <Link
             to={`/pacientes/${answer.patient_id}`}
-            className="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline"
+            className="text-primary-ink inline-flex items-center gap-1 underline-offset-2 hover:underline"
           >
             Abrir ficha
             <ExternalLink size={12} aria-hidden="true" />
@@ -102,7 +102,7 @@ export function SatisfactionAnswers({
     <section className="flex flex-col gap-3" aria-labelledby="satisfaction-answers">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 id="satisfaction-answers" className="flex items-center gap-2 text-sm font-semibold">
-          <MessageSquareText size={15} aria-hidden="true" className="text-primary" />
+          <MessageSquareText size={15} aria-hidden="true" className="text-primary-ink" />
           Avaliações e comentários
           {answers.data && <span className="text-muted-foreground font-normal">· {total}</span>}
         </h2>

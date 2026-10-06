@@ -108,7 +108,7 @@ export function StatCard({
   context,
   invertColor = false,
   icon,
-  accent = "bg-primary/10 text-primary",
+  accent = "bg-primary/10 text-primary-ink",
   onClick,
   loading = false,
   enterDelay,

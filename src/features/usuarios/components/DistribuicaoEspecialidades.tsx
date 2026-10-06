@@ -67,7 +67,7 @@ export function DistribuicaoEspecialidades({
                 // ONCOLOGISTA" to "MÉDICO…". The count stays on the card
                 // bottom, so the numbers still line up across the row.
                 "line-clamp-2 text-[11px] leading-tight tracking-wider uppercase",
-                ativo ? "text-primary" : "text-muted-foreground",
+                ativo ? "text-primary-ink" : "text-muted-foreground",
               )}
             >
               {item.label}

@@ -245,7 +245,7 @@ export function PacienteForm({
                   aria-current={ativa ? "step" : undefined}
                   className={cn(
                     "flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors max-md:min-h-10",
-                    ativa && "border-primary/30 bg-primary/10 text-primary font-medium",
+                    ativa && "border-primary/30 bg-primary/10 text-primary-ink font-medium",
                     concluida && !ativa && "border-border text-muted-foreground hover:bg-muted",
                     !ativa && !concluida && "border-border text-muted-foreground/70",
                   )}

@@ -54,6 +54,8 @@ export function UserAvatar({
   className,
 }: UserAvatarProps) {
   const color = colorful ? colorFromName(name) : "var(--primary)";
+  // The brand green is a fill; read as initials over its own tint it falls under AA.
+  const ink = colorful ? color : "var(--primary-ink)";
 
   return (
     <Avatar className={cn(SIZES[size], className)} title={name || undefined}>
@@ -65,7 +67,7 @@ export function UserAvatar({
             ? // `color-mix` instead of a `bg-*/10` class because the colour can
               // come from the name, and Tailwind generates no utility for a
               // dynamic value.
-              { backgroundColor: `color-mix(in oklab, ${color} 12%, transparent)`, color }
+              { backgroundColor: `color-mix(in oklab, ${color} 12%, transparent)`, color: ink }
             : { backgroundColor: color, color: "var(--primary-foreground)" }
         }
       >

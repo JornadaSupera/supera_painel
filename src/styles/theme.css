@@ -24,7 +24,12 @@
   --popover-foreground: #123431;
 
   --primary: #00aa92;
-  --primary-foreground: #f8fdfc;
+  /* Dark ink on the brand green: white on #00aa92 is 2.9:1, under AA. */
+  --primary-foreground: #12332f;
+  /* The green for text and icons on light surfaces. --primary is a fill colour
+     and reads at 2.9:1 as text; this one holds AA on white and on the
+     bg-primary/10 tint. Whatever is read in green uses this, never --primary. */
+  --primary-ink: #1c736b;
 
   --secondary: #b7f2ca;
   --secondary-foreground: #00372c;
@@ -46,7 +51,7 @@
   --sidebar: #f3fdf9;
   --sidebar-foreground: #123431;
   --sidebar-primary: #00aa92;
-  --sidebar-primary-foreground: #f8fdfc;
+  --sidebar-primary-foreground: #12332f;
   --sidebar-accent: #d5f4e2;
   --sidebar-accent-foreground: #00372c;
   --sidebar-border: #d4e6e0;
@@ -131,6 +136,7 @@
 
   --primary: #2dc5a6;
   --primary-foreground: #0a0a0a;
+  --primary-ink: #2dc5a6;
 
   --secondary: #262626;
   --secondary-foreground: #caeadb;
@@ -214,6 +220,7 @@
 
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
 
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);

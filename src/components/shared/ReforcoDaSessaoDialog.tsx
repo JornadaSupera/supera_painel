@@ -82,7 +82,7 @@ export function ReforcoDaSessaoDialog({
           <div className="flex gap-4">
             <span
               aria-hidden="true"
-              className="bg-primary/10 text-primary flex size-10 shrink-0 items-center justify-center rounded-full"
+              className="bg-primary/10 text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-full"
             >
               {semFator ? <ShieldAlert size={20} /> : <ShieldCheck size={20} />}
             </span>

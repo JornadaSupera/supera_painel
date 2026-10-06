@@ -81,7 +81,10 @@ export function LoginPage() {
         <>
           <p>
             Problemas para acessar?{" "}
-            <Link to="/recuperar-senha" className="text-primary font-medium underline underline-offset-4">
+            <Link
+              to="/recuperar-senha"
+              className="text-primary-ink font-medium underline underline-offset-4"
+            >
               Recuperar senha
             </Link>
           </p>
@@ -114,7 +117,7 @@ export function LoginPage() {
                   <FormLabel>Senha</FormLabel>
                   <Link
                     to="/recuperar-senha"
-                    className="text-muted-foreground hover:text-primary text-xs underline underline-offset-4"
+                    className="text-muted-foreground hover:text-primary-ink text-xs underline underline-offset-4"
                   >
                     Esqueci minha senha
                   </Link>

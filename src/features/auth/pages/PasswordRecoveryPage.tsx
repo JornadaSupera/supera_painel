@@ -269,7 +269,7 @@ function LinkProblemStep({ reason }: { reason: "expired" | "invalid" }) {
    ------------------------------------------------------------------------- */
 
 const TONES = {
-  primary: "bg-primary/10 text-primary ring-primary/15",
+  primary: "bg-primary/10 text-primary-ink ring-primary/15",
   success: "bg-success-bg text-success ring-success/20",
   warning: "bg-warning-bg text-warning ring-warning/20",
 } as const;

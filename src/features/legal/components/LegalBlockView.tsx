@@ -43,7 +43,7 @@ export function LegalBlockView({ block }: { block: LegalBlock }) {
       return (
         <List
           className={cn(
-            "marker:text-primary space-y-2 pl-6",
+            "marker:text-primary-ink space-y-2 pl-6",
             block.ordered ? "list-decimal" : "list-disc",
           )}
         >

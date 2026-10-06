@@ -39,7 +39,7 @@ export function UnderConstruction({ phase, prototypeUrl, deliverables }: UnderCo
         <ul className="text-muted-foreground flex max-w-[52ch] flex-col gap-1.5 text-left text-sm">
           {deliverables.map((item) => (
             <li key={item} className="flex gap-2">
-              <span aria-hidden="true" className="text-primary">
+              <span aria-hidden="true" className="text-primary-ink">
                 •
               </span>
               {item}

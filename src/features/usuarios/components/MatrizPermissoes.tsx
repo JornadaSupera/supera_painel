@@ -50,7 +50,7 @@ export function MatrizPermissoes() {
 function Concessao({ concedida }: { concedida: boolean }) {
   return concedida ? (
     <>
-      <Check aria-hidden className="text-primary size-4" />
+      <Check aria-hidden className="text-primary-ink size-4" />
       <span className="sr-only">Concedida</span>
     </>
   ) : (

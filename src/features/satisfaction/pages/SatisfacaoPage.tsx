@@ -218,7 +218,7 @@ export function SatisfacaoPage() {
                   value={data.responses}
                   context={`${data.promoters} promotores · ${data.passives} neutros · ${data.detractors} detratores`}
                   icon={<MessageSquareText size={16} />}
-                  accent="bg-primary/10 text-primary"
+                  accent="bg-primary/10 text-primary-ink"
                 />
                 <StatCard
                   label="Taxa de resposta"

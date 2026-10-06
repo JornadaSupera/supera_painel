@@ -31,7 +31,7 @@ import { visibleNavItems, type NavItem } from "./navigation";
 const ITEM_BASE =
   "group relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm transition-colors";
 
-const ITEM_ACTIVE = "bg-primary/10 text-primary font-medium";
+const ITEM_ACTIVE = "bg-primary/10 text-primary-ink font-medium";
 const ITEM_INACTIVE = "text-muted-foreground hover:bg-muted hover:text-foreground";
 
 /** Curve and duration shared by everything that moves during the collapse. */

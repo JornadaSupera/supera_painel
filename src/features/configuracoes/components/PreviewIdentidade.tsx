@@ -8,14 +8,30 @@
  * nenhuma classe do Tailwind conhece.
  */
 
-/** Branco ou quase preto, o que for legível sobre a cor de fundo. */
-function textoLegivelSobre(hex: string): string {
-  const r = Number.parseInt(hex.slice(1, 3), 16);
-  const g = Number.parseInt(hex.slice(3, 5), 16);
-  const b = Number.parseInt(hex.slice(5, 7), 16);
-  // Luminância relativa, aproximada o bastante para escolher entre dois extremos.
-  const luminancia = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminancia > 0.6 ? "#1a1a1a" : "#ffffff";
+// The two candidates for text on the typed colour. The dark one is the app's
+// text on its brand green — the clinic's rule is never white on that green.
+const DARK_TEXT = "#12332f";
+const LIGHT_TEXT = "#ffffff";
+
+/** WCAG relative luminance of a `#rrggbb` colour. */
+function luminance(hex: string): number {
+  const linear = (start: number) => {
+    const channel = Number.parseInt(hex.slice(start, start + 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * linear(1) + 0.7152 * linear(3) + 0.0722 * linear(5);
+}
+
+/**
+ * Whichever of the two reads better on the background, by WCAG contrast ratio.
+ * A brightness threshold picked white for mid greens like #33baab (2.4:1),
+ * where the dark text reaches 5.7:1.
+ */
+function readableTextOn(hex: string): string {
+  const background = luminance(hex);
+  const onDark = (luminance(LIGHT_TEXT) + 0.05) / (background + 0.05);
+  const onLight = (background + 0.05) / (luminance(DARK_TEXT) + 0.05);
+  return onLight >= onDark ? DARK_TEXT : LIGHT_TEXT;
 }
 
 export function PreviewIdentidade({
@@ -59,7 +75,7 @@ export function PreviewIdentidade({
 
           <span
             className="flex h-7 items-center justify-center rounded-md text-[10px] font-semibold"
-            style={{ backgroundColor: corPrimaria, color: textoLegivelSobre(corPrimaria) }}
+            style={{ backgroundColor: corPrimaria, color: readableTextOn(corPrimaria) }}
           >
             Entrar
           </span>

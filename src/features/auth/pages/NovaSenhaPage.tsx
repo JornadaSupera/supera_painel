@@ -121,7 +121,7 @@ export function NovaSenhaPage() {
         title={convite ? "Senha criada!" : "Senha alterada!"}
         description={convite ? "Seu acesso ao painel está pronto." : "Sua nova senha já está valendo."}
         footer={
-          <Link to="/login" className="text-primary font-medium underline underline-offset-4">
+          <Link to="/login" className="text-primary-ink font-medium underline underline-offset-4">
             Entrar no painel agora
           </Link>
         }
@@ -161,7 +161,7 @@ export function NovaSenhaPage() {
         footer={
           <Link
             to="/recuperar-senha"
-            className="text-primary font-medium underline underline-offset-4"
+            className="text-primary-ink font-medium underline underline-offset-4"
           >
             Solicitar um novo link
           </Link>

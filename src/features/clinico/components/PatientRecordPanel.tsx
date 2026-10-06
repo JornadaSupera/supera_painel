@@ -42,7 +42,7 @@ const AREAS = Object.values(ESPECIALIDADE);
 function NextAppointment({ appointment }: { appointment: AppointmentRecordEvent | null }) {
   return (
     <div className="bg-muted/40 flex items-start gap-3 rounded-xl border px-4 py-3">
-      <CalendarClock size={18} aria-hidden="true" className="text-primary mt-0.5 shrink-0" />
+      <CalendarClock size={18} aria-hidden="true" className="text-primary-ink mt-0.5 shrink-0" />
       <div className="flex flex-col gap-0.5 text-sm">
         <span className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
           Próximo compromisso

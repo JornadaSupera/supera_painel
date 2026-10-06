@@ -218,10 +218,10 @@ export function LegalDocumentView({ document: legal }: { document: LegalDocument
                     id={`${section.id}-titulo`}
                     className="flex items-baseline gap-3 text-xl font-semibold tracking-tight text-balance"
                   >
-                    <span className="text-primary font-mono text-sm tabular-nums">
+                    <span className="text-primary-ink font-mono text-sm tabular-nums">
                       {String(index + 1).padStart(2, "0")}
                     </span>
-                    <a href={`#${section.id}`} className="hover:text-primary transition-colors">
+                    <a href={`#${section.id}`} className="hover:text-primary-ink transition-colors">
                       {section.title}
                     </a>
                   </h2>
@@ -247,14 +247,14 @@ export function LegalDocumentView({ document: legal }: { document: LegalDocument
             to={other.to}
             className="no-print bg-card border-border hover:border-primary/50 group mt-8 flex items-center gap-4 rounded-2xl border p-5 transition-colors sm:p-6"
           >
-            <span className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
+            <span className="bg-primary/10 text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-xl">
               <other.icon size={22} aria-hidden="true" />
             </span>
             <span className="flex-1">
               <span className="text-muted-foreground block text-xs font-medium tracking-wider uppercase">
                 Veja também
               </span>
-              <span className="group-hover:text-primary block font-semibold transition-colors">
+              <span className="group-hover:text-primary-ink block font-semibold transition-colors">
                 {other.label}
               </span>
             </span>
@@ -270,7 +270,7 @@ export function LegalDocumentView({ document: legal }: { document: LegalDocument
             <span className="font-mono">{CONTROLLER.taxId}</span>
           </p>
           <p className="flex items-center gap-1.5">
-            <ShieldCheck size={14} className="text-primary" aria-hidden="true" />
+            <ShieldCheck size={14} className="text-primary-ink" aria-hidden="true" />
             Conexão segura. Seus dados são protegidos conforme a LGPD.
           </p>
         </div>

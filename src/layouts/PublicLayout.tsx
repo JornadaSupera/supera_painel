@@ -41,7 +41,7 @@ export function PublicLayout({ children }: { children: ReactNode }) {
         <p className="text-muted-foreground max-w-md text-center text-xs leading-relaxed text-balance">
           <ShieldCheck
             size={14}
-            className="text-primary mr-1.5 inline-block -translate-y-px align-middle"
+            className="text-primary-ink mr-1.5 inline-block -translate-y-px align-middle"
             aria-hidden="true"
           />
           Conexão segura. Seus dados são protegidos conforme a LGPD.

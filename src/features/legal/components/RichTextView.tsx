@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type { Inline, RichText } from "../types";
 
 const LINK_CLASS =
-  "text-primary decoration-primary/40 hover:decoration-primary font-medium underline underline-offset-4 transition-colors";
+  "text-primary-ink decoration-primary/40 hover:decoration-primary font-medium underline underline-offset-4 transition-colors";
 
 function InlineView({ run }: { run: Inline }) {
   if (typeof run === "string") return run;

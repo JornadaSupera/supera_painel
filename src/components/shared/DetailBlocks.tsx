@@ -39,7 +39,7 @@ export function DetailSection({
     <Card>
       <CardContent className="flex flex-col gap-4 pt-6">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <span aria-hidden="true" className="text-primary">
+          <span aria-hidden="true" className="text-primary-ink">
             {icone}
           </span>
           {titulo}

@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
+import chatGlass from "@/assets/images/chat-bamboo-glass.webp";
 import { EmptyState, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/shared";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -285,7 +286,9 @@ function ListaConversas({
             <p
               className={cn(
                 "text-[11px]",
-                conversa.nao_lida_pela_equipe ? "text-primary font-medium" : "text-muted-foreground",
+                conversa.nao_lida_pela_equipe
+                  ? "text-primary-ink font-medium"
+                  : "text-muted-foreground",
               )}
             >
               {relativeTime(conversa.ultima_mensagem_em)}
@@ -387,7 +390,14 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
 
       <ConversationAssignments conversationId={conversa.id} />
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      {/* Frosted glass with bamboo, the partitions between the clinic rooms. It sits on the
+          scrolling box, so it stays still while the messages move; bubbles stay opaque and loose
+          text over it goes dark. Light theme only: the photograph would glare in the dark one,
+          and `!` is what lets the class beat the inline image. */}
+      <div
+        className="flex-1 space-y-3 overflow-y-auto bg-cover bg-center p-4 dark:bg-none!"
+        style={{ backgroundImage: `url(${chatGlass})` }}
+      >
         {mensagens.isLoading && <Loading compact />}
         {mensagens.isError && (
           <ErrorState compact error={mensagens.error} onRetry={() => void mensagens.refetch()} />
@@ -404,10 +414,10 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
                 <div
                   role="separator"
                   aria-label="Mensagens novas"
-                  className="text-primary flex items-center gap-2 text-[11px] font-semibold tracking-wide uppercase"
+                  className="text-primary-ink flex items-center gap-2 text-[11px] font-semibold tracking-wide uppercase"
                 >
                   <span aria-hidden="true" className="bg-primary/30 h-px flex-1" />
-                  Mensagens novas
+                  <span className="bg-card rounded-full px-2 py-0.5">Mensagens novas</span>
                   <span aria-hidden="true" className="bg-primary/30 h-px flex-1" />
                 </div>
               )}
@@ -420,13 +430,15 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
                 )}
               >
                 {doSistema ? (
-                  <p className="text-muted-foreground mx-auto text-[11px] italic">{mensagem.corpo}</p>
+                  <p className="text-foreground/80 mx-auto text-[11px] italic">{mensagem.corpo}</p>
                 ) : (
                   <>
                     <div
                       className={cn(
                         "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-                        daEquipe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
+                        daEquipe
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card text-foreground border-border dark:bg-muted border shadow-xs",
                         nova && "ring-primary/40 ring-2",
                       )}
                     >
@@ -439,8 +451,10 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
                         </div>
                       )}
                     </div>
-                    <span className="text-muted-foreground text-[10px]">
-                      {nova && <span className="text-primary font-semibold uppercase">Nova · </span>}
+                    <span className="text-foreground/80 text-[10px]">
+                      {nova && (
+                        <span className="text-primary-ink font-semibold uppercase">Nova · </span>
+                      )}
                       {RESUMO_AUTOR[mensagem.autor]}
                       {mensagem.autor_nome ? ` · ${mensagem.autor_nome}` : ""} ·{" "}
                       {formatDateTime(mensagem.criado_em)}

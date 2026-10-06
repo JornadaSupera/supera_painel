@@ -190,7 +190,10 @@ function Content({ event, chatHref }: { event: RecordEvent; chatHref: string }):
           <StatusBadge tone={event.status_tone} size="sm" dot>
             {STATUS_CONVERSA_LABEL[event.status]}
           </StatusBadge>
-          <Link to={chatHref} className="text-primary text-xs underline-offset-2 hover:underline">
+          <Link
+            to={chatHref}
+            className="text-primary-ink text-xs underline-offset-2 hover:underline"
+          >
             Abrir no chat
           </Link>
         </p>

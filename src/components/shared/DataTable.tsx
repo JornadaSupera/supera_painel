@@ -388,7 +388,10 @@ export function DataTable<T>({
                         <Icon
                           size={13}
                           aria-hidden="true"
-                          className={cn("shrink-0 opacity-40", active && "text-primary opacity-100")}
+                          className={cn(
+                            "shrink-0 opacity-40",
+                            active && "text-primary-ink opacity-100",
+                          )}
                         />
                       </button>
                     ) : (

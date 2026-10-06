@@ -104,7 +104,7 @@ function ChipEspecialidade({
         // the form on a phone.
         "focus-visible:ring-ring/50 rounded-full border px-3 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none max-md:min-h-10",
         ativa
-          ? "border-primary/30 bg-primary/10 text-primary font-medium"
+          ? "border-primary/30 bg-primary/10 text-primary-ink font-medium"
           : "text-muted-foreground hover:bg-muted border-border",
       )}
     >

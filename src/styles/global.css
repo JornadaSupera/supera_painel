@@ -89,15 +89,15 @@
    (no repaint). Size it with --pattern-w; opacity with --pattern-opacity. */
 @layer components {
   .supera-pattern {
-    --_w: var(--pattern-w, 20rem);
-    --_h: calc(var(--_w) * 181.2 / 252);
+    --_w: var(--pattern-w, 14rem);
+    --_h: calc(var(--_w) * 129 / 211.8);
     position: absolute;
     inset: calc(var(--_h) * -1) calc(var(--_w) * -1);
     z-index: -1;
     pointer-events: none;
     background-image: url("../assets/images/pattern-supera.svg");
     background-size: var(--_w) var(--_h);
-    opacity: var(--pattern-opacity, 0.5);
+    opacity: var(--pattern-opacity, 0.4);
     will-change: transform;
   }
 
@@ -115,7 +115,7 @@
 @layer components {
   .supera-pattern-ink {
     --_w: var(--pattern-w, 16rem);
-    --_h: calc(var(--_w) * 181.2 / 252);
+    --_h: calc(var(--_w) * 129 / 211.8);
     position: absolute;
     inset: 0;
     z-index: -1;

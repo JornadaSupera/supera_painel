@@ -40,7 +40,7 @@ import { useKpis, useRegistrarExportacaoDashboard, useSeries } from "../hooks/us
  * entre eles.
  */
 const APRESENTACAO: Record<string, { icone: ComponentType; acento: string }> = {
-  pacientes_ativos: { icone: Users, acento: "bg-primary/10 text-primary" },
+  pacientes_ativos: { icone: Users, acento: "bg-primary/10 text-primary-ink" },
   novos_pacientes: { icone: UserPlus, acento: "bg-supera-empatia/10 text-supera-empatia" },
   sessoes_quimio: { icone: Activity, acento: "bg-supera-uniao/10 text-supera-uniao" },
   engajamento_app: { icone: TrendingUp, acento: "bg-mood-1/10 text-mood-1" },
@@ -296,7 +296,7 @@ export function DashboardPage() {
                 % de pacientes ativos com grau 2+ nos últimos 90 dias · n = pacientes do protocolo ·{" "}
                 <Link
                   to="/estatisticas/clinicas"
-                  className="text-primary underline-offset-2 hover:underline"
+                  className="text-primary-ink underline-offset-2 hover:underline"
                 >
                   ver com filtros
                 </Link>

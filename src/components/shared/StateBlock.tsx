@@ -57,7 +57,7 @@ function StateBlock({
         <span
           aria-hidden="true"
           className={cn(
-            "bg-primary/10 text-primary relative isolate flex items-center justify-center overflow-hidden rounded-full",
+            "bg-primary/10 text-primary-ink relative isolate flex items-center justify-center overflow-hidden rounded-full",
             "shadow-[0_0_0_8px_color-mix(in_srgb,currentColor_7%,transparent)]",
             "motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:duration-300",
             compact ? "size-12" : "size-16",

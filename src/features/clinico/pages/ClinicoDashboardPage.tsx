@@ -199,7 +199,10 @@ export function ClinicoDashboardPage() {
         <section className="bg-card rounded-2xl border p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-foreground text-sm font-semibold">Mensagens não respondidas</h2>
-            <Link to={`${base}/chat`} className="text-primary text-xs font-medium hover:underline">
+            <Link
+              to={`${base}/chat`}
+              className="text-primary-ink text-xs font-medium hover:underline"
+            >
               Abrir chat
             </Link>
           </div>
@@ -235,7 +238,10 @@ export function ClinicoDashboardPage() {
         <section className="bg-card rounded-2xl border p-5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <h2 className="text-foreground text-sm font-semibold">Fila de alertas</h2>
-            <Link to={`${base}/alertas`} className="text-primary text-xs font-medium hover:underline">
+            <Link
+              to={`${base}/alertas`}
+              className="text-primary-ink text-xs font-medium hover:underline"
+            >
               Abrir alertas
             </Link>
           </div>

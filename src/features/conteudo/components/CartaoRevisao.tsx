@@ -47,7 +47,7 @@ export function CartaoRevisao({ conteudo, onDecidir, onAbrir, ocupado }: CartaoR
           <button
             type="button"
             onClick={() => onAbrir(conteudo)}
-            className="text-foreground hover:text-primary truncate text-sm font-medium"
+            className="text-foreground hover:text-primary-ink truncate text-sm font-medium"
           >
             {conteudo.titulo}
           </button>
