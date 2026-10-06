@@ -52,7 +52,7 @@ export type { FormSelectProps } from "./FormSelect";
 export { UnderConstruction } from "./UnderConstruction";
 export type { UnderConstructionProps } from "./UnderConstruction";
 
-export { Breadcrumb, LevelBadge, PageHeader } from "./PageHeader";
+export { Breadcrumb, PageHeader } from "./PageHeader";
 export type { BreadcrumbItem, PageHeaderProps } from "./PageHeader";
 
 export { Pagination } from "./Pagination";

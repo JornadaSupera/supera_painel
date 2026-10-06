@@ -5,7 +5,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCountUp } from "@/hooks/useCountUp";
 import { formatNumber, parseFormattedNumber } from "@/lib/format";
 import { ENTER_CLASS, enterStyle } from "@/lib/motion";
-import { LevelBadge } from "./PageHeader";
 import { cn } from "@/lib/utils";
 
 /**
@@ -50,11 +49,6 @@ export interface StatCardProps {
   icon?: ReactNode;
   /** Classes for the icon accent: `bg-supera-uniao/10 text-supera-uniao`. */
   accent?: string;
-  /**
-   * Scope level. A Médio-level indicator gets the reference pill in the card
-   * corner — that is how the client checks what was contracted.
-   */
-  level?: "mvp" | "medio";
   /** Drill-down to the matching report. */
   onClick?: () => void;
   loading?: boolean;
@@ -115,7 +109,6 @@ export function StatCard({
   invertColor = false,
   icon,
   accent = "bg-primary/10 text-primary",
-  level,
   onClick,
   loading = false,
   enterDelay,
@@ -202,54 +195,32 @@ export function StatCard({
     </>
   );
 
-  // Room under the context line for the floating level pill. Without it the
-  // pill covered the last line whenever the card was narrow — two across on
-  // a phone, for one.
-  const pillRoom = level === "medio" && "pb-9";
-
-  // `className` belongs on whichever element ends up outermost: the card
-  // itself, except when `level="medio"` wraps it below to anchor the badge —
-  // there, the wrapper carries it instead. Gating on `!level` used to drop
-  // `className` silently for `level="mvp"` too, since it is truthy but never
-  // gets a wrapper.
-  const semWrapperProprio = level !== "medio";
   const enter = enterDelay === undefined ? undefined : ENTER_CLASS;
   const enterAt = enterStyle(enterDelay);
 
-  const card = onClick ? (
-    <button
-      type="button"
-      onClick={onClick}
-      style={semWrapperProprio ? enterAt : undefined}
-      className={cn(
-        BASE,
-        // Lifts a few pixels on hover and settles back when pressed: the card
-        // is a link to a report, and should feel like one.
-        "group hover:border-primary/40 h-full w-full cursor-pointer text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:shadow-sm motion-reduce:transition-none motion-reduce:hover:translate-y-0",
-        pillRoom,
-        semWrapperProprio && enter,
-        semWrapperProprio && className,
-      )}
-    >
-      {content}
-    </button>
-  ) : (
-    <div
-      style={semWrapperProprio ? enterAt : undefined}
-      className={cn(BASE, "h-full", pillRoom, semWrapperProprio && enter, semWrapperProprio && className)}
-    >
-      {content}
-    </div>
-  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        style={enterAt}
+        className={cn(
+          BASE,
+          // Lifts a few pixels on hover and settles back when pressed: the card
+          // is a link to a report, and should feel like one.
+          "group hover:border-primary/40 h-full w-full cursor-pointer text-left transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:shadow-sm motion-reduce:transition-none motion-reduce:hover:translate-y-0",
+          enter,
+          className,
+        )}
+      >
+        {content}
+      </button>
+    );
+  }
 
-  if (level !== "medio") return card;
-
-  // The level pill floats over the card corner, as in the reference. The
-  // `relative` wrapper exists only to anchor it.
   return (
-    <div style={enterAt} className={cn("relative", enter, className)}>
-      {card}
-      <LevelBadge level="Médio" className="absolute right-2 bottom-2" />
+    <div style={enterAt} className={cn(BASE, "h-full", enter, className)}>
+      {content}
     </div>
   );
 }

@@ -49,30 +49,6 @@ export function Breadcrumb({ items, className }: { items: BreadcrumbItem[]; clas
   );
 }
 
-/**
- * Scope-level pill.
- *
- * The reference screens mark each page as MVP or Médio. We reproduce it because
- * the client uses that label to check what was contracted — it disappears from
- * the final delivery, not from the build phase.
- */
-export function LevelBadge({ level, className }: { level: "MVP" | "Médio"; className?: string }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tracking-wide whitespace-nowrap",
-        level === "MVP"
-          ? "bg-primary/10 text-primary border-primary/20"
-          : "bg-supera-uniao/15 text-supera-uniao border-supera-uniao/25",
-        className,
-      )}
-    >
-      <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
-      {level}
-    </span>
-  );
-}
-
 export interface PageHeaderProps {
   /**
    * Small label above the title — the panel area: "Painel executivo",
@@ -99,8 +75,7 @@ export interface PageHeaderProps {
   backTo?: string;
   /** Texto acessível do botão de voltar. */
   backLabel?: string;
-  level?: "MVP" | "Médio";
-  /** Replaces the level pill with a badge of your own. */
+  /** A badge next to the title, such as a record status. */
   badge?: ReactNode;
   className?: string;
 }
@@ -111,7 +86,6 @@ export function PageHeader({
   subtitle,
   actions,
   breadcrumb,
-  level,
   badge,
   backTo,
   backLabel = "Voltar",
@@ -166,7 +140,7 @@ export function PageHeader({
 
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="mt-0.5 text-xl font-semibold tracking-tight sm:text-2xl">{title}</h1>
-          {badge ?? (level && <LevelBadge level={level} />)}
+          {badge}
         </div>
 
         {/* Short brand stroke under the title; it draws in once per screen. */}
