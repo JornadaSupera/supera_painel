@@ -532,6 +532,8 @@ interface LinhaConversation {
   subject_id: string | null;
   status: "open" | "resolved";
   origin_specialty_id: string | null;
+  /** Quem assumiu. `null` enquanto a conversa está na fila. Ausente em bases antigas. */
+  assigned_professional_id?: string | null;
   last_message_at: string;
   team_last_read_at: string | null;
 }
@@ -547,7 +549,17 @@ export async function listConversas(): Promise<ListResult<ConversaClinico>> {
     });
     if (error) return falhaDe(error);
 
-    const linhas = (data ?? []) as LinhaConversation[];
+    // Conversa assumida é de quem assumiu: a leitura ainda a entrega aos colegas
+    // da área, então ela sai da lista aqui. A barreira de verdade é do banco — isto
+    // só impede que a tela mostre, e deixe responder, o que é de outra pessoa.
+    // Quem não tem perfil de profissional (o administrador) vê a fila inteira.
+    const eu = await profissionalDaSessao();
+    const meuId = "error" in eu ? null : eu.profissionalId;
+
+    const linhas = ((data ?? []) as LinhaConversation[]).filter(
+      (linha) =>
+        meuId === null || !linha.assigned_professional_id || linha.assigned_professional_id === meuId,
+    );
     if (linhas.length === 0) return ok([]);
 
     const idsPacientes = [...new Set(linhas.map((linha) => linha.patient_id))];
@@ -594,9 +606,9 @@ export async function listConversas(): Promise<ListResult<ConversaClinico>> {
         ultima_mensagem_em: linha.last_message_at,
         nao_lida_pela_equipe:
           !linha.team_last_read_at || linha.team_last_read_at < linha.last_message_at,
-        // `claim_conversation` só assume quando `origin_specialty_id IS NULL` —
-        // é a mesma condição, lida ao contrário.
-        atribuida: linha.origin_specialty_id !== null,
+        equipe_lida_em: linha.team_last_read_at,
+        atribuida: Boolean(linha.assigned_professional_id),
+        minha: meuId !== null && linha.assigned_professional_id === meuId,
         especialidade_origem: linha.origin_specialty_id
           ? paraEspecialidade(codigoPorEspecialidade.get(linha.origin_specialty_id))
           : null,

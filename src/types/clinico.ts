@@ -113,8 +113,12 @@ export interface ConversaClinico {
   ultima_mensagem_em: string;
   /** `last_message_at` mais recente que a última leitura da equipe. */
   nao_lida_pela_equipe: boolean;
-  /** `null` até alguém da equipe assumir — a fila mostra "não atribuída". */
+  /** Última leitura da equipe (ISO 8601 UTC). `null` se ninguém abriu a conversa. */
+  equipe_lida_em: string | null;
+  /** `false` até alguém assumir: a conversa está na fila. */
   atribuida: boolean;
+  /** Quem assumiu é a pessoa logada. Só ela responde, resolve e encaminha. */
+  minha: boolean;
   /**
    * The specialty the conversation was routed to when claimed. Only that
    * specialty can resolve it, so the screen offers "resolve" by comparing it

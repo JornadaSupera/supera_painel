@@ -1,5 +1,5 @@
 import { Search } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { EmptyState, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/shared";
@@ -17,7 +17,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { AUTOR_MENSAGEM, ESPECIALIDADE_LABEL, STATUS_CONVERSA_LABEL } from "@/lib/enums";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { ConversaClinico } from "@/types/clinico";
+import type { ConversaClinico, MensagemClinico } from "@/types/clinico";
 import { AnexoDaMensagem } from "../components/AnexoDaMensagem";
 import { ComposerMensagem } from "../components/ComposerMensagem";
 import { ConversationAssignments } from "../components/ConversationAssignments";
@@ -60,6 +60,15 @@ const RESUMO_AUTOR: Record<string, string> = {
   [AUTOR_MENSAGEM.SISTEMA]: "Sistema",
 };
 
+function subtituloDaFila(lista: ConversaClinico[]): string {
+  const abertas = lista.filter((c) => c.status === "aberta");
+  const novas = abertas.filter((c) => c.nao_lida_pela_equipe).length;
+  const base = `${abertas.length} ${abertas.length === 1 ? "conversa aberta" : "conversas abertas"}`;
+
+  if (novas === 0) return base;
+  return `${base} · ${novas} com ${novas === 1 ? "mensagem nova" : "mensagens novas"}`;
+}
+
 export function ClinicoChatPage() {
   const { user } = useAuth();
   const area = user?.especialidade ? ESPECIALIDADE_LABEL[user.especialidade] : "";
@@ -93,7 +102,7 @@ export function ClinicoChatPage() {
       <PageHeader
         eyebrow={area}
         title="Chat"
-        subtitle={`${lista.filter((c) => c.status === "aberta").length} conversas abertas`}
+        subtitle={subtituloDaFila(lista)}
       />
 
       {pacienteDaFicha && conversas.data && !conversaDoPaciente && (
@@ -138,6 +147,7 @@ export function ClinicoChatPage() {
 
 const RECORTES: { value: RecorteDeConversas; label: string }[] = [
   { value: "todas", label: "Todas" },
+  { value: "minhas", label: "Minhas" },
   { value: "nao_resolvidas", label: "Não resolvidas" },
   { value: "da_minha_area", label: "Da minha área" },
 ];
@@ -238,14 +248,32 @@ function ListaConversas({
             type="button"
             onClick={() => onSelecionar(conversa.id)}
             className={cn(
-              "border-border/60 flex flex-col gap-1 border-b p-3 text-left transition-colors last:border-b-0",
-              conversa.id === selecionadaId ? "bg-primary/10" : "hover:bg-muted/60",
+              "border-border/60 relative flex flex-col gap-1 border-b p-3 text-left transition-colors last:border-b-0",
+              conversa.id === selecionadaId
+                ? "bg-primary/10"
+                : conversa.nao_lida_pela_equipe
+                  ? "bg-primary/5 hover:bg-primary/10"
+                  : "hover:bg-muted/60",
             )}
           >
+            {/* A conversa com mensagem nova ganha uma faixa na borda, o nome em
+                negrito e a etiqueta: o ponto sozinho passava despercebido. */}
+            {conversa.nao_lida_pela_equipe && (
+              <span aria-hidden="true" className="bg-primary absolute inset-y-0 left-0 w-1" />
+            )}
             <div className="flex items-center justify-between gap-2">
-              <p className="text-foreground truncate text-sm font-medium">{conversa.paciente_nome}</p>
+              <p
+                className={cn(
+                  "text-foreground truncate text-sm",
+                  conversa.nao_lida_pela_equipe ? "font-semibold" : "font-medium",
+                )}
+              >
+                {conversa.paciente_nome}
+              </p>
               {conversa.nao_lida_pela_equipe && (
-                <span className="bg-primary size-2 shrink-0 rounded-full" aria-label="Não lida" />
+                <span className="bg-primary text-primary-foreground shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+                  Nova
+                </span>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -254,7 +282,16 @@ function ListaConversas({
               </StatusBadge>
               <span className="text-muted-foreground truncate text-xs">{conversa.assunto_label}</span>
             </div>
-            <p className="text-muted-foreground text-[11px]">{relativeTime(conversa.ultima_mensagem_em)}</p>
+            <p
+              className={cn(
+                "text-[11px]",
+                conversa.nao_lida_pela_equipe ? "text-primary font-medium" : "text-muted-foreground",
+              )}
+            >
+              {relativeTime(conversa.ultima_mensagem_em)}
+              {conversa.minha && " · com você"}
+              {!conversa.atribuida && conversa.status === "aberta" && " · na fila"}
+            </p>
           </button>
         ))}
       </div>
@@ -269,6 +306,26 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
   const resolver = useResolverConversa();
   const marcarLida = useMarcarConversaLida();
   const [encaminhando, setEncaminhando] = useState(false);
+
+  // O que é "novo" nesta conversa: o que chegou depois da última leitura da
+  // equipe, e o que chega com ela aberta (a atualização periódica traz). Os dois
+  // pontos de corte são fixados na abertura — marcar a conversa como lida, logo
+  // em seguida, não apaga a marca de quem acabou de abrir.
+  const [lidaAte] = useState(conversa.equipe_lida_em);
+  const [jaVistas, setJaVistas] = useState<ReadonlySet<string> | null>(null);
+  useEffect(() => {
+    if (!jaVistas && mensagens.data) setJaVistas(new Set(mensagens.data.map((m) => m.id)));
+  }, [jaVistas, mensagens.data]);
+
+  const ehNova = (mensagem: MensagemClinico): boolean => {
+    if (mensagem.autor === AUTOR_MENSAGEM.PROFISSIONAL || mensagem.autor === AUTOR_MENSAGEM.SISTEMA) {
+      return false;
+    }
+    if (jaVistas && !jaVistas.has(mensagem.id)) return true;
+    return lidaAte === null || mensagem.criado_em > lidaAte;
+  };
+
+  const primeiraNovaId = (mensagens.data ?? []).find(ehNova)?.id ?? null;
 
   // Abrir a conversa é o próprio ato de ler — não exige clique à parte. Também
   // vale para a mensagem que chega com ela aberta: sem isso, a atualização
@@ -286,9 +343,8 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
   }, [total]);
 
   const aberta = conversa.status === "aberta";
-  const daMinhaEspecialidade =
-    conversa.especialidade_origem !== null && conversa.especialidade_origem === user?.especialidade;
-  const deOutraEspecialidade = conversa.especialidade_origem !== null && !daMinhaEspecialidade;
+  const deOutraEspecialidade =
+    conversa.especialidade_origem !== null && conversa.especialidade_origem !== user?.especialidade;
 
   return (
     <div className="bg-card flex max-h-[70vh] flex-col rounded-2xl border">
@@ -309,10 +365,9 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
               Assumir
             </Button>
           )}
-          {/* Only the specialty the conversation was routed to can resolve it —
-              the backend refuses anyone else, and an unassigned one belongs to
-              nobody yet. Offering the button elsewhere only led to a refusal. */}
-          {aberta && daMinhaEspecialidade && (
+          {/* The conversation belongs to who claimed it: only that person resolves
+              or hands it over. An unclaimed one belongs to nobody yet. */}
+          {aberta && conversa.minha && (
             <Button
               size="sm"
               variant="outline"
@@ -322,9 +377,7 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
               Marcar resolvida
             </Button>
           )}
-          {/* Same rule as resolving, and the database enforces it: only who is in
-              the area of the conversation hands it over, and only while it is open. */}
-          {aberta && daMinhaEspecialidade && (
+          {aberta && conversa.minha && (
             <Button size="sm" variant="outline" onClick={() => setEncaminhando(true)}>
               Encaminhar
             </Button>
@@ -343,39 +396,59 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
         {(mensagens.data ?? []).map((mensagem) => {
           const daEquipe = mensagem.autor === "profissional";
           const doSistema = mensagem.autor === "sistema";
+          const nova = ehNova(mensagem);
 
           return (
-            <div
-              key={mensagem.id}
-              className={cn("flex flex-col gap-0.5", daEquipe ? "items-end" : "items-start")}
-            >
-              {doSistema ? (
-                <p className="text-muted-foreground mx-auto text-[11px] italic">{mensagem.corpo}</p>
-              ) : (
-                <>
-                  <div
-                    className={cn(
-                      "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
-                      daEquipe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
-                    )}
-                  >
-                    <p className="break-words whitespace-pre-wrap">{mensagem.corpo}</p>
-                    {mensagem.anexos.length > 0 && (
-                      <div className="mt-2 flex flex-col items-start gap-2">
-                        {mensagem.anexos.map((anexo) => (
-                          <AnexoDaMensagem key={anexo.id} anexo={anexo} daEquipe={daEquipe} />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-muted-foreground text-[10px]">
-                    {RESUMO_AUTOR[mensagem.autor]}
-                    {mensagem.autor_nome ? ` · ${mensagem.autor_nome}` : ""} ·{" "}
-                    {formatDateTime(mensagem.criado_em)}
-                  </span>
-                </>
+            <Fragment key={mensagem.id}>
+              {mensagem.id === primeiraNovaId && (
+                <div
+                  role="separator"
+                  aria-label="Mensagens novas"
+                  className="text-primary flex items-center gap-2 text-[11px] font-semibold tracking-wide uppercase"
+                >
+                  <span aria-hidden="true" className="bg-primary/30 h-px flex-1" />
+                  Mensagens novas
+                  <span aria-hidden="true" className="bg-primary/30 h-px flex-1" />
+                </div>
               )}
-            </div>
+              <div
+                className={cn(
+                  "flex flex-col gap-0.5",
+                  daEquipe ? "items-end" : "items-start",
+                  nova &&
+                    "motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300",
+                )}
+              >
+                {doSistema ? (
+                  <p className="text-muted-foreground mx-auto text-[11px] italic">{mensagem.corpo}</p>
+                ) : (
+                  <>
+                    <div
+                      className={cn(
+                        "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
+                        daEquipe ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
+                        nova && "ring-primary/40 ring-2",
+                      )}
+                    >
+                      <p className="break-words whitespace-pre-wrap">{mensagem.corpo}</p>
+                      {mensagem.anexos.length > 0 && (
+                        <div className="mt-2 flex flex-col items-start gap-2">
+                          {mensagem.anexos.map((anexo) => (
+                            <AnexoDaMensagem key={anexo.id} anexo={anexo} daEquipe={daEquipe} />
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground text-[10px]">
+                      {nova && <span className="text-primary font-semibold uppercase">Nova · </span>}
+                      {RESUMO_AUTOR[mensagem.autor]}
+                      {mensagem.autor_nome ? ` · ${mensagem.autor_nome}` : ""} ·{" "}
+                      {formatDateTime(mensagem.criado_em)}
+                    </span>
+                  </>
+                )}
+              </div>
+            </Fragment>
           );
         })}
 
@@ -389,11 +462,19 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
       />
 
       <footer className="border-border border-t p-3">
-        {aberta ? (
-          <ComposerMensagem conversaId={conversa.id} />
-        ) : (
+        {!aberta ? (
           <p className="text-muted-foreground text-xs">
             Esta conversa foi encerrada. Só o paciente pode abrir uma nova.
+          </p>
+        ) : conversa.minha ? (
+          <ComposerMensagem conversaId={conversa.id} />
+        ) : conversa.atribuida ? (
+          <p className="text-muted-foreground text-xs">
+            Esta conversa está com outro profissional. Só quem a assumiu responde.
+          </p>
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            Assuma a conversa para responder. Quem assume passa a ser o único a vê-la e a responder.
           </p>
         )}
       </footer>
