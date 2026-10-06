@@ -71,6 +71,11 @@ export function carriesRecoveryLink(location: { search: string; hash: string }):
   return RECOVERY_KEYS.some((key) => params.has(key));
 }
 
+/** What the link says it was issued for. A link that says nothing is a recovery. */
+export function recoveryLinkPurpose(location: { search: string; hash: string }): RecoveryLinkType {
+  return linkType(readParams(location));
+}
+
 export function readRecoveryLink({ search, hash }: { search: string; hash: string }): RecoveryLink {
   const params = readParams({ search, hash });
 

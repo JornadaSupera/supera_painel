@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useParams } from "react-router-do
 
 import { Loading } from "@/components/shared";
 import { AvisoSessao } from "@/features/auth/components/AvisoSessao";
-import { carriesRecoveryLink } from "@/features/auth/recovery-link";
+import { carriesRecoveryLink, recoveryLinkPurpose } from "@/features/auth/recovery-link";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { MfaPage } from "@/features/auth/pages/MfaPage";
 import { NovaSenhaPage } from "@/features/auth/pages/NovaSenhaPage";
@@ -103,14 +103,22 @@ const ROUTES_THAT_CONSUME_A_LINK = ["/redefinir-senha", "/nova-senha"];
  * the template unconfigured; it stops a configuration mistake from surfacing as
  * an invalid token.
  *
- * It forwards to the PANEL's page. A stray link can no longer say who it was
- * for, and the only flow in this codebase that targets this origin is the
- * panel's own `requestPasswordReset`. The app's link names
- * `/redefinir-senha` explicitly and lands there without passing through here.
+ * A stray recovery link goes to the APP's page. The panel's own
+ * `requestPasswordReset` names `/nova-senha` and lands there without passing
+ * through here; the app asks for its e-mail without a destination, so its
+ * links are the ones that arrive at the root. Sending a patient to the staff
+ * page told them to sign in to a panel they have no access to.
+ *
+ * A staff invitation is the exception: it says `type=invite`, and choosing the
+ * first password is the panel's screen.
  */
 function needsRecoveryRescue(location: { pathname: string; search: string; hash: string }) {
   if (ROUTES_THAT_CONSUME_A_LINK.includes(location.pathname)) return false;
   return carriesRecoveryLink(location);
+}
+
+function rescueDestination(location: { search: string; hash: string }) {
+  return recoveryLinkPurpose(location) === "invite" ? "/nova-senha" : "/redefinir-senha";
 }
 
 /**
@@ -153,7 +161,11 @@ export function AppRoutes() {
   if (needsRecoveryRescue(location)) {
     return (
       <Navigate
-        to={{ pathname: "/nova-senha", search: location.search, hash: location.hash }}
+        to={{
+          pathname: rescueDestination(location),
+          search: location.search,
+          hash: location.hash,
+        }}
         replace
       />
     );
