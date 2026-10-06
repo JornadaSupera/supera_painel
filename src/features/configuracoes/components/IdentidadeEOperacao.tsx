@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 
 import { Clock, ImageUp, MessageSquareText, Palette, Plus, Trash2, X } from "lucide-react";
 
-import { ErrorState, Footnote, SkeletonCards } from "@/components/shared";
+import { ErrorState, Footnote, SkeletonCards, TimeInput } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -402,30 +402,24 @@ function LinhaDia({
 
         {intervalos.map((intervalo, indice) => (
           <div key={indice} className="flex items-center gap-2">
-            <Input
-              type="time"
+            <TimeInput
               value={intervalo.abre}
               aria-label={`${label}, abre`}
               className="w-28"
-              onChange={(evento) =>
+              onChange={(valor) =>
                 onChange(
-                  intervalos.map((item, i) =>
-                    i === indice ? { ...item, abre: evento.target.value } : item,
-                  ),
+                  intervalos.map((item, i) => (i === indice ? { ...item, abre: valor } : item)),
                 )
               }
             />
             <span className="text-muted-foreground text-xs">até</span>
-            <Input
-              type="time"
+            <TimeInput
               value={intervalo.fecha}
               aria-label={`${label}, fecha`}
               className="w-28"
-              onChange={(evento) =>
+              onChange={(valor) =>
                 onChange(
-                  intervalos.map((item, i) =>
-                    i === indice ? { ...item, fecha: evento.target.value } : item,
-                  ),
+                  intervalos.map((item, i) => (i === indice ? { ...item, fecha: valor } : item)),
                 )
               }
             />
