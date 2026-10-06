@@ -158,6 +158,7 @@ export const queryKeys = {
     carteira: (dias: number) => ["clinico", "carteira", dias] as const,
     alertas: (status?: string) => ["clinico", "alertas", status ?? "todos"] as const,
     conversas: () => ["clinico", "conversas"] as const,
+    perfil: () => ["clinico", "perfil"] as const,
     mensagens: (conversaId: string) => ["clinico", "conversas", conversaId, "mensagens"] as const,
     /** Fora de `clinico.all` de propósito: o anexo não muda, e invalidar a fila não deve baixá-lo de novo. */
     anexo: (caminho: string) => ["clinico-anexo", caminho] as const,

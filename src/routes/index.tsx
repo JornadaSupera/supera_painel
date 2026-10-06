@@ -67,6 +67,7 @@ const ClinicoAlertasPage = lazy(() => import("@/features/clinico/pages/ClinicoAl
 const ClinicoCarteiraPage = lazy(() => import("@/features/clinico/pages/ClinicoCarteiraPage"));
 const ClinicoConteudoPage = lazy(() => import("@/features/clinico/pages/ClinicoConteudoPage"));
 const ClinicoOrientacaoPage = lazy(() => import("@/features/clinico/pages/ClinicoOrientacaoPage"));
+const ClinicoPerfilPage = lazy(() => import("@/features/clinico/pages/ClinicoPerfilPage"));
 /* Not a panel screen: its audience is app users, so it stays out of the bundle
    that panel staff load first. */
 const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
@@ -314,6 +315,7 @@ export function AppRoutes() {
                 <Route path="conteudo/nova" element={<ClinicoOrientacaoPage />} />
                 <Route path="conteudo/:id" element={<ClinicoOrientacaoPage />} />
               </Route>
+              <Route path="perfil" element={<ClinicoPerfilPage />} />
               <Route path="seguranca" element={<SegurancaContaPage />} />
             </Route>
           </Route>
