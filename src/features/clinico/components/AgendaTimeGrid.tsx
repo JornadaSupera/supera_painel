@@ -1,4 +1,4 @@
-import { MoreHorizontal } from "lucide-react";
+import { CircleCheck, MoreHorizontal } from "lucide-react";
 import { useMemo, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import type { PersonalBlock } from "@/types/agenda";
 import type { CompromissoAgenda } from "@/types/clinico";
 import type { AgendaDay } from "../agenda-days";
+import { isConfirmed } from "../agenda-confirmation";
 import { APPOINTMENT_CARD_TONE, BLOCK_PATTERN } from "../agenda-tones";
 
 /**
@@ -221,18 +222,36 @@ export function AgendaTimeGrid({
                 const { appointment } = item;
                 const width = 100 / columns;
                 const cardHeight = Math.max(MIN_CARD_PX, ((end - start) / 60) * HOUR_PX);
+                const confirmed = isConfirmed(appointment);
                 const card = (
                   <>
                     <span className="font-semibold tabular-nums">{timeOfMinutes(start)}</span>{" "}
+                    {confirmed && (
+                      <CircleCheck
+                        size={11}
+                        aria-hidden="true"
+                        className="text-success -mt-0.5 inline align-middle"
+                      />
+                    )}{" "}
                     <span className="font-medium">{appointment.paciente_nome}</span>
                     <span className="block truncate opacity-80">{appointment.tipo_label}</span>
                     {/* The status is always in the text; the badge is only drawn where it fits. */}
                     {cardHeight >= BADGE_MIN_PX ? (
-                      <StatusBadge tone={appointment.status_tom} size="sm" className="mt-0.5">
-                        {appointment.status_label}
-                      </StatusBadge>
+                      <span className="mt-0.5 flex flex-wrap gap-1">
+                        <StatusBadge tone={appointment.status_tom} size="sm">
+                          {appointment.status_label}
+                        </StatusBadge>
+                        {confirmed && (
+                          <StatusBadge tone="success" size="sm">
+                            Confirmada
+                          </StatusBadge>
+                        )}
+                      </span>
                     ) : (
-                      <span className="sr-only">, {appointment.status_label}</span>
+                      <span className="sr-only">
+                        , {appointment.status_label}
+                        {confirmed ? ", confirmada pelo paciente" : ""}
+                      </span>
                     )}
                   </>
                 );
@@ -246,7 +265,7 @@ export function AgendaTimeGrid({
                   left: `calc(${column * width}% + 2px)`,
                   width: `calc(${width}% - 4px)`,
                 };
-                const title = `${timeOfMinutes(start)} a ${timeOfMinutes(end)} · ${appointment.paciente_nome} · ${appointment.tipo_label} · ${appointment.status_label}`;
+                const title = `${timeOfMinutes(start)} a ${timeOfMinutes(end)} · ${appointment.paciente_nome} · ${appointment.tipo_label} · ${appointment.status_label}${confirmed ? " · confirmada pelo paciente" : ""}`;
 
                 // Only an appointment still scheduled can be moved or closed: the
                 // database does not take one out of a terminal state.

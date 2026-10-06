@@ -1,8 +1,9 @@
-import { LockKeyhole } from "lucide-react";
+import { CircleCheck, LockKeyhole } from "lucide-react";
 
 import { dayOfMonth, monthOf, timeOfMinutes, weekdayShort } from "@/lib/agenda";
 import { cn } from "@/lib/utils";
 import type { AgendaDay } from "../agenda-days";
+import { isConfirmed } from "../agenda-confirmation";
 import { APPOINTMENT_CARD_TONE } from "../agenda-tones";
 
 /**
@@ -90,6 +91,12 @@ export function AgendaMonthView({
                   )}
                 >
                   <span className="font-semibold tabular-nums">{timeOfMinutes(start)}</span>{" "}
+                  {isConfirmed(appointment) && (
+                    <>
+                      <CircleCheck size={10} aria-hidden="true" className="text-success inline align-middle" />
+                      <span className="sr-only">confirmada, </span>{" "}
+                    </>
+                  )}
                   {appointment.tipo_label}
                 </span>
               ))}

@@ -1,4 +1,4 @@
-import { CalendarClock, CalendarX2, CheckCheck, LoaderCircle, UserX } from "lucide-react";
+import { CalendarClock, CalendarX2, CheckCheck, CircleCheck, Clock, LoaderCircle, UserX } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -13,8 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { instantParts, timeOfMinutes } from "@/lib/agenda";
+import { cn } from "@/lib/utils";
 import type { AppointmentOutcome } from "@/types/agenda";
 import type { CompromissoAgenda } from "@/types/clinico";
+import { confirmationText, isConfirmed } from "../agenda-confirmation";
 import { useSetAppointmentStatus } from "../hooks/useScheduling";
 
 /**
@@ -86,6 +88,20 @@ export function AppointmentActionsDialog({
                 </StatusBadge>
                 {appointment.local && <span className="text-muted-foreground">· {appointment.local}</span>}
               </div>
+
+              <p
+                className={cn(
+                  "flex items-center gap-1.5 text-sm",
+                  isConfirmed(appointment) ? "text-success font-medium" : "text-muted-foreground",
+                )}
+              >
+                {isConfirmed(appointment) ? (
+                  <CircleCheck size={15} aria-hidden="true" />
+                ) : (
+                  <Clock size={15} aria-hidden="true" />
+                )}
+                {confirmationText(appointment)}
+              </p>
 
               <div className="grid gap-2 sm:grid-cols-2">
                 <Button
