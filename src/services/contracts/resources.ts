@@ -308,6 +308,7 @@ export const RESOURCES = {
       "assumirAlerta",
       "designarAlerta",
       "resolverAlerta",
+      "getMeuPerfil",
       "listConversas",
       "listMensagens",
       "enviarMensagem",

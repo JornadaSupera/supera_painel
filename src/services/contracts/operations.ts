@@ -26,6 +26,7 @@ import type {
   ConversaClinico,
   MensagemClinico,
 } from "@/types/clinico";
+import type { PerfilProfissional } from "@/types/professional-profile";
 import type { SatisfactionResponse, SatisfactionSummary } from "@/types/satisfaction";
 import type {
   AppointmentInput,
@@ -690,6 +691,9 @@ export interface ClinicoOperations {
     conduta: CondutaAlerta;
     notas?: string;
   }): Promise<SingleResult<null>>;
+
+  /** O cadastro de quem está logado: quando entrou e as áreas em que atua. */
+  getMeuPerfil(): Promise<SingleResult<PerfilProfissional>>;
 
   /** As conversas — mesma fila de equipe da fila de alertas. */
   listConversas(): Promise<ListResult<ConversaClinico>>;
