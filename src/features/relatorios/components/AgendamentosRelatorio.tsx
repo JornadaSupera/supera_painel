@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import { CalendarClock, Pause, Play, Plus } from "lucide-react";
 
-import { Can, EmptyState, ErrorState, Footnote, SkeletonCards, StatusBadge } from "@/components/shared";
+import { Can, EmptyState, ErrorState, Footnote, SkeletonCards, StatusBadge, TimeInput } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -176,12 +176,7 @@ function DialogoAgendamento({
               <Label htmlFor="agendamento-horario" className="text-xs">
                 Horário
               </Label>
-              <Input
-                id="agendamento-horario"
-                type="time"
-                value={horario}
-                onChange={(evento) => setHorario(evento.target.value)}
-              />
+              <TimeInput id="agendamento-horario" value={horario} onChange={setHorario} />
             </div>
           </div>
 
