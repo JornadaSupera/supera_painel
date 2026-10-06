@@ -141,7 +141,6 @@ export function EstatisticasClinicasPage() {
       <PageHeader
         eyebrow="Estatísticas"
         title="Estatísticas clínicas"
-        level="Médio"
         subtitle="Cruzamento Protocolo × Efeito × Grau · todos os números agregados, sem identificação"
         actions={
           <BotaoExportarCaptura

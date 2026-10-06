@@ -99,7 +99,6 @@ export function EstatisticasOperacionaisPage() {
       <PageHeader
         eyebrow="Estatísticas"
         title="Estatísticas operacionais"
-        level="Médio"
         subtitle="Operação da clínica · volume, tempo de resposta e adesão à agenda"
       />
 
@@ -130,7 +129,6 @@ export function EstatisticasOperacionaisPage() {
                   context={indicador.valor === null ? "sem base no período" : indicador.contexto}
                   invertColor={indicador.inverter_cor}
                   icon={<Icone />}
-                  level="medio"
                 />
               );
             })}
@@ -220,7 +218,6 @@ export function EstatisticasOperacionaisPage() {
               context="aguardando um profissional assumir"
               invertColor
               icon={<ShieldAlert />}
-              level="medio"
             />
             <StatCard
               label="Em atendimento"
@@ -229,7 +226,6 @@ export function EstatisticasOperacionaisPage() {
               }
               context="já assumidos por um profissional"
               icon={<ShieldAlert />}
-              level="medio"
             />
           </div>
         )}
