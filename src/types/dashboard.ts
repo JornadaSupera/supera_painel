@@ -35,12 +35,6 @@ export interface Kpi {
   historico: number[];
   /** Relatório aberto pelo drill-down. */
   relatorio_slug?: string;
-  /**
-   * Nível do escopo contratado. Indicador marcado como "medio" só existe
-   * porque contratamos MVP + Médio — no protótipo ele some ao alternar o
-   * seletor para MVP.
-   */
-  nivel?: "mvp" | "medio";
 }
 
 export interface PontoSessoes {

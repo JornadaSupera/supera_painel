@@ -202,7 +202,6 @@ export function DashboardPage() {
                         invertColor={kpi.inverter_cor}
                         icon={Icone ? <Icone /> : undefined}
                         accent={visual?.acento}
-                        level={kpi.nivel}
                         enterDelay={i * 50}
                         // Drill-down: cada indicador abre o relatório que o
                         // detalha (Fase 8).
