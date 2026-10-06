@@ -17,6 +17,7 @@ import { STATUS_CONVITE_LABEL } from "@/types/paciente";
 import type {
   CampoPii,
   CuidadorVinculado,
+  DiagnosticoPaciente,
   PacienteClinicaEntrada,
   PacienteDetalhe,
   PacienteEntrada,
@@ -116,6 +117,7 @@ interface LinhaConvite {
 
 interface LinhaDiagnostico {
   patient_id: string;
+  created_at?: string;
   cid10_id: string;
   staging: string | null;
   tnm: string | null;
@@ -234,6 +236,8 @@ function statusDoConvite(linha: LinhaPaciente, convite?: LinhaConvite | null): S
 interface ContextoProjecao {
   catalogos: Catalogos;
   diagnostico?: LinhaDiagnostico | null;
+  /** Todas as linhas de diagnóstico da ficha. */
+  diagnosticos?: LinhaDiagnostico[];
   plano?: LinhaPlano | null;
   historico?: LinhaHistorico[];
   convite?: LinhaConvite | null;
@@ -275,9 +279,47 @@ function projetar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteLis
   };
 }
 
+/**
+ * Os diagnósticos da ficha, o principal primeiro e sem repetir o CID.
+ *
+ * O banco só acrescenta: quando o principal muda, a linha antiga continua lá
+ * com a marca de principal retirada, e o mesmo CID pode ter sido registrado mais
+ * de uma vez. Fica a linha mais recente de cada CID, com a do principal ganhando
+ * das demais.
+ */
+function listarDiagnosticos(linhas: LinhaDiagnostico[], catalogos: Catalogos): DiagnosticoPaciente[] {
+  const instante = (linha: LinhaDiagnostico) => linha.diagnosed_on ?? linha.created_at ?? "";
+
+  const ordenadas = [...linhas].sort((a, b) => {
+    if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;
+    return instante(b).localeCompare(instante(a));
+  });
+
+  const vistos = new Set<string>();
+  const resultado: DiagnosticoPaciente[] = [];
+
+  for (const linha of ordenadas) {
+    if (vistos.has(linha.cid10_id)) continue;
+    vistos.add(linha.cid10_id);
+
+    const cid = catalogos.cidPorId.get(linha.cid10_id);
+    resultado.push({
+      cid: cid?.code ?? "",
+      cid_descricao: cid?.label ?? "",
+      estadiamento: linha.staging,
+      tnm: linha.tnm,
+      diagnostico_em: linha.diagnosed_on,
+      principal: linha.is_primary,
+    });
+  }
+
+  return resultado;
+}
+
 function detalhar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteDetalhe {
   return {
     ...projetar(linha, contexto),
+    diagnosticos: listarDiagnosticos(contexto.diagnosticos ?? [], contexto.catalogos),
     // Mesmo motivo do CPF acima: já chegam mascarados do banco.
     telefone_mascarado: linha.phone ?? "—",
     email_mascarado: linha.email ?? "—",
@@ -591,6 +633,7 @@ export async function getById({ id }: { id: string }): Promise<SingleResult<Paci
       detalhar(linha, {
         catalogos,
         diagnostico: listaDiagnosticos.find((item) => item.is_primary) ?? listaDiagnosticos[0] ?? null,
+        diagnosticos: listaDiagnosticos,
         // Plano vigente é a linha com `ended_on` nulo.
         plano: listaPlanos.find((item) => !item.ended_on) ?? listaPlanos[0] ?? null,
         historico: (historico.data ?? []) as LinhaHistorico[],
@@ -972,6 +1015,29 @@ function mudou(novo: string | number | null | undefined, atual: string | number 
   return normalizar(novo) !== normalizar(atual);
 }
 
+/**
+ * O id do CID no catálogo, a partir do código que a clínica escreve.
+ *
+ * O formulário fala em código de CID porque é o que a clínica escreve; a chave
+ * estrangeira é resolvida aqui, na fronteira com o banco.
+ */
+async function idDoCid(
+  supabase: ReturnType<typeof getSupabaseClient>,
+  codigo: string,
+): Promise<{ id: string } | ReturnType<typeof fail> | ReturnType<typeof falhaDe>> {
+  const { data: cid, error } = await supabase
+    .from("cid10")
+    .select("id")
+    .eq("code", codigo)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (error) return falhaDe(error);
+  if (!cid) return fail(ERROR_CODE.VALIDATION, `O CID "${codigo}" não está no catálogo.`);
+
+  return { id: (cid as { id: string }).id };
+}
+
 export async function updateClinical({
   id,
   dados,
@@ -1009,28 +1075,55 @@ export async function updateClinical({
         );
       }
 
-      // O formulário fala em código de CID porque é o que a clínica escreve; a
-      // chave estrangeira é resolvida aqui, na fronteira com o banco.
-      const { data: cid, error: erroCid } = await supabase
-        .from("cid10")
-        .select("id")
-        .eq("code", codigo)
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (erroCid) return falhaDe(erroCid);
-      if (!cid) return fail(ERROR_CODE.VALIDATION, `O CID "${codigo}" não está no catálogo.`);
+      const cid = await idDoCid(supabase, codigo);
+      if (!("id" in cid)) return cid;
 
       const { error } = await supabase.rpc("upsert_patient_diagnosis", {
         p_patient_id: id,
-        p_cid10_id: (cid as { id: string }).id,
+        p_cid10_id: cid.id,
         p_staging: dados.estadiamento ?? ficha.estadiamento,
         p_tnm: dados.tnm ?? ficha.tnm,
         p_diagnosed_on: dados.diagnostico_em ?? ficha.diagnostico_em,
-        // Sempre principal: a ficha administrativa registra o diagnóstico que
-        // conduz o tratamento. Diagnóstico secundário é registro clínico, e
-        // entra pelo sistema do consultório.
+        // Este é o principal: o que conduz o tratamento. Os demais entram em
+        // `diagnosticos_adicionais`, sem tirar a marca deste.
         p_is_primary: true,
+      });
+
+      if (error) return falhaDe(error);
+    }
+
+    /* ------------------------------------------ diagnósticos adicionais */
+
+    // Um CID que a ficha já tem não é registrado de novo: a função só sabe
+    // acrescentar, e repetir o código criaria uma linha igual a cada salvamento.
+    // O principal que acabou de ser escrito conta como já tendo.
+    const jaNaFicha = new Set(ficha.diagnosticos.map((diagnostico) => diagnostico.cid));
+    const codigoPrincipal = (dados.cid ?? ficha.cid ?? "").trim();
+    if (codigoPrincipal) jaNaFicha.add(codigoPrincipal);
+
+    if ((dados.diagnosticos_adicionais?.length ?? 0) > 0 && !codigoPrincipal) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "Informe o diagnóstico principal antes de registrar outros diagnósticos.",
+      );
+    }
+
+    for (const adicional of dados.diagnosticos_adicionais ?? []) {
+      const codigo = adicional.cid.trim();
+      if (!codigo || jaNaFicha.has(codigo)) continue;
+      jaNaFicha.add(codigo);
+
+      const cid = await idDoCid(supabase, codigo);
+      if (!("id" in cid)) return cid;
+
+      const { error } = await supabase.rpc("upsert_patient_diagnosis", {
+        p_patient_id: id,
+        p_cid10_id: cid.id,
+        p_staging: adicional.estadiamento ?? null,
+        p_tnm: adicional.tnm ?? null,
+        p_diagnosed_on: adicional.diagnostico_em ?? null,
+        // O principal não muda: o adicional é um registro ao lado dele.
+        p_is_primary: false,
       });
 
       if (error) return falhaDe(error);

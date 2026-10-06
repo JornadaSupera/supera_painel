@@ -57,8 +57,24 @@ export interface PacienteListItem {
   criado_em: string | null;
 }
 
+/** Um diagnóstico registrado na ficha. O principal é o que conduz o tratamento. */
+export interface DiagnosticoPaciente {
+  /** Código do CID-10: "C50.9". */
+  cid: string;
+  cid_descricao: string;
+  estadiamento: string | null;
+  tnm: string | null;
+  diagnostico_em: string | null;
+  principal: boolean;
+}
+
 /** Ficha completa. Tudo que a listagem tem, mais o que só ela mostra. */
 export interface PacienteDetalhe extends PacienteListItem {
+  /**
+   * Todos os diagnósticos da ficha, o principal primeiro e sem repetir o CID.
+   * `cid`, `estadiamento`, `tnm` e `diagnostico_em` abaixo são os do principal.
+   */
+  diagnosticos: DiagnosticoPaciente[];
   telefone_mascarado: string;
   email_mascarado: string;
   estadiamento: string | null;
@@ -182,7 +198,19 @@ export interface PacienteEntrada {
  * é otimização — é a única forma de a ficha não ganhar uma linha repetida a
  * cada vez que alguém abre a edição e salva sem alterar nada.
  */
+export interface DiagnosticoAdicionalEntrada {
+  cid: string;
+  estadiamento?: string | null;
+  tnm?: string | null;
+  diagnostico_em?: string | null;
+}
+
 export interface PacienteClinicaEntrada {
+  /**
+   * Diagnósticos além do principal. Cada um vira um registro novo, sem trocar o
+   * principal; um CID que a ficha já tem é ignorado, não duplicado.
+   */
+  diagnosticos_adicionais?: DiagnosticoAdicionalEntrada[];
   /** Código do CID-10, como a clínica o escreve: "C50.9". */
   cid?: string | null;
   estadiamento?: string | null;
