@@ -1,6 +1,6 @@
 import { DetailCard, DetailRow, SectionHeading } from "@/components/shared";
 import { FASE_TRATAMENTO_LABEL } from "@/lib/enums";
-import { formatLongDate } from "@/lib/format";
+import { formatDate, formatLongDate } from "@/lib/format";
 import type { PacienteDetalhe } from "@/types/paciente";
 import { AppAccessDetails } from "./AppAccessDetails";
 import { CampoSensivel } from "./CampoSensivel";
@@ -16,6 +16,8 @@ import { OrigemDosDados } from "./OrigemDosDados";
  * the end of the same tab instead of disappearing.
  *
  * The allergies are not repeated here: they live in the header, on every tab.
+ * Both panels read this same tab, the administration included, so the
+ * registration data it checks (code, birth date, sex) is here too.
  */
 export function PatientGeneralTab({
   paciente,
@@ -61,6 +63,10 @@ export function PatientGeneralTab({
               ) : null}
             </DetailRow>
 
+            <DetailRow label="Diagnosticado em">
+              {paciente.diagnostico_em && <span className="tabular-nums">{formatDate(paciente.diagnostico_em)}</span>}
+            </DetailRow>
+
             <DetailRow label="Protocolo ativo">
               {paciente.protocolo && (
                 <>
@@ -82,8 +88,20 @@ export function PatientGeneralTab({
           </dl>
         </DetailCard>
 
-        <DetailCard title="Contato & cuidador">
+        <DetailCard title="Identificação & contato">
           <dl className="flex flex-col gap-3">
+            <DetailRow label="Código">
+              <span className="font-mono text-xs tabular-nums">{paciente.codigo}</span>
+            </DetailRow>
+
+            <DetailRow label="Nascimento">
+              {paciente.nascimento && <span className="tabular-nums">{formatDate(paciente.nascimento)}</span>}
+            </DetailRow>
+
+            <DetailRow label="Sexo">
+              {paciente.sexo && <span className="capitalize">{paciente.sexo}</span>}
+            </DetailRow>
+
             <DetailRow label="Telefone">
               <CampoSensivel
                 pacienteId={paciente.id}
