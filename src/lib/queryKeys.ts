@@ -151,6 +151,12 @@ export const queryKeys = {
     unread: () => ["notifications", "unread"] as const,
     /** The admin's pending queues, counted. */
     pending: () => ["notifications", "pending"] as const,
+    /**
+     * The names in the open inbox. Outside `notifications.all` on purpose:
+     * marking one as read refreshes the inbox, and must not read the names
+     * again — each one is a line on the audit trail.
+     */
+    patientNames: (ids: readonly string[]) => ["notification-patient-names", ...ids] as const,
   },
   clinico: {
     all: ["clinico"] as const,

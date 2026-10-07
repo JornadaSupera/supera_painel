@@ -29,6 +29,20 @@ export function useNaoLidas() {
   });
 }
 
+/**
+ * Whose each notification in the open inbox is. Asked when the bell opens and
+ * kept for minutes: a name does not change, and each one read is a line on the
+ * audit trail, so the inbox rereading every minute does not ask again.
+ */
+export function useNomesDasNotificacoes(ids: string[], enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.notifications.patientNames(ids),
+    queryFn: async () => (await call(() => notificacoesApi.nomesDosPacientes({ ids }))).data,
+    enabled: enabled && ids.length > 0,
+    staleTime: 5 * 60_000,
+  });
+}
+
 /** The admin's queues. Off for everyone else: the counts would come back empty anyway. */
 export function usePendenciasAdmin(enabled: boolean) {
   return useQuery({

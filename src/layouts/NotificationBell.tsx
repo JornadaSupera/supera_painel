@@ -16,6 +16,7 @@ import {
   useMarcarNotificacaoLida,
   useMarcarTodasLidas,
   useNaoLidas,
+  useNomesDasNotificacoes,
   useNotificacoes,
   usePendenciasAdmin,
 } from "@/hooks/useNotificacoes";
@@ -33,8 +34,9 @@ import { PRAZO_PEDIDO_TITULAR_DIAS, type NotificacaoItem } from "@/types/notific
  * announces: data-subject requests to decide and content waiting for review.
  * The number on the bell is the sum of both.
  *
- * No patient names: the inbox says what happened and where, and the screen it
- * opens is where the patient is read, with the read on the trail.
+ * Each notification about a patient says whose it is: "Alerta de sintoma
+ * crítico" alone does not tell anyone what to open first. The names are read
+ * only when the bell opens, one audited read per patient, and kept for minutes.
  */
 
 function iconeDe(item: NotificacaoItem) {
@@ -98,6 +100,12 @@ export function NotificationBell({
   const naoLidas = useNaoLidas();
   const pendencias = usePendenciasAdmin(admin);
   const lista = useNotificacoes(aberto);
+  const idsPacientes = [
+    ...new Set(
+      (lista.data ?? []).map((item) => item.paciente_id).filter((id): id is string => Boolean(id)),
+    ),
+  ].sort();
+  const nomes = useNomesDasNotificacoes(idsPacientes, aberto);
   const marcarLida = useMarcarNotificacaoLida();
   const marcarTodas = useMarcarTodasLidas();
 
@@ -249,6 +257,7 @@ export function NotificationBell({
               <ul className="divide-y">
                 {(lista.data ?? []).map((item) => {
                   const Icone = iconeDe(item);
+                  const paciente = item.paciente_id ? nomes.data?.[item.paciente_id] : undefined;
                   return (
                     <li key={item.id}>
                       <button
@@ -271,6 +280,7 @@ export function NotificationBell({
                           <span className={cn("text-sm", !item.lida && "font-semibold")}>
                             {item.titulo}
                           </span>
+                          {paciente && <span className="text-foreground text-xs">{paciente}</span>}
                           <span className="text-muted-foreground text-xs">
                             {relativeTime(item.criada_em)}
                             {!item.lida && <span className="sr-only">, não lida</span>}
