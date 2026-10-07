@@ -6,6 +6,7 @@ import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { STATUS_USUARIO, STATUS_USUARIO_LABEL, type StatusUsuario } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
+import { REFRESH_MS } from "@/lib/refresh";
 import { call, permissoesApi, usuariosApi } from "@/services/apiClient";
 import { ApiException, ERROR_CODE } from "@/services/contracts";
 import { useUsuariosStore } from "@/stores/usuarios";
@@ -33,6 +34,8 @@ export function useUsuarios() {
     queryKey: queryKeys.users.list(params),
     queryFn: () => call(() => usuariosApi.list(params)),
     placeholderData: (anterior) => anterior,
+    // A pending invite turns active when the person opens the link, elsewhere.
+    refetchInterval: REFRESH_MS.livre,
   });
 
   const { items, ...status } = toListQuery(query);
@@ -44,6 +47,7 @@ export function useUsuario(id: string | undefined) {
     queryKey: queryKeys.users.detail(id ?? ""),
     enabled: Boolean(id),
     queryFn: async () => (await call(() => usuariosApi.getById({ id: id as string }))).data,
+    refetchInterval: REFRESH_MS.livre,
   });
 }
 

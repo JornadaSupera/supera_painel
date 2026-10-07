@@ -2,13 +2,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { queryKeys } from "@/lib/queryKeys";
+import { REFRESH_MS } from "@/lib/refresh";
 import { call, notificacoesApi } from "@/services/apiClient";
 
 /**
  * The bell's data. Polled, not live: a minute is close enough for an inbox, and
- * the queries pause with the tab in the background.
+ * the queries pause with the tab in the background. Any action taken in the
+ * panel refreshes it at once — see the mutation cache in `app/providers`.
  */
-const INTERVALO = 60_000;
+const INTERVALO = REFRESH_MS.livre;
 
 export function useNotificacoes(enabled: boolean) {
   return useQuery({

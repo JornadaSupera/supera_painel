@@ -6,6 +6,7 @@ import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { ACAO_REVISAO, STATUS_CONTEUDO, type AcaoRevisao } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
+import { REFRESH_MS } from "@/lib/refresh";
 import { aprovacoesApi, call, conteudosApi } from "@/services/apiClient";
 import type { ListParams } from "@/services/contracts";
 import { useConteudosStore } from "@/stores/conteudos";
@@ -33,6 +34,8 @@ export function useFilaRevisao() {
   const query = useQuery({
     queryKey: queryKeys.approvals.queue(),
     queryFn: () => call(() => aprovacoesApi.listQueue({ page: 1, pageSize: 50 })),
+    // Professionals send content to review while the admin has the queue open.
+    refetchInterval: REFRESH_MS.auditada,
   });
 
   const { items, ...status } = toListQuery(query);
@@ -54,6 +57,7 @@ export function useConteudos() {
     queryKey: queryKeys.contents.list(params),
     queryFn: () => call(() => conteudosApi.list(params)),
     placeholderData: (anterior) => anterior,
+    refetchInterval: REFRESH_MS.auditada,
   });
 
   const { items, ...status } = toListQuery(query);

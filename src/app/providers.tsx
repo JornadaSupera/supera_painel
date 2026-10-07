@@ -1,10 +1,11 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { BrowserRouter } from "react-router-dom";
 
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { queryKeys } from "@/lib/queryKeys";
 import { ERROR_CODE, type ErrorCode } from "@/services/contracts";
 
 /**
@@ -28,7 +29,13 @@ const NAO_RETENTAVEL: ErrorCode[] = [
 ];
 
 function createQueryClient() {
-  return new QueryClient({
+  const client: QueryClient = new QueryClient({
+    // After any write, the bell counts again: deciding a request, approving
+    // content or taking an alert changes what is waiting, and the bell sits on
+    // every screen. Its reads are head counts, so this costs nothing.
+    mutationCache: new MutationCache({
+      onSuccess: () => void client.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+    }),
     defaultOptions: {
       queries: {
         // Painel administrativo: dado desatualizado engana decisão.
@@ -63,6 +70,8 @@ function createQueryClient() {
       },
     },
   });
+
+  return client;
 }
 
 export function AppProviders({ children }: { children: ReactNode }) {

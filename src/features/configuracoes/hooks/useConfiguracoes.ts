@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { audit } from "@/lib/audit";
 import type { Especialidade, VocabularioCriavel, VocabularioTermo } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
+import { REFRESH_MS } from "@/lib/refresh";
 import { toListQuery } from "@/hooks/listQuery";
 import { call, configuracoesApi } from "@/services/apiClient";
 import type { VersaoLegal } from "@/types/configuracao";
@@ -469,6 +470,8 @@ export function useSolicitacoesTitular() {
   const query = useQuery({
     queryKey: queryKeys.settings.dataSubjectRequests(),
     queryFn: () => call(() => configuracoesApi.getSolicitacoesTitular()),
+    // Requests arrive from the app while the tab is open.
+    refetchInterval: REFRESH_MS.livre,
   });
 
   const { items, ...status } = toListQuery(query);
