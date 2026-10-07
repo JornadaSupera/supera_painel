@@ -49,6 +49,8 @@ export { MarkdownText } from "./MarkdownText";
 export type { LogoProps } from "./Logo";
 export type { FilterSelectProps } from "./FilterBar";
 
+export { FormSection } from "./FormSection";
+
 export { FormSelect } from "./FormSelect";
 export type { FormSelectProps } from "./FormSelect";
 
