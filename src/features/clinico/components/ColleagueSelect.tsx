@@ -3,11 +3,13 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ESPECIALIDADE_LABEL } from "@/lib/enums";
+import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
 import type { TransferTarget } from "@/types/conversation-transfer";
 import { useTransferTargets } from "../hooks/useConversationTransfer";
 
@@ -19,9 +21,33 @@ import { useTransferTargets } from "../hooks/useConversationTransfer";
  * neither dialog repeats them. Each dialog decides what to do with the choice.
  */
 
+const AREA_ORDER = Object.keys(ESPECIALIDADE_LABEL) as Especialidade[];
+
+/**
+ * Colleagues by area, in the order the areas are listed everywhere else: who to
+ * hand something to is first a question of which area. A colleague with two
+ * areas sits under the main one, and the second is named beside them.
+ */
+function byArea(
+  targets: TransferTarget[],
+): { area: Especialidade | null; targets: TransferTarget[] }[] {
+  const groups = new Map<Especialidade | null, TransferTarget[]>();
+  for (const target of targets) {
+    const area = target.specialties[0] ?? null;
+    groups.set(area, [...(groups.get(area) ?? []), target]);
+  }
+
+  return [...AREA_ORDER, null]
+    .filter((area) => groups.has(area))
+    .map((area) => ({
+      area,
+      targets: (groups.get(area) ?? []).sort((a, b) => a.name.localeCompare(b.name, "pt-BR")),
+    }));
+}
+
 function describe(target: TransferTarget): string {
-  const areas = target.specialties.map((specialty) => ESPECIALIDADE_LABEL[specialty]).join(", ");
-  return areas ? `${target.name} · ${areas}` : target.name;
+  const others = target.specialties.slice(1).map((specialty) => ESPECIALIDADE_LABEL[specialty]);
+  return others.length > 0 ? `${target.name} · também ${others.join(", ")}` : target.name;
 }
 
 export function ColleagueSelect({
@@ -73,10 +99,15 @@ export function ColleagueSelect({
           <SelectValue placeholder="Escolha um colega" />
         </SelectTrigger>
         <SelectContent>
-          {colleagues.data.map((target) => (
-            <SelectItem key={target.professional_id} value={target.professional_id}>
-              {describe(target)}
-            </SelectItem>
+          {byArea(colleagues.data).map((group) => (
+            <SelectGroup key={group.area ?? "sem-area"}>
+              <SelectLabel>{group.area ? ESPECIALIDADE_LABEL[group.area] : "Sem área"}</SelectLabel>
+              {group.targets.map((target) => (
+                <SelectItem key={target.professional_id} value={target.professional_id}>
+                  {describe(target)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
           ))}
         </SelectContent>
       </Select>

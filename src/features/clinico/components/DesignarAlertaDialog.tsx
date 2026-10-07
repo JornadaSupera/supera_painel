@@ -15,6 +15,7 @@ import type { AlertaClinico } from "@/types/clinico";
 import { useDesignarAlerta } from "../hooks/useAlertasClinicos";
 import { useTransferTargets } from "../hooks/useConversationTransfer";
 import { assignAlertSchema, type AssignAlertForm } from "../schemas";
+import { AlertContext } from "./AlertContext";
 import { ColleagueSelect } from "./ColleagueSelect";
 
 /**
@@ -62,7 +63,7 @@ export function DesignarAlertaDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <form onSubmit={enviar} noValidate className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>Designar alerta · {alerta.paciente_nome}</DialogTitle>
@@ -71,6 +72,10 @@ export function DesignarAlertaDialog({
               cuidar do alerta.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Who to hand it to depends on what the patient reported: the
+              context comes first, open. */}
+          <AlertContext alerta={alerta} defaultOpen />
 
           <ColleagueSelect
             id="assign-alert-target"

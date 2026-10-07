@@ -26,7 +26,9 @@ import { pluralize, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { AlertaClinico } from "@/types/clinico";
 import { SEVERITY_EDGE } from "../alert-tones";
+import { AlertContext } from "../components/AlertContext";
 import { DesignarAlertaDialog } from "../components/DesignarAlertaDialog";
+import { DistressFlagBadge } from "../components/DistressFlagNotice";
 import { DialogResolverAlerta } from "../components/DialogResolverAlerta";
 import { useAlertasClinicos, useAssumirAlerta, useResolverAlerta } from "../hooks/useAlertasClinicos";
 
@@ -193,6 +195,7 @@ export function ClinicoAlertasPage() {
                         <NotebookPen size={11} aria-hidden="true" />
                         {alerta.pelo_acompanhante ? "diário · acompanhante" : "diário"}
                       </StatusBadge>
+                      <DistressFlagBadge patientId={alerta.paciente_id} />
                     </div>
 
                     <p className="text-sm">
@@ -211,6 +214,8 @@ export function ClinicoAlertasPage() {
                         Status: <span className="text-foreground font-semibold">{STATUS_ALERTA_LABEL[alerta.status]}</span>
                       </span>
                     </p>
+
+                    <AlertContext alerta={alerta} />
 
                     {alerta.conduta_notas && (
                       <p className="bg-muted/60 mt-1 rounded-lg px-3 py-2 text-xs">
