@@ -180,6 +180,13 @@ export const queryKeys = {
       ["clinico", "record", patientId, days ?? "all"] as const,
     /** Symptoms of one diary entry. Immutable once saved. */
     diarySymptoms: (entryId: string) => ["clinico", "diary", entryId, "symptoms"] as const,
+    /** One patient's diary, as a list. */
+    patientDiary: (patientId: string) => ["clinico", "patient-diary", patientId] as const,
+    /**
+     * One patient's appointments still to come. Under the agenda prefix on purpose:
+     * booking, moving or closing an appointment refreshes it with the agenda.
+     */
+    patientAgenda: (patientId: string) => ["clinico", "agenda", "patient", patientId] as const,
   },
 
   /** Satisfação dos pacientes — a pesquisa NPS. */

@@ -40,7 +40,12 @@ import type {
   SchedulingAccess,
 } from "@/types/agenda";
 import type { ConversationAssignment, TransferTarget } from "@/types/conversation-transfer";
-import type { DiarySymptom, PatientTimeline } from "@/types/patient-record";
+import type {
+  AppointmentRecordEvent,
+  DiarySymptom,
+  PatientDiary,
+  PatientTimeline,
+} from "@/types/patient-record";
 import type {
   ClinicaConfiguracao,
   ConfiguracaoSeguranca,
@@ -738,6 +743,10 @@ export interface ClinicoOperations {
   }): Promise<SingleResult<PatientTimeline>>;
   /** Os sintomas de um registro do diário. Lidos sob demanda: é uma chamada por registro. */
   listDiarySymptoms(params: { entryId: string }): Promise<ListResult<DiarySymptom>>;
+  /** The patient's saved diary entries, newest first, up to the database ceiling. */
+  listPatientDiary(params: { patientId: string }): Promise<SingleResult<PatientDiary>>;
+  /** The patient's appointments still to come, soonest first, whoever they are with. */
+  listUpcomingAppointments(params: { patientId: string }): Promise<ListResult<AppointmentRecordEvent>>;
   /**
    * Grava uma anotação pontual da própria especialidade — texto livre, sem
    * caráter de evolução oficial. A anotação não se edita nem se apaga: corrigir

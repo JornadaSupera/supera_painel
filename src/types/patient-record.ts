@@ -44,11 +44,17 @@ export interface ConversationRecordEvent extends RecordEventBase {
 
 export interface AppointmentRecordEvent extends RecordEventBase {
   kind: "appointment";
+  /** What whoever booked it called it — "Quimioterapia — Ciclo 4". */
+  title: string;
   type_label: string;
   status_label: string;
   status_tone: StatusTone;
+  /** Catalog code (`scheduled`, `completed`, …): what decides, while the label is what reads. */
+  status_code: string | null;
   ends_at: string;
   location: string | null;
+  /** When the patient (or whoever accompanies them) confirmed attendance in the app. */
+  confirmed_at: string | null;
 }
 
 export interface NoteRecordEvent extends RecordEventBase {
@@ -95,6 +101,27 @@ export interface DiarySymptom {
   id: string;
   symptom_label: string;
   grade: number;
+  /** The grade read on the same scale as the alerts, so one grade never gets two colors. */
+  severity: Severidade;
+}
+
+/** One saved diary entry, without its symptoms — those are one call per entry. */
+export interface PatientDiaryEntry {
+  id: string;
+  /** ISO 8601 UTC — when it was sent. */
+  occurred_at: string;
+  /** Calendar day the entry refers to (`YYYY-MM-DD`). */
+  entry_date: string;
+  free_text: string | null;
+  /** Written by the caregiver on the patient's behalf, not by the patient. */
+  by_caregiver: boolean;
+}
+
+export interface PatientDiary {
+  /** Newest first. */
+  entries: PatientDiaryEntry[];
+  /** The database stops at 200 entries per read: past that, the count is a floor. */
+  capped: boolean;
 }
 
 /**

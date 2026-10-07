@@ -318,6 +318,8 @@ export const RESOURCES = {
       "marcarConversaLida",
       "getPatientTimeline",
       "listDiarySymptoms",
+      "listPatientDiary",
+      "listUpcomingAppointments",
       "addSpecialtyNote",
       "raiseDistressFlag",
       "listTransferTargets",

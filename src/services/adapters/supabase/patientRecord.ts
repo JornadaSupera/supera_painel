@@ -11,6 +11,8 @@ import {
 import type {
   AppointmentRecordEvent,
   DiarySymptom,
+  PatientDiary,
+  PatientDiaryEntry,
   PatientTimeline,
   RecordEvent,
 } from "@/types/patient-record";
@@ -44,6 +46,7 @@ interface DiaryRow {
   id: string;
   entry_date: string;
   free_text: string | null;
+  acting_as: "patient" | "caregiver";
   submitted_at: string | null;
   created_at: string;
 }
@@ -67,12 +70,14 @@ interface ConversationRow {
 
 interface AppointmentRow {
   id: string;
+  title: string;
   appointment_type_id: string | null;
   status_id: string | null;
   starts_at: string;
   ends_at: string;
   location_label: string | null;
   origin_specialty_id: string | null;
+  confirmed_at: string | null;
 }
 
 interface NoteRow {
@@ -102,6 +107,46 @@ const ROWS_PER_SOURCE = 100;
 
 function idsOf<T>(rows: T[], pick: (row: T) => string | null | undefined): string[] {
   return [...new Set(rows.map(pick).filter((id): id is string => Boolean(id)))];
+}
+
+interface StatusRow {
+  id: string;
+  code: string;
+  label: string;
+}
+
+/** An appointment row in words: the timeline and the agenda tab read it the same way. */
+function toAppointmentEvent(
+  row: AppointmentRow,
+  lookups: {
+    typeLabel: Map<string, string>;
+    statusById: Map<string, StatusRow>;
+    specialtyOf: (id: string | null) => Especialidade | null;
+  },
+): AppointmentRecordEvent {
+  const status = row.status_id ? lookups.statusById.get(row.status_id) : undefined;
+  const situacao = situacaoDoCompromisso(status, row.ends_at);
+  const typeLabel =
+    (row.appointment_type_id && lookups.typeLabel.get(row.appointment_type_id)) || "Compromisso";
+  return {
+    kind: "appointment",
+    id: row.id,
+    occurred_at: row.starts_at,
+    specialty: lookups.specialtyOf(row.origin_specialty_id),
+    title: row.title?.trim() || typeLabel,
+    type_label: typeLabel,
+    status_label: situacao.label,
+    status_tone: situacao.tom,
+    status_code: status?.code ?? null,
+    ends_at: row.ends_at,
+    location: row.location_label,
+    confirmed_at: row.confirmed_at,
+  };
+}
+
+/** Diary rows that were actually sent: a draft is still the patient's, not the record's. */
+function savedDiaryRows(rows: DiaryRow[]): DiaryRow[] {
+  return rows.filter((row) => row.submitted_at !== null);
 }
 
 export async function getPatientTimeline(params: {
@@ -196,7 +241,7 @@ export async function getPatientTimeline(params: {
         : empty<{ id: string; label: string }>(),
       statusIds.length
         ? supabase.from("appointment_statuses").select("id, code, label").in("id", statusIds)
-        : empty<{ id: string; code: string; label: string }>(),
+        : empty<StatusRow>(),
       professionalIds.length
         ? professionalNamesQuery(supabase, professionalIds)
         : empty<ProfessionalNameRow>(),
@@ -212,32 +257,17 @@ export async function getPatientTimeline(params: {
     const statusById = new Map((statusesRes.data ?? []).map((row) => [row.id, row]));
     const professionalName = namesById((professionalsRes.data ?? []) as ProfessionalNameRow[]);
 
-    const appointmentEvents = appointmentRows.map<AppointmentRecordEvent>((row) => {
-      const status = row.status_id ? statusById.get(row.status_id) : undefined;
-      const situacao = situacaoDoCompromisso(status, row.ends_at);
-      return {
-        kind: "appointment",
-        id: row.id,
-        occurred_at: row.starts_at,
-        specialty: specialtyOf(row.origin_specialty_id),
-        type_label: (row.appointment_type_id && typeLabel.get(row.appointment_type_id)) || "Compromisso",
-        status_label: situacao.label,
-        status_tone: situacao.tom,
-        ends_at: row.ends_at,
-        location: row.location_label,
-      };
-    });
+    const appointmentEvents = appointmentRows.map((row) =>
+      toAppointmentEvent(row, { typeLabel, statusById, specialtyOf }),
+    );
 
     // Only a scheduled appointment can be "next": a cancelled or rescheduled one
     // in the future is not coming.
-    const scheduledIds = new Set(
-      appointmentRows
-        .filter((row) => row.status_id && statusById.get(row.status_id)?.code === "scheduled")
-        .map((row) => row.id),
-    );
     const nextAppointment =
       appointmentEvents
-        .filter((event) => scheduledIds.has(event.id) && new Date(event.occurred_at).getTime() > now)
+        .filter(
+          (event) => event.status_code === "scheduled" && new Date(event.occurred_at).getTime() > now,
+        )
         .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))[0] ?? null;
 
     const events: RecordEvent[] = [
@@ -334,8 +364,104 @@ export async function listDiarySymptoms(params: { entryId: string }): Promise<Li
           id: row.id,
           symptom_label: label.get(row.symptom_id) ?? "Sintoma",
           grade: row.grade,
+          severity: severidadeDoGrau(row.grade),
         }))
         .sort((a, b) => b.grade - a.grade || a.symptom_label.localeCompare(b.symptom_label)),
+    );
+  });
+}
+
+/** The ceiling of one diary read, set by the database. */
+const DIARY_CEILING = 200;
+
+/**
+ * The patient's diary as a list, newest first, with no window: the record counts
+ * every entry and shows a few at a time. Symptoms stay out — they are one call
+ * per entry, made only for the entries on screen.
+ */
+export async function listPatientDiary(params: { patientId: string }): Promise<SingleResult<PatientDiary>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient().rpc("read_diary_entries", {
+      p_patient_id: params.patientId,
+      p_limit: DIARY_CEILING,
+      p_before: null,
+    });
+    if (error) return falhaDe(error);
+
+    const rows = (data ?? []) as DiaryRow[];
+
+    const entries = savedDiaryRows(rows)
+      .map<PatientDiaryEntry>((row) => ({
+        id: row.id,
+        occurred_at: row.submitted_at ?? row.created_at,
+        entry_date: row.entry_date,
+        free_text: row.free_text?.trim() || null,
+        by_caregiver: row.acting_as === "caregiver",
+      }))
+      .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+
+    return okOne<PatientDiary>({ entries, capped: rows.length >= DIARY_CEILING });
+  });
+}
+
+/**
+ * The appointments still to come for one patient, soonest first, whoever they
+ * are with. Only the scheduled ones: a cancelled or rescheduled appointment in
+ * the future is not coming, and the one that replaced it is already here.
+ */
+export async function listUpcomingAppointments(params: {
+  patientId: string;
+}): Promise<ListResult<AppointmentRecordEvent>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+    const now = new Date().toISOString();
+
+    const [appointments, specialtiesRes] = await Promise.all([
+      supabase.rpc("read_appointments", {
+        p_patient_id: params.patientId,
+        p_from: now,
+        p_to: null,
+        p_limit: TETO_READ,
+      }),
+      supabase.from("specialties").select("id, code"),
+    ]);
+    if (appointments.error) return falhaDe(appointments.error);
+    if (specialtiesRes.error) return falhaDe(specialtiesRes.error);
+
+    const rows = (appointments.data ?? []) as AppointmentRow[];
+    if (rows.length === 0) return ok([]);
+
+    const typeIds = idsOf(rows, (row) => row.appointment_type_id);
+    const statusIds = idsOf(rows, (row) => row.status_id);
+
+    const [typesRes, statusesRes] = await Promise.all([
+      typeIds.length
+        ? supabase.from("appointment_types").select("id, label").in("id", typeIds)
+        : Promise.resolve({ data: [] as { id: string; label: string }[], error: null }),
+      statusIds.length
+        ? supabase.from("appointment_statuses").select("id, code, label").in("id", statusIds)
+        : Promise.resolve({ data: [] as StatusRow[], error: null }),
+    ]);
+    if (typesRes.error) return falhaDe(typesRes.error);
+    if (statusesRes.error) return falhaDe(statusesRes.error);
+
+    const specialtyById = new Map(
+      ((specialtiesRes.data ?? []) as { id: string; code: string }[]).map((row) => [
+        row.id,
+        paraEspecialidade(row.code),
+      ]),
+    );
+    const lookups = {
+      typeLabel: new Map((typesRes.data ?? []).map((row) => [row.id, row.label])),
+      statusById: new Map((statusesRes.data ?? []).map((row) => [row.id, row])),
+      specialtyOf: (id: string | null) => (id ? (specialtyById.get(id) ?? null) : null),
+    };
+
+    return ok(
+      rows
+        .map((row) => toAppointmentEvent(row, lookups))
+        .filter((event) => event.status_code === "scheduled")
+        .sort((a, b) => a.occurred_at.localeCompare(b.occurred_at)),
     );
   });
 }
