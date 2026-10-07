@@ -79,16 +79,16 @@ export type Permissao = (typeof PERMISSAO)[keyof typeof PERMISSAO];
 const TODAS_PERMISSOES = Object.values(PERMISSAO);
 
 /**
- * Profissional clínico: consulta e produz conteúdo, cadastra e corrige fichas,
- * vê só os próprios indicadores. Não gerencia usuários nem configurações da
- * clínica.
+ * Profissional clínico: consulta e produz conteúdo, vê só os próprios
+ * indicadores. Não gerencia usuários nem configurações da clínica.
  */
 const PERMISSOES_PROFISSIONAL: Permissao[] = [
   PERMISSAO.DASHBOARD_READ,
   PERMISSAO.PACIENTES_READ,
-  // Cadastra e corrige a ficha, como a recepção. Convite, vínculo com a conta e
-  // desativação continuam com a administração.
-  PERMISSAO.PACIENTES_WRITE,
+  // Sem PACIENTES_WRITE por enquanto: o cadastro e a correção de ficha pelo
+  // profissional estão decididos, mas o banco ainda os recusa. A linha volta
+  // quando create_patient e update_patient aceitarem o profissional; a rota e
+  // os botões do painel clínico já existem e aparecem sozinhos.
   // A lista filtrada sai em CSV (Mapa 2.2.5): o banco aceita o registro da
   // exportação pelo profissional, e o arquivo leva só dado mascarado.
   PERMISSAO.PACIENTES_EXPORT,
