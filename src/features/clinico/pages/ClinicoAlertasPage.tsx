@@ -1,5 +1,5 @@
-import { CircleCheck, Clock, NotebookPen } from "lucide-react";
-import { useState } from "react";
+import { CircleCheck, Clock, NotebookPen, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import {
@@ -13,8 +13,12 @@ import {
   StatusBadge,
   UserAvatar,
 } from "@/components/shared";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
+import { flashClass, useFlashTarget } from "@/hooks/useFlashTarget";
+import { useMarcarLidasDoAlvo } from "@/hooks/useNotificacoes";
+import { useTargetLookup } from "@/hooks/useTargetLookup";
 import {
   CONDUTA_ALERTA_LABEL,
   ESPECIALIDADE_LABEL,
@@ -59,6 +63,11 @@ import { useAlertasClinicos, useAssumirAlerta, useResolverAlerta } from "../hook
  * de página do banco pede "os anteriores a", e como a lista vem do mais antigo,
  * não há como buscar os mais novos depois do teto. A tela avisa quando isso
  * acontece.
+ *
+ * `?alerta=<id>` é o endereço que a notificação abre: a tela rola até o alerta
+ * e o realça por alguns segundos. Se ele já foi resolvido, ou está com outro
+ * profissional, a tela diz isso; se não está em nenhuma das três leituras,
+ * lê de novo uma vez antes de dizer que não o encontrou.
  */
 
 const ORDEM_SEVERIDADE: Severidade[] = [
@@ -163,8 +172,59 @@ export function ClinicoAlertasPage() {
     (alerta) => daGravidade(alerta) && (!situacao || alerta.status === situacao),
   );
   const resolvidosFiltrados = todosResolvidos.filter(daGravidade);
-  const resolvidos = resolvidosFiltrados.slice(0, visiveis);
   const historicoTruncado = (historico.data?.length ?? 0) >= TETO_LEITURA;
+
+  // O alerta que a notificação abriu, procurado nas três leituras.
+  const alvoId = params.get("alerta");
+  const alvo = alvoId
+    ? (ativos.find((alerta) => alerta.id === alvoId) ??
+      todosResolvidos.find((alerta) => alerta.id === alvoId) ??
+      null)
+    : null;
+  // The bell marked the three reads stale before coming here: until they answer
+  // again, the cached ones may place the alert in the wrong section.
+  const leiturasProntas =
+    Boolean(pendentes.data && emAtendimento.data && historico.data) &&
+    !pendentes.isFetching &&
+    !emAtendimento.isFetching &&
+    !historico.isFetching;
+  const lookup = useTargetLookup({
+    id: alvoId,
+    found: alvo !== null,
+    settled: leiturasProntas,
+    refetch: () => Promise.all([pendentes.refetch(), emAtendimento.refetch(), historico.refetch()]),
+  });
+  const alvoVisivel = alvo
+    ? alvo.status === "resolvido"
+      ? mostraResolvidos && daGravidade(alvo)
+      : mostraAtivos && ativosFiltrados.includes(alvo)
+    : false;
+  // Um resolvido antigo pode estar além dos que a lista mostra: ela abre até ele.
+  const posicaoNoHistorico = alvo?.status === "resolvido" ? resolvidosFiltrados.indexOf(alvo) : -1;
+  const resolvidos = resolvidosFiltrados.slice(0, Math.max(visiveis, posicaoNoHistorico + 1));
+  const realcado = useFlashTarget(alvo && alvoVisivel ? `alerta-${alvo.id}` : null, leiturasProntas);
+
+  // Ver o alerta que a notificação anunciava é lê-la: as outras que apontam
+  // para ele (crítico e designado, por exemplo) também deixam de ser novas.
+  const marcarLidas = useMarcarLidasDoAlvo();
+  const lidasPara = useRef<string | null>(null);
+  useEffect(() => {
+    if (!alvo || lidasPara.current === alvo.id) return;
+    lidasPara.current = alvo.id;
+    marcarLidas.mutate({ tabela: "alerts", id: alvo.id });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alvo?.id]);
+
+  function esquecerAlvo() {
+    setParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual);
+        proximo.delete("alerta");
+        return proximo;
+      },
+      { replace: true },
+    );
+  }
 
   const contagem = ORDEM_SEVERIDADE.map((severidade) => ({
     severidade,
@@ -195,6 +255,17 @@ export function ClinicoAlertasPage() {
             : `${pluralize(ativos.length, "ativo", "ativos")} · ordenados por gravidade`
         }
       />
+
+      {!carregando && lookup !== "idle" && (
+        <AvisoDoAlvo
+          lookup={lookup}
+          alvo={alvo}
+          visivel={alvoVisivel}
+          historicoTruncado={historicoTruncado}
+          onLimparFiltros={limparFiltros}
+          onFechar={esquecerAlvo}
+        />
+      )}
 
       {carregando && <SkeletonCards count={3} />}
 
@@ -279,9 +350,11 @@ export function ClinicoAlertasPage() {
               {ativosFiltrados.map((alerta) => (
                 <article
                   key={alerta.id}
+                  id={`alerta-${alerta.id}`}
                   className={cn(
-                    "bg-card flex flex-col gap-3 rounded-2xl border border-l-4 p-4 md:flex-row md:items-start",
+                    "bg-card flex scroll-mt-20 flex-col gap-3 rounded-2xl border border-l-4 p-4 md:flex-row md:items-start",
                     SEVERITY_EDGE[alerta.severidade],
+                    flashClass(realcado === `alerta-${alerta.id}`),
                   )}
                 >
                   <UserAvatar name={alerta.paciente_nome} size="md" className="max-md:hidden" />
@@ -380,7 +453,14 @@ export function ClinicoAlertasPage() {
               <SectionHeading id="historico-alertas">Resolvidos recentemente</SectionHeading>
 
               {resolvidos.map((alerta) => (
-                <article key={alerta.id} className="bg-card flex items-start gap-3 rounded-2xl border p-4">
+                <article
+                  key={alerta.id}
+                  id={`alerta-${alerta.id}`}
+                  className={cn(
+                    "bg-card flex scroll-mt-20 items-start gap-3 rounded-2xl border p-4",
+                    flashClass(realcado === `alerta-${alerta.id}`),
+                  )}
+                >
                   <CircleCheck size={16} aria-hidden="true" className="text-success mt-0.5 shrink-0" />
                   <div className="flex min-w-0 flex-col gap-0.5">
                     <p className="text-sm">
@@ -452,6 +532,74 @@ export function ClinicoAlertasPage() {
         enviando={resolver.isPending}
       />
     </div>
+  );
+}
+
+/**
+ * What the screen says about the alert a notification opened. Nothing when it
+ * is in the queue, waiting for whoever takes it: the ring around it says enough.
+ */
+function AvisoDoAlvo({
+  lookup,
+  alvo,
+  visivel,
+  historicoTruncado,
+  onLimparFiltros,
+  onFechar,
+}: {
+  lookup: "searching" | "found" | "missing";
+  alvo: AlertaClinico | null;
+  visivel: boolean;
+  historicoTruncado: boolean;
+  onLimparFiltros: () => void;
+  onFechar: () => void;
+}) {
+  let texto: string | null = null;
+  let acao: ReactNode = null;
+
+  if (lookup === "searching") {
+    texto = "Procurando o alerta da notificação…";
+  } else if (lookup === "missing") {
+    texto = historicoTruncado
+      ? `O alerta da notificação não está na fila nem no histórico que esta tela lê. O histórico chega a ${TETO_LEITURA} resolvidos, dos mais antigos para os mais novos: um alerta resolvido há pouco pode ficar de fora.`
+      : "O alerta da notificação não está na fila nem no histórico de resolvidos.";
+  } else if (alvo && !visivel) {
+    texto = "O alerta da notificação está fora dos filtros escolhidos.";
+    acao = (
+      <Button variant="outline" size="sm" onClick={onLimparFiltros}>
+        Limpar filtros
+      </Button>
+    );
+  } else if (alvo?.status === "resolvido") {
+    texto = [
+      `Este alerta já foi resolvido${alvo.resolvido_em ? ` ${relativeTime(alvo.resolvido_em)}` : ""}`,
+      alvo.atribuido_a ? `, com ${alvo.atribuido_a} como responsável` : "",
+      ". Ele está em destaque no histórico abaixo.",
+    ].join("");
+  } else if (alvo?.status === "assumido" && !alvo.meu) {
+    texto = `Este alerta já está em atendimento${alvo.atribuido_a ? ` com ${alvo.atribuido_a}` : ""}.`;
+  }
+
+  if (!texto) return null;
+
+  return (
+    <Alert role="status" className="flex items-start justify-between gap-3">
+      <AlertDescription className="flex flex-wrap items-center gap-3">
+        <span>{texto}</span>
+        {acao}
+      </AlertDescription>
+      {lookup !== "searching" && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="-my-1 size-7 shrink-0"
+          aria-label="Fechar o aviso"
+          onClick={onFechar}
+        >
+          <X />
+        </Button>
+      )}
+    </Alert>
   );
 }
 
