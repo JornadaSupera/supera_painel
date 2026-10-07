@@ -15,7 +15,7 @@ export { CatalogFilterSelect } from "./CatalogFilterSelect";
 export { Can } from "./Can";
 
 export { DateInput, TimeInput } from "./DateTimeFields";
-export { DetailField, DetailSection } from "./DetailBlocks";
+export { DetailCard, DetailField, DetailRow, DetailSection, SectionHeading } from "./DetailBlocks";
 export type { CanProps } from "./Can";
 
 export { BarChart, CHART_COLORS, DonutChart, LineChart } from "./Charts";

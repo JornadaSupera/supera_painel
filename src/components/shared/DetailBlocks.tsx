@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 /**
  * Blocos de leitura de uma ficha — o cartão com título e o par rótulo/valor.
@@ -47,5 +48,59 @@ export function DetailSection({
         {children}
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * The small uppercase heading of a record block — "DIAGNÓSTICO & TRATAMENTO",
+ * "PRÓXIMOS COMPROMISSOS". It names a group without competing with the title of
+ * the page, so it reads as a label, not as a headline.
+ */
+export function SectionHeading({
+  children,
+  id,
+  className,
+}: {
+  children: ReactNode;
+  id?: string;
+  className?: string;
+}) {
+  return (
+    <h2
+      id={id}
+      className={cn(
+        "text-muted-foreground text-xs font-medium tracking-wider uppercase",
+        className,
+      )}
+    >
+      {children}
+    </h2>
+  );
+}
+
+/** A card opened by a `SectionHeading`: the record's reading blocks, side by side or full width. */
+export function DetailCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-4">
+        <SectionHeading>{title}</SectionHeading>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * A label beside its value. `DetailField` stacks the two; this keeps them on one
+ * line, so a block of short facts reads down a single column of values.
+ */
+export function DetailRow({ label, children }: { label: string; children?: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[8.5rem_minmax(0,1fr)] items-baseline gap-3">
+      <dt className="text-muted-foreground text-[11px] font-medium tracking-wider uppercase">
+        {label}
+      </dt>
+      <dd className="text-sm">{children ?? "—"}</dd>
+    </div>
   );
 }
