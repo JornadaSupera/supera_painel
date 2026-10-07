@@ -218,7 +218,7 @@ export function mensagemDoErro(erro: ErroPostgrest | null | undefined): string |
   if (traduzida) return traduzida;
 
   const hint = erro?.hint?.trim();
-  if (hint) return hint;
+  if (hint && !DICA_DE_GRANT.test(hint)) return hint;
 
   if (!mensagem) return undefined;
 
@@ -229,8 +229,26 @@ export function mensagemDoErro(erro: ErroPostgrest | null | undefined): string |
   return erro?.code && MENSAGEM_LEGIVEL.has(erro.code) ? mensagem : undefined;
 }
 
+/**
+ * PostgREST's hint for a missing grant: it names the role and a GRANT to run.
+ * Advice for whoever owns the database, never screen text.
+ */
+const DICA_DE_GRANT = /^Grant the required privileges/i;
+
+/** The same hint for the `anon` role: the request carried no session at all. */
+const GRANT_PARA_ANONIMO = /\bTO anon;?$/i;
+
 /** Converte um erro do PostgREST em resposta de falha do contrato. */
 export function falhaDe(erro: ErroPostgrest | null | undefined): FailResult {
+  // A request that reached the database as `anon` had no session: it ended in
+  // this tab, and the next screen should be the sign-in, not a GRANT.
+  if (erro?.hint && GRANT_PARA_ANONIMO.test(erro.hint.trim())) {
+    return fail(ERROR_CODE.UNAUTHORIZED, "Sua sessão terminou. Entre de novo para continuar.", {
+      code: erro.code,
+      message: erro.message,
+    });
+  }
+
   return fail(traduzirErro(erro), mensagemDoErro(erro), {
     code: erro?.code,
     message: erro?.message,
