@@ -1,6 +1,5 @@
 import {
   BellRing,
-  BarChart3,
   CalendarDays,
   FileText,
   LayoutDashboard,
@@ -10,7 +9,6 @@ import {
 } from "lucide-react";
 
 import type { Especialidade } from "@/lib/enums";
-import { PERMISSAO } from "@/lib/rbac";
 import type { NavItem } from "./navigation";
 
 /**
@@ -22,7 +20,7 @@ import type { NavItem } from "./navigation";
  * only exist once we know which specialty is asking.
  *
  * Matches the six routes found in the clinical prototype
- * (`clinico/{especialidade}/…`) — see PA-07.
+ * (`clinico/{especialidade}/…`), in the prototype's order — see PA-07.
  */
 export function clinicoNavItems(especialidade: Especialidade): NavItem[] {
   const base = `/clinico/${especialidade}`;
@@ -41,14 +39,15 @@ export function clinicoNavItems(especialidade: Especialidade): NavItem[] {
       title: "Carteira de pacientes",
     },
     {
-      label: "Agenda",
-      to: `${base}/agenda`,
-      icon: CalendarDays,
-    },
-    {
       label: "Chat",
       to: `${base}/chat`,
       icon: MessageSquare,
+    },
+    {
+      label: "Conteúdo",
+      to: `${base}/conteudo`,
+      icon: FileText,
+      title: "Minhas orientações",
     },
     {
       label: "Alertas",
@@ -57,17 +56,9 @@ export function clinicoNavItems(especialidade: Especialidade): NavItem[] {
       title: "Fila de alertas",
     },
     {
-      label: "Carteira",
-      to: `${base}/carteira`,
-      icon: BarChart3,
-      permission: PERMISSAO.ESTATISTICAS_READ_SELF,
-      title: "Carteira do profissional",
-    },
-    {
-      label: "Conteúdo",
-      to: `${base}/conteudo`,
-      icon: FileText,
-      title: "Minhas orientações",
+      label: "Agenda",
+      to: `${base}/agenda`,
+      icon: CalendarDays,
     },
   ];
 }

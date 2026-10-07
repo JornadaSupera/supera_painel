@@ -59,7 +59,6 @@ function useRefreshAgenda() {
   return async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.clinico.agendaAll() }),
-      queryClient.invalidateQueries({ queryKey: ["clinico", "carteira"] }),
     ]);
   };
 }

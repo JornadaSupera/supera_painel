@@ -61,7 +61,6 @@ const ClinicoPacientesPage = lazy(() => import("@/features/clinico/pages/Clinico
 const ClinicoAgendaPage = lazy(() => import("@/features/clinico/pages/ClinicoAgendaPage"));
 const ClinicoChatPage = lazy(() => import("@/features/clinico/pages/ClinicoChatPage"));
 const ClinicoAlertasPage = lazy(() => import("@/features/clinico/pages/ClinicoAlertasPage"));
-const ClinicoCarteiraPage = lazy(() => import("@/features/clinico/pages/ClinicoCarteiraPage"));
 const ClinicoConteudoPage = lazy(() => import("@/features/clinico/pages/ClinicoConteudoPage"));
 const ClinicoOrientacaoPage = lazy(() => import("@/features/clinico/pages/ClinicoOrientacaoPage"));
 const ClinicoPerfilPage = lazy(() => import("@/features/clinico/pages/ClinicoPerfilPage"));
@@ -289,9 +288,6 @@ export function AppRoutes() {
               <Route path="agenda" element={<ClinicoAgendaPage />} />
               <Route path="chat" element={<ClinicoChatPage />} />
               <Route path="alertas" element={<ClinicoAlertasPage />} />
-              <Route element={<PermissionRoute permission={PERMISSAO.ESTATISTICAS_READ_SELF} />}>
-                <Route path="carteira" element={<ClinicoCarteiraPage />} />
-              </Route>
               {/* Writing is the professional's, in their own area: the list and the
                   editor share the module permission, and the database still decides
                   who is the author. "nova" outranks ":id" by being static. */}
