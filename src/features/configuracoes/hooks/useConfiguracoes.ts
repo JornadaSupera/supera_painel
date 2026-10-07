@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { audit } from "@/lib/audit";
-import type { VocabularioTermo } from "@/lib/enums";
+import type { Especialidade, VocabularioCriavel, VocabularioTermo } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
 import { toListQuery } from "@/hooks/listQuery";
 import { call, configuracoesApi } from "@/services/apiClient";
@@ -101,39 +101,44 @@ export function useSetTermoVocabularioAtivo() {
 }
 
 /**
- * Novo sintoma no diário.
+ * Novo termo num vocabulário.
  *
- * Além das Configurações, relê o catálogo de efeitos e os gatilhos de alerta:
- * os dois listam os sintomas, e o novo tem que aparecer neles sem recarregar.
+ * Além das Configurações, relê o que lista cada vocabulário em outras telas —
+ * os gatilhos de alerta e o catálogo de efeitos (sintomas), as categorias da
+ * biblioteca e os tipos da agenda — para o termo novo aparecer sem recarregar.
  */
-export function useCriarSintoma() {
+export function useCriarTermoVocabulario() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (params: { label: string; psicologico: boolean }) => {
-      const { data } = await call(() => configuracoesApi.criarSintoma(params));
+    mutationFn: async (params: {
+      vocabulario: VocabularioCriavel;
+      label: string;
+      psicologico?: boolean;
+      especialidade?: Especialidade | null;
+    }) => {
+      const { data } = await call(() => configuracoesApi.criarTermoVocabulario(params));
       audit.update(RECURSO, data?.id ?? params.label, {
         operacao: "vocabulario_termo_criacao",
-        vocabulario: "symptoms",
+        vocabulario: params.vocabulario,
       });
 
       return data;
     },
-    onSuccess: async (sintoma) => {
+    onSuccess: async (termo) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.get() }),
         queryClient.invalidateQueries({ queryKey: queryKeys.settings.alertRules() }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.catalogs.effects() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.catalogs.all }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.contents.categories() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.clinico.appointmentTypes() }),
       ]);
 
-      toast.success("Sintoma cadastrado", {
-        description: sintoma
-          ? `“${sintoma.label}” entrou no catálogo de sintomas do diário.`
-          : undefined,
+      toast.success("Cadastrado", {
+        description: termo ? `“${termo.label}” entrou no catálogo.` : undefined,
       });
     },
-    onError: (erro) =>
-      toast.error("Não foi possível cadastrar o sintoma", { description: erro.message }),
+    onError: (erro) => toast.error("Não foi possível cadastrar", { description: erro.message }),
   });
 }
 

@@ -1,4 +1,4 @@
-import type { VocabularioTermo } from "@/lib/enums";
+import type { Especialidade, VocabularioCriavel, VocabularioTermo } from "@/lib/enums";
 import {
   ERROR_CODE,
   fail,
@@ -25,6 +25,7 @@ import type { ParametroOperacional } from "@/types/estatisticas";
 import { METAS_OPERACIONAIS } from "../_operationalTargets";
 import { TETO_READ, executar, falhaDe, paraIso, umDe } from "./_helpers";
 import { getSupabaseClient } from "./client";
+import { specialtyIdOf } from "./_specialtyId";
 
 const BUCKET_BRANDING = "clinic-branding";
 const TAMANHO_MAXIMO_LOGO = 2 * 1024 * 1024;
@@ -46,8 +47,9 @@ const TIPOS_ACEITOS_LOGO = ["image/png", "image/jpeg", "image/webp"];
  *    uma vez. Retirar e reativar são a MESMA função,
  *    `set_vocabulary_term_active`, nos dois sentidos — a leitura não filtra
  *    por `is_active`, então um termo retirado continua visível e reversível.
- *    Criar termo novo: o painel cadastra sintoma (`criarSintoma`). Os outros
- *    vocabulários também têm função de criação no banco, ainda sem tela.
+ *    Criar termo novo é `criarTermoVocabulario`, uma função do banco por
+ *    vocabulário. Tipo de notificação não se cria: nasce com o recurso que o
+ *    envia.
  *  - **Operação** (documento legal, limiar de alerta, motivo de situação) tem
  *    escrita completa, inclusive criação. São decisões da clínica que mudam
  *    com a rotina dela.
@@ -56,6 +58,15 @@ const TIPOS_ACEITOS_LOGO = ["image/png", "image/jpeg", "image/webp"];
  * ver `MENSAGEM_LEGIVEL` em `_helpers`, que é o que faz a frase chegar à tela
  * em vez de virar "Verifique os dados informados".
  */
+
+/** The category of a notification type, in words: the code never reaches the screen. */
+const GRUPO_DE_NOTIFICACAO: Record<string, string> = {
+  agenda: "Agenda",
+  alert: "Alertas",
+  chat: "Chat",
+  content: "Conteúdo",
+  report: "Relatórios",
+};
 
 interface LinhaCatalogo {
   id: string;
@@ -130,14 +141,13 @@ export async function get(): Promise<SingleResult<Configuracoes>> {
           category: string;
           is_silenceable: boolean;
         })[]
-      ).map((linha) =>
-        projetar(
+      ).map((linha) => {
+        const grupo = GRUPO_DE_NOTIFICACAO[linha.category] ?? "Outros";
+        return projetar(
           linha,
-          linha.is_silenceable
-            ? `${linha.category} · pode ser silenciada`
-            : `${linha.category} · não silenciável`,
-        ),
-      ),
+          linha.is_silenceable ? `${grupo} · pode ser silenciada` : `${grupo} · não silenciável`,
+        );
+      }),
 
       categorias_conteudo: (
         categorias.data as unknown as (LinhaCatalogo & {
@@ -275,65 +285,129 @@ function codigoDoRotulo(rotulo: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
+/** What each vocabulary calls one of its terms, for the refusals below. */
+const NOME_DO_TERMO: Record<VocabularioCriavel, string> = {
+  symptoms: "o sintoma",
+  conversation_subjects: "o assunto",
+  content_categories: "a categoria",
+  appointment_types: "o tipo de compromisso",
+};
+
 /**
- * Cadastra um sintoma — `create_symptom`, só do administrador.
+ * Cadastra um termo — uma função do banco por vocabulário, só do administrador.
  *
  * Dois rótulos que dão o mesmo código ("Náusea" e "nausea") seriam o mesmo
- * sintoma para o diário e para os relatórios. O banco recusa o segundo pelo
- * código único; a checagem antes da chamada existe para dizer qual sintoma já
- * ocupa aquele lugar, e se ele está retirado, em vez de uma recusa genérica.
+ * termo para quem aponta para ele. O banco só recusa o segundo quando o código
+ * coincide; a checagem antes da chamada compara também o nome, sem acento e sem
+ * caixa, e diz qual termo já ocupa aquele lugar e se ele está retirado.
+ *
+ * Assunto do chat nasce sem rota, como todos os existentes; com `especialidade`,
+ * a rota é gravada logo depois por `set_conversation_subject_specialty`.
  */
-export async function criarSintoma({
+export async function criarTermoVocabulario({
+  vocabulario,
   label,
-  psicologico,
+  psicologico = false,
+  especialidade = null,
 }: {
+  vocabulario: VocabularioCriavel;
   label: string;
-  psicologico: boolean;
+  psicologico?: boolean;
+  especialidade?: Especialidade | null;
 }): Promise<SingleResult<ItemCatalogo>> {
   return executar(async () => {
     const supabase = getSupabaseClient();
     const rotulo = label.trim();
     const codigo = codigoDoRotulo(rotulo);
+    const nome = NOME_DO_TERMO[vocabulario];
 
-    if (!codigo) return fail(ERROR_CODE.VALIDATION, "O nome do sintoma precisa ter letras.");
+    if (!codigo) return fail(ERROR_CODE.VALIDATION, "O nome precisa ter letras.");
+
+    if (vocabulario === "content_categories" && !especialidade) {
+      return fail(
+        ERROR_CODE.VALIDATION,
+        "Escolha a área que produz as orientações desta categoria.",
+      );
+    }
+
+    let especialidadeId: string | null = null;
+    if (especialidade) {
+      const encontrada = await specialtyIdOf(especialidade);
+      if ("error" in encontrada) return encontrada;
+      especialidadeId = encontrada.id;
+    }
 
     const { data, error: erroLeitura } = await supabase
-      .from("symptoms")
+      .from(vocabulario)
       .select("code, label, is_active, sort_order")
       .order("sort_order", { ascending: false });
 
     if (erroLeitura) return falhaDe(erroLeitura);
 
-    const existentes = data as LinhaSintoma[];
-    const ocupado = existentes.find((linha) => linha.code === codigo);
+    const existentes = data as LinhaTermo[];
+    // By code AND by name: the older terms carry english codes
+    // ("medical_consultation" for "Consulta médica"), so comparing codes alone
+    // let "CONSULTA MÉDICA" in as a second term.
+    const mesmo = (linha: LinhaTermo) =>
+      linha.code === codigo || codigoDoRotulo(linha.label) === codigo;
+    // The active one first: it is the one people see, and the one to point to.
+    const ocupado =
+      existentes.find((linha) => linha.is_active && mesmo(linha)) ?? existentes.find(mesmo);
 
     if (ocupado) {
       return fail(
         ERROR_CODE.CONFLICT,
         ocupado.is_active
-          ? `Já existe o sintoma “${ocupado.label}”, que o diário trata como o mesmo.`
-          : `Já existe o sintoma “${ocupado.label}”, retirado. Reative-o na lista em vez de cadastrar de novo.`,
+          ? `Já existe ${nome} “${ocupado.label}”, que o sistema trata como o mesmo.`
+          : `Já existe ${nome} “${ocupado.label}” entre os retirados. Reative na lista em vez de cadastrar de novo.`,
       );
     }
 
-    const { data: id, error } = await supabase.rpc("create_symptom", {
-      p_code: codigo,
-      p_label: rotulo,
-      // Fim da lista: a leitura acima vem do maior para o menor.
-      p_sort_order: (existentes[0]?.sort_order ?? 0) + 1,
-      p_is_psychological: psicologico,
-    });
+    // Fim da lista: a leitura acima vem do maior para o menor.
+    const ordem = (existentes[0]?.sort_order ?? 0) + 1;
+    const comum = { p_code: codigo, p_label: rotulo, p_sort_order: ordem };
+
+    const { data: id, error } =
+      vocabulario === "symptoms"
+        ? await supabase.rpc("create_symptom", { ...comum, p_is_psychological: psicologico })
+        : vocabulario === "content_categories"
+          ? await supabase.rpc("create_content_category", {
+              ...comum,
+              p_specialty_id: especialidadeId,
+            })
+          : vocabulario === "appointment_types"
+            ? await supabase.rpc("create_appointment_type", {
+                ...comum,
+                p_color: null,
+                p_icon_name: null,
+              })
+            : await supabase.rpc("create_conversation_subject", comum);
 
     if (error) return falhaDe(error);
     if (typeof id !== "string") {
-      return fail(ERROR_CODE.UNKNOWN, "O cadastro não devolveu o identificador do sintoma.");
+      return fail(ERROR_CODE.UNKNOWN, "O cadastro não devolveu o identificador do termo.");
     }
 
-    return termoDoVocabulario("symptoms", id);
+    if (vocabulario === "conversation_subjects" && especialidadeId) {
+      const { error: erroRota } = await supabase.rpc("set_conversation_subject_specialty", {
+        p_subject_id: id,
+        p_specialty_id: especialidadeId,
+      });
+      // O assunto já existe: a falha da rota não desfaz o cadastro, e a tela
+      // diz o que faltou em vez de convidar a cadastrar de novo.
+      if (erroRota) {
+        return fail(
+          ERROR_CODE.UNKNOWN,
+          "O assunto foi cadastrado, mas a área que responde não foi gravada. Ele fica na fila geral.",
+        );
+      }
+    }
+
+    return termoDoVocabulario(vocabulario, id);
   });
 }
 
-interface LinhaSintoma {
+interface LinhaTermo {
   code: string;
   label: string;
   is_active: boolean;

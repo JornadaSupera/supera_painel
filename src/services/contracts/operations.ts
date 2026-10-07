@@ -5,6 +5,7 @@ import type {
   Periodo,
   StatusAlerta,
   StatusUsuario,
+  VocabularioCriavel,
   VocabularioTermo,
 } from "@/lib/enums";
 import type { KpisResposta, SeriesResposta } from "@/types/dashboard";
@@ -943,15 +944,19 @@ export interface ConfiguracoesOperations {
   }): Promise<SingleResult<ItemCatalogo>>;
 
   /**
-   * Cadastra um sintoma no diário, no fim da lista.
+   * Cadastra um termo num vocabulário, no fim da lista.
    *
    * O código técnico não é parâmetro: a camada de dados o deriva do rótulo.
    * Ele nunca aparece na tela e não muda depois de criado — é o que o diário,
-   * os relatórios e os gatilhos de alerta usam para apontar para o sintoma.
+   * os relatórios, os gatilhos e o roteamento do chat usam para apontar para o
+   * termo. `psicologico` vale para sintoma; `especialidade` é obrigatória
+   * para categoria de conteúdo e, para assunto do chat, é a área que responde.
    */
-  criarSintoma(params: {
+  criarTermoVocabulario(params: {
+    vocabulario: VocabularioCriavel;
     label: string;
-    psicologico: boolean;
+    psicologico?: boolean;
+    especialidade?: Especialidade | null;
   }): Promise<SingleResult<ItemCatalogo>>;
 
   /** Identidade visual, mensagens e horário — `clinic_settings`, desde 25/09/2026. */

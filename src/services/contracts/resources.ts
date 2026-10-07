@@ -242,8 +242,8 @@ export const RESOURCES = {
       "get",
       "atualizarTermoVocabulario",
       "setTermoVocabularioAtivo",
-      /** Novo sintoma no diário — o único vocabulário com cadastro pelo painel. */
-      "criarSintoma",
+      /** Novo termo — sintoma, assunto do chat, categoria de conteúdo, tipo de compromisso. */
+      "criarTermoVocabulario",
       /** Identidade visual, mensagens e horário — ver `types/configuracao.ts`. */
       "getClinica",
       "uploadLogo",

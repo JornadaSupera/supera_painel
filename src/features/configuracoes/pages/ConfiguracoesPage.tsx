@@ -38,7 +38,7 @@ import { GatilhosAlerta } from "../components/GatilhosAlerta";
 import { IdentidadeEOperacao } from "../components/IdentidadeEOperacao";
 import { MetasOperacionais } from "../components/MetasOperacionais";
 import { MotivosSituacao } from "../components/MotivosSituacao";
-import { NovoSintoma } from "../components/NovoSintoma";
+import { NovoTermo } from "../components/NovoTermo";
 import { SolicitacoesTitular } from "../components/SolicitacoesTitular";
 import {
   useAtualizarTermoVocabulario,
@@ -434,31 +434,40 @@ export function ConfiguracoesPage() {
                   descricao="Os sintomas que o paciente marca, e o eixo dos relatórios clínicos"
                   itens={dados.sintomas}
                   vocabulario={VOCABULARIO_TERMO.SINTOMAS}
-                  rodape={<NovoSintoma />}
+                  rodape={<NovoTermo vocabulario={VOCABULARIO_TERMO.SINTOMAS} />}
                 />
                 <Catalogo
                   titulo="Tipos de notificação"
                   descricao="O que o aplicativo envia, e o que não pode ser silenciado"
                   itens={dados.notificacoes}
                   vocabulario={VOCABULARIO_TERMO.NOTIFICACOES}
+                  rodape={
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      Tipos de notificação não se cadastram aqui: cada um nasce junto com o recurso
+                      que o envia.
+                    </p>
+                  }
                 />
                 <Catalogo
                   titulo="Categorias de conteúdo"
                   descricao="Os chips de filtro da biblioteca de orientações"
                   itens={dados.categorias_conteudo}
                   vocabulario={VOCABULARIO_TERMO.CATEGORIAS_CONTEUDO}
+                  rodape={<NovoTermo vocabulario={VOCABULARIO_TERMO.CATEGORIAS_CONTEUDO} />}
                 />
                 <Catalogo
                   titulo="Assuntos do chat"
                   descricao="O que o paciente escolhe ao abrir uma conversa"
                   itens={dados.assuntos_chat}
                   vocabulario={VOCABULARIO_TERMO.ASSUNTOS_CHAT}
+                  rodape={<NovoTermo vocabulario={VOCABULARIO_TERMO.ASSUNTOS_CHAT} />}
                 />
                 <Catalogo
                   titulo="Tipos de compromisso"
                   descricao="O que aparece na agenda, e o recorte do relatório de sessões de infusão"
                   itens={dados.tipos_compromisso}
                   vocabulario={VOCABULARIO_TERMO.TIPOS_COMPROMISSO}
+                  rodape={<NovoTermo vocabulario={VOCABULARIO_TERMO.TIPOS_COMPROMISSO} />}
                 />
               </div>
             )

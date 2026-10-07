@@ -456,6 +456,13 @@ export const VOCABULARIO_TERMO = {
 
 export type VocabularioTermo = (typeof VOCABULARIO_TERMO)[keyof typeof VOCABULARIO_TERMO];
 
+/**
+ * The vocabularies the panel can add to. Notification types are not among them:
+ * each one is born with the feature that sends it, so the database has no way to
+ * create one by hand.
+ */
+export type VocabularioCriavel = Exclude<VocabularioTermo, "notification_types">;
+
 /* ------------------------------------------------------------------------
    Helpers
    ------------------------------------------------------------------------ */
