@@ -254,4 +254,9 @@ export interface ResultadoConvite {
   /** Celular mascarado para onde o SMS foi; `null` quando não saiu. */
   destino: string | null;
   expira_em: string | null;
+  /**
+   * Why the SMS did not go out: the server has no SMS provider configured, or
+   * the provider refused the message. `null` when it went out.
+   */
+  falha: "sms_nao_configurado" | "sms_recusado" | null;
 }

@@ -37,6 +37,7 @@ import {
   paraIso,
   umDe,
 } from "./_helpers";
+import { chamarFuncao } from "./_edge";
 import { getSupabaseClient } from "./client";
 import { codigoExibidoDoPaciente, paraCodigoDeFase, paraFase } from "./mapping";
 
@@ -1259,55 +1260,65 @@ const CODIGO_DO_CONVITE_SMS: Record<string, ErrorCode> = {
  * Envia o convite por SMS.
  *
  * `send-patient-invite` (Edge Function) nunca devolve o token — ele só existe
- * dentro da mensagem que o paciente recebe. `sms_failed` vira "não saiu": nos
- * dois motivos que o geram — sem credencial Twilio configurada, ou o envio real
- * falhou — a função já cancela o convite sozinha antes de responder, então não
- * sobra nada pendente. Um erro que não dá para ler (rede fora, função
- * inalcançável) é tratado do mesmo jeito.
+ * dentro da mensagem que o paciente recebe. `sms_failed` vira "não saiu", com o
+ * motivo: sem credencial Twilio configurada, ou o envio real falhou. Nos dois a
+ * função já cancela o convite sozinha antes de responder, então não sobra nada
+ * pendente.
+ *
+ * > [!] Por `chamarFuncao`, nunca por `supabase.functions.invoke`.
+ * `invoke` repassa o cabeçalho `x-application-name` do cliente, que o CORS da
+ * função não aceita: o navegador bloqueava a chamada antes de ela sair, e isso
+ * parecia "SMS não configurado". Mesmo com o Twilio ligado, nenhum SMS sairia.
  *
  * Qualquer outro código é recusa de verdade — ficha errada, já vinculada,
  * inativa, celular fora de formato — e sobe para a tela como qualquer outra
- * chamada deste adapter.
+ * chamada deste adapter. Rede fora também: dizer "não saiu por falta de SMS"
+ * sobre uma chamada que nem chegou seria mentir sobre o motivo.
  */
-async function enviarConviteSms(
-  supabase: ReturnType<typeof getSupabaseClient>,
-  patientId: string,
-): Promise<{ enviado: true; resultado: ResultadoConvite } | { enviado: false } | FailResult> {
-  const { data, error } = await supabase.functions.invoke("send-patient-invite", {
-    body: { patient_id: patientId },
-  });
+async function enviarConviteSms(patientId: string): Promise<ResultadoConvite | FailResult> {
+  const resposta = await chamarFuncao<{
+    invitation_id: string;
+    phone_masked: string;
+    expires_at: string;
+  }>("send-patient-invite", { patient_id: patientId });
 
-  if (!error) {
-    const resposta = data as { invitation_id: string; phone_masked: string; expires_at: string };
-
+  if (!resposta.error && resposta.data) {
     return {
+      paciente_id: patientId,
       enviado: true,
-      resultado: {
-        paciente_id: patientId,
-        enviado: true,
-        destino: resposta.phone_masked,
-        expira_em: paraIso(resposta.expires_at),
-      },
+      destino: resposta.data.phone_masked,
+      expira_em: paraIso(resposta.data.expires_at),
+      falha: null,
     };
   }
 
-  let codigo: string | undefined;
-  try {
-    const resposta: Response | undefined = (error as { context?: Response }).context;
-    const corpo = resposta ? await resposta.clone().json() : null;
-    codigo = (corpo as { error?: string } | null)?.error;
-  } catch {
-    codigo = undefined;
-  }
+  const detalhes = (resposta.error?.details ?? null) as {
+    sentinela?: string;
+    detail?: string;
+  } | null;
+  const codigo = detalhes?.sentinela;
 
-  if (!codigo || codigo === "sms_failed") return { enviado: false };
+  if (codigo === "sms_failed") {
+    return {
+      paciente_id: patientId,
+      enviado: false,
+      destino: null,
+      expira_em: null,
+      falha:
+        detalhes?.detail === "sms_provider_not_configured" ? "sms_nao_configurado" : "sms_recusado",
+    };
+  }
 
   // A code the function shares with the RPCs (`underage`) uses the same
   // sentence the RPC path shows, so the two ways of inviting never disagree.
-  return fail(
-    CODIGO_DO_CONVITE_SMS[codigo] ?? ERROR_CODE.UNKNOWN,
-    MENSAGEM_DO_CONVITE_SMS[codigo] ?? mensagemDaSentinela(codigo),
-  );
+  if (codigo) {
+    return fail(
+      CODIGO_DO_CONVITE_SMS[codigo] ?? ERROR_CODE.UNKNOWN,
+      MENSAGEM_DO_CONVITE_SMS[codigo] ?? mensagemDaSentinela(codigo),
+    );
+  }
+
+  return fail(resposta.error?.code ?? ERROR_CODE.UNKNOWN, resposta.error?.message);
 }
 
 /**
@@ -1324,14 +1335,10 @@ async function enviarConviteSms(
  */
 export async function sendInvite({ id }: { id: string }): Promise<SingleResult<ResultadoConvite>> {
   return executar(async () => {
-    const sms = await enviarConviteSms(getSupabaseClient(), id);
+    const sms = await enviarConviteSms(id);
     if ("error" in sms) return sms;
 
-    return okOne<ResultadoConvite>(
-      sms.enviado
-        ? sms.resultado
-        : { paciente_id: id, enviado: false, destino: null, expira_em: null },
-    );
+    return okOne<ResultadoConvite>(sms);
   });
 }
 

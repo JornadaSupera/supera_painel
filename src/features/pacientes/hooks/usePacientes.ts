@@ -5,6 +5,7 @@ import { toListQuery } from "@/hooks/listQuery";
 import { useListParams } from "@/hooks/useListParams";
 import { audit } from "@/lib/audit";
 import { queryKeys } from "@/lib/queryKeys";
+import { REFRESH_MS } from "@/lib/refresh";
 import { call, pacientesApi } from "@/services/apiClient";
 import { usePacientesStore } from "@/stores/pacientes";
 import type {
@@ -43,6 +44,7 @@ export function usePacientes() {
     // Mantém a página anterior visível durante a troca de página: sem isso a
     // tabela pisca para o esqueleto a cada clique na paginação.
     placeholderData: (anterior) => anterior,
+    refetchInterval: REFRESH_MS.auditada,
   });
 
   const { items, ...status } = toListQuery(query);
@@ -61,6 +63,7 @@ export function usePaciente(id: string | undefined) {
     queryKey: queryKeys.patients.detail(id ?? ""),
     enabled: Boolean(id),
     queryFn: async () => (await call(() => pacientesApi.getById({ id: id as string }))).data,
+    refetchInterval: REFRESH_MS.auditada,
   });
 }
 
@@ -107,9 +110,17 @@ function avisarConvite(resultado: ResultadoConvite | null | undefined) {
     return;
   }
 
+  if (resultado?.falha === "sms_recusado") {
+    toast.warning("O SMS não saiu", {
+      description:
+        "O provedor de SMS recusou o envio. Confira o celular da ficha e reemita o convite.",
+    });
+    return;
+  }
+
   toast.info("O código de ativação vai por SMS", {
     description:
-      "O envio por SMS ainda não está ativo, então nenhuma mensagem saiu agora. Quando estiver, reemita o convite pela ficha e o código chega no celular do paciente.",
+      "O envio por SMS ainda não está configurado no servidor, então nenhuma mensagem saiu agora. Quando estiver, reemita o convite pela ficha e o código chega no celular do paciente.",
   });
 }
 
