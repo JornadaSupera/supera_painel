@@ -23,7 +23,13 @@ export const PERMISSAO = {
   DASHBOARD_READ: "dashboard:read",
 
   PACIENTES_READ: "pacientes:read",
+  /** Cadastrar a ficha e corrigi-la. */
   PACIENTES_WRITE: "pacientes:write",
+  /**
+   * Emitir e cancelar o convite do aplicativo, e desfazer o vínculo com a conta.
+   * Separado de cadastrar: quem cadastra pode não ser quem decide o acesso ao app.
+   */
+  PACIENTES_INVITE: "pacientes:invite",
   PACIENTES_DEACTIVATE: "pacientes:deactivate",
   PACIENTES_EXPORT: "pacientes:export",
   /** Revelar CPF, telefone ou e-mail completos. Cada uso gera log. */
@@ -73,12 +79,16 @@ export type Permissao = (typeof PERMISSAO)[keyof typeof PERMISSAO];
 const TODAS_PERMISSOES = Object.values(PERMISSAO);
 
 /**
- * Profissional clínico: consulta e produz conteúdo, vê só os próprios
- * indicadores. Não gerencia usuários nem configurações da clínica.
+ * Profissional clínico: consulta e produz conteúdo, cadastra e corrige fichas,
+ * vê só os próprios indicadores. Não gerencia usuários nem configurações da
+ * clínica.
  */
 const PERMISSOES_PROFISSIONAL: Permissao[] = [
   PERMISSAO.DASHBOARD_READ,
   PERMISSAO.PACIENTES_READ,
+  // Cadastra e corrige a ficha, como a recepção. Convite, vínculo com a conta e
+  // desativação continuam com a administração.
+  PERMISSAO.PACIENTES_WRITE,
   // A lista filtrada sai em CSV (Mapa 2.2.5): o banco aceita o registro da
   // exportação pelo profissional, e o arquivo leva só dado mascarado.
   PERMISSAO.PACIENTES_EXPORT,
@@ -181,6 +191,7 @@ export const PERMISSAO_LABEL: Record<Permissao, string> = {
   "dashboard:read": "Ver dashboard",
   "pacientes:read": "Ver pacientes",
   "pacientes:write": "Cadastrar e editar pacientes",
+  "pacientes:invite": "Convidar pacientes para o aplicativo",
   "pacientes:deactivate": "Desativar pacientes",
   "pacientes:export": "Exportar lista de pacientes",
   "pacientes:reveal_pii": "Revelar dados pessoais completos",
