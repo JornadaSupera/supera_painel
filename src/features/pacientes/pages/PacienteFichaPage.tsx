@@ -1,15 +1,4 @@
-import {
-  Ban,
-  CalendarDays,
-  ChevronLeft,
-  MessageSquareShare,
-  Smartphone,
-  SquarePen,
-  Stethoscope,
-  TriangleAlert,
-  User,
-  UsersRound,
-} from "lucide-react";
+import { Ban, ChevronLeft, MessageSquareShare, SquarePen, TriangleAlert } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -17,42 +6,24 @@ import {
   BackendPendente,
   Can,
   ConfirmDialog,
-  DetailField,
-  DetailSection,
   ErrorState,
   PageHeader,
   ScrollableTabsList,
   SkeletonForm,
-  StatusBadge,
-  TONE_RISK,
-  TONE_PATIENT_STATUS,
-  UserAvatar,
 } from "@/components/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import {
-  FASE_TRATAMENTO_LABEL,
-  RISCO_LABEL,
-  STATUS_PACIENTE,
-  STATUS_PACIENTE_LABEL,
-} from "@/lib/enums";
-import { formatDate, formatDateTime, ageInYears } from "@/lib/format";
+import { STATUS_PACIENTE } from "@/lib/enums";
+import { formatDateTime } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import type { PacienteDetalhe, ResultadoConvite } from "@/types/paciente";
-import { AppAccessDetails } from "../components/AppAccessDetails";
-import { CampoSensivel } from "../components/CampoSensivel";
-import { CuidadoresVinculados } from "../components/CuidadoresVinculados";
 import { ConviteEmitidoDialog } from "../components/ConviteEmitidoDialog";
 import { DeactivatePatientDialog } from "../components/DeactivatePatientDialog";
-import { OtherDiagnosesList } from "../components/DiagnosisDetails";
-import { OrigemDosDados } from "../components/OrigemDosDados";
 import { PatientGeneralTab } from "../components/PatientGeneralTab";
 import { PatientRecordHeader } from "../components/PatientRecordHeader";
 import { motivoIndisponivel } from "@/services/apiClient";
 import { PacienteForm } from "../components/PacienteForm";
-import { protocolDetails } from "../protocol";
 import {
   useAtualizarPaciente,
   useDesvincularConta,
@@ -70,6 +41,9 @@ import { paraClinica, paraEntrada, VALORES_INICIAIS, type PacienteForm as Valore
  *
  * Abrir esta tela é um evento de auditoria: é aqui que os dados de uma pessoa
  * identificada aparecem juntos. O registro sai de `usePaciente`.
+ *
+ * Both panels read the record the same way: a header card, then "Geral" and the
+ * tabs each panel brings.
  */
 
 /* ------------------------------------------------------------- apoio */
@@ -139,11 +113,10 @@ export interface PacienteFichaPageProps {
    */
   actions?: (paciente: PacienteDetalhe) => ReactNode;
   /**
-   * With tabs, the record is read as the clinical panel's: a header card on top
-   * and "Geral" plus these tabs below. Without them it stays one page of cards,
-   * which is how the administration reads it.
+   * What comes after "Geral". Both panels read the record the same way — a
+   * header card on top and the tabs below — and each brings its own tabs.
    */
-  tabs?: RecordTab[];
+  tabs: RecordTab[];
 }
 
 export function PacienteFichaPage({
@@ -151,7 +124,7 @@ export function PacienteFichaPage({
   eyebrow = "Gestão",
   actions,
   tabs,
-}: PacienteFichaPageProps = {}) {
+}: PacienteFichaPageProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -170,7 +143,7 @@ export function PacienteFichaPage({
   // An unknown value in the address — an old link, a typo — opens "Geral".
   const requestedTab = searchParams.get(TAB_PARAM);
   const activeTab =
-    requestedTab && tabs?.some((tab) => tab.value === requestedTab) ? requestedTab : GENERAL_TAB;
+    requestedTab && tabs.some((tab) => tab.value === requestedTab) ? requestedTab : GENERAL_TAB;
   const openTab = (value: string) =>
     setSearchParams(
       (current) => {
@@ -361,254 +334,48 @@ export function PacienteFichaPage({
   // actions inside the card they stay framed with the record they act on. Each
   // tab mounts when opened: the clinical ones read audited sources, and a tab
   // nobody opens should not leave a read in the trail.
-  if (tabs) {
-    return (
-      <div className="flex flex-col gap-5">
-        <Button
-          variant="ghost"
-          size="sm"
-          asChild
-          className="text-muted-foreground hover:text-foreground -ml-2 h-10 w-fit gap-1 px-2 md:h-7"
-        >
-          <Link to={basePath}>
-            <ChevronLeft size={14} aria-hidden="true" />
-            Voltar à lista
-          </Link>
-        </Button>
-
-        <PatientRecordHeader paciente={paciente} actions={recordActions} />
-
-        {inactiveNotice}
-
-        <Tabs value={activeTab} onValueChange={openTab} className="gap-4">
-          <ScrollableTabsList aria-label="Seções da ficha">
-            <TabsTrigger value={GENERAL_TAB}>Geral</TabsTrigger>
-            {tabs.map((tab) => (
-              <TabsTrigger key={tab.value} value={tab.value}>
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </ScrollableTabsList>
-
-          <TabsContent value={GENERAL_TAB}>
-            <PatientGeneralTab
-              paciente={paciente}
-              onUnlink={() => setDesvinculando(true)}
-              unlinking={desvincular.isPending}
-            />
-          </TabsContent>
-
-          {tabs.map((tab) => (
-            <TabsContent key={tab.value} value={tab.value}>
-              {typeof tab.content === "function" ? tab.content(paciente) : tab.content}
-            </TabsContent>
-          ))}
-        </Tabs>
-
-        {dialogs}
-      </div>
-    );
-  }
-
-  /* ------------------------------------------------- leitura administrativa */
-
-  // Header and cards share one width. With only the cards capped, a wide
-  // monitor put Editar and Desativar ~1500px from the record they act on.
   return (
-    <div className="flex max-w-5xl flex-col gap-5">
-      <PageHeader
-        eyebrow={eyebrow}
-        title={paciente.nome}
-        backTo={basePath}
-        backLabel="Pacientes"
-        breadcrumb={[{ label: "Pacientes", to: basePath }, { label: paciente.nome }]}
-        badge={
-          <StatusBadge tone={TONE_PATIENT_STATUS[paciente.status]} size="sm" dot>
-            {STATUS_PACIENTE_LABEL[paciente.status]}
-          </StatusBadge>
-        }
-        subtitle={
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="tabular-nums">{paciente.codigo}</span>
-            <span aria-hidden="true">·</span>
-            <span className="tabular-nums">{ageInYears(paciente.nascimento)} anos</span>
-            <span aria-hidden="true">·</span>
-            <span>CPF</span>
-            <CampoSensivel
-              pacienteId={paciente.id}
-              campo="cpf"
-              mascarado={paciente.cpf_mascarado}
-              nomePaciente={paciente.nome}
-            />
-          </span>
-        }
-        actions={recordActions}
-      />
+    <div className="flex flex-col gap-5">
+      <Button
+        variant="ghost"
+        size="sm"
+        asChild
+        className="text-muted-foreground hover:text-foreground -ml-2 h-10 w-fit gap-1 px-2 md:h-7"
+      >
+        <Link to={basePath}>
+          <ChevronLeft size={14} aria-hidden="true" />
+          Voltar à lista
+        </Link>
+      </Button>
+
+      <PatientRecordHeader paciente={paciente} actions={recordActions} />
 
       {inactiveNotice}
 
-      <OrigemDosDados paciente={paciente} />
+      <Tabs value={activeTab} onValueChange={openTab} className="gap-4">
+        <ScrollableTabsList aria-label="Seções da ficha">
+          <TabsTrigger value={GENERAL_TAB}>Geral</TabsTrigger>
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </ScrollableTabsList>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <DetailSection titulo="Identificação" icone={<User size={15} />}>
-          <div className="flex items-center gap-3">
-            <UserAvatar name={paciente.nome} size="lg" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{paciente.nome}</p>
-              <p className="text-muted-foreground text-xs capitalize">{paciente.sexo ?? "—"}</p>
-            </div>
-          </div>
-
-          <dl className="grid grid-cols-2 gap-4">
-            <DetailField rotulo="Nascimento">
-              <span className="tabular-nums">{formatDate(paciente.nascimento)}</span>
-            </DetailField>
-
-            <DetailField rotulo="CPF">
-              <CampoSensivel
-                pacienteId={paciente.id}
-                campo="cpf"
-                mascarado={paciente.cpf_mascarado}
-                nomePaciente={paciente.nome}
-              />
-            </DetailField>
-
-            <DetailField rotulo="Telefone">
-              <CampoSensivel
-                pacienteId={paciente.id}
-                campo="telefone"
-                mascarado={paciente.telefone_mascarado}
-                nomePaciente={paciente.nome}
-              />
-            </DetailField>
-
-            <DetailField rotulo="E-mail">
-              <CampoSensivel
-                pacienteId={paciente.id}
-                campo="email"
-                mascarado={paciente.email_mascarado}
-                nomePaciente={paciente.nome}
-              />
-            </DetailField>
-          </dl>
-        </DetailSection>
-
-        <DetailSection titulo="Diagnóstico e tratamento" icone={<Stethoscope size={15} />}>
-          <dl className="grid grid-cols-2 gap-4">
-            <DetailField rotulo={outrosDiagnosticos.length > 0 ? "Diagnóstico principal" : "CID-10"}>
-              <span className="tabular-nums">{paciente.cid}</span>
-              <p className="text-muted-foreground text-xs">{paciente.cid_descricao}</p>
-            </DetailField>
-
-            <DetailField rotulo="Estadiamento">
-              {paciente.estadiamento ?? "—"}
-              {paciente.tnm && (
-                <p className="text-muted-foreground font-mono text-xs">{paciente.tnm}</p>
-              )}
-            </DetailField>
-
-            <DetailField rotulo="Fase">
-              <span className="capitalize">
-                {paciente.fase ? FASE_TRATAMENTO_LABEL[paciente.fase] : "—"}
-              </span>
-            </DetailField>
-
-            <DetailField rotulo="Risco">
-              {paciente.risco ? (
-                <StatusBadge tone={TONE_RISK[paciente.risco]} size="sm">
-                  {RISCO_LABEL[paciente.risco]}
-                </StatusBadge>
-              ) : (
-                "—"
-              )}
-            </DetailField>
-
-            <DetailField rotulo="Diagnóstico em">
-              <span className="tabular-nums">{formatDate(paciente.diagnostico_em)}</span>
-            </DetailField>
-
-            <DetailField rotulo="Médico responsável">{paciente.medico_responsavel_nome ?? "—"}</DetailField>
-
-            {outrosDiagnosticos.length > 0 && (
-              <div className="col-span-2">
-                <DetailField rotulo="Outros diagnósticos">
-                  <OtherDiagnosesList diagnoses={outrosDiagnosticos} />
-                </DetailField>
-              </div>
-            )}
-
-            <div className="col-span-2">
-              <DetailField rotulo="Protocolo">
-                {paciente.protocolo ? (
-                  <div className="flex flex-col gap-1.5">
-                    <span className="font-medium">{paciente.protocolo.nome}</span>
-                    <p className="text-muted-foreground text-xs">{protocolDetails(paciente)}</p>
-                  </div>
-                ) : (
-                  "—"
-                )}
-              </DetailField>
-            </div>
-          </dl>
-        </DetailSection>
-
-        <DetailSection titulo="Alergias e reações prévias" icone={<CalendarDays size={15} />}>
-          <dl className="flex flex-col gap-4">
-            <DetailField rotulo="Alergias">
-              {paciente.alergias.length > 0 ? (
-                <ul className="flex flex-wrap gap-1.5">
-                  {paciente.alergias.map((alergia) => (
-                    <li key={alergia}>
-                      <StatusBadge tone="warning" size="sm">
-                        {alergia}
-                      </StatusBadge>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <span className="text-muted-foreground text-sm">Nenhuma registrada</span>
-              )}
-            </DetailField>
-
-            <DetailField rotulo="Reações prévias">
-              {paciente.reacoes_previas.length > 0 ? (
-                <ul className="flex flex-wrap gap-1.5">
-                  {paciente.reacoes_previas.map((reacao) => (
-                    <li key={reacao}>
-                      <Badge variant="secondary" className="text-[11px] font-normal">
-                        {reacao}
-                      </Badge>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <span className="text-muted-foreground text-sm">Nenhuma registrada</span>
-              )}
-            </DetailField>
-
-            {paciente.observacoes && (
-              <DetailField rotulo="Observações">
-                <p className="text-sm leading-relaxed">{paciente.observacoes}</p>
-              </DetailField>
-            )}
-          </dl>
-        </DetailSection>
-
-        <DetailSection titulo="Acesso ao aplicativo" icone={<Smartphone size={15} />}>
-          <AppAccessDetails
+        <TabsContent value={GENERAL_TAB}>
+          <PatientGeneralTab
             paciente={paciente}
             onUnlink={() => setDesvinculando(true)}
             unlinking={desvincular.isPending}
           />
-        </DetailSection>
+        </TabsContent>
 
-        {/* Dado pessoal de terceiro dentro da ficha: aparece porque o
-            encarregado de dados pergunta por ele, mascarado porque o painel
-            não precisa do contato. */}
-        <DetailSection titulo="Acompanhantes" icone={<UsersRound size={15} />}>
-          <CuidadoresVinculados pacienteId={paciente.id} />
-        </DetailSection>
-      </div>
+        {tabs.map((tab) => (
+          <TabsContent key={tab.value} value={tab.value}>
+            {typeof tab.content === "function" ? tab.content(paciente) : tab.content}
+          </TabsContent>
+        ))}
+      </Tabs>
 
       {dialogs}
     </div>

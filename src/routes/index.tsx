@@ -37,7 +37,6 @@ import { ProtectedRoute } from "./ProtectedRoute";
 const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
 const PacientesPage = lazy(() => import("@/features/pacientes/pages/PacientesPage"));
 const PacienteNovoPage = lazy(() => import("@/features/pacientes/pages/PacienteNovoPage"));
-const PacienteFichaPage = lazy(() => import("@/features/pacientes/pages/PacienteFichaPage"));
 const UsuariosPage = lazy(() => import("@/features/usuarios/pages/UsuariosPage"));
 const UsuarioFormPage = lazy(() => import("@/features/usuarios/pages/UsuarioFormPage"));
 const UsuarioDetalhePage = lazy(() => import("@/features/usuarios/pages/UsuarioDetalhePage"));
@@ -64,7 +63,9 @@ const ClinicoAlertasPage = lazy(() => import("@/features/clinico/pages/ClinicoAl
 const ClinicoConteudoPage = lazy(() => import("@/features/clinico/pages/ClinicoConteudoPage"));
 const ClinicoOrientacaoPage = lazy(() => import("@/features/clinico/pages/ClinicoOrientacaoPage"));
 const ClinicoPerfilPage = lazy(() => import("@/features/clinico/pages/ClinicoPerfilPage"));
-/* The patient record in tabs: composed in `routes/`, where two features may meet. */
+/* The patient record in tabs, in both panels: composed in `routes/`, where two
+   features may meet. */
+const AdminPatientRecord = lazy(() => import("./AdminPatientRecord"));
 const ClinicalPatientRecord = lazy(() => import("./ClinicalPatientRecord"));
 /* Not a panel screen: its audience is app users, so it stays out of the bundle
    that panel staff load first. */
@@ -191,7 +192,7 @@ export function AppRoutes() {
 
               <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
                 <Route path="/pacientes" element={<PacientesPage />} />
-                <Route path="/pacientes/:id" element={<PacienteFichaPage />} />
+                <Route path="/pacientes/:id" element={<AdminPatientRecord />} />
               </Route>
 
               {/* Creating and editing a professional is access management: it
