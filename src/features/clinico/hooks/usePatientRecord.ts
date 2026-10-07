@@ -45,6 +45,16 @@ export function usePatientDiary(patientId: string) {
   });
 }
 
+/** The distress flags on one patient: the record's band and the marks on lists share it. */
+export function useDistressFlags(patientId: string) {
+  return useQuery({
+    queryKey: queryKeys.clinico.distressFlags(patientId),
+    queryFn: async () => (await call(() => clinicoApi.listDistressFlags({ patientId }))).data,
+    enabled: Boolean(patientId),
+    staleTime: 60_000,
+  });
+}
+
 /** What is still to come for the patient, with anyone on the team. */
 export function useUpcomingAppointments(patientId: string) {
   return useQuery({

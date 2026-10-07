@@ -28,6 +28,7 @@ import type { AlertaClinico, CompromissoAgenda } from "@/types/clinico";
 import type { PacienteListItem } from "@/types/paciente";
 import { SEVERITY_DOT, SEVERITY_RANK } from "../alert-tones";
 import { ConversaSemResposta } from "../components/ConversaSemResposta";
+import { DistressFlagBadge } from "../components/DistressFlagNotice";
 import { useAgendaClinica } from "../hooks/useAgendaClinica";
 import { useAlertasClinicos } from "../hooks/useAlertasClinicos";
 import { useConversasClinicas } from "../hooks/useConversasClinicas";
@@ -148,7 +149,10 @@ function PacienteDoDia({
         <span className="w-12 shrink-0 font-mono text-sm tabular-nums">{formatTime(compromisso.inicio)}</span>
         <UserAvatar name={compromisso.paciente_nome} size="sm" />
         <span className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate text-sm font-medium">{compromisso.paciente_nome}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-medium">{compromisso.paciente_nome}</span>
+            <DistressFlagBadge patientId={compromisso.paciente_id} />
+          </span>
           <span className="text-muted-foreground truncate text-xs">{linhaClinica(compromisso, paciente)}</span>
         </span>
         <StatusBadge tone={compromisso.status_tom} size="sm" pill>
@@ -172,7 +176,10 @@ function AlertaNaFila({ alerta, href }: { alerta: AlertaClinico; href: string })
           className={cn("mt-1.5 size-2 shrink-0 rounded-full", SEVERITY_DOT[alerta.severidade])}
         />
         <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="truncate text-sm font-medium">{alerta.paciente_nome}</span>
+          <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span className="truncate text-sm font-medium">{alerta.paciente_nome}</span>
+            <DistressFlagBadge patientId={alerta.paciente_id} />
+          </span>
           <span className="text-muted-foreground text-xs">
             {alerta.sintoma_label} · grau {alerta.grau}
             <span className="sr-only">, severidade {SEVERIDADE_LABEL[alerta.severidade]}</span>

@@ -1,5 +1,6 @@
 import { useParams } from "react-router-dom";
 
+import { DistressFlagBanner } from "@/features/clinico/components/DistressFlagNotice";
 import { PatientChatShortcut } from "@/features/clinico/components/PatientChatShortcut";
 import { PatientScheduleShortcut } from "@/features/clinico/components/PatientScheduleShortcut";
 import { PacienteFichaPage } from "@/features/pacientes/pages/PacienteFichaPage";
@@ -27,6 +28,7 @@ export function ClinicalPatientRecord() {
     <PacienteFichaPage
       basePath={`${base}/pacientes`}
       eyebrow={ESPECIALIDADE_LABEL[area]}
+      notice={<DistressFlagBanner patientId={id} />}
       actions={(paciente) => (
         <>
           <PatientChatShortcut href={chatHref} />

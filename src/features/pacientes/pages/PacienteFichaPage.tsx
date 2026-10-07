@@ -114,6 +114,11 @@ export interface PacienteFichaPageProps {
    */
   actions?: (paciente: PacienteDetalhe) => ReactNode;
   /**
+   * A notice the embedding panel shows under the header card, above the tabs —
+   * what the team must see before reading anything else.
+   */
+  notice?: ReactNode;
+  /**
    * What comes after "Geral". Both panels read the record the same way — a
    * header card on top and the tabs below — and each brings its own tabs.
    */
@@ -124,6 +129,7 @@ export function PacienteFichaPage({
   basePath = "/pacientes",
   eyebrow = "Gestão",
   actions,
+  notice,
   tabs,
 }: PacienteFichaPageProps) {
   const { id } = useParams<{ id: string }>();
@@ -353,6 +359,7 @@ export function PacienteFichaPage({
 
       <PatientRecordHeader paciente={paciente} actions={recordActions} />
 
+      {notice}
       {inactiveNotice}
 
       <Tabs value={activeTab} onValueChange={openTab} className="gap-4">
