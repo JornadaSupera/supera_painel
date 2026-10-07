@@ -16,14 +16,15 @@ import type { AppointmentTypeOption } from "@/types/agenda";
 /** The value of "no filter": a Select item cannot carry an empty string. */
 export const ALL_TYPES = "todos";
 
-const VIEWS: AgendaView[] = [AGENDA_VIEW.MONTH, AGENDA_VIEW.WEEK, AGENDA_VIEW.DAY];
+const VIEWS: AgendaView[] = [AGENDA_VIEW.LIST, AGENDA_VIEW.MONTH, AGENDA_VIEW.WEEK, AGENDA_VIEW.DAY];
 
 /**
  * What the agenda is showing and how to change it: the view, the period, the
  * kind of appointment and the entry point for blocking time.
  *
  * The view is a set of buttons with `aria-pressed`, not tabs: nothing here is a
- * panel that swaps, it is the same calendar drawn three ways.
+ * panel that swaps, it is the same calendar drawn four ways — the days as a list,
+ * and the month, week and day as a grid.
  */
 export function AgendaToolbar({
   view,
@@ -49,7 +50,7 @@ export function AgendaToolbar({
   /** Omitted for someone who does not run the schedule: there is nothing to book with. */
   onNewAppointment?: () => void;
 }) {
-  const period = { mes: "mês", semana: "semana", dia: "dia" }[view];
+  const period = { lista: "semana", mes: "mês", semana: "semana", dia: "dia" }[view];
 
   return (
     <div className="flex flex-col gap-3">

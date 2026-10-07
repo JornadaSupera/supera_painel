@@ -12,10 +12,11 @@
 
 export const AGENDA_TIME_ZONE = "America/Sao_Paulo";
 
-export const AGENDA_VIEW = { MONTH: "mes", WEEK: "semana", DAY: "dia" } as const;
+export const AGENDA_VIEW = { LIST: "lista", MONTH: "mes", WEEK: "semana", DAY: "dia" } as const;
 export type AgendaView = (typeof AGENDA_VIEW)[keyof typeof AGENDA_VIEW];
 
 export const AGENDA_VIEW_LABEL: Record<AgendaView, string> = {
+  lista: "Lista",
   mes: "Mês",
   semana: "Semana",
   dia: "Dia",
@@ -167,9 +168,15 @@ export function dayStart(key: string): string {
 
 /* ------------------------------------------------------------------ ranges */
 
-/** The days a view shows, from `from` (inclusive) to `to` (exclusive), as keys. */
+/**
+ * The days a view shows, from `from` (inclusive) to `to` (exclusive), as keys.
+ *
+ * The list is the seven days from the chosen one, not a calendar week: opened
+ * on a Friday it reads "Friday to Thursday", which is what is ahead.
+ */
 export function visibleDays(view: AgendaView, key: string): { from: string; to: string } {
   if (view === AGENDA_VIEW.DAY) return { from: key, to: addDays(key, 1) };
+  if (view === AGENDA_VIEW.LIST) return { from: key, to: addDays(key, 7) };
   if (view === AGENDA_VIEW.WEEK) {
     const start = startOfWeek(key);
     return { from: start, to: addDays(start, 7) };
@@ -182,7 +189,7 @@ export function visibleDays(view: AgendaView, key: string): { from: string; to: 
 
 export function stepView(view: AgendaView, key: string, direction: 1 | -1): string {
   if (view === AGENDA_VIEW.DAY) return addDays(key, direction);
-  if (view === AGENDA_VIEW.WEEK) return addDays(key, 7 * direction);
+  if (view === AGENDA_VIEW.WEEK || view === AGENDA_VIEW.LIST) return addDays(key, 7 * direction);
   return addMonths(key, direction);
 }
 
