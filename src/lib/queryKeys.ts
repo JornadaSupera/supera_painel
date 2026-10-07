@@ -188,6 +188,10 @@ export const queryKeys = {
      * booking, moving or closing an appointment refreshes it with the agenda.
      */
     patientAgenda: (patientId: string) => ["clinico", "agenda", "patient", patientId] as const,
+    /** Orientations sent straight to one patient. */
+    directedSends: (patientId: string) => ["clinico", "directed-sends", patientId] as const,
+    /** The published orientations one area can send. */
+    sendableContent: (specialty: string) => ["clinico", "sendable-content", specialty] as const,
   },
 
   /** Satisfação dos pacientes — a pesquisa NPS. */

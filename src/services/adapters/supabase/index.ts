@@ -9,6 +9,7 @@ import * as auth from "./auth";
 import * as catalogos from "./catalogos";
 import * as clinico from "./clinico";
 import * as conversationTransfer from "./conversationTransfer";
+import * as directedContent from "./directedContent";
 import * as patientRecord from "./patientRecord";
 import * as personalAgenda from "./personalAgenda";
 import * as professionalProfile from "./professionalProfile";
@@ -51,8 +52,16 @@ const implemented = {
   conteudos,
   aprovacoes,
   auditoria,
-  // The record, the transfer, the personal calendar and the scheduling live in their own files but answer to the same resource.
-  clinico: { ...clinico, ...patientRecord, ...conversationTransfer, ...personalAgenda, ...scheduling, ...professionalProfile },
+  // The record, the directed sends, the transfer, the personal calendar and the scheduling live in their own files but answer to the same resource.
+  clinico: {
+    ...clinico,
+    ...patientRecord,
+    ...directedContent,
+    ...conversationTransfer,
+    ...personalAgenda,
+    ...scheduling,
+    ...professionalProfile,
+  },
   estatisticasClinicas,
   estatisticasOperacionais,
   configuracoes,

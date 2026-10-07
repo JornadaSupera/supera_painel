@@ -39,6 +39,7 @@ import type {
   SchedulingAccess,
 } from "@/types/agenda";
 import type { ConversationAssignment, TransferTarget } from "@/types/conversation-transfer";
+import type { DirectedSend, SendableContent } from "@/types/directed-content";
 import type {
   AppointmentRecordEvent,
   DiarySymptom,
@@ -764,6 +765,23 @@ export interface ClinicoOperations {
    * a sinalização, de qual área e quando — nunca o texto.
    */
   raiseDistressFlag(params: { noteId: string }): Promise<SingleResult<null>>;
+
+  /**
+   * Orientations sent straight to the patient, newest first, each with when the
+   * patient opened it. A confidential area's sends only reach that area.
+   */
+  listDirectedSends(params: { patientId: string }): Promise<ListResult<DirectedSend>>;
+  /** The published orientations of one area's library: what that area can send. */
+  listSendableContent(params: { specialty: Especialidade }): Promise<ListResult<SendableContent>>;
+  /**
+   * Sends a published orientation to the patient's app, from one of the
+   * professional's own areas. The database notifies the patient.
+   */
+  sendDirectedContent(params: {
+    patientId: string;
+    contentItemId: string;
+    specialty: Especialidade;
+  }): Promise<SingleResult<{ send_id: string }>>;
 
   /** Colegas ativos que podem receber uma conversa, sem a própria pessoa. */
   listTransferTargets(): Promise<ListResult<TransferTarget>>;
