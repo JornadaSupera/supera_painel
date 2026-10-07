@@ -71,7 +71,9 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
               <SquarePen />
               Editar cadastro
             </DropdownMenuItem>
+          </Can>
 
+          <Can permission={PERMISSAO.PACIENTES_INVITE}>
             {/* A record already tied to an app account has nothing to invite. */}
             {paciente.convite_status !== "aceito" && (
               <DropdownMenuItem

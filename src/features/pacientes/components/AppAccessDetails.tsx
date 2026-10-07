@@ -58,7 +58,7 @@ export function AppAccessDetails({
         </p>
       )}
 
-      <Can permission={PERMISSAO.PACIENTES_WRITE}>
+      <Can permission={PERMISSAO.PACIENTES_INVITE}>
         <div className="flex flex-wrap gap-2 border-t pt-3">
           {paciente.convite_status === "enviado" && (
             <Button
