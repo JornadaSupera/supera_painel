@@ -23,6 +23,8 @@ export interface CompromissoAgenda {
   id: string;
   paciente_id: string;
   paciente_nome: string;
+  /** O nome que quem marcou deu ao compromisso: "Quimioterapia — Ciclo 4". */
+  titulo: string;
   tipo_label: string;
   status_label: string;
   /**

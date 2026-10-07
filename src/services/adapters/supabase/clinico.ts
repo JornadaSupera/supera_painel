@@ -104,6 +104,7 @@ function ehFalha<T>(valor: T | ReturnType<typeof falhaDe>): valor is ReturnType<
 interface LinhaAppointment {
   id: string;
   patient_id: string;
+  title: string;
   appointment_type_id: string | null;
   status_id: string | null;
   starts_at: string;
@@ -314,12 +315,14 @@ export async function getMinhaAgenda(params: {
     const compromissos: CompromissoAgenda[] = linhas.map((linha) => {
       const status = linha.status_id ? statusPorId.get(linha.status_id) : undefined;
       const situacao = situacaoDoCompromisso(status, linha.ends_at);
+      const tipo = (linha.appointment_type_id && labelPorTipo.get(linha.appointment_type_id)) || "Compromisso";
 
       return {
         id: linha.id,
         paciente_id: linha.patient_id,
         paciente_nome: nomePorPaciente.get(linha.patient_id) ?? "Paciente",
-        tipo_label: (linha.appointment_type_id && labelPorTipo.get(linha.appointment_type_id)) || "Compromisso",
+        titulo: linha.title?.trim() || tipo,
+        tipo_label: tipo,
         status_label: situacao.label,
         status_codigo: status?.code ?? null,
         status_tom: situacao.tom,
