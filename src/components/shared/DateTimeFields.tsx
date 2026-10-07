@@ -8,9 +8,13 @@ import { brDateToIso, brTimeToIso, isoToBrDate, maskDate, maskTime } from "@/lib
  *
  * The value that goes in and out is the ISO one (`YYYY-MM-DD`, `HH:mm`), so a
  * form swaps `<Input type="date">` for `<DateInput>` and nothing else changes.
- * While the text is incomplete or not a real moment, the value is `""` — the
- * form's own validation says what is missing — and the half-typed text stays on
- * screen.
+ * The half-typed text always stays on screen.
+ *
+ * While a date is incomplete or not a real day, its value is the text itself,
+ * which no date rule accepts: the form says the date is invalid. It used to be
+ * `""`, and an optional date typed halfway was saved as "not informed", with no
+ * message. A time still sends `""` while incomplete: the screens that use it
+ * read empty as "not filled in yet".
  */
 
 type FieldProps = Omit<ComponentProps<typeof Input>, "type" | "value" | "onChange" | "defaultValue"> & {
@@ -63,7 +67,7 @@ function MaskedField({
 const DATE_CONFIG: MaskedFieldConfig = {
   mask: maskDate,
   toText: isoToBrDate,
-  toValue: brDateToIso,
+  toValue: (text) => brDateToIso(text) || text,
   placeholder: "dd/mm/aaaa",
   maxLength: 10,
 };
