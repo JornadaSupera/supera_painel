@@ -107,7 +107,9 @@ export function LegalDocumentView({ document: legal }: { document: LegalDocument
       <BrandRibbon />
 
       {/* ------------------------------------------------------------ hero */}
-      <header className="bg-supera-perfeicao text-primary-foreground dark:bg-sidebar dark:text-foreground relative isolate overflow-hidden print:bg-transparent print:text-inherit">
+      {/* White, not `primary-foreground`: that token is the dark ink that sits on
+          the light primary green, and on this dark green it read as black. */}
+      <header className="bg-supera-perfeicao dark:bg-sidebar dark:text-foreground relative isolate overflow-hidden text-white print:bg-transparent print:text-inherit">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 no-print">
           <div className="bg-supera-uniao/35 absolute -top-32 -right-24 size-[28rem] rounded-full blur-3xl" />
           <div className="bg-supera-empatia/20 absolute -bottom-40 left-[-10rem] size-[24rem] rounded-full blur-3xl" />
@@ -156,7 +158,9 @@ export function LegalDocumentView({ document: legal }: { document: LegalDocument
                       cn(
                         "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
                         isActive
-                          ? "bg-card text-foreground shadow-sm"
+                          ? // On the near-black dark hero the card colour barely
+                            // differs from the background; the green tint marks it.
+                            "bg-card text-foreground dark:bg-primary/15 dark:text-primary shadow-sm"
                           : "opacity-80 hover:bg-current/10 hover:opacity-100",
                       )
                     }
