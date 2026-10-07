@@ -19,6 +19,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
+import { useTargetLookup } from "@/hooks/useTargetLookup";
 import { AUTOR_MENSAGEM, ESPECIALIDADE_LABEL, STATUS_CONVERSA_LABEL } from "@/lib/enums";
 import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ import {
 import {
   useAssumirConversa,
   useConversasClinicas,
+  useLerNotificacoesDaConversa,
   useMarcarConversaLida,
   useMensagensClinicas,
   useResolverConversa,
@@ -61,6 +63,10 @@ import {
  * A tela abre na fila em largura total, como no protótipo; clicar numa conversa
  * a abre ao lado de uma fila estreita, e "Voltar à fila" fecha. Busca e recortes
  * ficam acima das duas formas e valem para as duas.
+ *
+ * `?conversa=<id>` é o endereço que a notificação abre: a conversa já vem
+ * selecionada. Quando ela não está na fila de quem abriu (assumida por outro,
+ * ou encaminhada e resolvida por quem a recebeu), a tela diz por quê.
  */
 
 const RESUMO_AUTOR: Record<string, string> = {
@@ -123,7 +129,8 @@ export function ClinicoChatPage() {
   // dele, e abre a que é sua, senão a da sua área, senão a mais recente — a lista
   // já vem da mais recente para a mais antiga. Sem o parâmetro, a tela abre na
   // fila inteira, como no protótipo, e a conversa abre ao clicar.
-  const pacienteDaFicha = useSearchParams()[0].get("paciente");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pacienteDaFicha = searchParams.get("paciente");
   const doPaciente = pacienteDaFicha
     ? (conversas.data ?? []).filter((conversa) => conversa.paciente_id === pacienteDaFicha)
     : [];
@@ -140,6 +147,40 @@ export function ClinicoChatPage() {
       setAbriuDaFicha(true);
     }
   }, [abriuDaFicha, conversaDoPaciente]);
+
+  // A notificação leva para cá com `?conversa=`: a conversa abre já
+  // selecionada. Se ela ainda não veio na leitura, a lista é lida de novo uma
+  // vez antes de a tela dizer que não a encontrou.
+  const conversaPedida = searchParams.get("conversa");
+  const encaminhada = searchParams.get("encaminhada") === "1";
+  const conversaDaNotificacao = conversaPedida
+    ? ((conversas.data ?? []).find((conversa) => conversa.id === conversaPedida) ?? null)
+    : null;
+  const lookup = useTargetLookup({
+    id: conversaPedida,
+    found: conversaDaNotificacao !== null,
+    settled: Boolean(conversas.data) && !conversas.isFetching,
+    refetch: () => conversas.refetch(),
+  });
+
+  const abertaPelaNotificacao = useRef<string | null>(null);
+  useEffect(() => {
+    if (!conversaDaNotificacao || abertaPelaNotificacao.current === conversaDaNotificacao.id) return;
+    abertaPelaNotificacao.current = conversaDaNotificacao.id;
+    setSelecionada(conversaDaNotificacao.id);
+  }, [conversaDaNotificacao]);
+
+  function esquecerConversaPedida() {
+    setSearchParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual);
+        proximo.delete("conversa");
+        proximo.delete("encaminhada");
+        return proximo;
+      },
+      { replace: true },
+    );
+  }
 
   const lista = conversas.data ?? [];
   const conversaAtual = lista.find((conversa) => conversa.id === selecionada) ?? null;
@@ -170,6 +211,29 @@ export function ClinicoChatPage() {
           <AlertDescription>
             Este paciente ainda não tem conversa com a equipe. A fila abaixo mostra as demais.
           </AlertDescription>
+        </Alert>
+      )}
+
+      {!conversas.isLoading && (lookup === "searching" || lookup === "missing") && (
+        <Alert role="status" className="flex items-start justify-between gap-3">
+          <AlertDescription>
+            {lookup === "searching"
+              ? "Procurando a conversa da notificação…"
+              : encaminhada
+                ? "A conversa que você encaminhou foi resolvida por quem a recebeu. Ela ficou com essa pessoa e não aparece mais na sua fila."
+                : "A conversa da notificação não está na sua fila. Uma conversa assumida por outro profissional fica só com quem a assumiu."}
+          </AlertDescription>
+          {lookup === "missing" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="-my-1 size-7 shrink-0"
+              aria-label="Fechar o aviso"
+              onClick={esquecerConversaPedida}
+            >
+              <X />
+            </Button>
+          )}
         </Alert>
       )}
 
@@ -482,6 +546,14 @@ function PainelConversa({ conversa, onFechar }: { conversa: ConversaClinico; onF
     if (conversa.nao_lida_pela_equipe) marcarLida.mutate(conversa.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversa.id, conversa.nao_lida_pela_equipe]);
+
+  // E o que a anunciou no sino ("Conversa atribuída a você") deixa de ser
+  // novo, tenha ela sido aberta pela notificação ou pela fila.
+  const lerNotificacoes = useLerNotificacoesDaConversa();
+  useEffect(() => {
+    lerNotificacoes(conversa.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversa.id]);
 
   // A conversa cresce para baixo: a mensagem nova é a que se quer ver.
   const fimRef = useRef<HTMLDivElement>(null);
