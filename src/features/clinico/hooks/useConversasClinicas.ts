@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { useBlobUrl } from "@/hooks/useBlobUrl";
+import { useMarcarLidasDoAlvo } from "@/hooks/useNotificacoes";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, clinicoApi } from "@/services/apiClient";
 import { ApiException } from "@/services/contracts";
@@ -102,12 +103,23 @@ function useInvalidarConversas() {
   return () => queryClient.invalidateQueries({ queryKey: queryKeys.clinico.all });
 }
 
+/**
+ * The notifications that pointed to a conversation the person has open or just
+ * acted on stop being new. Opening it is reading what announced it.
+ */
+export function useLerNotificacoesDaConversa() {
+  const marcarLidas = useMarcarLidasDoAlvo();
+  return (id: string) => marcarLidas.mutate({ tabela: "conversations", id });
+}
+
 export function useAssumirConversa() {
   const invalidar = useInvalidarConversas();
+  const lerNotificacoes = useLerNotificacoesDaConversa();
 
   return useMutation({
     mutationFn: async (id: string) => (await call(() => clinicoApi.assumirConversa({ id }))).data,
-    onSuccess: async () => {
+    onSuccess: async (_data, id) => {
+      lerNotificacoes(id);
       await invalidar();
       toast.success("Conversa assumida");
     },
@@ -117,10 +129,12 @@ export function useAssumirConversa() {
 
 export function useResolverConversa() {
   const invalidar = useInvalidarConversas();
+  const lerNotificacoes = useLerNotificacoesDaConversa();
 
   return useMutation({
     mutationFn: async (id: string) => (await call(() => clinicoApi.resolverConversa({ id }))).data,
-    onSuccess: async () => {
+    onSuccess: async (_data, id) => {
+      lerNotificacoes(id);
       await invalidar();
       toast.success("Conversa marcada como resolvida");
     },

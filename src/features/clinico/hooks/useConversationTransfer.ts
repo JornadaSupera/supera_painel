@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { audit } from "@/lib/audit";
 import { queryKeys } from "@/lib/queryKeys";
 import { call, clinicoApi } from "@/services/apiClient";
+import { useLerNotificacoesDaConversa } from "./useConversasClinicas";
 
 /**
  * Handing a conversation to a colleague, and the history of who held it.
@@ -34,6 +35,7 @@ export function useConversationAssignments(conversationId: string, enabled: bool
 
 export function useTransferConversation() {
   const queryClient = useQueryClient();
+  const lerNotificacoes = useLerNotificacoesDaConversa();
 
   return useMutation({
     mutationFn: async (params: { conversationId: string; toProfessionalId: string; toName: string }) =>
@@ -47,6 +49,9 @@ export function useTransferConversation() {
       ).data,
     onSuccess: (_data, params) => {
       audit.update("conversations", params.conversationId, { operation: "transfer" });
+      // Handing it on can happen from the queue, without opening it: what
+      // announced it to this person is settled either way.
+      lerNotificacoes(params.conversationId);
       // The conversation changes area, the queue changes, the history grows and
       // the patient gets a message: everything about the chat is stale. Not
       // awaited — the dialog should close now, not after the queue has reloaded.
