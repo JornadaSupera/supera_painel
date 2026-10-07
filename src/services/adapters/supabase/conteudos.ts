@@ -5,7 +5,6 @@ import {
   TIPO_CONTEUDO,
   type AcaoRevisao,
   type StatusConteudo,
-  type TipoConteudo,
 } from "@/lib/enums";
 import {
   ERROR_CODE,
@@ -38,7 +37,7 @@ import { paginate } from "../_list";
 import { executar, falhaDe, profissionalDaSessao, umDe } from "./_helpers";
 import { falhou, resumirLeituraConteudo } from "./_summaries";
 import { getSupabaseClient } from "./client";
-import { paraEspecialidade } from "./mapping";
+import { paraEspecialidade, toContentKind, toMediaKind } from "./mapping";
 
 /**
  * Conteúdo — a biblioteca de orientações e o workflow que a alimenta.
@@ -88,12 +87,6 @@ const STATUS_POR_CODIGO: Record<string, StatusConteudo> = {
   rejected: STATUS_CONTEUDO.REJEITADO,
   published: STATUS_CONTEUDO.PUBLICADO,
   archived: STATUS_CONTEUDO.DESPUBLICADO,
-};
-
-const TIPO_POR_CODIGO: Record<string, TipoConteudo> = {
-  text: TIPO_CONTEUDO.ARTIGO,
-  video: TIPO_CONTEUDO.VIDEO,
-  pdf: TIPO_CONTEUDO.PDF,
 };
 
 /** Ação do painel → `content_review_action`. */
@@ -201,7 +194,7 @@ function projetar(linha: LinhaVersao, leituras: Map<string, number> | null): Con
     resumo: summarizeBody(linha.body),
     versao: Number(linha.version_no),
     status: STATUS_POR_CODIGO[linha.status] ?? STATUS_CONTEUDO.RASCUNHO,
-    tipo: TIPO_POR_CODIGO[linha.media_kind] ?? TIPO_CONTEUDO.ARTIGO,
+    tipo: toContentKind(linha.media_kind),
     categoria: categoria?.label ?? "Sem categoria",
     categoria_id: categoria?.id ?? "",
     especialidade: paraEspecialidade(areaDaCategoria?.code),
@@ -600,16 +593,6 @@ export async function listCategories(): Promise<ListResult<CategoriaConteudo>> {
    ESCRITA DO AUTOR
    ------------------------------------------------------------------------- */
 
-const MEDIA_KIND_POR_TIPO: Record<TipoConteudo, string> = {
-  [TIPO_CONTEUDO.ARTIGO]: "text",
-  [TIPO_CONTEUDO.VIDEO]: "video",
-  [TIPO_CONTEUDO.PDF]: "pdf",
-};
-
-const TIPO_POR_MEDIA_KIND = Object.fromEntries(
-  Object.entries(MEDIA_KIND_POR_TIPO).map(([tipo, kind]) => [kind, tipo as TipoConteudo]),
-) as Record<string, TipoConteudo>;
-
 const SEM_PERMISSAO_DE_AUTOR =
   "Só quem escreveu a orientação edita, e só enquanto a versão é rascunho ou foi devolvida.";
 
@@ -676,7 +659,7 @@ export async function create(entrada: ConteudoEntrada): Promise<SingleResult<Con
       content_item_id: itemId,
       title: entrada.titulo.trim(),
       body: entrada.corpo.trim(),
-      media_kind: MEDIA_KIND_POR_TIPO[entrada.tipo],
+      media_kind: toMediaKind(entrada.tipo),
       video_url: entrada.tipo === TIPO_CONTEUDO.VIDEO ? (entrada.video_url?.trim() ?? null) : null,
       estimated_reading_minutes: entrada.minutos_leitura ?? null,
       created_by_professional_id: eu.profissionalId,
@@ -724,7 +707,7 @@ export async function update({
 
     // O tipo e o link se conferem juntos: trocar para vídeo sem link, ou deixar
     // o link de um vídeo que virou texto, são as duas metades do mesmo erro.
-    const tipoFinal = dados.tipo ?? TIPO_POR_MEDIA_KIND[versao.media_kind] ?? TIPO_CONTEUDO.ARTIGO;
+    const tipoFinal = dados.tipo ?? toContentKind(versao.media_kind);
     const linkFinal = dados.video_url !== undefined ? dados.video_url : versao.video_url;
 
     const invalida = invalidContentEntry({ ...dados, tipo: tipoFinal, video_url: linkFinal });
@@ -737,7 +720,7 @@ export async function update({
     if (dados.titulo !== undefined) alteracoes.title = dados.titulo.trim();
     if (dados.corpo !== undefined) alteracoes.body = dados.corpo.trim();
     if (dados.tipo !== undefined || dados.video_url !== undefined) {
-      alteracoes.media_kind = MEDIA_KIND_POR_TIPO[tipoFinal];
+      alteracoes.media_kind = toMediaKind(tipoFinal);
       alteracoes.video_url = tipoFinal === TIPO_CONTEUDO.VIDEO ? (linkFinal?.trim() ?? null) : null;
     }
     if (dados.minutos_leitura !== undefined) {

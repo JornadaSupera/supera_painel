@@ -3,10 +3,12 @@ import {
   ESPECIALIDADE,
   FASE_TRATAMENTO,
   ORIGEM_AUDITORIA,
+  TIPO_CONTEUDO,
   type AcaoAuditoria,
   type Especialidade,
   type FaseTratamento,
   type OrigemAuditoria,
+  type TipoConteudo,
 } from "@/lib/enums";
 
 /**
@@ -80,6 +82,30 @@ export function paraFase(codigo: string | null | undefined): FaseTratamento | nu
  */
 export function paraCodigoDeFase(fase: string | null | undefined): string | null {
   return fase ? (CODIGO_POR_FASE[fase as FaseTratamento] ?? null) : null;
+}
+
+/* -------------------------------------------------------------------------
+   CONTENT KIND — `content_versions.media_kind`
+   ------------------------------------------------------------------------- */
+
+const MEDIA_KIND_BY_CONTENT_KIND: Record<TipoConteudo, string> = {
+  [TIPO_CONTEUDO.ARTIGO]: "text",
+  [TIPO_CONTEUDO.VIDEO]: "video",
+  [TIPO_CONTEUDO.PDF]: "pdf",
+};
+
+/** Derived, so the two directions never drift apart. */
+const CONTENT_KIND_BY_MEDIA_KIND = Object.fromEntries(
+  Object.entries(MEDIA_KIND_BY_CONTENT_KIND).map(([kind, mediaKind]) => [mediaKind, kind]),
+) as Record<string, TipoConteudo>;
+
+/** An unknown or missing code reads as an article: text is what every version has. */
+export function toContentKind(mediaKind: string | null | undefined): TipoConteudo {
+  return (mediaKind ? CONTENT_KIND_BY_MEDIA_KIND[mediaKind] : undefined) ?? TIPO_CONTEUDO.ARTIGO;
+}
+
+export function toMediaKind(kind: TipoConteudo): string {
+  return MEDIA_KIND_BY_CONTENT_KIND[kind];
 }
 
 /* -------------------------------------------------------------------------
