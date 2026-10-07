@@ -37,16 +37,17 @@ interface LinhaNotificacao {
   notification_types: { code: string; label: string } | { code: string; label: string }[] | null;
 }
 
-export async function list(): Promise<ListResult<NotificacaoItem>> {
+export async function list(params?: { naoLidas?: boolean }): Promise<ListResult<NotificacaoItem>> {
   return executar(async () => {
-    const { data, error } = await getSupabaseClient()
+    let consulta = getSupabaseClient()
       .from("notifications")
       .select(
         "id, created_at, read_at, target_table, target_id, patient_id, notification_types ( code, label )",
       )
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
-      .limit(LIMITE);
+      .is("archived_at", null);
+    if (params?.naoLidas) consulta = consulta.is("read_at", null);
+
+    const { data, error } = await consulta.order("created_at", { ascending: false }).limit(LIMITE);
     if (error) return falhaDe(error);
 
     return ok(
@@ -87,6 +88,31 @@ export async function marcarLida({ id }: { id: string }): Promise<SingleResult<n
       .from("notifications")
       .update({ read_at: new Date().toISOString() })
       .eq("id", id)
+      .is("read_at", null);
+    if (error) return falhaDe(error);
+
+    return okOne(null);
+  });
+}
+
+/**
+ * Every unread one of this account that points to one row — an alert taken or
+ * resolved, a conversation opened from its own screen. Acting on the item is
+ * reading what announced it; the bell should not keep calling it new.
+ */
+export async function marcarLidasDoAlvo({
+  tabela,
+  id,
+}: {
+  tabela: string;
+  id: string;
+}): Promise<SingleResult<null>> {
+  return executar(async () => {
+    const { error } = await getSupabaseClient()
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("target_table", tabela)
+      .eq("target_id", id)
       .is("read_at", null);
     if (error) return falhaDe(error);
 

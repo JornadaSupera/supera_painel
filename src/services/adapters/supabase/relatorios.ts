@@ -654,15 +654,42 @@ export async function listExecucoes(): Promise<ListResult<ExecucaoRelatorio>> {
 
     if (error) return falhaDe(error);
 
-    return ok(
-      (data as unknown as LinhaExecucao[]).map((linha) => ({
-        id: linha.id,
-        slug: slugDoCodigo(linha.report_code),
-        periodo_de: linha.period_start,
-        periodo_ate: linha.period_end,
-        gerado_em: linha.created_at,
-      })),
-    );
+    return ok((data as unknown as LinhaExecucao[]).map(projetarExecucao));
+  });
+}
+
+function projetarExecucao(linha: LinhaExecucao): ExecucaoRelatorio {
+  return {
+    id: linha.id,
+    slug: slugDoCodigo(linha.report_code),
+    periodo_de: linha.period_start,
+    periodo_ate: linha.period_end,
+    gerado_em: linha.created_at,
+  };
+}
+
+/**
+ * One generation, the one a "report ready" notification points to. It names the
+ * report and the period; the result itself is not kept, so the panel runs the
+ * report again to show it.
+ */
+export async function getExecucao({ id }: { id: string }): Promise<SingleResult<ExecucaoRelatorio>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient()
+      .from("report_runs")
+      .select("id, report_code, period_start, period_end, created_at")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) return falhaDe(error);
+    if (!data) {
+      return fail(
+        ERROR_CODE.NOT_FOUND,
+        "Esta geração de relatório não existe mais, ou só a administração pode abri-la.",
+      );
+    }
+
+    return okOne(projetarExecucao(data as unknown as LinhaExecucao));
   });
 }
 

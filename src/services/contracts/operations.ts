@@ -1199,6 +1199,9 @@ export interface RelatoriosOperations {
   /** As últimas gerações — a prova de que a rotina agendada rodou de fato. */
   listExecucoes(): Promise<ListResult<ExecucaoRelatorio>>;
 
+  /** One generation, the one a "report ready" notification points to. */
+  getExecucao(params: { id: string }): Promise<SingleResult<ExecucaoRelatorio>>;
+
   /**
    * Registra na trilha uma exportação que o navegador acabou de gerar sozinho
    * (o PDF é uma captura da tela, não passa pelo banco). O CSV se registra na
@@ -1218,11 +1221,13 @@ export interface RelatoriosOperations {
  * are counts: the database creates no notification for them.
  */
 export interface NotificacoesOperations {
-  /** The newest notifications not archived, read or not. */
-  list(): Promise<ListResult<NotificacaoItem>>;
+  /** The newest notifications not archived, read or not — or only the unread ones. */
+  list(params?: { naoLidas?: boolean }): Promise<ListResult<NotificacaoItem>>;
   /** Every unread one, not only those the list shows. */
   contarNaoLidas(): Promise<SingleResult<{ total: number }>>;
   marcarLida(params: { id: string }): Promise<SingleResult<null>>;
+  /** The unread ones pointing to one row (`alerts`, `conversations`…), once it was acted on. */
+  marcarLidasDoAlvo(params: { tabela: string; id: string }): Promise<SingleResult<null>>;
   marcarTodasLidas(): Promise<SingleResult<null>>;
   /** Data-subject requests and content waiting for the administration. */
   getPendenciasAdmin(): Promise<SingleResult<PendenciasAdmin>>;
