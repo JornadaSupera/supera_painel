@@ -29,6 +29,26 @@ export function useSatisfactionSummary(days: number | null) {
   });
 }
 
+/** How many answers the record tab shows: a patient answers once per milestone. */
+const PATIENT_ANSWERS_LIMIT = 50;
+
+/** One patient's answers, newest first, for the satisfaction tab of the record. */
+export function usePatientSatisfaction(patientId: string) {
+  return useQuery({
+    queryKey: queryKeys.satisfaction.list({ patientId }),
+    queryFn: () =>
+      call(() =>
+        satisfacaoApi.list({
+          page: 1,
+          pageSize: PATIENT_ANSWERS_LIMIT,
+          sort: { field: "answered_at", direction: "desc" },
+          filters: { patient_id: patientId },
+        }),
+      ),
+    enabled: Boolean(patientId),
+  });
+}
+
 export function useSatisfactionAnswers(params: {
   days: number | null;
   filters: AnswerFilters;

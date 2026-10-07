@@ -38,7 +38,17 @@ const CATEGORY_OPTIONS = (Object.keys(NPS_CATEGORY_LABEL) as NpsCategory[]).map(
   label: NPS_CATEGORY_LABEL[value],
 }));
 
-function AnswerCard({ answer }: { answer: SatisfactionResponse }) {
+/**
+ * One answer. `showPatient` is off inside the patient record, where the patient
+ * is already the one on screen.
+ */
+export function AnswerCard({
+  answer,
+  showPatient = true,
+}: {
+  answer: SatisfactionResponse;
+  showPatient?: boolean;
+}) {
   return (
     <article className="bg-card flex flex-col gap-2 rounded-2xl border p-4">
       <header className="flex flex-wrap items-center gap-2">
@@ -57,18 +67,22 @@ function AnswerCard({ answer }: { answer: SatisfactionResponse }) {
         <p className="text-muted-foreground text-sm italic">Sem comentário.</p>
       )}
 
-      <footer className="text-muted-foreground flex items-center gap-2 text-xs">
-        <span className="tabular-nums">{answer.patient_code}</span>
-        <Can permission={PERMISSAO.PACIENTES_READ}>
-          <Link
-            to={`/pacientes/${answer.patient_id}`}
-            className="text-primary-ink inline-flex items-center gap-1 underline-offset-2 hover:underline"
-          >
-            Abrir ficha
-            <ExternalLink size={12} aria-hidden="true" />
-          </Link>
-        </Can>
-      </footer>
+      {showPatient && (
+        <footer className="text-muted-foreground flex items-center gap-2 text-xs">
+          <span className="tabular-nums">{answer.patient_code}</span>
+          <Can permission={PERMISSAO.PACIENTES_READ}>
+            {/* Straight to the record's satisfaction tab: the answers are what
+                the person came from. */}
+            <Link
+              to={`/pacientes/${answer.patient_id}?aba=satisfacao`}
+              className="text-primary-ink inline-flex items-center gap-1 underline-offset-2 hover:underline"
+            >
+              Abrir ficha
+              <ExternalLink size={12} aria-hidden="true" />
+            </Link>
+          </Can>
+        </footer>
+      )}
     </article>
   );
 }

@@ -174,6 +174,10 @@ export async function list(params: ListParams = {}): Promise<ListResult<Satisfac
     }
 
     if (filters.with_comment === "yes") query = query.not("comment", "is", null);
+    // One patient's answers, for the satisfaction tab of the record.
+    if (typeof filters.patient_id === "string" && filters.patient_id) {
+      query = query.eq("survey.patient_id", filters.patient_id);
+    }
     if (range) query = query.gte("answered_at", range.from).lte("answered_at", range.to);
 
     const field = sort?.field === "score" ? "score" : "answered_at";
