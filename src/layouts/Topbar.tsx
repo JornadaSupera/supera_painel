@@ -16,21 +16,22 @@ import {
 import { useAuth } from "@/contexts/auth-context";
 import { useScrolled } from "@/hooks/useScrolled";
 import { ESPECIALIDADE_LABEL, PAPEL_LABEL } from "@/lib/enums";
+import { PERMISSAO } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 import { panelAreaOf } from "@/routes/home-path";
 import { useLayoutStore } from "@/stores/layout";
 import { useThemeStore, type Theme } from "@/stores/theme";
+import { NotificationBell } from "./NotificationBell";
 
 /**
  * Top bar.
  *
- * Theme and the user menu.
+ * Notifications, theme and the user menu.
  *
- * The global search and the notifications bell are NOT here on purpose. Both
- * sat in the bar as disabled controls, and a control that does nothing and does
- * not say why reads as a broken screen. They come back with the feature behind
- * them: the search once it reaches patients, professionals and content; the bell
- * once there is a source of notifications to list.
+ * The global search is NOT here on purpose: it sat in the bar as a disabled
+ * control, and a control that does nothing and does not say why reads as a
+ * broken screen. It comes back once it reaches patients, professionals and
+ * content.
  */
 
 const THEME_ICON: Record<Theme, typeof Sun> = {
@@ -47,7 +48,7 @@ const THEME_LABEL: Record<Theme, string> = {
 };
 
 export function Topbar() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, can } = useAuth();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
   const setMobileMenuOpen = useLayoutStore((s) => s.setMobileMenuOpen);
@@ -90,6 +91,15 @@ export function Topbar() {
         {/* The area the professional works in, always in sight in the clinical panel. */}
         {area === "clinico" && user?.especialidade && (
           <SpecialtySeal specialty={user.especialidade} className="mr-2 hidden lg:inline-flex" />
+        )}
+
+        {/* ----------------------------------------------- notifications */}
+        {area && (
+          <NotificationBell
+            admin={area === "admin"}
+            podeAprovarConteudo={can(PERMISSAO.CONTEUDO_APPROVE)}
+            especialidade={area === "clinico" ? (user?.especialidade ?? null) : null}
+          />
         )}
 
         {/* ------------------------------------------------------ theme */}
