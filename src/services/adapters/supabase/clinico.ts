@@ -24,13 +24,8 @@ import {
   TOM_POR_STATUS_ALERTA,
   TOM_POR_STATUS_CONVERSA,
 } from "./_clinicalMaps";
-import {
-  compartilharLeitura,
-  executar,
-  falhaDe,
-  profissionalDaSessao,
-  umDe,
-} from "./_helpers";
+import { executar, falhaDe, profissionalDaSessao } from "./_helpers";
+import { nomesDePacientes } from "./_patientNames";
 import { namesById, professionalNamesQuery, type ProfessionalNameRow } from "./_professionalNames";
 import { falhou, janelaDeDias, resumirChat } from "./_summaries";
 import { getSupabaseClient } from "./client";
@@ -51,41 +46,6 @@ async function areasVigentes(
   if (error) return falhaDe(error);
 
   return new Set(((data ?? []) as { specialty_id: string }[]).map((linha) => linha.specialty_id));
-}
-
-/** Quanto tempo uma segunda consulta da mesma tela ainda aproveita o nome já lido. */
-const NOME_DE_PACIENTE_VALIDADE_MS = 30_000;
-
-/** `read_patient` por id distinto — N é sempre pequeno (uma janela, uma fila). */
-async function nomesDePacientes(
-  supabase: SupabaseClientLike,
-  ids: string[],
-): Promise<Map<string, string> | ReturnType<typeof falhaDe>> {
-  const nomes = new Map<string, string>();
-
-  /*
-   * `read_patient` grava uma leitura na trilha por paciente, e a agenda e a fila
-   * de alertas da mesma tela pedem os mesmos pacientes. A segunda leitura pega
-   * carona na primeira (ver `compartilharLeitura`): um gesto, uma leitura.
-   */
-  const resultados = await Promise.all(
-    ids.map((id) =>
-      compartilharLeitura(
-        `read_patient:${id}`,
-        NOME_DE_PACIENTE_VALIDADE_MS,
-        async () => supabase.rpc("read_patient", { p_patient_id: id }),
-        (resposta) => !resposta.error,
-      ),
-    ),
-  );
-
-  for (const resultado of resultados) {
-    if (resultado.error) return falhaDe(resultado.error);
-    const linha = umDe(resultado.data as { id: string; full_name: string }[] | null);
-    if (linha) nomes.set(linha.id, linha.full_name);
-  }
-
-  return nomes;
 }
 
 function ehFalha<T>(valor: T | ReturnType<typeof falhaDe>): valor is ReturnType<typeof falhaDe> {
