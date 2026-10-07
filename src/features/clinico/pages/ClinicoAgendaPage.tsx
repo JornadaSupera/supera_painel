@@ -10,8 +10,10 @@ import {
   AGENDA_VIEW,
   dayStart,
   isDayKey,
+  minutesOfTime,
   monthGrid,
   stepView,
+  timeOfMinutes,
   todayKey,
   visibleDays,
   type AgendaView,
@@ -19,10 +21,11 @@ import {
 import { ESPECIALIDADE_LABEL } from "@/lib/enums";
 import { formatNumber, pluralize } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
-import type { PersonalBlock } from "@/types/agenda";
+import type { BusinessHour, PersonalBlock } from "@/types/agenda";
 import type { CompromissoAgenda } from "@/types/clinico";
 import { buildAgendaDays } from "../agenda-days";
 import { resumoDoPeriodo } from "../agenda-resumo";
+import { AgendaListView } from "../components/AgendaListView";
 import { AgendaMonthView } from "../components/AgendaMonthView";
 import { AgendaTimeGrid } from "../components/AgendaTimeGrid";
 import { ALL_TYPES, AgendaToolbar } from "../components/AgendaToolbar";
@@ -34,16 +37,20 @@ import { useAppointmentTypes, useBusinessHours, useMyBlocks } from "../hooks/use
 import { useSchedulingAccess } from "../hooks/useScheduling";
 
 /**
- * Agenda pessoal do profissional: mês, semana e dia, com filtro por tipo, o
- * horário da clínica ao fundo e os bloqueios do próprio profissional. Cada
- * compromisso abre a ficha do paciente, dentro do painel clínico.
+ * Agenda pessoal do profissional, de duas formas: a lista dos próximos sete dias,
+ * uma coluna por dia (a do protótipo, e a que abre), e a grade de mês, semana e
+ * dia, com o horário da clínica ao fundo. Filtro por tipo e os bloqueios do
+ * próprio profissional valem nas duas. Clicar num compromisso abre o diálogo dele
+ * (detalhes, ficha do paciente e, para quem gere a agenda, as ações), nunca a
+ * ficha direto.
  *
- * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/farmaceutico/agenda/
+ * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/psicologo/agenda/
  *
  * > [!] O que a tela mostra vem da URL
- * `?visao=mes|semana|dia&data=AAAA-MM-DD&tipo=…`. Assim o botão de voltar do
- * navegador desfaz a navegação pelo calendário, e um endereço copiado abre a
- * mesma agenda. O padrão (semana de hoje, todos os tipos) fica fora do endereço.
+ * `?visao=lista|mes|semana|dia&data=AAAA-MM-DD&tipo=…`. Assim o botão de voltar
+ * do navegador desfaz a navegação pelo calendário, e um endereço copiado abre a
+ * mesma agenda. O padrão (lista a partir de hoje, todos os tipos) fica fora do
+ * endereço.
  *
  * > [!] Bloqueio impede marcar, mas não cancela o que já está marcado
  * O agendamento recusa o horário que colide com um bloqueio (`slot_blocked`), sem
@@ -57,6 +64,22 @@ import { useSchedulingAccess } from "../hooks/useScheduling";
  */
 
 const VIEWS = Object.values(AGENDA_VIEW) as string[];
+const DEFAULT_VIEW: AgendaView = AGENDA_VIEW.LIST;
+
+const VIEW_TITLE: Record<AgendaView, string> = {
+  lista: "Sua semana",
+  semana: "Sua semana",
+  dia: "Seu dia",
+  mes: "Seu mês",
+};
+
+/** "08:00–18:00": from the earliest opening to the latest closing of the week. */
+function clinicHours(hours: BusinessHour[]): string | null {
+  if (hours.length === 0) return null;
+  const opens = Math.min(...hours.map((hour) => minutesOfTime(hour.opens_at)));
+  const closes = Math.max(...hours.map((hour) => minutesOfTime(hour.closes_at)));
+  return `${timeOfMinutes(opens)}–${timeOfMinutes(closes)}`;
+}
 
 export function ClinicoAgendaPage() {
   const { user, can } = useAuth();
@@ -68,7 +91,7 @@ export function ClinicoAgendaPage() {
   const now = useNow();
   const today = todayKey(now);
   const viewParam = params.get("visao");
-  const view: AgendaView = viewParam && VIEWS.includes(viewParam) ? (viewParam as AgendaView) : AGENDA_VIEW.WEEK;
+  const view: AgendaView = viewParam && VIEWS.includes(viewParam) ? (viewParam as AgendaView) : DEFAULT_VIEW;
   const dayParam = params.get("data");
   const day = isDayKey(dayParam) ? dayParam : today;
   const type = params.get("tipo") ?? ALL_TYPES;
@@ -82,7 +105,7 @@ export function ClinicoAgendaPage() {
   const go = (next: { visao?: AgendaView; data?: string; tipo?: string }) => {
     const merged = { visao: view, data: day, tipo: type, ...next };
     const query = new URLSearchParams();
-    if (merged.visao !== AGENDA_VIEW.WEEK) query.set("visao", merged.visao);
+    if (merged.visao !== DEFAULT_VIEW) query.set("visao", merged.visao);
     if (merged.data !== today) query.set("data", merged.data);
     if (merged.tipo !== ALL_TYPES) query.set("tipo", merged.tipo);
     setParams(query);
@@ -118,7 +141,7 @@ export function ClinicoAgendaPage() {
   const access = useSchedulingAccess();
   const canSchedule = access.data?.allowed === true;
   const [booking, setBooking] = useState(false);
-  const [managing, setManaging] = useState<CompromissoAgenda | null>(null);
+  const [opened, setOpened] = useState<CompromissoAgenda | null>(null);
   const [moving, setMoving] = useState<CompromissoAgenda | null>(null);
 
   const total = days.reduce((sum, entry) => sum + entry.appointments.length, 0);
@@ -128,16 +151,19 @@ export function ClinicoAgendaPage() {
   const newBlockDay =
     view === AGENDA_VIEW.DAY ? day : today >= range.from && today < range.to ? today : range.from;
 
+  // The account's name falls back to the e-mail; an address is not a name to show.
+  const ownName = user && user.nome !== user.email ? user.nome : null;
+  const hoursLabel = clinicHours(hours.data ?? []);
+  const subtitle =
+    [ownName, hoursLabel ? `horário ${hoursLabel}` : null].filter(Boolean).join(" · ") ||
+    "Seus compromissos e bloqueios";
+
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow={area}
-        title="Agenda"
-        subtitle={
-          agenda.data
-            ? `${pluralize(total, "compromisso", "compromissos")} neste período`
-            : "Seus compromissos e bloqueios"
-        }
+        eyebrow={area ? `${area} · Agenda` : "Agenda"}
+        title={VIEW_TITLE[view]}
+        subtitle={subtitle}
       />
 
       <AgendaToolbar
@@ -180,7 +206,8 @@ export function ClinicoAgendaPage() {
         </Alert>
       )}
 
-      {agenda.data && total === 0 && (
+      {/* The list says it day by day; the grids need the sentence. */}
+      {agenda.data && total === 0 && view !== AGENDA_VIEW.LIST && (
         <p className="text-muted-foreground text-sm" role="status">
           {type === ALL_TYPES
             ? "Nenhum compromisso neste período."
@@ -197,21 +224,33 @@ export function ClinicoAgendaPage() {
         />
       )}
 
-      {agenda.data && view !== AGENDA_VIEW.MONTH && (
+      {agenda.data && view === AGENDA_VIEW.LIST && (
+        <AgendaListView
+          days={days}
+          today={today}
+          now={now}
+          onOpen={setOpened}
+          onEditBlock={(block) => setEditing({ block })}
+        />
+      )}
+
+      {agenda.data && (view === AGENDA_VIEW.WEEK || view === AGENDA_VIEW.DAY) && (
         <AgendaTimeGrid
           days={days}
           today={today}
           now={now}
-          recordHref={recordHref}
           onOpenDay={view === AGENDA_VIEW.WEEK ? (key) => go({ visao: AGENDA_VIEW.DAY, data: key }) : undefined}
           onEditBlock={(block) => setEditing({ block })}
-          onManage={canSchedule ? setManaging : undefined}
+          onOpen={setOpened}
         />
       )}
 
-      <p className="text-muted-foreground text-xs">
-        Áreas sombreadas: clínica fechada. Listras: horário que você bloqueou, onde ninguém marca compromisso.
-      </p>
+      {view !== AGENDA_VIEW.LIST && (
+        <p className="text-muted-foreground text-xs">
+          Áreas sombreadas: clínica fechada. Listras: horário que você bloqueou, onde ninguém marca
+          compromisso.
+        </p>
+      )}
 
       <AppointmentFormDialog
         open={booking || moving !== null}
@@ -228,13 +267,14 @@ export function ClinicoAgendaPage() {
       />
 
       <AppointmentActionsDialog
-        appointment={managing}
-        onOpenChange={(open) => !open && setManaging(null)}
+        appointment={opened}
+        onOpenChange={(open) => !open && setOpened(null)}
         onReschedule={(appointment) => {
-          setManaging(null);
+          setOpened(null);
           setMoving(appointment);
         }}
         recordHref={recordHref}
+        canManage={canSchedule}
       />
 
       <BlockDialog

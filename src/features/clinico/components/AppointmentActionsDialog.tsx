@@ -20,21 +20,26 @@ import { confirmationText, isConfirmed } from "../agenda-confirmation";
 import { useSetAppointmentStatus } from "../hooks/useScheduling";
 
 /**
- * What can be done with a booked appointment: move it, or record how it ended.
+ * An appointment opened from the agenda: what it is, whether the patient
+ * confirmed, the way to the record and — for whoever runs the schedule — the
+ * actions: move it, or record how it ended.
  *
- * Only an appointment still `scheduled` gets here. The database does not move an
- * appointment out of a terminal state, so offering "cancel" on one that already
- * happened would be a button that can only answer no.
+ * Every appointment opens here, whatever its status; the actions only show while
+ * it is still `scheduled`. The database does not move an appointment out of a
+ * terminal state, so offering "cancel" on one that already happened would be a
+ * button that can only answer no.
  *
- * Nothing here decides who may. Whoever cannot see an appointment never gets it
- * in the agenda to click on, and whoever can is refused by the database if they
- * do not run the schedule — the answer reaches the screen as a message.
+ * `canManage` only decides what is drawn. Whoever cannot see an appointment
+ * never gets it in the agenda to click on, and whoever can is refused by the
+ * database if they do not run the schedule — the answer reaches the screen as a
+ * message.
  */
 export function AppointmentActionsDialog({
   appointment,
   onOpenChange,
   onReschedule,
   recordHref,
+  canManage,
 }: {
   /** `null` is closed. */
   appointment: CompromissoAgenda | null;
@@ -42,6 +47,8 @@ export function AppointmentActionsDialog({
   onReschedule: (appointment: CompromissoAgenda) => void;
   /** Where the patient record is, or `null` when this person cannot open it. */
   recordHref: ((patientId: string) => string) | null;
+  /** Whether this person runs the schedule, as the database answered. */
+  canManage: boolean;
 }) {
   const setStatus = useSetAppointmentStatus();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -58,6 +65,8 @@ export function AppointmentActionsDialog({
       },
     );
   };
+
+  const actionable = canManage && appointment?.status_codigo === "scheduled";
 
   const when = appointment
     ? (() => {
@@ -82,66 +91,81 @@ export function AppointmentActionsDialog({
               </DialogHeader>
 
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="font-medium">{appointment.tipo_label}</span>
+                <span className="font-medium">{appointment.titulo}</span>
+                {appointment.titulo !== appointment.tipo_label && (
+                  <span className="text-muted-foreground">· {appointment.tipo_label}</span>
+                )}
                 <StatusBadge tone={appointment.status_tom} size="sm">
                   {appointment.status_label}
                 </StatusBadge>
                 {appointment.local && <span className="text-muted-foreground">· {appointment.local}</span>}
               </div>
 
-              <p
-                className={cn(
-                  "flex items-center gap-1.5 text-sm",
-                  isConfirmed(appointment) ? "text-success font-medium" : "text-muted-foreground",
-                )}
-              >
-                {isConfirmed(appointment) ? (
-                  <CircleCheck size={15} aria-hidden="true" />
-                ) : (
-                  <Clock size={15} aria-hidden="true" />
-                )}
-                {confirmationText(appointment)}
-              </p>
+              {/* The database clears the confirmation once the appointment leaves
+                  "scheduled": on a closed one, "not confirmed yet" would be false. */}
+              {appointment.status_codigo === "scheduled" && (
+                <p
+                  className={cn(
+                    "flex items-center gap-1.5 text-sm",
+                    isConfirmed(appointment) ? "text-success font-medium" : "text-muted-foreground",
+                  )}
+                >
+                  {isConfirmed(appointment) ? (
+                    <CircleCheck size={15} aria-hidden="true" />
+                  ) : (
+                    <Clock size={15} aria-hidden="true" />
+                  )}
+                  {confirmationText(appointment)}
+                </p>
+              )}
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={setStatus.isPending}
-                  onClick={() => record("completed")}
-                >
-                  {setStatus.isPending ? <LoaderCircle className="animate-spin" /> : <CheckCheck />}
-                  Marcar como realizado
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={setStatus.isPending}
-                  onClick={() => record("no_show")}
-                >
-                  <UserX />
-                  Paciente faltou
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={setStatus.isPending}
-                  onClick={() => onReschedule(appointment)}
-                >
-                  <CalendarClock />
-                  Remarcar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="text-destructive hover:text-destructive"
-                  disabled={setStatus.isPending}
-                  onClick={() => setConfirmingCancel(true)}
-                >
-                  <CalendarX2 />
-                  Cancelar compromisso
-                </Button>
-              </div>
+              {actionable && (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={setStatus.isPending}
+                    onClick={() => record("completed")}
+                  >
+                    {setStatus.isPending ? <LoaderCircle className="animate-spin" /> : <CheckCheck />}
+                    Marcar como realizado
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={setStatus.isPending}
+                    onClick={() => record("no_show")}
+                  >
+                    <UserX />
+                    Paciente faltou
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={setStatus.isPending}
+                    onClick={() => onReschedule(appointment)}
+                  >
+                    <CalendarClock />
+                    Remarcar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="text-destructive hover:text-destructive"
+                    disabled={setStatus.isPending}
+                    onClick={() => setConfirmingCancel(true)}
+                  >
+                    <CalendarX2 />
+                    Cancelar compromisso
+                  </Button>
+                </div>
+              )}
+
+              {!canManage && appointment.status_codigo === "scheduled" && (
+                <p className="text-muted-foreground text-xs">
+                  Remarcar, cancelar e registrar o desfecho ficam com quem gere a agenda.
+                </p>
+              )}
 
               <DialogFooter className="sm:justify-between">
                 {recordHref ? (

@@ -1,6 +1,5 @@
-import { CircleCheck, MoreHorizontal } from "lucide-react";
+import { CircleCheck } from "lucide-react";
 import { useMemo, type CSSProperties } from "react";
-import { Link } from "react-router-dom";
 
 import { StatusBadge } from "@/components/shared";
 import {
@@ -24,6 +23,9 @@ import { APPOINTMENT_CARD_TONE, BLOCK_PATTERN } from "../agenda-tones";
  * blocks are hatched, and appointments that overlap sit side by side. The visible
  * hours stretch to include anything that falls outside the clinic's day, so a
  * 7 a.m. appointment is never cut off by a grid that starts at 8.
+ *
+ * An appointment is one button that opens its dialog — the same for everyone and
+ * every status. The way to the patient's record is inside it.
  */
 
 const HOUR_PX = 56;
@@ -58,25 +60,19 @@ export function AgendaTimeGrid({
   days,
   today,
   now,
-  recordHref,
   onOpenDay,
   onEditBlock,
-  onManage,
+  onOpen,
 }: {
   days: AgendaDay[];
   today: string;
   /** O instante de agora: a linha que marca a hora corrente, no dia de hoje. */
   now: Date;
-  /** Where an appointment leads, or `null` when the person cannot open records. */
-  recordHref: ((patientId: string) => string) | null;
   /** Makes the day heading a way into the day view. Omitted in the day view itself. */
   onOpenDay?: (key: string) => void;
   onEditBlock: (block: PersonalBlock) => void;
-  /**
-   * Opens what can be done with an appointment — move it, record how it ended.
-   * Omitted for someone who does not run the schedule, and the cards stay links.
-   */
-  onManage?: (appointment: CompromissoAgenda) => void;
+  /** Opens the appointment's dialog. */
+  onOpen: (appointment: CompromissoAgenda) => void;
 }) {
   const { from, to } = useMemo(() => visibleRange(days), [days]);
   const height = ((to - from) / 60) * HOUR_PX;
@@ -267,49 +263,18 @@ export function AgendaTimeGrid({
                 };
                 const title = `${timeOfMinutes(start)} a ${timeOfMinutes(end)} · ${appointment.paciente_nome} · ${appointment.tipo_label} · ${appointment.status_label}${confirmed ? " · confirmada pelo paciente" : ""}`;
 
-                // Only an appointment still scheduled can be moved or closed: the
-                // database does not take one out of a terminal state.
-                if (onManage && appointment.status_codigo === "scheduled") {
-                  // The card is a link and the menu a button, side by side: a
-                  // button inside a link is not valid, and it would swallow the click.
-                  return (
-                    <div key={appointment.id} className={cn(className, "p-0")} style={style} title={title}>
-                      {recordHref ? (
-                        <Link
-                          to={recordHref(appointment.paciente_id)}
-                          className="focus-visible:ring-ring block h-full px-1.5 py-0.5 pr-6 focus-visible:ring-2 focus-visible:outline-none"
-                        >
-                          {card}
-                        </Link>
-                      ) : (
-                        <div className="h-full px-1.5 py-0.5 pr-6">{card}</div>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => onManage(appointment)}
-                        aria-label={`Gerenciar o compromisso de ${appointment.paciente_nome}`}
-                        className="focus-visible:ring-ring absolute top-0.5 right-0.5 rounded p-0.5 hover:bg-black/10 focus-visible:ring-2 focus-visible:outline-none dark:hover:bg-white/10"
-                      >
-                        <MoreHorizontal size={14} aria-hidden="true" />
-                      </button>
-                    </div>
-                  );
-                }
-
-                return recordHref ? (
-                  <Link
+                return (
+                  <button
                     key={appointment.id}
-                    to={recordHref(appointment.paciente_id)}
-                    className={className}
+                    type="button"
+                    onClick={() => onOpen(appointment)}
+                    // A button centers what it holds; the card reads from the top.
+                    className={cn(className, "flex flex-col justify-start text-left transition-shadow hover:shadow-md")}
                     style={style}
                     title={title}
                   >
-                    {card}
-                  </Link>
-                ) : (
-                  <div key={appointment.id} className={className} style={style} title={title}>
-                    {card}
-                  </div>
+                    <span className="block w-full">{card}</span>
+                  </button>
                 );
               })}
             </div>
