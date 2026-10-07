@@ -165,7 +165,7 @@ export function PatientRecordPanel({
                   onDone={() => setWriting(false)}
                 />
               ) : (
-                <Button type="button" variant="outline" className="w-fit" onClick={() => setWriting(true)}>
+                <Button type="button" className="w-fit" onClick={() => setWriting(true)}>
                   <Plus />
                   Nova anotação · {ESPECIALIDADE_LABEL[area]}
                 </Button>
