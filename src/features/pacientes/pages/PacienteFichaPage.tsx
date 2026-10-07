@@ -14,6 +14,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { STATUS_PACIENTE } from "@/lib/enums";
 import { formatDateTime } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
@@ -23,6 +24,7 @@ import { DeactivatePatientDialog } from "../components/DeactivatePatientDialog";
 import { PatientGeneralTab } from "../components/PatientGeneralTab";
 import { PatientRecordHeader } from "../components/PatientRecordHeader";
 import { motivoIndisponivel } from "@/services/apiClient";
+import { isBelowAppMinimumAge, UNDERAGE_INVITE_REASON } from "../appAccess";
 import { PacienteForm } from "../components/PacienteForm";
 import {
   useAtualizarPaciente,
@@ -174,6 +176,8 @@ export function PacienteFichaPage({
   }
 
   const inativo = paciente.status === STATUS_PACIENTE.INATIVO;
+  const conviteFechado =
+    semConvite ?? (isBelowAppMinimumAge(paciente.nascimento) ? UNDERAGE_INVITE_REASON : null);
   const outrosDiagnosticos = paciente.diagnosticos.filter((diagnostico) => !diagnostico.principal);
 
   /* ------------------------------------------------------------ edição */
@@ -246,21 +250,37 @@ export function PacienteFichaPage({
     <>
       {actions?.(paciente)}
       <Can permission={PERMISSAO.PACIENTES_WRITE}>
-        <Button
-          variant="outline"
-          disabled={inativo || convite.isPending || semConvite !== null}
-          title={semConvite ?? undefined}
-          onClick={() =>
-            convite.mutate(paciente.id, {
-              // O código sai uma vez só. O diálogo é o que dá a quem
-              // emitiu a chance de anotá-lo antes de ele sumir.
-              onSuccess: (resultado) => setConviteEmitido(resultado ?? null),
-            })
-          }
-        >
-          <MessageSquareShare />
-          {paciente.convite_status === "nao_enviado" ? "Emitir convite" : "Reemitir convite"}
-        </Button>
+        {/* The invite is what ties the app account to this record. Once one is
+            tied, a new invite can only be refused: changing the account starts
+            with "Desfazer vínculo", in the general tab. */}
+        {paciente.convite_status !== "aceito" && (
+          <Tooltip>
+            {/* A disabled button takes no pointer events, so a title on it never
+                shows. The reason hangs on a wrapper that can be hovered and
+                focused instead. */}
+            <TooltipTrigger asChild>
+              <span tabIndex={conviteFechado ? 0 : -1} className="inline-flex">
+                <Button
+                  variant="outline"
+                  disabled={inativo || convite.isPending || conviteFechado !== null}
+                  onClick={() =>
+                    convite.mutate(paciente.id, {
+                      // O código sai uma vez só. O diálogo é o que dá a quem
+                      // emitiu a chance de anotá-lo antes de ele sumir.
+                      onSuccess: (resultado) => setConviteEmitido(resultado ?? null),
+                    })
+                  }
+                >
+                  <MessageSquareShare />
+                  {paciente.convite_status === "nao_enviado" ? "Emitir convite" : "Reemitir convite"}
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {conviteFechado && (
+              <TooltipContent className="max-w-xs">{conviteFechado}</TooltipContent>
+            )}
+          </Tooltip>
+        )}
 
         <Button
           disabled={inativo || semEdicao !== null}

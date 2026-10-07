@@ -15,6 +15,7 @@ import { STATUS_PACIENTE } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
 import { motivoIndisponivel } from "@/services/apiClient";
 import type { PacienteListItem } from "@/types/paciente";
+import { isBelowAppMinimumAge, UNDERAGE_INVITE_SHORT_REASON } from "../appAccess";
 import { useEnviarConvite } from "../hooks/usePacientes";
 import { DeactivatePatientDialog } from "./DeactivatePatientDialog";
 
@@ -38,6 +39,7 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
   const semEdicao = motivoIndisponivel("pacientes.update");
   const semConvite = motivoIndisponivel("pacientes.sendInvite");
   const semDesativar = motivoIndisponivel("pacientes.deactivate");
+  const menor = isBelowAppMinimumAge(paciente.nascimento);
 
   return (
     // O clique no menu não deve abrir a ficha — a linha inteira é clicável.
@@ -70,14 +72,22 @@ export function AcoesPaciente({ paciente }: { paciente: PacienteListItem }) {
               Editar cadastro
             </DropdownMenuItem>
 
-            <DropdownMenuItem
-              disabled={inativo || convite.isPending || semConvite !== null}
-              title={semConvite ?? undefined}
-              onSelect={() => convite.mutate(paciente.id)}
-            >
-              <MessageSquareShare />
-              {paciente.convite_status === "nao_enviado" ? "Enviar convite" : "Reenviar convite"}
-            </DropdownMenuItem>
+            {/* A record already tied to an app account has nothing to invite. */}
+            {paciente.convite_status !== "aceito" && (
+              <DropdownMenuItem
+                disabled={inativo || convite.isPending || semConvite !== null || menor}
+                title={semConvite ?? undefined}
+                onSelect={() => convite.mutate(paciente.id)}
+              >
+                <MessageSquareShare />
+                {/* A disabled item takes no hover, so a title would never show:
+                    the reason is written under the label. */}
+                <span className="flex flex-col">
+                  {paciente.convite_status === "nao_enviado" ? "Enviar convite" : "Reenviar convite"}
+                  {menor && <span className="text-xs">{UNDERAGE_INVITE_SHORT_REASON}</span>}
+                </span>
+              </DropdownMenuItem>
+            )}
           </Can>
 
           <Can permission={PERMISSAO.PACIENTES_DEACTIVATE}>
