@@ -475,7 +475,9 @@ export function useSolicitacoesTitular() {
   });
 
   const { items, ...status } = toListQuery(query);
-  return { ...status, solicitacoes: items };
+  // Read on purpose: the bell's link waits for the fresh read before saying
+  // which request is the most urgent, or that none is open any more.
+  return { ...status, isFetching: query.isFetching, solicitacoes: items };
 }
 
 /**

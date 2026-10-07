@@ -352,7 +352,10 @@ function Catalogo({
   );
 }
 
-/** The tabs a link can open with `?aba=` — the bell sends the admin to "lgpd". */
+/**
+ * The tabs a link can open with `?aba=` — the bell sends the admin to "lgpd",
+ * with `?destaque=aberto|falha` to bring the most urgent request into view.
+ */
 const ABAS = [
   "identidade",
   "catalogos",
@@ -370,11 +373,14 @@ export function ConfiguracoesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const pedida = searchParams.get("aba");
   const aba = ABAS.find((valor) => valor === pedida) ?? "catalogos";
+  // `?destaque=` belongs to the tab the bell opened; another tab drops it.
+  const destaque = searchParams.get("destaque");
   const trocarAba = (valor: string) =>
     setSearchParams(
       (atual) => {
         const proximo = new URLSearchParams(atual);
         proximo.set("aba", valor);
+        proximo.delete("destaque");
         return proximo;
       },
       { replace: true },
@@ -602,7 +608,9 @@ export function ConfiguracoesPage() {
         </TabsContent>
 
         <TabsContent value="lgpd">
-          <SolicitacoesTitular />
+          <SolicitacoesTitular
+            destaque={destaque === "aberto" || destaque === "falha" ? destaque : null}
+          />
         </TabsContent>
       </Tabs>
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Scale } from "lucide-react";
 
@@ -7,7 +7,9 @@ import { AlertTriangle } from "lucide-react";
 import { ConfirmDialog, EmptyState, ErrorState, Footnote, SkeletonCards, StatusBadge } from "@/components/shared";
 import type { ConfirmDialogProps } from "@/components/shared";
 import { Button } from "@/components/ui/button";
+import { flashClass, useFlashTarget } from "@/hooks/useFlashTarget";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { SolicitacaoTitular } from "@/types/configuracao";
 import { downloadProgress, hasPendingDownload, type DownloadProgress } from "../downloadWindow";
 import {
@@ -139,12 +141,14 @@ function configurarDecisao(
 function Linha({
   solicitacao,
   progresso,
+  realcada,
   onDecidir,
   onCompletar,
   onVerTexto,
 }: {
   solicitacao: SolicitacaoTitular;
   progresso: DownloadProgress | null;
+  realcada: boolean;
   onDecidir: (deferir: boolean) => void;
   onCompletar: () => void;
   onVerTexto: () => void;
@@ -153,7 +157,14 @@ function Linha({
   const vencido = solicitacao.aberto && dias > PRAZO_DIAS;
 
   return (
-    <li className="flex flex-wrap items-start justify-between gap-3 py-3">
+    <li
+      id={`pedido-${solicitacao.id}`}
+      className={cn(
+        // `-mx-3 px-3`: room for the bell's ring, the text stays where it was.
+        "-mx-3 flex scroll-mt-20 flex-wrap items-start justify-between gap-3 rounded-lg px-3 py-3",
+        flashClass(realcada),
+      )}
+    >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-foreground text-xs font-medium">{solicitacao.tipo_label}</p>
@@ -238,10 +249,41 @@ function Linha({
   );
 }
 
-export function SolicitacoesTitular() {
-  const { solicitacoes, isLoading, isError, error, refetch } = useSolicitacoesTitular();
+/**
+ * The request the bell sends the admin to: the one open the longest, or the
+ * oldest whose execution failed. Oldest first because the legal deadline runs
+ * from the day it was opened.
+ */
+function maisUrgente(
+  solicitacoes: SolicitacaoTitular[],
+  destaque: "aberto" | "falha",
+): SolicitacaoTitular | null {
+  const candidatos = solicitacoes.filter((solicitacao) =>
+    destaque === "aberto" ? solicitacao.aberto : Boolean(solicitacao.execucao_erro),
+  );
+  return [...candidatos].sort((a, b) => a.criado_em.localeCompare(b.criado_em))[0] ?? null;
+}
+
+export function SolicitacoesTitular({
+  destaque = null,
+}: {
+  /** `?destaque=` from the bell: which kind of request to bring into view. */
+  destaque?: "aberto" | "falha" | null;
+}) {
+  const { solicitacoes, isLoading, isError, isFetching, error, refetch } = useSolicitacoesTitular();
   const decidir = useDecidirSolicitacao();
   const completar = useCompletarSolicitacao();
+
+  // Waits for the read the bell asked for: the cached list may predate the
+  // request that made the bell ring, or one another admin already decided.
+  // Once only: the list rereading every minute must not blink the notice.
+  const [lida, setLida] = useState(false);
+  useEffect(() => {
+    if (destaque && !isLoading && !isFetching) setLida(true);
+  }, [destaque, isLoading, isFetching]);
+  const pronto = destaque !== null && lida;
+  const alvo = pronto ? maisUrgente(solicitacoes, destaque) : null;
+  const realcado = useFlashTarget(alvo ? `pedido-${alvo.id}` : null, pronto);
 
   // O pedido em decisão, e qual decisão. `null` = nenhum diálogo aberto.
   const [decisao, setDecisao] = useState<{ pedido: SolicitacaoTitular; deferir: boolean } | null>(
@@ -295,6 +337,20 @@ export function SolicitacoesTitular() {
           </StatusBadge>
         </header>
 
+        {destaque && (
+          <p role="status" className="text-muted-foreground mb-2 text-xs">
+            {!pronto
+              ? "Lendo os pedidos de novo…"
+              : alvo
+                ? destaque === "aberto"
+                  ? "Em destaque: o pedido em aberto há mais tempo."
+                  : "Em destaque: o pedido mais antigo com execução que falhou."
+                : destaque === "aberto"
+                  ? "Nenhum pedido em aberto agora: ele pode ter sido decidido por outra pessoa da administração."
+                  : "Nenhum pedido com execução falhando agora: a rotina pode ter conseguido na nova tentativa."}
+          </p>
+        )}
+
         {solicitacoes.length === 0 ? (
           <EmptyState
             compact
@@ -308,6 +364,7 @@ export function SolicitacoesTitular() {
                 key={solicitacao.id}
                 solicitacao={solicitacao}
                 progresso={downloadProgress(solicitacao, agora)}
+                realcada={realcado === `pedido-${solicitacao.id}`}
                 onDecidir={(deferir) => setDecisao({ pedido: solicitacao, deferir })}
                 onCompletar={() => setCompletando(solicitacao)}
                 onVerTexto={() => setVendoTexto(solicitacao)}
