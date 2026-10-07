@@ -109,6 +109,9 @@ const MENSAGEM_POR_SENTINELA: Record<string, string> = {
   cpf_frozen_after_activation:
     "O CPF não muda depois que o paciente ativou o app. Desfaça o vínculo da conta antes de corrigi-lo.",
   unknown_treatment_phase: "Esta fase de tratamento não está ativa no cadastro.",
+  birth_date_in_future: "A data de nascimento não pode ser depois de hoje.",
+  underage:
+    "Ficha de menor de 18 anos: o aplicativo só é liberado a partir dos 18, e o convite não é emitido.",
 
   /* ------------------------------------------------------ profissional */
   account_not_found:
@@ -194,26 +197,30 @@ export function traduzirErro(erro: ErroPostgrest | null | undefined): ErrorCode 
 }
 
 /**
- * Mensagem a exibir, na ordem em que a informação é mais útil.
+ * Message to show, in the order the information is most useful.
  *
- * 1. O `HINT` das funções deste banco é escrito para ser lido por quem opera o
- *    painel — "peça a outro administrador", "desvincule a conta antes". Quando
- *    existe, é melhor do que qualquer texto genérico nosso.
- * 2. Sem `HINT`, a sentinela traduzida: `message` traz um identificador estável
- *    (`invalid_cpf`), que é preciso para o código e ilegível na tela.
- * 3. Sem as duas, a própria `message` — mas só quando ela é frase e vem de um
- *    código cuja mensagem é escrita para ser lida. Ver `MENSAGEM_LEGIVEL`.
- * 4. Sem nenhuma das três, o contrato usa a mensagem padrão do código de erro.
+ * 1. The translated sentinel: `message` carries a stable identifier
+ *    (`invalid_cpf`) that the map above turns into screen text.
+ * 2. Without a translation, the function's `HINT`. It is written for whoever
+ *    operates the panel, but the database keeps it in plain ASCII ("nao",
+ *    "esta") and some hints name a database function ("Reative com
+ *    set_patient_active") — which is why a translation, when there is one,
+ *    comes first.
+ * 3. Without either, the `message` itself — only when it is a sentence and
+ *    comes from a code whose message is meant to be read. See
+ *    `MENSAGEM_LEGIVEL`.
+ * 4. Without any of the three, the contract uses the error code's default.
  */
 export function mensagemDoErro(erro: ErroPostgrest | null | undefined): string | undefined {
+  const mensagem = erro?.message?.trim();
+
+  const traduzida = mensagem ? MENSAGEM_POR_SENTINELA[mensagem] : undefined;
+  if (traduzida) return traduzida;
+
   const hint = erro?.hint?.trim();
   if (hint) return hint;
 
-  const mensagem = erro?.message?.trim();
   if (!mensagem) return undefined;
-
-  const traduzida = MENSAGEM_POR_SENTINELA[mensagem];
-  if (traduzida) return traduzida;
 
   // Sentinela ainda sem tradução não vai para a tela: `invalid_cpf` não é
   // frase, e exibi-lo cru seria mostrar o identificador do código.

@@ -33,6 +33,7 @@ import {
   executar,
   falhaDe,
   logarExportacao,
+  mensagemDaSentinela,
   paraIso,
   umDe,
 } from "./_helpers";
@@ -1251,6 +1252,7 @@ const CODIGO_DO_CONVITE_SMS: Record<string, ErrorCode> = {
   patient_already_linked: ERROR_CODE.CONFLICT,
   patient_inactive: ERROR_CODE.CONFLICT,
   invalid_phone: ERROR_CODE.VALIDATION,
+  underage: ERROR_CODE.VALIDATION,
 };
 
 /**
@@ -1304,7 +1306,12 @@ async function tentarConviteSms(
 
   if (!codigo || codigo === "sms_failed") return { enviado: false };
 
-  return fail(CODIGO_DO_CONVITE_SMS[codigo] ?? ERROR_CODE.UNKNOWN, MENSAGEM_DO_CONVITE_SMS[codigo]);
+  // A code the function shares with the RPCs (`underage`) uses the same
+  // sentence the RPC path shows, so the two ways of inviting never disagree.
+  return fail(
+    CODIGO_DO_CONVITE_SMS[codigo] ?? ERROR_CODE.UNKNOWN,
+    MENSAGEM_DO_CONVITE_SMS[codigo] ?? mensagemDaSentinela(codigo),
+  );
 }
 
 /**
