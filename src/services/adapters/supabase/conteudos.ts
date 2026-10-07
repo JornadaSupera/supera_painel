@@ -515,11 +515,16 @@ export async function listMine(params: ListParams = {}): Promise<ListResult<Cont
     const eu = await profissionalDaSessao();
     if ("error" in eu) return eu;
 
-    const { data, error } = await getSupabaseClient()
-      .from("content_versions")
-      .select(SELECT_VERSAO)
-      .eq("created_by_professional_id", eu.profissionalId)
-      .order("updated_at", { ascending: false });
+    // The reads come with the list, as in the library: the author sees how many
+    // patients marked each text as read. A failed count is a dash, not a zero.
+    const [{ data, error }, leituras] = await Promise.all([
+      getSupabaseClient()
+        .from("content_versions")
+        .select(SELECT_VERSAO)
+        .eq("created_by_professional_id", eu.profissionalId)
+        .order("updated_at", { ascending: false }),
+      contagemDeLeituras(),
+    ]);
     if (error) return falhaDe(error);
 
     const linhas = data as unknown as LinhaVersao[];
@@ -531,7 +536,7 @@ export async function listMine(params: ListParams = {}): Promise<ListResult<Cont
     if ("error" in ultimas) return ultimas;
 
     const itens = linhas.map((linha) => {
-      const item = projetar(linha, null);
+      const item = projetar(linha, leituras);
       return { ...item, status: statusForAuthor(item.status, ultimas.get(linha.id) ?? null) };
     });
 

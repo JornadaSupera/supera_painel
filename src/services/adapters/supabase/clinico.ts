@@ -1,16 +1,8 @@
 import { attachmentError, safeAttachmentName } from "@/lib/attachments";
-import {
-  FASE_TRATAMENTO,
-  STATUS_PACIENTE,
-  type AutorMensagem,
-  type CondutaAlerta,
-  type FaseTratamento,
-  type StatusAlerta,
-} from "@/lib/enums";
+import { type AutorMensagem, type CondutaAlerta, type StatusAlerta } from "@/lib/enums";
 import {
   ERROR_CODE,
   fail,
-  failWith,
   ok,
   okOne,
   type ListResult,
@@ -19,11 +11,9 @@ import {
 import type {
   AlertaClinico,
   AnexoMensagem,
-  CarteiraResumo,
   CompromissoAgenda,
   ConversaClinico,
   MensagemClinico,
-  MotivoDeAtencao,
 } from "@/types/clinico";
 import {
   severidadeDoGrau,
@@ -41,9 +31,9 @@ import {
   umDe,
 } from "./_helpers";
 import { namesById, professionalNamesQuery, type ProfessionalNameRow } from "./_professionalNames";
+import { falhou, janelaDeDias, resumirChat } from "./_summaries";
 import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
-import { varrerLista } from "./pacientes";
 
 type SupabaseClientLike = ReturnType<typeof getSupabaseClient>;
 
@@ -111,159 +101,6 @@ interface LinhaAppointment {
   ends_at: string;
   location_label: string | null;
   confirmed_at: string | null;
-}
-
-/* -------------------------------------------------------------------------
-   CARTEIRA DE QUEM ESTÁ LOGADO
-   -------------------------------------------------------------------------
-   Tudo aqui sai de leituras que o painel já faz, e nenhuma lê conteúdo de
-   mensagem nem de anotação:
-
-     agenda             → quem a pessoa atendeu, e o que houve em cada horário
-     lista de pacientes → fase e situação de cada um, e o nome de quem pede atenção
-     alertas            → os que ela resolveu, e os que estão abertos
-
-   Fica de fora, de propósito, o tempo de resposta PRÓPRIO: o resumo do banco é
-   por equipe, e calculá-lo aqui exigiria ler as mensagens de cada conversa — o
-   conteúdo clínico inteiro, e sob sigilo, para virar um número.
-   ------------------------------------------------------------------------- */
-
-const UM_DIA_MS = 24 * 60 * 60 * 1000;
-/** Até onde a varredura da lista de pacientes vai: dez páginas de 200. */
-const TETO_DA_LISTA = 2000;
-const TETO_DE_ALERTAS = 200;
-
-const ORDEM_DAS_FASES: (FaseTratamento | null)[] = [
-  FASE_TRATAMENTO.ATIVO,
-  FASE_TRATAMENTO.REMISSAO,
-  FASE_TRATAMENTO.SEGUIMENTO,
-  FASE_TRATAMENTO.MANUTENCAO,
-  FASE_TRATAMENTO.FINALIZACAO,
-  null,
-];
-
-export async function getCarteira(params: { dias: number }): Promise<SingleResult<CarteiraResumo>> {
-  return executar(async () => {
-    const supabase = getSupabaseClient();
-
-    const eu = await profissionalDaSessao();
-    if ("error" in eu) return eu;
-
-    const agora = Date.now();
-    const de = new Date(agora - params.dias * UM_DIA_MS).toISOString();
-    const ate = new Date(agora).toISOString();
-
-    const lerAlertas = (status: "resolved" | "open" | "in_progress") =>
-      supabase.rpc("read_alerts", { p_status: status, p_limit: TETO_DE_ALERTAS, p_before: null });
-
-    const [agenda, lista, resolvidos, abertos, emAtendimento] = await Promise.all([
-      // Sem nomes: a carteira conta, e cada nome seria uma leitura na trilha.
-      getMinhaAgenda({ de, ate, semNomes: true }),
-      compartilharLeitura(
-        "carteira:lista-de-pacientes",
-        30_000,
-        () => varrerLista({}, TETO_DA_LISTA),
-        (resultado) => "itens" in resultado,
-      ),
-      lerAlertas("resolved"),
-      lerAlertas("open"),
-      lerAlertas("in_progress"),
-    ]);
-
-    if (agenda.error) return failWith(agenda.error);
-    if (!("itens" in lista)) return lista;
-    for (const leitura of [resolvidos, abertos, emAtendimento]) {
-      if (leitura.error) return falhaDe(leitura.error);
-    }
-
-    const compromissos = agenda.data;
-    const pacientePorId = new Map(lista.itens.map((item) => [item.id, item]));
-    const idsDaCarteira = new Set(compromissos.map((compromisso) => compromisso.paciente_id));
-
-    /* ---------------------------------------------------------- por fase */
-
-    const totalPorFase = new Map<FaseTratamento | null, number>();
-    let ativos = 0;
-
-    for (const id of idsDaCarteira) {
-      const paciente = pacientePorId.get(id);
-      if (paciente?.status === STATUS_PACIENTE.ATIVO) ativos += 1;
-
-      // Quem não está na lista varrida (teto) ou não tem fase cai em "sem fase".
-      const fase = paciente?.fase ?? null;
-      totalPorFase.set(fase, (totalPorFase.get(fase) ?? 0) + 1);
-    }
-
-    /* -------------------------------------------------------- compromissos */
-
-    const contar = (codigo: string) =>
-      compromissos.filter((compromisso) => compromisso.status_codigo === codigo).length;
-
-    const semDesfecho = compromissos.filter(
-      (compromisso) =>
-        compromisso.status_codigo === "scheduled" && new Date(compromisso.fim).getTime() < agora,
-    ).length;
-
-    /* ---------------------------------------------------- alertas tratados */
-
-    const linhasResolvidas = (resolvidos.data ?? []) as LinhaAlert[];
-    const tratados = linhasResolvidas.filter(
-      (linha) =>
-        linha.assigned_professional_id === eu.profissionalId &&
-        linha.resolved_at !== null &&
-        linha.resolved_at >= de,
-    ).length;
-
-    /* ----------------------------------------------------------- atenção */
-
-    const motivosPorPaciente = new Map<string, Set<MotivoDeAtencao>>();
-    const marcar = (id: string, motivo: MotivoDeAtencao) => {
-      const motivos = motivosPorPaciente.get(id) ?? new Set<MotivoDeAtencao>();
-      motivos.add(motivo);
-      motivosPorPaciente.set(id, motivos);
-    };
-
-    // Alerta aberto de alguém da carteira. A fila é da equipe inteira: o alerta
-    // de quem esta pessoa não atendeu no período não é assunto da carteira dela.
-    for (const linha of [...((abertos.data ?? []) as LinhaAlert[]), ...((emAtendimento.data ?? []) as LinhaAlert[])]) {
-      if (idsDaCarteira.has(linha.patient_id)) marcar(linha.patient_id, "alerta_ativo");
-    }
-    for (const compromisso of compromissos) {
-      if (compromisso.status_codigo === "no_show") marcar(compromisso.paciente_id, "faltou");
-    }
-
-    const atencao = [...motivosPorPaciente.entries()]
-      .map(([id, motivos]) => ({
-        paciente_id: id,
-        paciente_nome: pacientePorId.get(id)?.nome ?? "Paciente",
-        motivos: [...motivos],
-      }))
-      .sort(
-        (a, b) =>
-          b.motivos.length - a.motivos.length || a.paciente_nome.localeCompare(b.paciente_nome, "pt-BR"),
-      );
-
-    return okOne<CarteiraResumo>({
-      dias: params.dias,
-      pacientes: idsDaCarteira.size,
-      pacientes_ativos: ativos,
-      por_fase: ORDEM_DAS_FASES.map((fase) => ({ fase, total: totalPorFase.get(fase) ?? 0 })),
-      compromissos: {
-        total: compromissos.length,
-        realizados: contar("completed"),
-        faltas: contar("no_show"),
-        reagendados: contar("rescheduled"),
-        cancelados: contar("cancelled"),
-        sem_desfecho: semDesfecho,
-      },
-      alertas_tratados: {
-        total: tratados,
-        limitado: linhasResolvidas.length >= TETO_DE_ALERTAS,
-      },
-      atencao,
-      lista_limitada: lista.parcial,
-    });
-  });
 }
 
 export async function getMinhaAgenda(params: {
@@ -344,6 +181,8 @@ export async function getMinhaAgenda(params: {
 interface LinhaAlert {
   id: string;
   patient_id: string;
+  /** Who wrote the diary entry that raised it — copied to the alert for the queue. */
+  source_actor_kind: "patient" | "caregiver";
   symptom_id: string | null;
   grade: number;
   status: "open" | "in_progress" | "resolved";
@@ -431,6 +270,7 @@ export async function listAlertas(params?: {
         sintoma_label: (linha.symptom_id && labelPorSintoma.get(linha.symptom_id)) || "Sintoma",
         grau: linha.grade,
         severidade: severidadeDoGrau(linha.grade),
+        pelo_acompanhante: linha.source_actor_kind === "caregiver",
         status: statusApp,
         status_tom: TOM_POR_STATUS_ALERTA[statusApp],
         conduta_tipo: linha.conduct_kind ? CONDUTA_POR_CODIGO[linha.conduct_kind] : null,
@@ -861,5 +701,37 @@ export async function marcarConversaLida(params: { id: string }): Promise<Single
     });
     if (error) return falhaDe(error);
     return okOne(null);
+  });
+}
+
+/* -------------------------------------------------------------------------
+   TEMPO DE RESPOSTA — o número que o dashboard e o chat clínicos mostram
+   ------------------------------------------------------------------------- */
+
+/**
+ * Average minutes until the team's first reply, over the last `dias` days.
+ *
+ * `summarize_chat_response_times` runs under the caller's row policies, so a
+ * professional's number covers the conversations they can see. Weighted by
+ * answered conversations, not an average of averages: a bucket with one
+ * conversation and one with forty would otherwise weigh the same. `null` when
+ * nothing was answered in the window — which is not zero minutes.
+ */
+export async function getTempoDeResposta(params: {
+  dias: number;
+}): Promise<SingleResult<{ minutos: number | null }>> {
+  return executar(async () => {
+    const chat = await resumirChat({ janela: janelaDeDias(params.dias), granularidade: "month" });
+    if (falhou(chat)) return chat;
+
+    let segundos = 0;
+    let conversas = 0;
+    for (const linha of chat.linhas) {
+      if (linha.first_response_avg_seconds === null || linha.answered_count === 0) continue;
+      segundos += linha.first_response_avg_seconds * linha.answered_count;
+      conversas += linha.answered_count;
+    }
+
+    return okOne({ minutos: conversas === 0 ? null : Math.round(segundos / conversas / 60) });
   });
 }

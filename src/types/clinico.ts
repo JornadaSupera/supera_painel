@@ -1,7 +1,6 @@
 import type { StatusTone } from "@/components/shared";
 import type {
   AutorMensagem,
-  FaseTratamento,
   CondutaAlerta,
   Especialidade,
   Severidade,
@@ -57,6 +56,8 @@ export interface AlertaClinico {
   sintoma_label: string;
   grau: number;
   severidade: Severidade;
+  /** The diary entry behind it was written by the caregiver, not by the patient. */
+  pelo_acompanhante: boolean;
   status: StatusAlerta;
   status_tom: StatusTone;
   conduta_tipo: CondutaAlerta | null;
@@ -66,42 +67,6 @@ export interface AlertaClinico {
   criado_em: string;
   assumido_em: string | null;
   resolvido_em: string | null;
-}
-
-/**
- * A carteira de quem está logado: os pacientes que atendeu no período e o que
- * aconteceu com eles.
- *
- * "Carteira" aqui é uma definição que a leitura sustenta: os pacientes com
- * compromisso na agenda DESTA pessoa, nos últimos N dias. O banco não guarda um
- * vínculo profissional ↔ paciente, e inventar um (a base toda, ou "quem me
- * escreveu") daria números que parecem da pessoa e não são.
- *
- * Só contagem, e a lista de quem pede atenção — com o motivo dito, sem escore.
- */
-export type MotivoDeAtencao = "alerta_ativo" | "faltou";
-
-export interface CarteiraResumo {
-  dias: number;
-  pacientes: number;
-  /** Dos pacientes da carteira, quantos estão com a ficha ativa hoje. */
-  pacientes_ativos: number;
-  /** Na ordem das fases. `fase: null` = sem fase registrada, ou fora do alcance da leitura. */
-  por_fase: { fase: FaseTratamento | null; total: number }[];
-  compromissos: {
-    total: number;
-    realizados: number;
-    faltas: number;
-    reagendados: number;
-    cancelados: number;
-    /** Já passaram e continuam marcados como agendados: ninguém registrou o desfecho. */
-    sem_desfecho: number;
-  };
-  /** Alertas que esta pessoa resolveu no período. `limitado`: a leitura bateu no teto. */
-  alertas_tratados: { total: number; limitado: boolean };
-  atencao: { paciente_id: string; paciente_nome: string; motivos: MotivoDeAtencao[] }[];
-  /** A varredura da lista de pacientes parou no teto: parte da carteira pode estar sem fase. */
-  lista_limitada: boolean;
 }
 
 /** Uma conversa da fila de chat — mesma leitura de equipe que `AlertaClinico`. */

@@ -21,7 +21,6 @@ import type { AuditoriaListItem, FacetasAuditoria, ResumoAuditoria } from "@/typ
 import type { Cid, EfeitoAdverso, Protocolo } from "@/types/catalogo";
 import type {
   AlertaClinico,
-  CarteiraResumo,
   CompromissoAgenda,
   ConversaClinico,
   MensagemClinico,
@@ -616,12 +615,6 @@ export interface FiltroClinico {
  * via.
  */
 export interface ClinicoOperations {
-  /**
-   * A carteira de quem está logado nos últimos `dias`: pacientes atendidos por
-   * fase, compromissos, alertas tratados e quem pede atenção. Só o que as
-   * leituras atuais sustentam; ver `CarteiraResumo`.
-   */
-  getCarteira(params: { dias: number }): Promise<SingleResult<CarteiraResumo>>;
 
   /** Compromissos do profissional logado, na janela informada. */
   getMinhaAgenda(params: {
@@ -728,6 +721,11 @@ export interface ClinicoOperations {
   resolverConversa(params: { id: string }): Promise<SingleResult<null>>;
   /** Registra a leitura da conversa por esta conta. */
   marcarConversaLida(params: { id: string }): Promise<SingleResult<null>>;
+  /**
+   * Average minutes until the team's first reply over the last `dias` days, over
+   * the conversations this person can see. `null` when nothing was answered.
+   */
+  getTempoDeResposta(params: { dias: number }): Promise<SingleResult<{ minutos: number | null }>>;
 
   /**
    * A linha do tempo de um paciente: diário, alertas, conversas, compromissos,

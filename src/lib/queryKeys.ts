@@ -155,9 +155,10 @@ export const queryKeys = {
     /** When people on the team cannot take appointments, in a window. */
     busyIn: (from: string, to: string) => ["clinico", "busy", from, to] as const,
     /** Sem status = a fila inteira; `undefined` vira `"todos"`, para a chave não colidir com "sem filtro nenhum". */
-    carteira: (dias: number) => ["clinico", "carteira", dias] as const,
     alertas: (status?: string) => ["clinico", "alertas", status ?? "todos"] as const,
     conversas: () => ["clinico", "conversas"] as const,
+    /** Average minutes to the first reply over the last N days. */
+    tempoDeResposta: (dias: number) => ["clinico", "tempo-de-resposta", dias] as const,
     perfil: () => ["clinico", "perfil"] as const,
     mensagens: (conversaId: string) => ["clinico", "conversas", conversaId, "mensagens"] as const,
     /** Fora de `clinico.all` de propósito: o anexo não muda, e invalidar a fila não deve baixá-lo de novo. */
