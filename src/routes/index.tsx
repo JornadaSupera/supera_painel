@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { Loading } from "@/components/shared";
 import { AvisoSessao } from "@/features/auth/components/AvisoSessao";
@@ -8,11 +8,8 @@ import { LoginPage } from "@/features/auth/pages/LoginPage";
 import { MfaPage } from "@/features/auth/pages/MfaPage";
 import { NovaSenhaPage } from "@/features/auth/pages/NovaSenhaPage";
 import { RecuperarSenhaPage } from "@/features/auth/pages/RecuperarSenhaPage";
-import { PatientChatShortcut } from "@/features/clinico/components/PatientChatShortcut";
-import { PatientRecordPanel } from "@/features/clinico/components/PatientRecordPanel";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ClinicoLayout } from "@/layouts/ClinicoLayout";
-import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
 import { PERMISSAO } from "@/lib/rbac";
 import { AreaRoute } from "./AreaRoute";
 import { HomeRedirect } from "./HomeRedirect";
@@ -68,6 +65,8 @@ const ClinicoCarteiraPage = lazy(() => import("@/features/clinico/pages/ClinicoC
 const ClinicoConteudoPage = lazy(() => import("@/features/clinico/pages/ClinicoConteudoPage"));
 const ClinicoOrientacaoPage = lazy(() => import("@/features/clinico/pages/ClinicoOrientacaoPage"));
 const ClinicoPerfilPage = lazy(() => import("@/features/clinico/pages/ClinicoPerfilPage"));
+/* The patient record in tabs: composed in `routes/`, where two features may meet. */
+const ClinicalPatientRecord = lazy(() => import("./ClinicalPatientRecord"));
 /* Not a panel screen: its audience is app users, so it stays out of the bundle
    that panel staff load first. */
 const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
@@ -119,32 +118,6 @@ function needsRecoveryRescue(location: { pathname: string; search: string; hash:
 
 function rescueDestination(location: { search: string; hash: string }) {
   return recoveryLinkPurpose(location) === "invite" ? "/nova-senha" : "/redefinir-senha";
-}
-
-/**
- * The patient record, inside the clinical frame.
- *
- * Same page the administrative panel uses; the way back and the label above the
- * title change, so a professional never lands in the other panel's navigation by
- * opening a patient. It adds what only a professional needs: the shortcut to the
- * patient's chat and the multidisciplinary timeline, where they write in their
- * own area. Composed here because a feature does not import another feature.
- */
-function ClinicoPacienteFicha() {
-  const { especialidade, id } = useParams<{ especialidade: string; id: string }>();
-  const area = especialidade as Especialidade;
-  const base = `/clinico/${area}`;
-  const chatHref = `${base}/chat?paciente=${id ?? ""}`;
-
-  return (
-    <PacienteFichaPage
-      basePath={`${base}/pacientes`}
-      eyebrow={ESPECIALIDADE_LABEL[area]}
-      extraActions={<PatientChatShortcut href={chatHref} />}
-    >
-      {id && <PatientRecordPanel patientId={id} area={area} chatHref={chatHref} />}
-    </PacienteFichaPage>
-  );
 }
 
 export function AppRoutes() {
@@ -311,7 +284,7 @@ export function AppRoutes() {
               <Route index element={<ClinicoDashboardPage />} />
               <Route path="pacientes" element={<ClinicoPacientesPage />} />
               <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
-                <Route path="pacientes/:id" element={<ClinicoPacienteFicha />} />
+                <Route path="pacientes/:id" element={<ClinicalPatientRecord />} />
               </Route>
               <Route path="agenda" element={<ClinicoAgendaPage />} />
               <Route path="chat" element={<ClinicoChatPage />} />

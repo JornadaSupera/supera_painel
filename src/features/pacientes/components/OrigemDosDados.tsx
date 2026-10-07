@@ -45,7 +45,7 @@ function Parte({ rotulo, dado }: { rotulo: string; dado: OrigemDoDado | null }) 
 
 export function OrigemDosDados({ paciente }: { paciente: PacienteDetalhe }) {
   return (
-    <div className="bg-muted/40 text-muted-foreground flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 rounded-xl px-3 py-2 text-[11px]">
+    <div className="bg-muted/40 text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl px-3 py-2 text-[11px]">
       <span className="flex items-center gap-1.5 font-medium">
         <DatabaseZap size={13} aria-hidden="true" />
         Origem dos dados
