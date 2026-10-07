@@ -29,7 +29,8 @@ import {
 import { executar, falhaDe, profissionalDaSessao, TETO_READ } from "./_helpers";
 import { namesById, NO_NAME, professionalNamesQuery, type ProfessionalNameRow } from "./_professionalNames";
 import { getSupabaseClient } from "./client";
-import { paraCodigoDeEspecialidade, paraEspecialidade } from "./mapping";
+import { specialtyIdOf } from "./_specialtyId";
+import { paraEspecialidade } from "./mapping";
 
 /**
  * The patient record — one read per source, put together here.
@@ -518,13 +519,8 @@ export async function addSpecialtyNote(params: {
     const me = await profissionalDaSessao();
     if ("error" in me) return me;
 
-    const { data: specialty, error: specialtyError } = await supabase
-      .from("specialties")
-      .select("id")
-      .eq("code", paraCodigoDeEspecialidade(params.specialty))
-      .maybeSingle();
-    if (specialtyError) return falhaDe(specialtyError);
-    if (!specialty) return fail(ERROR_CODE.NOT_FOUND, "Especialidade não encontrada.");
+    const specialty = await specialtyIdOf(params.specialty);
+    if ("error" in specialty) return specialty;
 
     const noteId = crypto.randomUUID();
 
