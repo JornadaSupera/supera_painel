@@ -25,6 +25,8 @@ export interface FiltroDeConversas {
   recorte: RecorteDeConversas;
   /** O rótulo do assunto, ou `TODOS_OS_ASSUNTOS`. */
   assunto: string;
+  /** Only this patient's conversations — set when the chat is opened from the record. */
+  paciente: string | null;
 }
 
 /** Sem acento e sem caixa: quem digita "joao" acha "João". */
@@ -43,6 +45,7 @@ export function filtrarConversas(
   const busca = semAcentos(filtro.busca.trim());
 
   return conversas.filter((conversa) => {
+    if (filtro.paciente && conversa.paciente_id !== filtro.paciente) return false;
     if (filtro.recorte === "minhas" && !conversa.minha) return false;
     if (filtro.recorte === "nao_resolvidas" && conversa.status !== "aberta") return false;
     if (

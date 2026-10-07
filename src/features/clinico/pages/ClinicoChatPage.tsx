@@ -101,7 +101,12 @@ const RECORTES: { value: RecorteDeConversas; label: string }[] = [
   { value: "da_minha_area", label: "Da minha área" },
 ];
 
-const FILTRO_INICIAL: FiltroDeConversas = { busca: "", recorte: "todas", assunto: TODOS_OS_ASSUNTOS };
+const FILTRO_INICIAL: FiltroDeConversas = {
+  busca: "",
+  recorte: "todas",
+  assunto: TODOS_OS_ASSUNTOS,
+  paciente: null,
+};
 
 export function ClinicoChatPage() {
   const { user } = useAuth();
@@ -113,19 +118,25 @@ export function ClinicoChatPage() {
   const [filtro, setFiltro] = useState<FiltroDeConversas>(FILTRO_INICIAL);
   const [encaminhar, setEncaminhar] = useState<ConversaClinico | null>(null);
 
-  // A ficha do paciente leva para cá com `?paciente=`: a conversa dele abre
-  // direto. A lista vem da mais recente para a mais antiga, então o primeiro que
-  // casa é a conversa mais recente daquele paciente. Sem isso, a tela abre na
+  // A ficha do paciente leva para cá com `?paciente=`. Um paciente pode ter
+  // conversas com mais de uma área ao mesmo tempo: a lista passa a mostrar só as
+  // dele, e abre a que é sua, senão a da sua área, senão a mais recente — a lista
+  // já vem da mais recente para a mais antiga. Sem o parâmetro, a tela abre na
   // fila inteira, como no protótipo, e a conversa abre ao clicar.
   const pacienteDaFicha = useSearchParams()[0].get("paciente");
-  const conversaDoPaciente = pacienteDaFicha
-    ? conversas.data?.find((conversa) => conversa.paciente_id === pacienteDaFicha)
-    : undefined;
+  const doPaciente = pacienteDaFicha
+    ? (conversas.data ?? []).filter((conversa) => conversa.paciente_id === pacienteDaFicha)
+    : [];
+  const conversaDoPaciente =
+    doPaciente.find((conversa) => conversa.minha) ??
+    doPaciente.find((conversa) => conversa.especialidade_origem === user?.especialidade) ??
+    doPaciente[0];
 
   const [abriuDaFicha, setAbriuDaFicha] = useState(false);
   useEffect(() => {
     if (!abriuDaFicha && conversaDoPaciente) {
       setSelecionada(conversaDoPaciente.id);
+      setFiltro((atual) => ({ ...atual, paciente: conversaDoPaciente.paciente_id }));
       setAbriuDaFicha(true);
     }
   }, [abriuDaFicha, conversaDoPaciente]);
@@ -137,7 +148,13 @@ export function ClinicoChatPage() {
   const assuntos = assuntosDaLista(lista);
   const visiveis = filtrarConversas(lista, filtro, user?.especialidade ?? null);
   const filtrando =
-    filtro.busca.trim() !== "" || filtro.recorte !== "todas" || filtro.assunto !== TODOS_OS_ASSUNTOS;
+    filtro.busca.trim() !== "" ||
+    filtro.recorte !== "todas" ||
+    filtro.assunto !== TODOS_OS_ASSUNTOS ||
+    filtro.paciente !== null;
+  const nomeDoPacienteFiltrado = filtro.paciente
+    ? lista.find((conversa) => conversa.paciente_id === filtro.paciente)?.paciente_nome
+    : undefined;
   const minutos = tempoDeResposta.isSuccess ? tempoDeResposta.data?.minutos : undefined;
 
   return (
@@ -177,6 +194,18 @@ export function ClinicoChatPage() {
             />
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {filtro.paciente && (
+                <FilterChipGroup label="Paciente" className="sm:border-r sm:pr-4">
+                  <FilterChip active onClick={() => setFiltro({ ...filtro, paciente: null })}>
+                    <span className="inline-flex items-center gap-1">
+                      Só {nomeDoPacienteFiltrado ?? "este paciente"}
+                      <X size={12} aria-hidden="true" />
+                      <span className="sr-only">, tirar o filtro</span>
+                    </span>
+                  </FilterChip>
+                </FilterChipGroup>
+              )}
+
               <FilterChipGroup label="Mostrar conversas">
                 {RECORTES.map((recorte) => (
                   <FilterChip
