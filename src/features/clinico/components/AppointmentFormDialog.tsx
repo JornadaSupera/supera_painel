@@ -24,10 +24,9 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { addDays, dayStart, instantParts, overlapsBusy, timeOfMinutes } from "@/lib/agenda";
-import { ESPECIALIDADE_LABEL, type Especialidade } from "@/lib/enums";
+import type { Especialidade } from "@/lib/enums";
 import type { SchedulingAccess } from "@/types/agenda";
 import type { CompromissoAgenda } from "@/types/clinico";
-import { useTransferTargets } from "../hooks/useConversationTransfer";
 import { useAppointmentTypes } from "../hooks/usePersonalAgenda";
 import {
   useBusyIntervals,
@@ -224,7 +223,6 @@ function BookBody({
 }) {
   const schedule = useScheduleAppointment();
   const types = useAppointmentTypes();
-  const targets = useTransferTargets(true);
 
   const [patientName, setPatientName] = useState<string | null>(patient?.name ?? null);
   const [term, setTerm] = useState("");
@@ -253,15 +251,14 @@ function BookBody({
     }
   }, [values]);
 
-  const target = targets.data?.find((item) => item.professional_id === values.professional) ?? null;
-  const professionalId = values.professional === "me" ? (access?.professional_id ?? null) : values.professional;
+  // Always the caller's own diary: a professional books for themselves and the
+  // patient, never into a colleague's agenda.
+  const professionalId = access?.professional_id ?? null;
 
   const unavailable = useBusyWarning(values.date, window.starts_at, window.ends_at, professionalId);
 
-  // The area the session belongs to follows who it is for: the caller's own, or
-  // the colleague's main one. A session of a confidential area booked by someone
-  // outside it is refused by the database, and says so.
-  const originSpecialty: Especialidade | null = values.professional === "me" ? area : (target?.specialties[0] ?? null);
+  // The session belongs to the area the caller is working in.
+  const originSpecialty: Especialidade | null = area;
 
   const errors = formState.errors;
 
@@ -295,7 +292,8 @@ function BookBody({
       <DialogHeader>
         <DialogTitle>Nova consulta</DialogTitle>
         <DialogDescription>
-          O paciente é avisado pelo aplicativo. O horário não pode coincidir com um bloqueio de quem vai atender.
+          A consulta entra na sua agenda, e o paciente é avisado pelo aplicativo. O horário não pode
+          coincidir com um bloqueio seu.
         </DialogDescription>
       </DialogHeader>
 
@@ -415,40 +413,20 @@ function BookBody({
         idPrefix="book"
       />
 
-      {/* Where, and who */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="appt-location">Local</Label>
-          <Input
-            id="appt-location"
-            placeholder="Consultório, sala de infusão…"
-            {...register("location")}
-            aria-invalid={Boolean(errors.location)}
-          />
-          {errors.location && (
-            <p role="alert" className="text-destructive text-xs">
-              {errors.location.message}
-            </p>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="appt-professional">Com quem</Label>
-          <Select value={values.professional} onValueChange={(value) => setValue("professional", value)}>
-            <SelectTrigger id="appt-professional">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="me">Eu (minha agenda)</SelectItem>
-              {(targets.data ?? []).map((item) => (
-                <SelectItem key={item.professional_id} value={item.professional_id}>
-                  {item.name}
-                  {item.specialties[0] ? ` · ${ESPECIALIDADE_LABEL[item.specialties[0]]}` : ""}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* Where */}
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="appt-location">Local</Label>
+        <Input
+          id="appt-location"
+          placeholder="Consultório, sala de infusão…"
+          {...register("location")}
+          aria-invalid={Boolean(errors.location)}
+        />
+        {errors.location && (
+          <p role="alert" className="text-destructive text-xs">
+            {errors.location.message}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-col gap-1.5">
