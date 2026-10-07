@@ -84,9 +84,11 @@ const ESPECIES_LEGAIS: { tipo: VersaoLegal["tipo"]; label: string }[] = [
 ];
 
 /**
- * Uma linha de termo: rótulo e ordem corrigíveis no lugar, código fixo ao
- * lado — o mesmo par lápis/código de `MotivosSituacao`, com um segundo campo
- * porque aqui a ordem também é editável.
+ * One term of a vocabulary: its label and order are corrected in place.
+ *
+ * The database code stays off screen: it is an internal key, in english, and it
+ * tells nothing to whoever runs the clinic. The label is what names the term,
+ * for the eye and for the screen reader alike.
  */
 function LinhaCatalogo({
   item,
@@ -141,7 +143,7 @@ function LinhaCatalogo({
               value={rascunhoLabel}
               maxLength={60}
               className="h-8 min-w-0 flex-1 text-xs"
-              aria-label={`Rótulo de ${item.codigo}`}
+              aria-label={`Rótulo de ${item.label}`}
               onChange={(evento) => setRascunhoLabel(evento.target.value)}
               onKeyDown={(evento) => {
                 if (evento.key === "Enter") salvar();
@@ -154,7 +156,7 @@ function LinhaCatalogo({
               inputMode="numeric"
               min={0}
               className="h-8 w-14 shrink-0 text-xs"
-              aria-label={`Ordem de ${item.codigo}`}
+              aria-label={`Ordem de ${item.label}`}
               onChange={(evento) => setRascunhoOrdem(evento.target.value)}
               onKeyDown={(evento) => {
                 if (evento.key === "Enter") salvar();
@@ -186,8 +188,6 @@ function LinhaCatalogo({
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        <code className="text-muted-foreground font-mono text-[11px]">{item.codigo}</code>
-
         {editando ? (
           <>
             <Button
@@ -449,11 +449,10 @@ export function ConfiguracoesPage() {
           )}
 
           <Footnote>
-            Rótulo, ordem e o estado ativo/retirado dos catálogos acima mudam por aqui, com
-            auditoria a cada edição. O código de cada termo continua fixo — é ele que o diário, os
-            relatórios e os gatilhos de alerta usam para apontar para o mesmo item, e o sistema
-            recusa qualquer tentativa de trocá-lo. Cadastrar um termo novo continua exigindo
-            migração revisada, pela mesma razão. As regras de permissão por papel ficam em{" "}
+            Nome, ordem e o estado ativo/retirado dos itens acima mudam por aqui, e cada edição fica
+            na auditoria. Itens novos não se cadastram por esta tela: o diário, os relatórios e os
+            gatilhos de alerta dependem da lista, e a inclusão passa pela equipe técnica. As regras
+            de permissão por papel ficam em{" "}
             <strong>Usuários → Permissões por papel</strong>.
           </Footnote>
         </TabsContent>
