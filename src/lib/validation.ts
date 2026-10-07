@@ -44,18 +44,39 @@ export function isValidPhone(value: string | null | undefined): boolean {
   return digits.length === 10 || digits[2] === "9";
 }
 
-/** A past date, within a plausible range for a living person. */
+/** Today in the browser's time zone, as `YYYY-MM-DD` — the form a date field holds. */
+function localToday(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/**
+ * A calendar day after today, in the browser's time zone.
+ *
+ * Compared as `YYYY-MM-DD` text, not as instants: `new Date("2026-10-08")` is
+ * midnight UTC, which in Brasília is still 21h of the 7th, so comparing clocks
+ * let tomorrow through every evening — and the database, which counts days in
+ * the clinic's time zone, refused it on save.
+ */
+export function isFutureDate(iso: string | null | undefined): boolean {
+  const day = iso?.slice(0, 10) ?? "";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  return day > localToday();
+}
+
+/** A date up to today, within a plausible range for a living person. */
 export function isValidBirthDate(iso: string | null | undefined): boolean {
   if (!iso) return false;
 
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return false;
 
-  const today = new Date();
   const limit = new Date();
-  limit.setFullYear(today.getFullYear() - 120);
+  limit.setFullYear(limit.getFullYear() - 120);
 
-  return date <= today && date >= limit;
+  return !isFutureDate(iso) && date >= limit;
 }
 
 /**

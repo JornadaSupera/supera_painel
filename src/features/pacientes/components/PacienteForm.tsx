@@ -28,7 +28,8 @@ import { useCids, useEfeitosAdversos, useFasesTratamento } from "@/hooks/useCata
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { DiagnosticoPaciente } from "@/types/paciente";
-import { applyCpfMask, applyPhoneMask } from "@/lib/validation";
+import { applyCpfMask, applyPhoneMask, isValidBirthDate } from "@/lib/validation";
+import { isBelowAppMinimumAge, UNDERAGE_INVITE_REASON } from "../appAccess";
 import {
   ETAPAS,
   pacienteEdicaoSchema,
@@ -111,6 +112,28 @@ function AvisoAtoClinico({ edicao }: { edicao: boolean }) {
   );
 }
 
+/**
+ * Shown as soon as the birth date makes the patient a minor. The record is
+ * saved like any other; what closes is the app, and the front desk should know
+ * that before promising the patient an invite.
+ */
+function UnderageNotice({ edicao }: { edicao: boolean }) {
+  return (
+    <div
+      role="status"
+      className="border-border bg-muted/40 text-muted-foreground flex gap-2.5 rounded-lg border p-3 text-xs sm:col-span-2"
+    >
+      <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+      <p>
+        <span className="text-foreground font-medium">Menor de 18 anos.</span>{" "}
+        {edicao
+          ? "A ficha continua valendo, mas o aplicativo só é liberado a partir dos 18, e não há convite para ela. Uma conta que já esteja ligada continua ligada."
+          : "A ficha é cadastrada normalmente, mas o aplicativo só é liberado a partir dos 18, e o convite não é emitido."}
+      </p>
+    </div>
+  );
+}
+
 export interface PacienteFormProps {
   valoresIniciais: Valores;
   modo: "criacao" | "edicao";
@@ -150,6 +173,10 @@ export function PacienteForm({
     ...diagnosticosRegistrados.map((diagnostico) => diagnostico.cid),
     ...cidsEscolhidos,
   ]);
+
+  // Only a complete, valid date decides: half-typed digits are not an age.
+  const nascimento = form.watch("nascimento");
+  const menor = isValidBirthDate(nascimento) && isBelowAppMinimumAge(nascimento);
 
   const efeitos = useEfeitosAdversos();
   const cids = useCids();
@@ -323,6 +350,8 @@ export function PacienteForm({
                 />
 
                 <CampoData name="nascimento" rotulo="Data de nascimento" />
+
+                {menor && <UnderageNotice edicao={edicao} />}
               </div>
             )}
 
@@ -764,12 +793,19 @@ export function PacienteForm({
                         <div className="flex flex-col gap-0.5">
                           <FormLabel>Emitir convite de acesso agora</FormLabel>
                           <FormDescription>
-                            Enquanto não houver envio automático, o código aparece uma vez na
-                            tela para ser passado ao paciente.
+                            {menor
+                              ? UNDERAGE_INVITE_REASON
+                              : "Enquanto não houver envio automático, o código aparece uma vez na tela para ser passado ao paciente."}
                           </FormDescription>
                         </div>
                         <FormControl>
-                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          {/* Off and locked for a minor: the database would refuse
+                              the invite right after the record was saved. */}
+                          <Switch
+                            checked={field.value && !menor}
+                            disabled={menor}
+                            onCheckedChange={field.onChange}
+                          />
                         </FormControl>
                       </FormItem>
                     )}

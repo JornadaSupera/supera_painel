@@ -1,9 +1,16 @@
 import { z } from "zod";
 
 import { digitsOnly } from "@/lib/mask";
-import { isValidCpf, isValidBirthDate, isValidPastDate, isValidPhone } from "@/lib/validation";
+import {
+  isFutureDate,
+  isValidCpf,
+  isValidBirthDate,
+  isValidPastDate,
+  isValidPhone,
+} from "@/lib/validation";
 import type { FaseTratamento } from "@/lib/enums";
 import type { PacienteClinicaEntrada, PacienteEntrada } from "@/types/paciente";
+import { isBelowAppMinimumAge } from "./appAccess";
 
 /**
  * Validação do cadastro e da edição de paciente.
@@ -38,9 +45,12 @@ export const pacienteSchema = z.object({
 
   cpf: z.string().min(1, CAMPO_OBRIGATORIO).refine(isValidCpf, "CPF inválido — confira os dígitos."),
 
+  // The future gets its own message, ahead of the generic one: the database
+  // refuses it too, and "inválida" does not tell anyone the year is wrong.
   nascimento: z
     .string()
     .min(1, CAMPO_OBRIGATORIO)
+    .refine((valor) => !isFutureDate(valor), "A data de nascimento não pode ser depois de hoje.")
     .refine(isValidBirthDate, "Data de nascimento inválida."),
 
   /* ---------------------------------------------------- histórico clínico */
@@ -164,7 +174,9 @@ export function paraEntrada(valores: PacienteForm): PacienteEntrada {
     convenio: vazioComoNulo(valores.convenio),
     alergias: valores.alergias,
     reacoes_previas: valores.reacoes_previas,
-    enviar_convite: valores.enviar_convite,
+    // A minor's invite would only come back refused, after the record was
+    // already saved. The form shows the switch off; this keeps it off.
+    enviar_convite: valores.enviar_convite && !isBelowAppMinimumAge(valores.nascimento),
   };
 }
 
