@@ -1,5 +1,5 @@
 import { FASE_TRATAMENTO_LABEL, STATUS_PACIENTE, STATUS_PACIENTE_LABEL } from "@/lib/enums";
-import { ageInYears, formatDate } from "@/lib/format";
+import { ageInYears, formatDate, formatDateTime } from "@/lib/format";
 import { maskEmail, maskPhone } from "@/lib/mask";
 import {
   ERROR_CODE,
@@ -276,6 +276,8 @@ function projetar(linha: LinhaPaciente, contexto: ContextoProjecao): PacienteLis
     risco: null,
     convite_status: statusDoConvite(linha, contexto.convite),
     criado_em: linha.created_at,
+    // `read_patient` does not carry it; only the list does.
+    ultima_interacao_em: null,
   };
 }
 
@@ -406,6 +408,8 @@ interface LinhaListaPaciente {
   total_count: number;
   /** Data de cadastro — última coluna da projeção desde `rework_patient_list` (25/09/2026). */
   created_at: string;
+  /** The patient's or caregiver's last chat message — after `created_at` since 30/09/2026. */
+  last_interaction_at: string | null;
 }
 
 /**
@@ -418,7 +422,13 @@ interface LinhaListaPaciente {
  */
 const ORDENACAO: Record<
   string,
-  "full_name" | "birth_date" | "created_at" | "primary_cid10_code" | "treatment_phase" | "is_active"
+  | "full_name"
+  | "birth_date"
+  | "created_at"
+  | "primary_cid10_code"
+  | "treatment_phase"
+  | "is_active"
+  | "last_interaction_at"
 > = {
   nome: "full_name",
   nascimento: "birth_date",
@@ -426,6 +436,7 @@ const ORDENACAO: Record<
   cid: "primary_cid10_code",
   fase: "treatment_phase",
   status: "is_active",
+  ultima_interacao: "last_interaction_at",
 };
 
 /** O primeiro valor de um filtro, como texto — ou `null` quando não há filtro. */
@@ -479,6 +490,7 @@ function projetarLinha(linha: LinhaListaPaciente, fases: Fases): PacienteListIte
     // Desde `rework_patient_list` (25/09/2026) a projeção traz `created_at` —
     // antes disso só dava para ordenar por ele no servidor, sem ver o valor.
     criado_em: paraIso(linha.created_at),
+    ultima_interacao_em: paraIso(linha.last_interaction_at),
   };
 }
 
@@ -787,6 +799,8 @@ export async function exportar(
       Status: STATUS_PACIENTE_LABEL[item.status],
       "Acesso ao app": STATUS_CONVITE_LABEL[item.convite_status],
       "Cadastrado em": formatDate(item.criado_em),
+      // Date and time: a list sorted by it is how a team finds who went quiet.
+      "Última interação": item.ultima_interacao_em ? formatDateTime(item.ultima_interacao_em) : "",
     }));
 
     await logarExportacao({ escopo: "pacientes_lista", linhas: linhas.length });

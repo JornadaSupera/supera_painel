@@ -55,6 +55,13 @@ export interface PacienteListItem {
    * — são coisas diferentes, e a ficha, que lê a linha inteira, tem o valor.
    */
   criado_em: string | null;
+  /**
+   * The last message the patient (or whoever accompanies them) sent in the chat.
+   * Only the list carries it; the record's read does not, so there it is `null`.
+   * Under the same secrecy as the chat: a confidential conversation only counts
+   * for whoever can see it.
+   */
+  ultima_interacao_em: string | null;
 }
 
 /** Um diagnóstico registrado na ficha. O principal é o que conduz o tratamento. */
