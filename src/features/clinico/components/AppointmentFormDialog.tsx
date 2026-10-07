@@ -74,6 +74,7 @@ export function AppointmentFormDialog({
   defaultDay,
   access,
   area,
+  patient = null,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -82,8 +83,10 @@ export function AppointmentFormDialog({
   /** The day a new appointment starts on. */
   defaultDay: string;
   access: SchedulingAccess | null;
-  /** The booker\x27s own area: it decides who sees a session, so Psychology stays in Psychology. */
+  /** The booker's own area: it decides who sees a session, so Psychology stays in Psychology. */
   area: Especialidade | null;
+  /** Who a new appointment is for, when the dialog opens from that patient's record. */
+  patient?: { id: string; name: string } | null;
 }) {
   const moving = appointment !== null;
 
@@ -96,7 +99,13 @@ export function AppointmentFormDialog({
           (moving ? (
             <RescheduleBody appointment={appointment} onClose={() => onOpenChange(false)} access={access} />
           ) : (
-            <BookBody defaultDay={defaultDay} onClose={() => onOpenChange(false)} access={access} area={area} />
+            <BookBody
+              defaultDay={defaultDay}
+              onClose={() => onOpenChange(false)}
+              access={access}
+              area={area}
+              patient={patient}
+            />
           ))}
       </DialogContent>
     </Dialog>
@@ -107,7 +116,7 @@ export function AppointmentFormDialog({
    UNAVAILABLE
    ------------------------------------------------------------------------- */
 
-/** The day\x27s unavailable intervals, and whether the chosen window touches the professional\x27s. */
+/** The day's unavailable intervals, and whether the chosen window touches the professional's. */
 function useBusyWarning(date: string, startsAt: string, endsAt: string, professionalId: string | null) {
   const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
   const busy = useBusyIntervals(
@@ -156,7 +165,7 @@ function RescheduleBody({
     }
   }, [values]);
 
-  // The personal agenda only holds the caller\x27s own appointments.
+  // The personal agenda only holds the caller's own appointments.
   const unavailable = useBusyWarning(values.date, window.starts_at, window.ends_at, access?.professional_id ?? null);
 
   const submit = handleSubmit((form) => {
@@ -205,24 +214,26 @@ function BookBody({
   onClose,
   access,
   area,
+  patient,
 }: {
   defaultDay: string;
   onClose: () => void;
   access: SchedulingAccess | null;
   area: Especialidade | null;
+  patient: { id: string; name: string } | null;
 }) {
   const schedule = useScheduleAppointment();
   const types = useAppointmentTypes();
   const targets = useTransferTargets(true);
 
-  const [patientName, setPatientName] = useState<string | null>(null);
+  const [patientName, setPatientName] = useState<string | null>(patient?.name ?? null);
   const [term, setTerm] = useState("");
   const patients = usePatientSearch(patientName ? "" : term);
 
   const { register, handleSubmit, setValue, watch, control, formState } = useForm<AppointmentForm>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
-      patientId: "",
+      patientId: patient?.id ?? "",
       typeId: "",
       title: "",
       date: defaultDay,
@@ -247,8 +258,8 @@ function BookBody({
 
   const unavailable = useBusyWarning(values.date, window.starts_at, window.ends_at, professionalId);
 
-  // The area the session belongs to follows who it is for: the caller\x27s own, or
-  // the colleague\x27s main one. A session of a confidential area booked by someone
+  // The area the session belongs to follows who it is for: the caller's own, or
+  // the colleague's main one. A session of a confidential area booked by someone
   // outside it is refused by the database, and says so.
   const originSpecialty: Especialidade | null = values.professional === "me" ? area : (target?.specialties[0] ?? null);
 
