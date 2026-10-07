@@ -39,7 +39,9 @@ export function useFilaRevisao() {
   });
 
   const { items, ...status } = toListQuery(query);
-  return { ...status, fila: items };
+  // Read on purpose: the bell's link waits for the fresh read before marking
+  // what has waited the longest.
+  return { ...status, isFetching: query.isFetching, fila: items };
 }
 
 /** A lista "Publicados", com busca, filtros e paginação. */

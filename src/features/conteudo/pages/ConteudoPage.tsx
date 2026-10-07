@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { useAuth } from "@/contexts/auth-context";
+import { useFlashTarget } from "@/hooks/useFlashTarget";
 
 import {
   BackendPendente,
@@ -62,6 +64,16 @@ export function ConteudoPage() {
   const fila = useFilaRevisao();
   const publicados = useConteudos();
   const revisar = useRevisarConteudo();
+
+  // `?destaque=fila` comes from the bell: after the fresh read, the item that
+  // has waited the longest (the queue is oldest first) is brought into view.
+  const destacarFila = useSearchParams()[0].get("destaque") === "fila";
+  const [filaLida, setFilaLida] = useState(false);
+  useEffect(() => {
+    if (destacarFila && !fila.isLoading && !fila.isFetching) setFilaLida(true);
+  }, [destacarFila, fila.isLoading, fila.isFetching]);
+  const maisAntigo = destacarFila && filaLida ? (fila.fila[0] ?? null) : null;
+  const realcado = useFlashTarget(maisAntigo ? `revisao-${maisAntigo.id}` : null, maisAntigo !== null);
 
   const busca = useConteudosStore((estado) => estado.busca);
   const filtros = useConteudosStore((estado) => estado.filtros);
@@ -219,10 +231,17 @@ export function ConteudoPage() {
           />
         )}
 
+        {maisAntigo && (
+          <p role="status" className="text-muted-foreground -mt-1 text-xs">
+            Em destaque: a orientação que espera revisão há mais tempo.
+          </p>
+        )}
+
         {fila.fila.map((conteudo) => (
           <CartaoRevisao
             key={conteudo.id}
             conteudo={conteudo}
+            realcado={realcado === `revisao-${conteudo.id}`}
             ocupado={revisar.isPending}
             onDecidir={abrirDecisao}
             onAbrir={setEmLeitura}

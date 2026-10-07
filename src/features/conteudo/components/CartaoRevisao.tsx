@@ -3,9 +3,11 @@ import { Check, PenLine, X } from "lucide-react";
 import { StatusBadge, UserAvatar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
+import { flashClass } from "@/hooks/useFlashTarget";
 import { ACAO_REVISAO, TIPO_CONTEUDO_LABEL, type AcaoRevisao } from "@/lib/enums";
 import { relativeTime } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
+import { cn } from "@/lib/utils";
 import type { ConteudoListItem } from "@/types/conteudo";
 
 /**
@@ -33,15 +35,24 @@ export interface CartaoRevisaoProps {
   onAbrir: (conteudo: ConteudoListItem) => void;
   /** Trava as ações do cartão enquanto uma decisão está sendo enviada. */
   ocupado?: boolean;
+  /** Marked for a moment: the item the bell's link pointed to. */
+  realcado?: boolean;
 }
 
-export function CartaoRevisao({ conteudo, onDecidir, onAbrir, ocupado }: CartaoRevisaoProps) {
+export function CartaoRevisao({ conteudo, onDecidir, onAbrir, ocupado, realcado = false }: CartaoRevisaoProps) {
   const { can } = useAuth();
 
   const podeDecidir = can(PERMISSAO.CONTEUDO_APPROVE);
 
   return (
-    <article className="bg-card flex flex-col gap-3 rounded-2xl border p-4 md:flex-row md:items-start md:justify-between md:gap-6">
+    <article
+      // The DOM id the bell's link scrolls to — see `ConteudoPage`.
+      id={`revisao-${conteudo.id}`}
+      className={cn(
+        "bg-card flex scroll-mt-20 flex-col gap-3 rounded-2xl border p-4 md:flex-row md:items-start md:justify-between md:gap-6",
+        flashClass(realcado),
+      )}
+    >
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <button
