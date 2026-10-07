@@ -1,10 +1,11 @@
-import { MailX, Unlink } from "lucide-react";
+import { Info, MailX, Unlink } from "lucide-react";
 
 import { Can, DetailField } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { formatDate, formatDateTime, relativeTime } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import { STATUS_CONVITE_LABEL, type PacienteDetalhe } from "@/types/paciente";
+import { isBelowAppMinimumAge, UNDERAGE_INVITE_REASON } from "../appAccess";
 import { useCancelarConvite } from "../hooks/usePacientes";
 
 /**
@@ -47,6 +48,15 @@ export function AppAccessDetails({
           <span className="tabular-nums">{formatDate(paciente.criado_em)}</span>
         </DetailField>
       </dl>
+
+      {/* Why "Emitir convite" is off for this record, in writing: the header
+          only says it on hover. A record already linked keeps its link. */}
+      {paciente.convite_status !== "aceito" && isBelowAppMinimumAge(paciente.nascimento) && (
+        <p className="text-muted-foreground flex gap-2 text-xs">
+          <Info size={14} aria-hidden="true" className="mt-0.5 shrink-0" />
+          {UNDERAGE_INVITE_REASON}
+        </p>
+      )}
 
       <Can permission={PERMISSAO.PACIENTES_WRITE}>
         <div className="flex flex-wrap gap-2 border-t pt-3">
