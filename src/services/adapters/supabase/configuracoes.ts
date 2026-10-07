@@ -46,7 +46,8 @@ const TIPOS_ACEITOS_LOGO = ["image/png", "image/jpeg", "image/webp"];
  *    uma vez. Retirar e reativar são a MESMA função,
  *    `set_vocabulary_term_active`, nos dois sentidos — a leitura não filtra
  *    por `is_active`, então um termo retirado continua visível e reversível.
- *    Criar termo novo continua fora do painel: nenhuma RPC insere, só migração.
+ *    Criar termo novo: o painel cadastra sintoma (`criarSintoma`). Os outros
+ *    vocabulários também têm função de criação no banco, ainda sem tela.
  *  - **Operação** (documento legal, limiar de alerta, motivo de situação) tem
  *    escrita completa, inclusive criação. São decisões da clínica que mudam
  *    com a rotina dela.
@@ -258,6 +259,85 @@ export async function setTermoVocabularioAtivo({
     if (error) return falhaDe(error);
     return termoDoVocabulario(vocabulario, id);
   });
+}
+
+/**
+ * O código técnico de um termo, derivado do rótulo: "Dor de cabeça" vira
+ * `dor_de_cabeca`. Sem acento, só letras minúsculas e sublinhado — a única
+ * forma que o banco aceita. Dígitos saem pelo mesmo motivo.
+ */
+function codigoDoRotulo(rotulo: string): string {
+  return rotulo
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/**
+ * Cadastra um sintoma — `create_symptom`, só do administrador.
+ *
+ * Dois rótulos que dão o mesmo código ("Náusea" e "nausea") seriam o mesmo
+ * sintoma para o diário e para os relatórios. O banco recusa o segundo pelo
+ * código único; a checagem antes da chamada existe para dizer qual sintoma já
+ * ocupa aquele lugar, e se ele está retirado, em vez de uma recusa genérica.
+ */
+export async function criarSintoma({
+  label,
+  psicologico,
+}: {
+  label: string;
+  psicologico: boolean;
+}): Promise<SingleResult<ItemCatalogo>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+    const rotulo = label.trim();
+    const codigo = codigoDoRotulo(rotulo);
+
+    if (!codigo) return fail(ERROR_CODE.VALIDATION, "O nome do sintoma precisa ter letras.");
+
+    const { data, error: erroLeitura } = await supabase
+      .from("symptoms")
+      .select("code, label, is_active, sort_order")
+      .order("sort_order", { ascending: false });
+
+    if (erroLeitura) return falhaDe(erroLeitura);
+
+    const existentes = data as LinhaSintoma[];
+    const ocupado = existentes.find((linha) => linha.code === codigo);
+
+    if (ocupado) {
+      return fail(
+        ERROR_CODE.CONFLICT,
+        ocupado.is_active
+          ? `Já existe o sintoma “${ocupado.label}”, que o diário trata como o mesmo.`
+          : `Já existe o sintoma “${ocupado.label}”, retirado. Reative-o na lista em vez de cadastrar de novo.`,
+      );
+    }
+
+    const { data: id, error } = await supabase.rpc("create_symptom", {
+      p_code: codigo,
+      p_label: rotulo,
+      // Fim da lista: a leitura acima vem do maior para o menor.
+      p_sort_order: (existentes[0]?.sort_order ?? 0) + 1,
+      p_is_psychological: psicologico,
+    });
+
+    if (error) return falhaDe(error);
+    if (typeof id !== "string") {
+      return fail(ERROR_CODE.UNKNOWN, "O cadastro não devolveu o identificador do sintoma.");
+    }
+
+    return termoDoVocabulario("symptoms", id);
+  });
+}
+
+interface LinhaSintoma {
+  code: string;
+  label: string;
+  is_active: boolean;
+  sort_order: number;
 }
 
 /* -------------------------------------------------------------------------

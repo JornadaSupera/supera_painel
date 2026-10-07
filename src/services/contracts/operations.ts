@@ -926,6 +926,18 @@ export interface ConfiguracoesOperations {
     ativo: boolean;
   }): Promise<SingleResult<ItemCatalogo>>;
 
+  /**
+   * Cadastra um sintoma no diário, no fim da lista.
+   *
+   * O código técnico não é parâmetro: a camada de dados o deriva do rótulo.
+   * Ele nunca aparece na tela e não muda depois de criado — é o que o diário,
+   * os relatórios e os gatilhos de alerta usam para apontar para o sintoma.
+   */
+  criarSintoma(params: {
+    label: string;
+    psicologico: boolean;
+  }): Promise<SingleResult<ItemCatalogo>>;
+
   /** Identidade visual, mensagens e horário — `clinic_settings`, desde 25/09/2026. */
   getClinica(): Promise<SingleResult<ClinicaConfiguracao>>;
 
