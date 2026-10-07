@@ -17,7 +17,8 @@ import { OrigemDosDados } from "./OrigemDosDados";
  *
  * The allergies are not repeated here: they live in the header, on every tab.
  * Both panels read this same tab, the administration included, so the
- * registration data it checks (code, birth date, sex) is here too.
+ * registration data it checks (code, CPF, birth date, sex) is here too. The CPF
+ * also sits in the header, but whoever checks a registration reads this card.
  */
 export function PatientGeneralTab({
   paciente,
@@ -92,6 +93,15 @@ export function PatientGeneralTab({
           <dl className="flex flex-col gap-3">
             <DetailRow label="Código">
               <span className="font-mono text-xs tabular-nums">{paciente.codigo}</span>
+            </DetailRow>
+
+            <DetailRow label="CPF">
+              <CampoSensivel
+                pacienteId={paciente.id}
+                campo="cpf"
+                mascarado={paciente.cpf_mascarado}
+                nomePaciente={paciente.nome}
+              />
             </DetailRow>
 
             <DetailRow label="Nascimento">
