@@ -107,6 +107,8 @@ export const queryKeys = {
     run: <P extends QueryKeyParams<P>>(slug: string, params?: P | null) => ["reports", "run", slug, params ?? {}] as const,
     schedules: () => ["reports", "schedules"] as const,
     runs: () => ["reports", "runs"] as const,
+    /** One generation, opened from a "report ready" notification. */
+    execution: (id: string) => ["reports", "runs", id] as const,
   },
 
   statistics: {
@@ -149,6 +151,8 @@ export const queryKeys = {
     all: ["notifications"] as const,
     list: () => ["notifications", "list"] as const,
     unread: () => ["notifications", "unread"] as const,
+    /** The newest unread ones, read only when the count goes up: what is new, to announce. */
+    unreadList: () => ["notifications", "unread-list"] as const,
     /** The admin's pending queues, counted. */
     pending: () => ["notifications", "pending"] as const,
     /**
@@ -157,6 +161,8 @@ export const queryKeys = {
      * again — each one is a line on the audit trail.
      */
     patientNames: (ids: readonly string[]) => ["notification-patient-names", ...ids] as const,
+    /** Every set of names already read — where a toast looks, never asking for one. */
+    patientNamesAll: () => ["notification-patient-names"] as const,
   },
   clinico: {
     all: ["clinico"] as const,
@@ -167,8 +173,12 @@ export const queryKeys = {
     schedulingAccess: () => ["clinico", "scheduling-access"] as const,
     /** When people on the team cannot take appointments, in a window. */
     busyIn: (from: string, to: string) => ["clinico", "busy", from, to] as const,
+    /** Every window of busy times — they come from personal blocks: what saving one must refresh. */
+    busyAll: () => ["clinico", "busy"] as const,
     /** Sem status = a fila inteira; `undefined` vira `"todos"`, para a chave não colidir com "sem filtro nenhum". */
     alertas: (status?: string) => ["clinico", "alertas", status ?? "todos"] as const,
+    /** Every reading of the alert queue, by status or not: what opening one alert must refresh. */
+    alertasAll: () => ["clinico", "alertas"] as const,
     conversas: () => ["clinico", "conversas"] as const,
     /** Average minutes to the first reply over the last N days. */
     tempoDeResposta: (dias: number) => ["clinico", "tempo-de-resposta", dias] as const,

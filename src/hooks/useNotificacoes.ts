@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { queryKeys } from "@/lib/queryKeys";
@@ -6,9 +6,13 @@ import { REFRESH_MS } from "@/lib/refresh";
 import { call, notificacoesApi } from "@/services/apiClient";
 
 /**
- * The bell's data. Polled, not live: a minute is close enough for an inbox, and
- * the queries pause with the tab in the background. Any action taken in the
- * panel refreshes it at once — see the mutation cache in `app/providers`.
+ * The bell's data. Polled, not live: a minute is close enough for an inbox.
+ * Any action taken in the panel refreshes it at once — see the mutation cache
+ * in `app/providers`.
+ *
+ * The counts keep polling with the tab in the background, unlike every screen:
+ * they are head counts of the person's own rows, with nothing on the audit
+ * trail, and they are what puts "(3)" on a tab nobody is looking at.
  */
 const INTERVALO = REFRESH_MS.livre;
 
@@ -26,6 +30,20 @@ export function useNaoLidas() {
     queryKey: queryKeys.notifications.unread(),
     queryFn: async () => (await call(() => notificacoesApi.contarNaoLidas())).data,
     refetchInterval: INTERVALO,
+    refetchIntervalInBackground: true,
+  });
+}
+
+/**
+ * The newest unread notifications, read on demand when the count goes up: the
+ * count says something arrived, this says what. A plain read of the person's
+ * own rows, no audited read.
+ */
+export function lerNaoLidas(queryClient: QueryClient) {
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.notifications.unreadList(),
+    queryFn: async () => (await call(() => notificacoesApi.list({ naoLidas: true }))).data,
+    staleTime: 0,
   });
 }
 
@@ -50,6 +68,7 @@ export function usePendenciasAdmin(enabled: boolean) {
     queryFn: async () => (await call(() => notificacoesApi.getPendenciasAdmin())).data,
     enabled,
     refetchInterval: INTERVALO,
+    refetchIntervalInBackground: true,
   });
 }
 
@@ -58,6 +77,22 @@ export function useMarcarNotificacaoLida() {
 
   return useMutation({
     mutationFn: async (id: string) => (await call(() => notificacoesApi.marcarLida({ id }))).data,
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+  });
+}
+
+/**
+ * Marks as read what announced an item the person just acted on — taking or
+ * resolving an alert, opening a conversation. Silent: a failure here leaves a
+ * notification unread, which the bell still lets them clear, and must not
+ * cover the action's own confirmation with an error.
+ */
+export function useMarcarLidasDoAlvo() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { tabela: string; id: string }) =>
+      (await call(() => notificacoesApi.marcarLidasDoAlvo(params))).data,
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all }),
   });
 }

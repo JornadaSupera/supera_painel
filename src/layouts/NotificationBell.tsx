@@ -1,19 +1,11 @@
-import {
-  Bell,
-  CheckCheck,
-  FileText,
-  MessageCircle,
-  Scale,
-  SquarePen,
-  TriangleAlert,
-} from "lucide-react";
-import { useState, type ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Bell, CheckCheck, Scale, SquarePen } from "lucide-react";
+import { useState, type MouseEvent, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAuth } from "@/contexts/auth-context";
 import {
-  useMarcarNotificacaoLida,
   useMarcarTodasLidas,
   useNaoLidas,
   useNomesDasNotificacoes,
@@ -24,6 +16,14 @@ import type { Especialidade } from "@/lib/enums";
 import { pluralize, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { PRAZO_PEDIDO_TITULAR_DIAS, type NotificacaoItem } from "@/types/notificacao";
+import {
+  PENDING_TARGETS,
+  iconOf,
+  useOpenNotification,
+  useOpenPending,
+  type PendingTarget,
+} from "./notification-targets";
+import { useNotificationToasts } from "./useNotificationToasts";
 
 /**
  * The bell in the top bar: what is waiting for the signed-in person.
@@ -32,48 +32,42 @@ import { PRAZO_PEDIDO_TITULAR_DIAS, type NotificacaoItem } from "@/types/notific
  * conversation handed to you, a scheduled report ready — read and marked by each
  * account for itself. And, for the administration, the queues no notification
  * announces: data-subject requests to decide and content waiting for review.
- * The number on the bell is the sum of both.
+ * The number on the bell is the sum of both, and the same number goes in front
+ * of the tab title.
  *
  * Each notification about a patient says whose it is: "Alerta de sintoma
  * crítico" alone does not tell anyone what to open first. The names are read
  * only when the bell opens, one audited read per patient, and kept for minutes.
+ *
+ * Opening one goes to the item itself, not only to its screen — see
+ * `notification-targets`. What arrives while the person is elsewhere is
+ * announced by a toast — see `useNotificationToasts`.
  */
 
-function iconeDe(item: NotificacaoItem) {
-  if (item.alvo_tabela === "alerts") return TriangleAlert;
-  if (item.alvo_tabela === "conversations") return MessageCircle;
-  if (item.alvo_tabela === "report_runs") return FileText;
-  return Bell;
-}
-
-/** Where the click goes. `null` when the panel has no screen for it. */
-function destinoDe(item: NotificacaoItem, especialidade: Especialidade | null): string | null {
-  const base = especialidade ? `/clinico/${especialidade}` : null;
-  if (item.alvo_tabela === "alerts") return base ? `${base}/alertas` : null;
-  if (item.alvo_tabela === "conversations") {
-    if (!base) return null;
-    return item.paciente_id ? `${base}/chat?paciente=${item.paciente_id}` : `${base}/chat`;
-  }
-  if (item.alvo_tabela === "report_runs") return "/relatorios";
-  return null;
-}
-
 function LinhaPendencia({
-  to,
+  target,
   icone,
   children,
-  onNavigate,
+  onOpen,
 }: {
-  to: string;
+  target: PendingTarget;
   icone: ReactNode;
   children: ReactNode;
-  onNavigate: () => void;
+  onOpen: (target: PendingTarget) => void;
 }) {
+  // A real link, so it can still open in a new tab; a plain click goes through
+  // `onOpen`, which marks the queue stale before going.
+  const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+    event.preventDefault();
+    onOpen(target);
+  };
+
   return (
     <li>
       <Link
-        to={to}
-        onClick={onNavigate}
+        to={PENDING_TARGETS[target].to}
+        onClick={onClick}
         className="hover:bg-muted/60 focus-visible:ring-ring flex items-start gap-2.5 px-4 py-2.5 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
       >
         <span aria-hidden="true" className="text-primary-ink mt-0.5 shrink-0">
@@ -94,7 +88,7 @@ export function NotificationBell({
   podeAprovarConteudo: boolean;
   especialidade: Especialidade | null;
 }) {
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [aberto, setAberto] = useState(false);
 
   const naoLidas = useNaoLidas();
@@ -106,8 +100,9 @@ export function NotificationBell({
     ),
   ].sort();
   const nomes = useNomesDasNotificacoes(idsPacientes, aberto);
-  const marcarLida = useMarcarNotificacaoLida();
   const marcarTodas = useMarcarTodasLidas();
+  const abrirNotificacao = useOpenNotification(especialidade);
+  const abrirPendencia = useOpenPending();
 
   const p = pendencias.data;
   const pendentes =
@@ -119,15 +114,22 @@ export function NotificationBell({
   const naoLidasTotal = naoLidas.data?.total ?? 0;
   const total = naoLidasTotal + pendentes;
 
-  const fechar = () => setAberto(false);
+  useNotificationToasts({
+    account: user?.id ?? null,
+    unread: naoLidas.data?.total,
+    pending: admin ? (pendencias.data ?? undefined) : undefined,
+    canReview: podeAprovarConteudo,
+    especialidade,
+    onOpenInbox: () => setAberto(true),
+  });
 
   const abrir = (item: NotificacaoItem) => {
-    if (!item.lida) marcarLida.mutate(item.id);
-    const destino = destinoDe(item, especialidade);
-    if (destino) {
-      fechar();
-      navigate(destino);
-    }
+    if (abrirNotificacao(item)) setAberto(false);
+  };
+
+  const abrirFila = (target: PendingTarget) => {
+    setAberto(false);
+    abrirPendencia(target);
   };
 
   const rotulo =
@@ -191,9 +193,9 @@ export function NotificationBell({
                 <ul className="pb-1">
                   {p && p.pedidos_titular_abertos > 0 && (
                     <LinhaPendencia
-                      to="/configuracoes?aba=lgpd"
+                      target="requests"
                       icone={<Scale size={16} />}
-                      onNavigate={fechar}
+                      onOpen={abrirFila}
                     >
                       {pluralize(
                         p.pedidos_titular_abertos,
@@ -210,9 +212,9 @@ export function NotificationBell({
                   )}
                   {p && p.pedidos_titular_com_falha > 0 && (
                     <LinhaPendencia
-                      to="/configuracoes?aba=lgpd"
+                      target="failedRequests"
                       icone={<Scale size={16} />}
-                      onNavigate={fechar}
+                      onOpen={abrirFila}
                     >
                       {pluralize(
                         p.pedidos_titular_com_falha,
@@ -223,9 +225,9 @@ export function NotificationBell({
                   )}
                   {p && podeAprovarConteudo && p.conteudos_em_revisao > 0 && (
                     <LinhaPendencia
-                      to="/conteudo"
+                      target="review"
                       icone={<SquarePen size={16} />}
-                      onNavigate={fechar}
+                      onOpen={abrirFila}
                     >
                       {pluralize(
                         p.conteudos_em_revisao,
@@ -256,7 +258,7 @@ export function NotificationBell({
             ) : (
               <ul className="divide-y">
                 {(lista.data ?? []).map((item) => {
-                  const Icone = iconeDe(item);
+                  const Icone = iconOf(item);
                   const paciente = item.paciente_id ? nomes.data?.[item.paciente_id] : undefined;
                   return (
                     <li key={item.id}>
