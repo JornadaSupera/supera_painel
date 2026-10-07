@@ -1,10 +1,12 @@
 import { CircleCheck, Clock, NotebookPen } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import {
   EmptyState,
   ErrorState,
+  FilterChip,
+  FilterChipGroup,
   PageHeader,
   SectionHeading,
   SkeletonCards,
@@ -78,6 +80,26 @@ const PASSO_HISTORICO = 10;
 /** O teto de `read_alerts`: com isto na mão, pode haver mais do que a tela alcança. */
 const TETO_LEITURA = 200;
 
+/**
+ * Situação da fila. "Todos" é a tela sem filtro: os ativos e, embaixo, os
+ * resolvidos recentes. Os demais mostram só a lista daquela situação.
+ */
+const FILTROS_SITUACAO = [
+  { value: "", label: "Todos" },
+  { value: "pendente", label: "Pendentes" },
+  { value: "assumido", label: "Em atendimento" },
+  { value: "resolvido", label: "Resolvidos" },
+] as const;
+
+type FiltroSituacao = (typeof FILTROS_SITUACAO)[number]["value"];
+
+function lerGravidade(valor: string | null): Severidade | null {
+  return ORDEM_SEVERIDADE.find((severidade) => severidade === valor) ?? null;
+}
+
+function lerSituacao(valor: string | null): FiltroSituacao {
+  return FILTROS_SITUACAO.find((filtro) => filtro.value === valor)?.value ?? "";
+}
 
 export function ClinicoAlertasPage() {
   const { user } = useAuth();
@@ -94,6 +116,30 @@ export function ClinicoAlertasPage() {
   const [emDesignacao, setEmDesignacao] = useState<AlertaClinico | null>(null);
   const [visiveis, setVisiveis] = useState(PASSO_HISTORICO);
 
+  // Os filtros ficam no endereço: sobrevivem à releitura da página e vão junto
+  // quando alguém manda o link da fila filtrada para um colega.
+  const [params, setParams] = useSearchParams();
+  const gravidade = lerGravidade(params.get("gravidade"));
+  const situacao = lerSituacao(params.get("situacao"));
+  const filtrando = gravidade !== null || situacao !== "";
+
+  function filtrar(chave: "gravidade" | "situacao", valor: string) {
+    setParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual);
+        if (valor) proximo.set(chave, valor);
+        else proximo.delete(chave);
+        return proximo;
+      },
+      { replace: true },
+    );
+  }
+
+  function limparFiltros() {
+    filtrar("gravidade", "");
+    filtrar("situacao", "");
+  }
+
   const fila = {
     isLoading: pendentes.isLoading || emAtendimento.isLoading,
     isError: pendentes.isError || emAtendimento.isError,
@@ -109,7 +155,15 @@ export function ClinicoAlertasPage() {
   const todosResolvidos = [...(historico.data ?? [])].sort((a, b) =>
     (b.resolvido_em ?? "").localeCompare(a.resolvido_em ?? ""),
   );
-  const resolvidos = todosResolvidos.slice(0, visiveis);
+
+  const daGravidade = (alerta: AlertaClinico) => !gravidade || alerta.severidade === gravidade;
+  const mostraAtivos = situacao !== "resolvido";
+  const mostraResolvidos = situacao === "" || situacao === "resolvido";
+  const ativosFiltrados = ativos.filter(
+    (alerta) => daGravidade(alerta) && (!situacao || alerta.status === situacao),
+  );
+  const resolvidosFiltrados = todosResolvidos.filter(daGravidade);
+  const resolvidos = resolvidosFiltrados.slice(0, visiveis);
   const historicoTruncado = (historico.data?.length ?? 0) >= TETO_LEITURA;
 
   const contagem = ORDEM_SEVERIDADE.map((severidade) => ({
@@ -169,13 +223,60 @@ export function ClinicoAlertasPage() {
             ))}
           </div>
 
-          {ativos.length === 0 ? (
-            <EmptyState compact title="Nenhum alerta ativo" description="Todos os alertas foram resolvidos." />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <FilterChipGroup label="Filtrar por gravidade">
+              <FilterChip active={!gravidade} onClick={() => filtrar("gravidade", "")}>
+                Todas as gravidades
+              </FilterChip>
+              {ORDEM_SEVERIDADE.map((severidade) => (
+                <FilterChip
+                  key={severidade}
+                  active={gravidade === severidade}
+                  onClick={() => filtrar("gravidade", severidade)}
+                >
+                  {SEVERIDADE_LABEL[severidade]}
+                </FilterChip>
+              ))}
+            </FilterChipGroup>
+
+            <FilterChipGroup label="Filtrar por situação" className="sm:border-l sm:pl-4">
+              {FILTROS_SITUACAO.map((filtro) => (
+                <FilterChip
+                  key={filtro.value || "todos"}
+                  active={situacao === filtro.value}
+                  onClick={() => filtrar("situacao", filtro.value)}
+                >
+                  {filtro.label}
+                </FilterChip>
+              ))}
+            </FilterChipGroup>
+          </div>
+
+          {!mostraAtivos ? null : ativosFiltrados.length === 0 ? (
+            filtrando ? (
+              <EmptyState
+                compact
+                variant="search"
+                title="Nenhum alerta ativo com esses filtros"
+                description="Troque a gravidade ou a situação para ver os outros."
+                action={
+                  <Button variant="outline" size="sm" onClick={limparFiltros}>
+                    Limpar filtros
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                compact
+                title="Nenhum alerta ativo"
+                description="Todos os alertas foram resolvidos."
+              />
+            )
           ) : (
             <section className="flex flex-col gap-2">
               <SectionHeading>Ativos</SectionHeading>
 
-              {ativos.map((alerta) => (
+              {ativosFiltrados.map((alerta) => (
                 <article
                   key={alerta.id}
                   className={cn(
@@ -256,11 +357,25 @@ export function ClinicoAlertasPage() {
             </section>
           )}
 
-          {historico.isError && (
+          {mostraResolvidos && historico.isError && (
             <ErrorState compact error={historico.error} onRetry={() => void historico.refetch()} />
           )}
 
-          {resolvidos.length > 0 && (
+          {situacao === "resolvido" && !historico.isError && resolvidos.length === 0 && (
+            <EmptyState
+              compact
+              variant="search"
+              title="Nenhum alerta resolvido com esses filtros"
+              description="Troque a gravidade para ver os outros."
+              action={
+                <Button variant="outline" size="sm" onClick={limparFiltros}>
+                  Limpar filtros
+                </Button>
+              }
+            />
+          )}
+
+          {mostraResolvidos && resolvidos.length > 0 && (
             <section className="flex flex-col gap-2" aria-labelledby="historico-alertas">
               <SectionHeading id="historico-alertas">Resolvidos recentemente</SectionHeading>
 
@@ -302,12 +417,12 @@ export function ClinicoAlertasPage() {
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-muted-foreground text-xs">
-                  Mostrando {resolvidos.length} de {todosResolvidos.length}
+                  Mostrando {resolvidos.length} de {resolvidosFiltrados.length}
                   {historicoTruncado
                     ? `. O banco entrega no máximo ${TETO_LEITURA} de cada vez, dos mais antigos para os mais novos: pode haver resolvidos mais recentes que não chegam aqui.`
                     : ""}
                 </p>
-                {resolvidos.length < todosResolvidos.length && (
+                {resolvidos.length < resolvidosFiltrados.length && (
                   <Button
                     type="button"
                     variant="outline"
