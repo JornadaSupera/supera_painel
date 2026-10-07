@@ -45,6 +45,20 @@ export const ESPECIALIDADE_LABEL: Record<Especialidade, string> = {
   fisioterapeuta: "Fisioterapeuta",
 };
 
+/**
+ * The field each specialty works in — "a equipe de Psicologia", where the
+ * label above names the person ("Psicólogo").
+ */
+export const SPECIALTY_FIELD_LABEL: Record<Especialidade, string> = {
+  medico_oncologista: "Oncologia",
+  farmaceutico: "Farmácia",
+  enfermeiro: "Enfermagem",
+  nutricionista: "Nutrição",
+  psicologo: "Psicologia",
+  dentista: "Odontologia",
+  fisioterapeuta: "Fisioterapia",
+};
+
 /** Conselho profissional por especialidade — usado na validação do registro. */
 export const CONSELHO_POR_ESPECIALIDADE: Record<Especialidade, string> = {
   medico_oncologista: "CRM",

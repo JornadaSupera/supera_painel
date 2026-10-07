@@ -118,6 +118,25 @@ export function todayKey(now = new Date()): string {
   return instantParts(now.toISOString()).key;
 }
 
+/** Whole calendar days from one day key to another (`to - from`). */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((fromKey(to).getTime() - fromKey(from).getTime()) / 86_400_000);
+}
+
+/**
+ * "Hoje", "Amanhã", "Ontem", "Em 3 dias", "Há 2 dias" — the day of an instant
+ * next to today, in the clinic's zone. Past a week it is `null`: "em 23 dias"
+ * locates nothing, and the date does.
+ */
+export function relativeDay(iso: string, now = new Date()): string | null {
+  const diff = daysBetween(todayKey(now), instantParts(iso).key);
+  if (diff === 0) return "Hoje";
+  if (diff === 1) return "Amanhã";
+  if (diff === -1) return "Ontem";
+  if (Math.abs(diff) > 6) return null;
+  return diff > 0 ? `Em ${diff} dias` : `Há ${-diff} dias`;
+}
+
 /**
  * The instant of a wall-clock time in the clinic's zone.
  *

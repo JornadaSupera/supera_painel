@@ -1,3 +1,4 @@
+import type { Severidade } from "@/lib/enums";
 import type { TimelineWindow } from "@/types/patient-record";
 
 /**
@@ -29,3 +30,18 @@ export function specialtyNoteError(body: string): string | null {
   }
   return null;
 }
+
+/** How many diary entries the record shows at a time. */
+export const DIARY_PAGE_SIZE = 5;
+
+/**
+ * A diary entry described by its strongest symptom, on the alerts' scale. The
+ * words are the patient's side of it — how the day went — and not the alert's
+ * "baixa / média", which names a priority.
+ */
+export const DIARY_INTENSITY_LABEL: Record<Severidade, string> = {
+  baixa: "Leve",
+  media: "Moderado",
+  alta: "Intenso",
+  critica: "Crítico",
+};

@@ -9,8 +9,9 @@ import { call, clinicoApi } from "@/services/apiClient";
 import type { TimelineWindow } from "@/types/patient-record";
 
 /**
- * The patient record: the timeline, the symptoms of a diary entry, and the two
- * writes a professional can make — a note and a distress flag.
+ * The patient record: the timeline, the diary, the appointments to come, the
+ * symptoms of a diary entry, and the two writes a professional can make — a note
+ * and a distress flag.
  *
  * Reading is audited by the database inside each `read_*` function, so nothing
  * here reports a read (see `lib/audit`).
@@ -32,6 +33,23 @@ export function useDiarySymptoms(entryId: string, enabled: boolean) {
     queryFn: async () => (await call(() => clinicoApi.listDiarySymptoms({ entryId }))).data,
     enabled,
     staleTime: Infinity,
+  });
+}
+
+/** The diary as a list: the record counts it on the tab and shows a few entries at a time. */
+export function usePatientDiary(patientId: string) {
+  return useQuery({
+    queryKey: queryKeys.clinico.patientDiary(patientId),
+    queryFn: async () => (await call(() => clinicoApi.listPatientDiary({ patientId }))).data,
+    refetchInterval: 120_000,
+  });
+}
+
+/** What is still to come for the patient, with anyone on the team. */
+export function useUpcomingAppointments(patientId: string) {
+  return useQuery({
+    queryKey: queryKeys.clinico.patientAgenda(patientId),
+    queryFn: async () => (await call(() => clinicoApi.listUpcomingAppointments({ patientId }))).data,
   });
 }
 

@@ -1,0 +1,230 @@
+import { Flag, Layers, Lock, Plus } from "lucide-react";
+import { useState } from "react";
+
+import { EmptyState, ErrorState, SectionHeading, SkeletonRows } from "@/components/shared";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ESPECIALIDADE,
+  ESPECIALIDADE_LABEL,
+  SPECIALTY_FIELD_LABEL,
+  type Especialidade,
+} from "@/lib/enums";
+import { usePatientTimeline } from "../hooks/usePatientRecord";
+import { SpecialtyNoteForm } from "./SpecialtyNoteForm";
+import { TimelineEvent } from "./TimelineEvent";
+
+/**
+ * The record of one specialty — the multidisciplinary view, area by area.
+ *
+ * It opens on the professional's own area, and any other one can be picked. What
+ * shows up is what the database returns for that area: notes, distress flags,
+ * conversations and appointments. Secrecy is the database's: a confidential area
+ * seen from outside comes back with its flags only, and the screen says why.
+ *
+ * Validated scales and the therapeutic plan are not here: the database has no
+ * place for them yet, and this screen does not draw a block it cannot fill.
+ */
+
+const AREAS = Object.values(ESPECIALIDADE);
+
+type Writing = "note" | "flag" | null;
+
+function ConfidentialNotice({ field }: { field: string }) {
+  return (
+    <div
+      role="note"
+      className="border-primary/40 bg-primary/5 flex items-start gap-3 rounded-xl border px-4 py-3"
+    >
+      <Lock size={18} aria-hidden="true" className="text-primary-ink mt-0.5 shrink-0" />
+      <div className="flex flex-col gap-0.5">
+        <p className="text-primary-ink text-sm font-semibold">
+          Conteúdo sigiloso · visível somente à equipe de {field}
+        </p>
+        <p className="text-sm">
+          Outros profissionais não veem o conteúdo das anotações. Eles recebem apenas a sinalização
+          de sofrimento significativo, quando clinicamente relevante.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function SpecialtyRecordTab({
+  patientId,
+  area,
+  chatHref,
+}: {
+  patientId: string;
+  /** The professional's own specialty: where the view opens, and the only one they write in. */
+  area: Especialidade;
+  chatHref: string;
+}) {
+  const [selected, setSelected] = useState<Especialidade>(area);
+  const [writing, setWriting] = useState<Writing>(null);
+
+  // The whole history: an area's record is read as a whole, not by period.
+  const timeline = usePatientTimeline(patientId, null);
+
+  const own = selected === area;
+  const field = SPECIALTY_FIELD_LABEL[selected];
+  const confidential = (timeline.data?.confidential_specialties ?? []).includes(selected);
+  const events = (timeline.data?.events ?? []).filter((event) => event.specialty === selected);
+  const canFlag = own && area === ESPECIALIDADE.PSICOLOGO;
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card className="py-4">
+        <CardContent className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              aria-hidden="true"
+              className="bg-muted text-primary-ink flex size-9 shrink-0 items-center justify-center rounded-lg"
+            >
+              <Layers size={18} />
+            </span>
+            <div className="flex min-w-0 flex-col">
+              <h2 className="text-sm font-semibold">Ficha por especialidade</h2>
+              <p className="text-muted-foreground text-xs">
+                Visão multidisciplinar — abra a ficha de qualquer especialidade da equipe.
+              </p>
+            </div>
+          </div>
+
+          <Select
+            value={selected}
+            onValueChange={(value) => {
+              setSelected(value as Especialidade);
+              setWriting(null);
+            }}
+          >
+            <SelectTrigger className="w-56" aria-label="Especialidade">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AREAS.map((option) => (
+                <SelectItem key={option} value={option}>
+                  {ESPECIALIDADE_LABEL[option]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      {timeline.isLoading && <SkeletonRows count={3} />}
+
+      {timeline.isError && (
+        <ErrorState error={timeline.error} onRetry={() => void timeline.refetch()} compact />
+      )}
+
+      {timeline.data && (
+        <>
+          {confidential && own && <ConfidentialNotice field={field} />}
+
+          {/* Above the records, not after them as in the prototype: the list grows
+              with every note, and the one act this area has for the team should
+              not end up a page away. */}
+          {canFlag && (
+            <Card>
+              <CardContent className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex max-w-3xl flex-col gap-1">
+                    <h2 className="text-sm font-semibold">Sinalização à equipe</h2>
+                    <p className="text-muted-foreground text-xs">
+                      Use esta função para avisar a equipe sobre sofrimento significativo. O conteúdo da
+                      anotação NÃO é compartilhado: a equipe vê apenas que houve a sinalização, de qual
+                      área e quando.
+                    </p>
+                  </div>
+
+                  {writing === null && (
+                    <Button type="button" variant="outline" onClick={() => setWriting("flag")}>
+                      <Flag />
+                      Sinalizar sofrimento
+                    </Button>
+                  )}
+                </div>
+
+                {writing === "flag" && (
+                  <SpecialtyNoteForm
+                    patientId={patientId}
+                    specialty={area}
+                    flagByDefault
+                    onDone={() => setWriting(null)}
+                  />
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {confidential && !own && (
+            <Alert role="status">
+              <Lock />
+              <AlertTitle>Conteúdo sob sigilo profissional</AlertTitle>
+              <AlertDescription>
+                As anotações, conversas e compromissos de {field} ficam só com a própria área. Você vê
+                apenas as sinalizações, que são para toda a equipe.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <Card>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex flex-col gap-0.5">
+                  <SectionHeading>Registros de {field}</SectionHeading>
+                  <p className="text-muted-foreground text-xs">
+                    {confidential && own
+                      ? "Anotações da área, sob sigilo, e o que mais a área fez com o paciente."
+                      : "Anotações, sinalizações, conversas e compromissos da área, do mais recente para trás."}
+                  </p>
+                </div>
+
+                {own && writing === null && (
+                  <Button type="button" variant="outline" onClick={() => setWriting("note")}>
+                    <Plus />
+                    Nova anotação
+                  </Button>
+                )}
+              </div>
+
+              {writing === "note" && (
+                <SpecialtyNoteForm patientId={patientId} specialty={area} onDone={() => setWriting(null)} />
+              )}
+
+              {events.length === 0 ? (
+                <EmptyState
+                  compact
+                  title={`Nada registrado por ${field}`}
+                  description={
+                    own
+                      ? "As anotações que você escrever aqui ficam na ficha, com seu nome e a data."
+                      : "Quando a área registrar algo com este paciente, aparece aqui."
+                  }
+                />
+              ) : (
+                <ol className="flex flex-col gap-4" aria-label={`Registros de ${field}`}>
+                  {events.map((event) => (
+                    <TimelineEvent key={`${event.kind}-${event.id}`} event={event} chatHref={chatHref} />
+                  ))}
+                </ol>
+              )}
+            </CardContent>
+          </Card>
+
+        </>
+      )}
+    </div>
+  );
+}
+
+export default SpecialtyRecordTab;

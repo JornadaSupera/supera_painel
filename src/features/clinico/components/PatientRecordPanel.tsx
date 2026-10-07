@@ -92,7 +92,7 @@ export function PatientRecordPanel({
 
   return (
     <Card>
-      <CardContent className="flex flex-col gap-4 pt-6">
+      <CardContent className="flex flex-col gap-4">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="flex flex-col gap-0.5">
             <h2 className="text-sm font-semibold">Linha do tempo multidisciplinar</h2>

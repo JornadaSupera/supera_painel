@@ -26,17 +26,20 @@ export function SpecialtyNoteForm({
   patientId,
   specialty,
   onDone,
+  flagByDefault = false,
 }: {
   patientId: string;
   specialty: Especialidade;
   onDone: () => void;
+  /** Opened from "Sinalizar sofrimento": the flag starts ticked, and stays a choice. */
+  flagByDefault?: boolean;
 }) {
   const add = useAddSpecialtyNote(patientId);
   const canFlag = specialty === ESPECIALIDADE.PSICOLOGO;
 
   const form = useForm<SpecialtyNoteForm>({
     resolver: zodResolver(specialtyNoteSchema),
-    defaultValues: { body: "", flagDistress: false },
+    defaultValues: { body: "", flagDistress: canFlag && flagByDefault },
   });
   const { register, handleSubmit, setValue, watch, reset, formState } = form;
 

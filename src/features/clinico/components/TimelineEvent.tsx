@@ -256,7 +256,9 @@ export function TimelineEvent({ event, chatHref }: { event: RecordEvent; chatHre
         <Icon size={15} />
       </span>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5 pb-1">
+      {/* Capped for reading: the record spans the whole width, and a note
+          stretched across it would be one line too long to follow. */}
+      <div className="flex max-w-4xl min-w-0 flex-1 flex-col gap-1.5 pb-1">
         <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
           <span className="text-foreground font-medium">{KIND_LABEL[event.kind]}</span>
           {event.specialty && <span>{ESPECIALIDADE_LABEL[event.specialty]}</span>}
