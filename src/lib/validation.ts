@@ -1,3 +1,4 @@
+import { isDayKey, todayKey } from "./agenda";
 import { digitsOnly } from "./mask";
 
 /**
@@ -44,59 +45,50 @@ export function isValidPhone(value: string | null | undefined): boolean {
   return digits.length === 10 || digits[2] === "9";
 }
 
-/** Today in the browser's time zone, as `YYYY-MM-DD` — the form a date field holds. */
-function localToday(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
+/*
+ * Dates are compared as `YYYY-MM-DD` text, never as instants:
+ * `new Date("2026-10-08")` is midnight UTC, which in Brasília is still 21h of
+ * the 7th, so comparing clocks let tomorrow through every evening. And "today"
+ * is the clinic's, not the browser's: it is how the database counts days, and
+ * it refused on save what the form had let through.
+ *
+ * Only a real day passes. Text that is not one — "12/03/20", half-typed — is
+ * invalid here, and never read by `new Date`, which takes it for 3 December
+ * 2020.
+ */
+
+/** The `YYYY-MM-DD` part, when it is a real calendar day; `""` otherwise. */
+function dayOf(iso: string | null | undefined): string {
+  const day = iso?.slice(0, 10) ?? "";
+  return isDayKey(day) ? day : "";
 }
 
-/**
- * A calendar day after today, in the browser's time zone.
- *
- * Compared as `YYYY-MM-DD` text, not as instants: `new Date("2026-10-08")` is
- * midnight UTC, which in Brasília is still 21h of the 7th, so comparing clocks
- * let tomorrow through every evening — and the database, which counts days in
- * the clinic's time zone, refused it on save.
- */
+/** A calendar day after today, in the clinic's time zone. */
 export function isFutureDate(iso: string | null | undefined): boolean {
-  const day = iso?.slice(0, 10) ?? "";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
-  return day > localToday();
+  const day = dayOf(iso);
+  return day !== "" && day > todayKey();
 }
 
 /** A date up to today, within a plausible range for a living person. */
 export function isValidBirthDate(iso: string | null | undefined): boolean {
-  if (!iso) return false;
+  const day = dayOf(iso);
+  if (!day || isFutureDate(day)) return false;
 
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return false;
-
-  const limit = new Date();
-  limit.setFullYear(limit.getFullYear() - 120);
-
-  return !isFutureDate(iso) && date >= limit;
+  const today = todayKey();
+  const oldest = `${Number(today.slice(0, 4)) - 120}${today.slice(4)}`;
+  return day >= oldest;
 }
 
 /**
- * A date that has already happened.
+ * A date that has already happened — today counts.
  *
  * Used by the clinical record, where every date describes something that was
  * observed: a diagnosis and the start of a treatment plan are facts with a
  * past, and a future one is a typo — most often a wrong year.
  */
 export function isValidPastDate(iso: string | null | undefined): boolean {
-  if (!iso) return false;
-
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return false;
-
-  // End of today, so a date entered today is not refused by the clock.
-  const limit = new Date();
-  limit.setHours(23, 59, 59, 999);
-
-  return date <= limit && date.getFullYear() >= 1900;
+  const day = dayOf(iso);
+  return day !== "" && !isFutureDate(day) && day >= "1900-01-01";
 }
 
 /** "12345678909" → "123.456.789-09", applied as the person types. */

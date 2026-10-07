@@ -39,6 +39,17 @@ import { isBelowAppMinimumAge } from "./appAccess";
 
 const CAMPO_OBRIGATORIO = "Campo obrigatório.";
 
+/**
+ * Data clínica opcional: um fato que já aconteceu, então nunca depois de hoje.
+ * O futuro tem mensagem própria, antes da genérica: quase sempre é o ano errado,
+ * e "inválida" não diz isso. Texto que não é uma data inteira (digitado pela
+ * metade) também é recusado, em vez de virar "não informado" no envio.
+ */
+const dataPassadaOpcional = z
+  .string()
+  .refine((valor) => !isFutureDate(valor), "A data não pode ser depois de hoje.")
+  .refine((valor) => !valor || isValidPastDate(valor), "Data incompleta ou inválida.");
+
 export const pacienteSchema = z.object({
   /* ------------------------------------------------------- identificação */
   nome: z.string().min(3, "Informe o nome completo.").max(120, "Nome muito longo."),
@@ -61,9 +72,7 @@ export const pacienteSchema = z.object({
   cid: z.string(),
   estadiamento: z.string().max(20, "Estadiamento muito longo."),
   tnm: z.string().max(40, "Classificação TNM muito longa."),
-  diagnostico_em: z
-    .string()
-    .refine((valor) => !valor || isValidPastDate(valor), "Data inválida ou no futuro."),
+  diagnostico_em: dataPassadaOpcional,
 
   /** Outros diagnósticos, além do principal. Só os novos: os já gravados não voltam aqui. */
   diagnosticos_adicionais: z
@@ -72,9 +81,7 @@ export const pacienteSchema = z.object({
         cid: z.string().min(1, "Selecione o CID."),
         estadiamento: z.string().max(20, "Estadiamento muito longo."),
         tnm: z.string().max(40, "Classificação TNM muito longa."),
-        diagnostico_em: z
-          .string()
-          .refine((valor) => !valor || isValidPastDate(valor), "Data inválida ou no futuro."),
+        diagnostico_em: dataPassadaOpcional,
       }),
     )
     .refine(
@@ -90,9 +97,7 @@ export const pacienteSchema = z.object({
       "Informe um número de ciclos entre 1 e 99.",
     ),
   intencao: z.string().max(40, "Intenção muito longa."),
-  plano_iniciado_em: z
-    .string()
-    .refine((valor) => !valor || isValidPastDate(valor), "Data inválida ou no futuro."),
+  plano_iniciado_em: dataPassadaOpcional,
 
   fase: z.string(),
 
