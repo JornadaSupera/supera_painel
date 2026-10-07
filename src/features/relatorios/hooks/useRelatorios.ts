@@ -133,6 +133,20 @@ export function useExecucoes() {
   });
 }
 
+/**
+ * The generation a "report ready" notification points to: which report, and
+ * which period. A plain read of `report_runs`, which only the administration
+ * sees. It does not change once written.
+ */
+export function useExecucao(id: string | null) {
+  return useQuery({
+    queryKey: queryKeys.reports.execution(id ?? ""),
+    enabled: Boolean(id),
+    queryFn: async () => (await call(() => relatoriosApi.getExecucao({ id: id as string }))).data,
+    staleTime: Infinity,
+  });
+}
+
 export function useCriarAgendamento() {
   const queryClient = useQueryClient();
 

@@ -1,5 +1,15 @@
-import { BarChart3, Download, FileText, Link2, Lock, Play, Table2, TriangleAlert } from "lucide-react";
-import { useRef, useState } from "react";
+import {
+  BarChart3,
+  CalendarClock,
+  Download,
+  FileText,
+  Link2,
+  Lock,
+  Play,
+  Table2,
+  TriangleAlert,
+} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -33,16 +43,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useEspecialidades } from "@/hooks/useCatalogos";
-import { formatDuration, formatNumber } from "@/lib/format";
+import { formatDate, formatDateTime, formatDuration, formatNumber } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
 import {
   CATEGORIA_RELATORIO_LABEL,
   FILTRO_RELATORIO_LABEL,
   type CategoriaRelatorio,
   type DefinicaoRelatorio,
+  type ExecucaoRelatorio,
 } from "@/types/relatorio";
 import {
   useDefinicoes,
+  useExecucao,
   useExportarRelatorio,
   useExportarRelatorioPdf,
   useRelatorio,
@@ -78,6 +90,10 @@ import { AgendamentosRelatorio } from "../components/AgendamentosRelatorio";
  *  - **Exportação em Excel**: sai em CSV, que o Excel abre. Uma planilha
  *    binária exigiria uma dependência fora da lista contratada. O PDF é uma
  *    captura do resultado aberto, em retrato e em quantas páginas couber.
+ *  - **O relatório agendado abre recalculado.** `report_runs` guarda qual
+ *    relatório e de que período, não o resultado. A notificação abre o
+ *    relatório certo, com o período mais curto que alcança o da geração, e a
+ *    janela diz que os números são de agora.
  */
 
 const ORDEM: CategoriaRelatorio[] = ["pacientes", "clinico", "operacional", "qualidade"];
@@ -91,6 +107,18 @@ const PERIODOS = [
   { value: "180", label: "Últimos 180 dias" },
   { value: "365", label: "Último ano" },
 ];
+
+/**
+ * The shortest period on offer that still reaches back to the start of a
+ * generation's period. The engine runs "the last N days up to now", never a
+ * window in the past, so this is the closest the screen gets to that run.
+ */
+function periodoQueCobre(periodoDe: string): string {
+  const [ano, mes, dia] = periodoDe.split("-").map(Number);
+  const inicio = new Date(ano ?? 0, (mes ?? 1) - 1, dia ?? 1).getTime();
+  const dias = Math.ceil((Date.now() - inicio) / 86_400_000) + 1;
+  return PERIODOS.find((periodo) => Number(periodo.value) >= dias)?.value ?? "365";
+}
 
 /**
  * O relatório aberto e o período vivem na URL.
@@ -115,6 +143,22 @@ export function RelatoriosPage() {
   const dias = PERIODOS.some((periodo) => periodo.value === diasPedidos) ? (diasPedidos as string) : "30";
   const especialidadePedida = searchParams.get("especialidade");
   const definicoes = useDefinicoes();
+
+  /*
+   * "Relatório agendado disponível" abre `/relatorios?execucao=<id>`. A geração
+   * diz qual relatório e de que período; a tela abre esse relatório, com o
+   * período que cobre a geração, e mantém o id no endereço para a janela
+   * explicar de onde ele veio.
+   */
+  const execucaoId = searchParams.get("execucao");
+  const execucao = useExecucao(execucaoId);
+
+  useEffect(() => {
+    const gerada = execucao.data;
+    if (!gerada || slug) return;
+    const params = new URLSearchParams({ dias: periodoQueCobre(gerada.periodo_de), execucao: gerada.id });
+    navigate(`/relatorios/${gerada.slug}?${params.toString()}`, { replace: true });
+  }, [execucao.data, slug, navigate]);
 
   const porCategoria = (categoria: CategoriaRelatorio) =>
     (definicoes.data ?? []).filter((definicao) => definicao.categoria === categoria);
@@ -180,6 +224,26 @@ export function RelatoriosPage() {
 
       {definicoes.isLoading && <SkeletonCards count={6} />}
 
+      {execucaoId && !slug && execucao.isLoading && (
+        <Alert role="status">
+          <CalendarClock />
+          <AlertDescription>Abrindo o relatório agendado da notificação…</AlertDescription>
+        </Alert>
+      )}
+
+      {execucaoId && execucao.isError && (
+        <Alert role="status">
+          <TriangleAlert />
+          <AlertTitle>Não foi possível abrir o relatório agendado</AlertTitle>
+          <AlertDescription>
+            {execucao.error.message}
+            <Button size="sm" variant="outline" className="mt-1" onClick={() => void execucao.refetch()}>
+              Tentar de novo
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {slugDesconhecido && (
         <Alert role="status">
           <TriangleAlert />
@@ -226,6 +290,7 @@ export function RelatoriosPage() {
 
       <JanelaRelatorio
         definicao={aberto}
+        execucao={execucao.data && execucao.data.slug === slug ? execucao.data : null}
         dias={Number(dias)}
         especialidade={especialidadePedida}
         onEspecialidadeChange={trocarEspecialidade}
@@ -292,12 +357,15 @@ function CartaoRelatorio({
 
 function JanelaRelatorio({
   definicao,
+  execucao,
   dias,
   especialidade,
   onEspecialidadeChange,
   onOpenChange,
 }: {
   definicao: DefinicaoRelatorio | null;
+  /** The scheduled generation this window was opened from, if any. */
+  execucao: ExecucaoRelatorio | null;
   dias: number;
   /** O recorte que veio do endereço, ainda sem conferir contra o catálogo. */
   especialidade: string | null;
@@ -387,6 +455,25 @@ function JanelaRelatorio({
             {dados ? [aplicaPeriodo ? periodo : null, dados.resumo].filter(Boolean).join(" · ") : definicao?.descricao}
           </DialogDescription>
         </DialogHeader>
+
+        {/* The database keeps that the report was generated, not what it said: the
+            numbers below are computed now, and the note says so. */}
+        {execucao && (
+          <Alert role="status">
+            <CalendarClock />
+            <AlertTitle>Relatório agendado</AlertTitle>
+            <AlertDescription>
+              Gerado em {formatDateTime(execucao.gerado_em)}, sobre {formatDate(execucao.periodo_de)} a{" "}
+              {formatDate(execucao.periodo_ate)}. O banco guarda o aviso de que ele ficou pronto, não o
+              resultado: os números abaixo são calculados agora
+              {!aplicaPeriodo
+                ? ", sobre a base de hoje."
+                : dias >= Number(periodoQueCobre(execucao.periodo_de))
+                  ? `, com o período “${periodo}”, que inclui esse intervalo.`
+                  : `, com o período “${periodo}”, que não alcança o início dele. Amplie o período no cabeçalho da tela.`}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
