@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { toListQuery } from "@/hooks/listQuery";
 import { useListParams } from "@/hooks/useListParams";
@@ -28,4 +29,29 @@ export function useMeusPacientes() {
 
   const { items, ...status } = toListQuery(query);
   return { ...status, pacientes: items, params };
+}
+
+/** The largest page the list reads at once. */
+const SNAPSHOT_PAGE = { page: 1, pageSize: 200 } as const;
+
+/**
+ * Protocol, CID and phase of the active patients, by id — what a row of the day
+ * needs beside the name. One audited list read for the whole day, instead of
+ * three record reads per patient; a patient past the first 200 just shows
+ * without the line.
+ */
+export function usePacientesPorId(enabled: boolean) {
+  const query = useQuery({
+    queryKey: queryKeys.patients.list(SNAPSHOT_PAGE),
+    queryFn: () => call(() => pacientesApi.list(SNAPSHOT_PAGE)),
+    enabled,
+    staleTime: 5 * 60_000,
+  });
+
+  const porId = useMemo(
+    () => new Map((query.data?.data ?? []).map((paciente) => [paciente.id, paciente])),
+    [query.data],
+  );
+
+  return { ...query, porId };
 }

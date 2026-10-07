@@ -2,6 +2,7 @@ import { MessageSquareReply } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { UserAvatar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { relativeTime } from "@/lib/format";
 import type { ConversaClinico } from "@/types/clinico";
@@ -26,15 +27,19 @@ export function ConversaSemResposta({
   const marcarLida = useMarcarConversaLida();
 
   return (
-    <li className="rounded-xl border">
-      <div className="flex items-center gap-3 px-3 py-2 text-sm">
+    <li>
+      <div className="flex items-center gap-3 px-4 py-3 text-sm">
         <Link
           to={chatHref}
           className="hover:text-primary-ink flex min-w-0 flex-1 items-center gap-3 transition-colors"
         >
-          <span className="min-w-0 flex-1 truncate">{conversa.paciente_nome}</span>
+          <UserAvatar name={conversa.paciente_nome} size="sm" />
+          <span className="min-w-0 flex-1 truncate">
+            <span className="font-medium">{conversa.paciente_nome}</span>
+            <span className="text-muted-foreground"> · {conversa.assunto_label}</span>
+          </span>
           <span className="text-muted-foreground shrink-0 text-xs">
-            {conversa.assunto_label} · {relativeTime(conversa.ultima_mensagem_em)}
+            {relativeTime(conversa.ultima_mensagem_em)}
           </span>
         </Link>
 
@@ -52,7 +57,7 @@ export function ConversaSemResposta({
       </div>
 
       {respondendo && (
-        <div className="border-t px-3 py-2">
+        <div className="border-t px-4 py-2">
           <ComposerMensagem
             conversaId={conversa.id}
             permitirAnexo={false}

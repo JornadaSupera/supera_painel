@@ -25,6 +25,18 @@ export function useConversasClinicas() {
   });
 }
 
+/** The window the response time is averaged over, on the dashboard and in the chat. */
+export const RESPONSE_TIME_DAYS = 30;
+
+/** Average minutes to the team's first reply. A summary: it changes slowly, so it is not polled. */
+export function useTempoDeResposta(dias = RESPONSE_TIME_DAYS) {
+  return useQuery({
+    queryKey: queryKeys.clinico.tempoDeResposta(dias),
+    queryFn: async () => (await call(() => clinicoApi.getTempoDeResposta({ dias }))).data,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useMensagensClinicas(conversaId: string | null) {
   return useQuery({
     queryKey: queryKeys.clinico.mensagens(conversaId ?? ""),

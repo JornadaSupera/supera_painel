@@ -1,74 +1,205 @@
+import { ChevronRight, CircleCheck, MessageCircle, TriangleAlert, Users } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import {
   EmptyState,
   ErrorState,
   PageHeader,
-  SkeletonCards,
+  SkeletonRows,
   StatCard,
   StatusBadge,
+  UserAvatar,
 } from "@/components/shared";
 import { useAuth } from "@/contexts/auth-context";
-import { ESPECIALIDADE_LABEL, SEVERIDADE_LABEL, STATUS_CONVERSA } from "@/lib/enums";
-import { formatNumber, formatTime, pluralize } from "@/lib/format";
+import { useNow } from "@/hooks/useNow";
+import { addDays, dayStart, todayKey } from "@/lib/agenda";
+import {
+  ESPECIALIDADE_LABEL,
+  SEVERIDADE,
+  SEVERIDADE_LABEL,
+  STATUS_ALERTA_LABEL,
+  STATUS_CONVERSA,
+  type Severidade,
+} from "@/lib/enums";
+import { formatNumber, formatTime, pluralize, relativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import type { AlertaClinico, CompromissoAgenda } from "@/types/clinico";
+import type { PacienteListItem } from "@/types/paciente";
+import { SEVERITY_DOT, SEVERITY_RANK } from "../alert-tones";
 import { ConversaSemResposta } from "../components/ConversaSemResposta";
 import { useAgendaClinica } from "../hooks/useAgendaClinica";
 import { useAlertasClinicos } from "../hooks/useAlertasClinicos";
-import { useConversasClinicas } from "../hooks/useConversasClinicas";
+import { useConversasClinicas, useTempoDeResposta } from "../hooks/useConversasClinicas";
+import { usePacientesPorId } from "../hooks/useMeusPacientes";
 
 /**
  * Painel do dia — a tela de entrada do painel clínico.
  *
- * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/farmaceutico/
+ * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/psicologo/
  *
- * Três leituras reais: a agenda de hoje (`read_my_agenda`, recortada para o
- * dia corrente) e os resumos das filas de chat e de alertas, as mesmas que as
- * telas Chat e Alertas mostram por inteiro. Aqui só as cinco mais urgentes.
- * Os três blocos se atualizam sozinhos, e a conversa pode ser respondida daqui.
+ * Leituras reais: a agenda de hoje (`read_my_agenda`, recortada para o dia
+ * corrente no fuso da clínica), as filas de chat e de alertas — as mesmas que as
+ * telas Chat e Alertas mostram por inteiro — e o tempo médio de resposta do
+ * chat (`summarize_chat_response_times`). Protocolo e CID de cada paciente do
+ * dia saem de UMA leitura da lista, não de três leituras de ficha por pessoa.
  *
  * Os quatro cartões do topo saem das MESMAS leituras das listas logo abaixo, não
  * de uma conta paralela: o cartão e a lista não podem discordar. O de alertas
- * nas últimas 24 h e o de resolvidos no mês dependem de `read_alerts`, que
+ * nas últimas 24 h e o de resolvidas no mês dependem de `read_alerts`, que
  * entrega no máximo 200 por situação e do mais antigo para o mais novo; quando a
- * leitura bate no teto o cartão diz "mínimo" em vez de exibir um total que
- * parece exato.
+ * leitura bate no teto o cartão diz "≥" em vez de exibir um total que parece
+ * exato.
+ *
+ * Fica de fora o risco de cada paciente: ele vem do Gemed, que não está ligado.
  */
 
 const LIMITE_RESUMO = 5;
 /** O teto de `read_alerts` por situação. */
 const TETO_ALERTAS = 200;
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
+const GRAVES: ReadonlySet<Severidade> = new Set([SEVERIDADE.ALTA, SEVERIDADE.CRITICA]);
 
-function saudacao(): string {
-  const hora = new Date().getHours();
+function saudacao(agora: Date): string {
+  const hora = Number(
+    agora.toLocaleTimeString("en-GB", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }),
+  );
   if (hora < 12) return "Bom dia";
   if (hora < 18) return "Boa tarde";
   return "Boa noite";
 }
 
-function hoje(): { de: string; ate: string } {
-  const inicio = new Date();
-  inicio.setHours(0, 0, 0, 0);
-  const fim = new Date(inicio);
-  fim.setDate(fim.getDate() + 1);
-  return { de: inicio.toISOString(), ate: fim.toISOString() };
+/** "terça-feira, 7 de outubro" — o dia de hoje, no fuso da clínica. */
+function diaPorExtenso(agora: Date): string {
+  return agora.toLocaleDateString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+/** O primeiro dia do mês corrente e do anterior, como instantes. */
+function inicioDosMeses(hoje: string): { atual: number; anterior: number } {
+  const primeiro = `${hoje.slice(0, 7)}-01`;
+  const anterior = addDays(primeiro, -1).slice(0, 7);
+  return { atual: Date.parse(dayStart(primeiro)), anterior: Date.parse(dayStart(`${anterior}-01`)) };
+}
+
+/** Cabeçalho de um bloco: título, apoio e o atalho para a tela inteira. */
+function BlockHeader({
+  title,
+  subtitle,
+  to,
+  linkLabel,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  to: string;
+  linkLabel: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <h2 className="text-foreground text-sm font-semibold">{title}</h2>
+        {subtitle && <p className="text-muted-foreground text-xs">{subtitle}</p>}
+      </div>
+      <Link
+        to={to}
+        className="text-primary-ink inline-flex shrink-0 items-center gap-0.5 text-xs font-medium hover:underline"
+      >
+        {linkLabel}
+        <ChevronRight size={14} aria-hidden="true" />
+      </Link>
+    </div>
+  );
+}
+
+/** "FOLFOX · C18.9" — o que a lista sabe do paciente; sem ela, o nome do compromisso. */
+function linhaClinica(compromisso: CompromissoAgenda, paciente: PacienteListItem | undefined): string {
+  const partes = [
+    paciente?.protocolo_nome && paciente.protocolo_nome !== "—" ? paciente.protocolo_nome : null,
+    paciente?.cid || null,
+  ].filter(Boolean);
+  return partes.length > 0 ? partes.join(" · ") : compromisso.titulo;
+}
+
+function PacienteDoDia({
+  compromisso,
+  paciente,
+  href,
+}: {
+  compromisso: CompromissoAgenda;
+  paciente: PacienteListItem | undefined;
+  href: string;
+}) {
+  return (
+    <li>
+      <Link
+        to={href}
+        className="hover:bg-muted/50 focus-visible:ring-ring flex items-center gap-3 px-4 py-2.5 transition-colors focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+      >
+        <span className="w-12 shrink-0 font-mono text-sm tabular-nums">{formatTime(compromisso.inicio)}</span>
+        <UserAvatar name={compromisso.paciente_nome} size="sm" />
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-medium">{compromisso.paciente_nome}</span>
+          <span className="text-muted-foreground truncate text-xs">{linhaClinica(compromisso, paciente)}</span>
+        </span>
+        <StatusBadge tone={compromisso.status_tom} size="sm" pill>
+          {compromisso.status_label}
+        </StatusBadge>
+        <ChevronRight size={16} aria-hidden="true" className="text-muted-foreground shrink-0" />
+      </Link>
+    </li>
+  );
+}
+
+function AlertaNaFila({ alerta, href }: { alerta: AlertaClinico; href: string }) {
+  return (
+    <li>
+      <Link
+        to={href}
+        className="hover:bg-muted/50 focus-visible:ring-ring flex items-start gap-2.5 px-4 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset"
+      >
+        <span
+          aria-hidden="true"
+          className={cn("mt-1.5 size-2 shrink-0 rounded-full", SEVERITY_DOT[alerta.severidade])}
+        />
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate text-sm font-medium">{alerta.paciente_nome}</span>
+          <span className="text-muted-foreground text-xs">
+            {alerta.sintoma_label} · grau {alerta.grau}
+            <span className="sr-only">, severidade {SEVERIDADE_LABEL[alerta.severidade]}</span>
+          </span>
+          <span className="text-muted-foreground text-[11px]">
+            {relativeTime(alerta.criado_em)} · {STATUS_ALERTA_LABEL[alerta.status]}
+          </span>
+        </span>
+      </Link>
+    </li>
+  );
 }
 
 export function ClinicoDashboardPage() {
   const { user } = useAuth();
-  const primeiroNome = user?.nome.split(" ")[0] ?? "";
+  const agora = useNow();
+  const hoje = todayKey(agora);
+
+  // O nome da conta cai no e-mail quando não há nome cadastrado; e-mail não é saudação.
+  const primeiroNome = user && user.nome !== user.email ? (user.nome.split(" ")[0] ?? "") : "";
   const area = user?.especialidade ? ESPECIALIDADE_LABEL[user.especialidade] : "";
-
-  const agendaDeHoje = useAgendaClinica(hoje());
-  const compromissos = agendaDeHoje.data ?? [];
-  const vazio = !agendaDeHoje.isLoading && !agendaDeHoje.isError && compromissos.length === 0;
-
   const base = user?.especialidade ? `/clinico/${user.especialidade}` : "/clinico";
+
+  const agendaDeHoje = useAgendaClinica({ de: dayStart(hoje), ate: dayStart(addDays(hoje, 1)) });
+  const compromissos = agendaDeHoje.data ?? [];
+  const pacientes = usePacientesPorId(compromissos.length > 0);
 
   const conversas = useConversasClinicas();
   const semResposta = (conversas.data ?? [])
     .filter((c) => c.status === STATUS_CONVERSA.ABERTA && c.nao_lida_pela_equipe)
     .sort((a, b) => a.ultima_mensagem_em.localeCompare(b.ultima_mensagem_em));
+  const tempoDeResposta = useTempoDeResposta();
+  const minutos = tempoDeResposta.data?.minutos ?? null;
 
   // Por situação, como a tela de Alertas: numa leitura só, os resolvidos antigos
   // ocupariam o teto e esconderiam os alertas novos em aberto.
@@ -83,69 +214,128 @@ export function ClinicoDashboardPage() {
     error: pendentes.error ?? emAtendimento.error,
     refetch: () => void Promise.all([pendentes.refetch(), emAtendimento.refetch()]),
   };
-  const naFila = [...(pendentes.data ?? []), ...(emAtendimento.data ?? [])];
+  const naFila = [...(pendentes.data ?? []), ...(emAtendimento.data ?? [])].sort(
+    (a, b) =>
+      SEVERITY_RANK[a.severidade] - SEVERITY_RANK[b.severidade] || a.criado_em.localeCompare(b.criado_em),
+  );
+  const graves = naFila.filter((alerta) => GRAVES.has(alerta.severidade)).length;
 
-  const agora = Date.now();
-  const inicioDoMes = new Date();
-  inicioDoMes.setDate(1);
-  inicioDoMes.setHours(0, 0, 0, 0);
-
+  const instante = agora.getTime();
+  const meses = inicioDosMeses(hoje);
   const resolvidosLimitados = (resolvidos.data?.length ?? 0) >= TETO_ALERTAS;
+
   const pacientesHoje = new Set(compromissos.map((compromisso) => compromisso.paciente_id)).size;
-  const alertasEm24h = [...naFila, ...(resolvidos.data ?? [])].filter(
-    (alerta) => agora - new Date(alerta.criado_em).getTime() <= UM_DIA_MS,
+  const proximo = compromissos
+    .filter(
+      (compromisso) => compromisso.status_codigo === "scheduled" && Date.parse(compromisso.inicio) > instante,
+    )
+    .sort((a, b) => a.inicio.localeCompare(b.inicio))[0];
+
+  const gravesEm24h = [...naFila, ...(resolvidos.data ?? [])].filter(
+    (alerta) => GRAVES.has(alerta.severidade) && instante - Date.parse(alerta.criado_em) <= UM_DIA_MS,
   ).length;
-  const resolvidosNoMes = (resolvidos.data ?? []).filter(
-    (alerta) => alerta.resolvido_em && new Date(alerta.resolvido_em) >= inicioDoMes,
-  ).length;
+
+  const resolvidoEntre = (de: number, ate: number) =>
+    (resolvidos.data ?? []).filter((alerta) => {
+      const em = alerta.resolvido_em ? Date.parse(alerta.resolvido_em) : NaN;
+      return em >= de && em < ate;
+    }).length;
+  const resolvidosNoMes = resolvidoEntre(meses.atual, Infinity);
+  const resolvidosNoAnterior = resolvidoEntre(meses.anterior, meses.atual);
+  // Variação só com base: sem resolvidas no mês anterior não há porcentagem que signifique algo,
+  // e com a leitura no teto o mês anterior pode estar cortado.
+  const variacao =
+    !resolvidosLimitados && resolvidosNoAnterior > 0
+      ? Math.round(((resolvidosNoMes - resolvidosNoAnterior) / resolvidosNoAnterior) * 100)
+      : undefined;
+
+  const subtitulo = (
+    <span className="first-letter:uppercase">
+      {diaPorExtenso(agora)}
+      {agendaDeHoje.data && <> · {pluralize(pacientesHoje, "paciente agendado", "pacientes agendados")}</>}
+      {!alertas.isLoading && !alertas.isError && (
+        <>
+          {" · "}
+          {graves > 0 ? (
+            <span className="text-destructive font-medium">
+              {pluralize(graves, "alerta grave", "alertas graves")}
+            </span>
+          ) : (
+            "nenhum alerta grave"
+          )}
+        </>
+      )}
+    </span>
+  );
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
         eyebrow={area}
-        title={`${saudacao()}${primeiroNome ? `, ${primeiroNome}` : ""}`}
-        subtitle="Painel do dia · pacientes agendados, mensagens e alertas da sua área"
+        title={`${saudacao(agora)}${primeiroNome ? `, ${primeiroNome}` : ""}`}
+        subtitle={subtitulo}
       />
 
       <section aria-label="Indicadores do dia" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         <StatCard
+          icon={<Users />}
           label="Pacientes hoje"
           loading={agendaDeHoje.isLoading}
           value={agendaDeHoje.isError ? "—" : formatNumber(pacientesHoje)}
-          context={agendaDeHoje.isError ? "não foi possível ler a agenda" : "com compromisso marcado hoje"}
+          context={
+            agendaDeHoje.isError
+              ? "não foi possível ler a agenda"
+              : proximo
+                ? `Próximo às ${formatTime(proximo.inicio)}`
+                : compromissos.length > 0
+                  ? "nenhum outro hoje"
+                  : "nenhum compromisso hoje"
+          }
         />
         <StatCard
-          label="Alertas nas últimas 24 h"
+          icon={<TriangleAlert />}
+          accent="bg-destructive/10 text-destructive"
+          label="Alertas 24 h"
           loading={alertas.isLoading || resolvidos.isLoading}
           value={
             alertas.isError || resolvidos.isError
               ? "—"
-              : `${resolvidosLimitados ? "≥ " : ""}${formatNumber(alertasEm24h)}`
+              : `${resolvidosLimitados ? "≥ " : ""}${formatNumber(gravesEm24h)}`
           }
           context={
             alertas.isError || resolvidos.isError
               ? "não foi possível ler a fila"
-              : resolvidosLimitados
-                ? "leitura limitada a 200 por situação"
-                : "abertos em qualquer situação"
+              : "Severidade alta / crítica"
           }
           invertColor
         />
         <StatCard
-          label="Mensagens não respondidas"
+          icon={<MessageCircle />}
+          accent="bg-info/10 text-info-foreground"
+          label="Mensagens não resp."
           loading={conversas.isLoading}
           value={conversas.isError ? "—" : formatNumber(semResposta.length)}
-          context={conversas.isError ? "não foi possível ler o chat" : "conversas aguardando a equipe"}
+          context={
+            conversas.isError
+              ? "não foi possível ler o chat"
+              : minutos === null
+                ? "Tempo médio: sem respostas no mês"
+                : `Tempo médio: ${formatNumber(minutos)} min`
+          }
           invertColor
         />
         <StatCard
-          label="Resolvidos no mês"
+          icon={<CircleCheck />}
+          accent="bg-success/10 text-success-foreground"
+          label="Resolvidas (mês)"
           loading={resolvidos.isLoading}
           value={
             resolvidos.isError
               ? "—"
               : `${resolvidosLimitados ? "≥ " : ""}${formatNumber(resolvidosNoMes)}`
           }
+          delta={variacao}
+          period="vs anterior"
           context={
             resolvidos.isError
               ? "não foi possível ler o histórico"
@@ -156,100 +346,63 @@ export function ClinicoDashboardPage() {
         />
       </section>
 
-      <section className="bg-card rounded-2xl border p-5">
-        <h2 className="text-foreground mb-3 text-sm font-semibold">Pacientes de hoje</h2>
-
-        {agendaDeHoje.isLoading && <SkeletonCards count={2} />}
-
-        {agendaDeHoje.isError && (
-          <ErrorState compact error={agendaDeHoje.error} onRetry={() => void agendaDeHoje.refetch()} />
-        )}
-
-        {vazio && (
-          <EmptyState
-            compact
-            title="Nenhum compromisso hoje"
-            description="Quando houver um compromisso marcado para hoje, ele aparece aqui."
+      <div className="grid gap-5 lg:grid-cols-3">
+        <section className="bg-card overflow-hidden rounded-2xl border lg:col-span-2">
+          <BlockHeader
+            title="Pacientes do dia"
+            subtitle={
+              agendaDeHoje.data
+                ? `${pluralize(compromissos.length, "agendamento", "agendamentos")} · acesso rápido à ficha`
+                : "acesso rápido à ficha"
+            }
+            to={`${base}/agenda`}
+            linkLabel="Lista completa"
           />
-        )}
 
-        {compromissos.length > 0 && (
-          <ul className="flex flex-col gap-2">
-            {compromissos.map((compromisso) => (
-              <li key={compromisso.id}>
-                <Link
-                  to={`${base}/pacientes/${compromisso.paciente_id}`}
-                  className="hover:bg-muted/50 flex items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors"
-                >
-                  <span className="text-foreground w-12 shrink-0 font-medium tabular-nums">
-                    {formatTime(compromisso.inicio)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate">{compromisso.paciente_nome}</span>
-                  <StatusBadge tone={compromisso.status_tom} size="sm">
-                    {compromisso.status_label}
-                  </StatusBadge>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          {agendaDeHoje.isLoading && <SkeletonRows count={3} className="p-4" />}
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <section className="bg-card rounded-2xl border p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-foreground text-sm font-semibold">Mensagens não respondidas</h2>
-            <Link
-              to={`${base}/chat`}
-              className="text-primary-ink text-xs font-medium hover:underline"
-            >
-              Abrir chat
-            </Link>
-          </div>
-
-          {conversas.isLoading && <SkeletonCards count={2} />}
-
-          {conversas.isError && (
-            <ErrorState compact error={conversas.error} onRetry={() => void conversas.refetch()} />
+          {agendaDeHoje.isError && (
+            <div className="p-4">
+              <ErrorState compact error={agendaDeHoje.error} onRetry={() => void agendaDeHoje.refetch()} />
+            </div>
           )}
 
-          {!conversas.isLoading && !conversas.isError && semResposta.length === 0 && (
+          {agendaDeHoje.data && compromissos.length === 0 && (
             <EmptyState
               compact
-              title="Nenhuma mensagem sem resposta"
-              description="Conversas abertas com mensagem nova da equipe por ler aparecem aqui."
+              title="Nenhum compromisso hoje"
+              description="Quando houver um compromisso marcado para hoje, ele aparece aqui."
             />
           )}
 
-          {semResposta.length > 0 && (
-            <>
-              <p className="text-muted-foreground mb-2 text-xs">
-                {pluralize(semResposta.length, "conversa aguardando", "conversas aguardando")}
-              </p>
-              <ul className="flex flex-col gap-2">
-                {semResposta.slice(0, LIMITE_RESUMO).map((conversa) => (
-                  <ConversaSemResposta key={conversa.id} conversa={conversa} chatHref={`${base}/chat`} />
-                ))}
-              </ul>
-            </>
+          {compromissos.length > 0 && (
+            <ul className="divide-y">
+              {compromissos.map((compromisso) => (
+                <PacienteDoDia
+                  key={compromisso.id}
+                  compromisso={compromisso}
+                  paciente={pacientes.porId.get(compromisso.paciente_id)}
+                  href={`${base}/pacientes/${compromisso.paciente_id}`}
+                />
+              ))}
+            </ul>
           )}
         </section>
 
-        <section className="bg-card rounded-2xl border p-5">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-foreground text-sm font-semibold">Fila de alertas</h2>
-            <Link
-              to={`${base}/alertas`}
-              className="text-primary-ink text-xs font-medium hover:underline"
-            >
-              Abrir alertas
-            </Link>
-          </div>
+        <section className="bg-card overflow-hidden rounded-2xl border">
+          <BlockHeader
+            title="Fila de alertas"
+            subtitle="Priorizada por gravidade"
+            to={`${base}/alertas`}
+            linkLabel="Ver fila"
+          />
 
-          {alertas.isLoading && <SkeletonCards count={2} />}
+          {alertas.isLoading && <SkeletonRows count={3} className="p-4" />}
 
           {alertas.isError && (
-            <ErrorState compact error={alertas.error} onRetry={() => void alertas.refetch()} />
+            <div className="p-4">
+              <ErrorState compact error={alertas.error} onRetry={() => alertas.refetch()} />
+            </div>
           )}
 
           {!alertas.isLoading && !alertas.isError && naFila.length === 0 && (
@@ -261,26 +414,55 @@ export function ClinicoDashboardPage() {
           )}
 
           {naFila.length > 0 && (
-            <ul className="flex flex-col gap-2">
+            <ul className="divide-y">
               {naFila.slice(0, LIMITE_RESUMO).map((alerta) => (
-                <li key={alerta.id}>
-                  <Link
-                    to={`${base}/pacientes/${alerta.paciente_id}`}
-                    className="hover:bg-muted/50 flex items-center gap-3 rounded-xl border px-3 py-2 text-sm transition-colors"
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      {alerta.paciente_nome} · {alerta.sintoma_label}
-                    </span>
-                    <StatusBadge tone={alerta.status_tom} size="sm">
-                      {SEVERIDADE_LABEL[alerta.severidade]}
-                    </StatusBadge>
-                  </Link>
-                </li>
+                <AlertaNaFila
+                  key={alerta.id}
+                  alerta={alerta}
+                  href={`${base}/pacientes/${alerta.paciente_id}`}
+                />
               ))}
             </ul>
           )}
         </section>
       </div>
+
+      <section className="bg-card overflow-hidden rounded-2xl border">
+        <BlockHeader
+          title="Mensagens não respondidas"
+          subtitle={
+            minutos === null
+              ? "Tempo médio de resposta da clínica: sem respostas no mês"
+              : `Tempo médio de resposta da clínica: ${formatNumber(minutos)} min`
+          }
+          to={`${base}/chat`}
+          linkLabel="Abrir chat"
+        />
+
+        {conversas.isLoading && <SkeletonRows count={2} className="p-4" />}
+
+        {conversas.isError && (
+          <div className="p-4">
+            <ErrorState compact error={conversas.error} onRetry={() => void conversas.refetch()} />
+          </div>
+        )}
+
+        {!conversas.isLoading && !conversas.isError && semResposta.length === 0 && (
+          <EmptyState
+            compact
+            title="Nenhuma mensagem sem resposta"
+            description="Conversas abertas com mensagem nova do paciente aparecem aqui."
+          />
+        )}
+
+        {semResposta.length > 0 && (
+          <ul className="divide-y">
+            {semResposta.slice(0, LIMITE_RESUMO).map((conversa) => (
+              <ConversaSemResposta key={conversa.id} conversa={conversa} chatHref={`${base}/chat`} />
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
