@@ -172,37 +172,40 @@ export function ClinicoPacientesPage() {
 
       <CarteiraFiltros />
 
-      <DataTable
-        columns={COLUNAS}
-        data={pacientes}
-        caption="Pacientes da base compartilhada, com protocolo, fase do tratamento e última interação no chat."
-        label="pacientes"
-        loading={isLoading}
-        error={isError ? error : null}
-        onRetry={() => void refetch()}
-        sort={sort}
-        onSortChange={setSort}
-        filtered={filtrada}
-        onRowClick={(paciente) => navigate(`/clinico/${especialidade}/pacientes/${paciente.id}`)}
-        pagination={{
-          page,
-          pageSize,
-          count: total,
-          onPageChange: setPage,
-          onPageSizeChange: setPageSize,
-        }}
-        emptyState={
-          <EmptyState
-            variant={filtrada ? "search" : "empty"}
-            title={filtrada ? "Nenhum paciente no recorte" : "Nenhum paciente cadastrado"}
-            description={
-              filtrada
-                ? "Nenhuma ficha corresponde à busca e aos filtros aplicados."
-                : "Quando a clínica cadastrar pacientes, eles aparecem aqui."
-            }
-          />
-        }
-      />
+      {/* Same card as every other listing: the table on its own white surface. */}
+      <div className="bg-card overflow-hidden rounded-2xl border">
+        <DataTable
+          columns={COLUNAS}
+          data={pacientes}
+          caption="Pacientes da base compartilhada, com protocolo, fase do tratamento e última interação no chat."
+          label="pacientes"
+          loading={isLoading}
+          error={isError ? error : null}
+          onRetry={() => void refetch()}
+          sort={sort}
+          onSortChange={setSort}
+          filtered={filtrada}
+          onRowClick={(paciente) => navigate(`/clinico/${especialidade}/pacientes/${paciente.id}`)}
+          pagination={{
+            page,
+            pageSize,
+            count: total,
+            onPageChange: setPage,
+            onPageSizeChange: setPageSize,
+          }}
+          emptyState={
+            <EmptyState
+              variant={filtrada ? "search" : "empty"}
+              title={filtrada ? "Nenhum paciente no recorte" : "Nenhum paciente cadastrado"}
+              description={
+                filtrada
+                  ? "Nenhuma ficha corresponde à busca e aos filtros aplicados."
+                  : "Quando a clínica cadastrar pacientes, eles aparecem aqui."
+              }
+            />
+          }
+        />
+      </div>
     </div>
   );
 }
