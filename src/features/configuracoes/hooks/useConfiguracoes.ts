@@ -100,6 +100,43 @@ export function useSetTermoVocabularioAtivo() {
   });
 }
 
+/**
+ * Novo sintoma no diário.
+ *
+ * Além das Configurações, relê o catálogo de efeitos e os gatilhos de alerta:
+ * os dois listam os sintomas, e o novo tem que aparecer neles sem recarregar.
+ */
+export function useCriarSintoma() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { label: string; psicologico: boolean }) => {
+      const { data } = await call(() => configuracoesApi.criarSintoma(params));
+      audit.update(RECURSO, data?.id ?? params.label, {
+        operacao: "vocabulario_termo_criacao",
+        vocabulario: "symptoms",
+      });
+
+      return data;
+    },
+    onSuccess: async (sintoma) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.settings.get() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.settings.alertRules() }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.catalogs.effects() }),
+      ]);
+
+      toast.success("Sintoma cadastrado", {
+        description: sintoma
+          ? `“${sintoma.label}” entrou no catálogo de sintomas do diário.`
+          : undefined,
+      });
+    },
+    onError: (erro) =>
+      toast.error("Não foi possível cadastrar o sintoma", { description: erro.message }),
+  });
+}
+
 export function useTermos() {
   return useQuery({
     queryKey: queryKeys.settings.terms(),

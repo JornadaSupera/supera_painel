@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Ban, Check, FileText, Pencil, Plus, RotateCcw, X } from "lucide-react";
 
@@ -37,6 +37,7 @@ import { GatilhosAlerta } from "../components/GatilhosAlerta";
 import { IdentidadeEOperacao } from "../components/IdentidadeEOperacao";
 import { MetasOperacionais } from "../components/MetasOperacionais";
 import { MotivosSituacao } from "../components/MotivosSituacao";
+import { NovoSintoma } from "../components/NovoSintoma";
 import { SolicitacoesTitular } from "../components/SolicitacoesTitular";
 import {
   useAtualizarTermoVocabulario,
@@ -267,11 +268,14 @@ function Catalogo({
   descricao,
   itens,
   vocabulario,
+  rodape,
 }: {
   titulo: string;
   descricao: string;
   itens: ItemCatalogo[];
   vocabulario: VocabularioTermo;
+  /** Below the list — the create form, for the vocabularies that have one. */
+  rodape?: ReactNode;
 }) {
   const retirar = useSetTermoVocabularioAtivo();
   // O termo aguardando confirmação de retirada. `null` = nenhum.
@@ -308,6 +312,8 @@ function Catalogo({
           ))}
         </ul>
       )}
+
+      {rodape && <div className="border-border mt-3 border-t pt-3">{rodape}</div>}
 
       <AlertDialog
         open={retirando !== null}
@@ -402,6 +408,7 @@ export function ConfiguracoesPage() {
                   descricao="Os sintomas que o paciente marca, e o eixo dos relatórios clínicos"
                   itens={dados.sintomas}
                   vocabulario={VOCABULARIO_TERMO.SINTOMAS}
+                  rodape={<NovoSintoma />}
                 />
                 <Catalogo
                   titulo="Tipos de notificação"
