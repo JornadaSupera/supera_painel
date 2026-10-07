@@ -68,6 +68,8 @@ export { SearchInput } from "./SearchInput";
 export { BotaoExportarCaptura } from "./BotaoExportarCaptura";
 export { SkeletonCards, SkeletonChart, SkeletonForm, SkeletonRows, SkeletonTable } from "./Skeletons";
 
+export { SpecialtySeal } from "./SpecialtySeal";
+
 export { SourceErrorAlert, SourceErrorChip } from "./SourceError";
 export type { SourceErrorProps } from "./SourceError";
 

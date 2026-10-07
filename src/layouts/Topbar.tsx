@@ -1,7 +1,7 @@
 import { LogOut, Menu, Monitor, Moon, ShieldCheck, Sun, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { UserAvatar } from "@/components/shared";
+import { SpecialtySeal, UserAvatar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -87,6 +87,11 @@ export function Topbar() {
       </Button>
 
       <div className="ml-auto flex items-center gap-1">
+        {/* The area the professional works in, always in sight in the clinical panel. */}
+        {area === "clinico" && user?.especialidade && (
+          <SpecialtySeal specialty={user.especialidade} className="mr-2 hidden lg:inline-flex" />
+        )}
+
         {/* ------------------------------------------------------ theme */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
