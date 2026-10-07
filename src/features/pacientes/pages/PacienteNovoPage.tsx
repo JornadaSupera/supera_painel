@@ -1,10 +1,9 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { BackendPendente, PageHeader } from "@/components/shared";
-import { motivoIndisponivel } from "@/services/apiClient";
-import type { ResultadoConvite } from "@/types/paciente";
-import { ConviteEmitidoDialog } from "../components/ConviteEmitidoDialog";
+import { useCan } from "@/contexts/auth-context";
+import { useMotivoIndisponivel } from "@/hooks/useMotivoIndisponivel";
+import { PERMISSAO } from "@/lib/rbac";
 import { PacienteForm } from "../components/PacienteForm";
 import { useCriarPaciente } from "../hooks/usePacientes";
 import { paraClinica, paraEntrada, VALORES_INICIAIS, type PacienteForm as Valores } from "../schemas";
@@ -15,53 +14,52 @@ import { paraClinica, paraEntrada, VALORES_INICIAIS, type PacienteForm as Valore
  * Rota separada da listagem, e não um modal: são quatro etapas com vinte e
  * cinco campos — um diálogo desse tamanho não sobrevive a uma interrupção, e
  * interrupção é a regra em recepção de clínica.
+ *
+ * Serve aos dois painéis: `basePath` é a listagem de onde se veio, e é para lá
+ * que voltam o cancelar e a ficha recém-criada.
  */
-export function PacienteNovoPage() {
+export function PacienteNovoPage({
+  basePath = "/pacientes",
+  eyebrow = "Gestão",
+}: {
+  basePath?: string;
+  eyebrow?: string;
+}) {
   const navigate = useNavigate();
+  const can = useCan();
   const criar = useCriarPaciente();
-
-  /*
-   * O código de ativação só existe uma vez, e a navegação para a ficha o
-   * apagaria da tela antes de alguém anotá-lo. Por isso a ida para a ficha
-   * espera o diálogo ser fechado: é o único momento em que dá para saber que a
-   * pessoa viu o código.
-   */
-  const [conviteEmitido, setConviteEmitido] = useState<ResultadoConvite | null>(null);
-  const [pacienteCriado, setPacienteCriado] = useState<string | null>(null);
-
-  const irParaFicha = (id: string | null) => navigate(id ? `/pacientes/${id}` : "/pacientes");
+  const podeConvidar = can(PERMISSAO.PACIENTES_INVITE);
 
   // A rota continua alcançável pela URL mesmo com o botão desabilitado na
   // listagem. Barrar aqui evita o pior caminho: o formulário inteiro preenchido
   // para receber uma recusa no envio.
-  const indisponivel = motivoIndisponivel("pacientes.create");
+  const indisponivel = useMotivoIndisponivel("pacientes.create");
 
   const salvar = (valores: Valores) => {
-    criar.mutate({ entrada: paraEntrada(valores), clinica: paraClinica(valores) }, {
-      onSuccess: ({ paciente, convite }) => {
-        // Com código na mão, o diálogo primeiro. Sem ele, vai direto para a
-        // ficha: é lá que se confere o que foi cadastrado e se reemite o
-        // convite, se preciso.
-        if (convite?.token) {
-          setPacienteCriado(paciente?.id ?? null);
-          setConviteEmitido(convite);
-          return;
-        }
+    // Quem não convida não dispara convite, mesmo que o valor inicial da chave
+    // seja "ligado": o envio seria recusado logo depois de a ficha existir.
+    const preenchida = paraEntrada(valores);
+    const entrada = { ...preenchida, enviar_convite: podeConvidar && preenchida.enviar_convite };
 
-        irParaFicha(paciente?.id ?? null);
-      },
-    });
+    criar.mutate(
+      { entrada, clinica: paraClinica(valores) },
+      { onSuccess: ({ paciente }) => navigate(paciente ? `${basePath}/${paciente.id}` : basePath) },
+    );
   };
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow="Gestão"
+        eyebrow={eyebrow}
         title="Novo paciente"
-        backTo="/pacientes"
+        backTo={basePath}
         backLabel="Pacientes"
-        breadcrumb={[{ label: "Pacientes", to: "/pacientes" }, { label: "Novo paciente" }]}
-        subtitle="O convite de acesso ao aplicativo é enviado por SMS ao final do cadastro."
+        breadcrumb={[{ label: "Pacientes", to: basePath }, { label: "Novo paciente" }]}
+        subtitle={
+          podeConvidar
+            ? "O código de acesso ao aplicativo chega por SMS no celular do paciente."
+            : "O convite de acesso ao aplicativo é emitido pela administração, depois do cadastro."
+        }
       />
 
       {indisponivel ? (
@@ -72,17 +70,9 @@ export function PacienteNovoPage() {
           valoresIniciais={VALORES_INICIAIS}
           salvando={criar.isPending}
           onSubmit={salvar}
-          onCancelar={() => navigate("/pacientes")}
+          onCancelar={() => navigate(basePath)}
         />
       )}
-
-      <ConviteEmitidoDialog
-        convite={conviteEmitido}
-        onClose={() => {
-          setConviteEmitido(null);
-          irParaFicha(pacienteCriado);
-        }}
-      />
     </div>
   );
 }

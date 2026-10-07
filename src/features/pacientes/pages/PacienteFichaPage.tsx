@@ -3,7 +3,6 @@ import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import {
-  BackendPendente,
   Can,
   ConfirmDialog,
   ErrorState,
@@ -11,15 +10,16 @@ import {
   ScrollableTabsList,
   SkeletonForm,
 } from "@/components/shared";
+import { DisabledReason } from "@/components/shared/DisabledReason";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { STATUS_PACIENTE } from "@/lib/enums";
 import { formatDateTime } from "@/lib/format";
+import { useCan } from "@/contexts/auth-context";
+import { useMotivoIndisponivel } from "@/hooks/useMotivoIndisponivel";
 import { PERMISSAO } from "@/lib/rbac";
-import type { PacienteDetalhe, ResultadoConvite } from "@/types/paciente";
-import { ConviteEmitidoDialog } from "../components/ConviteEmitidoDialog";
+import type { PacienteDetalhe } from "@/types/paciente";
 import { DeactivatePatientDialog } from "../components/DeactivatePatientDialog";
 import { PatientGeneralTab } from "../components/PatientGeneralTab";
 import { PatientRecordHeader } from "../components/PatientRecordHeader";
@@ -138,9 +138,13 @@ export function PacienteFichaPage({
   const atualizar = useAtualizarPaciente(id ?? "");
   const convite = useEnviarConvite();
   const desvincular = useDesvincularConta();
-  const [conviteEmitido, setConviteEmitido] = useState<ResultadoConvite | null>(null);
+  const can = useCan();
+  const semEdicao = useMotivoIndisponivel("pacientes.update");
 
-  const editando = searchParams.get("editar") === "1";
+  // The address alone does not open the form: whoever cannot edit, or whose
+  // edit the backend still refuses, reads the record instead.
+  const editando =
+    searchParams.get("editar") === "1" && can(PERMISSAO.PACIENTES_WRITE) && semEdicao === null;
 
   // An unknown value in the address — an old link, a typo — opens "Geral".
   const requestedTab = searchParams.get(TAB_PARAM);
@@ -157,7 +161,6 @@ export function PacienteFichaPage({
       { replace: true },
     );
 
-  const semEdicao = motivoIndisponivel("pacientes.update");
   const semConvite = motivoIndisponivel("pacientes.sendInvite");
   const semDesativar = motivoIndisponivel("pacientes.deactivate");
   const sairDaEdicao = () => setSearchParams({}, { replace: true });
@@ -198,9 +201,6 @@ export function PacienteFichaPage({
           subtitle={`${paciente.codigo} · alterações ficam registradas na trilha de auditoria`}
         />
 
-        {semEdicao ? (
-          <BackendPendente titulo="Edição de ficha" motivo={semEdicao} />
-        ) : (
         <PacienteForm
           modo="edicao"
           valoresIniciais={paraFormulario(paciente)}
@@ -239,7 +239,6 @@ export function PacienteFichaPage({
             );
           }}
         />
-        )}
       </div>
     );
   }
@@ -249,47 +248,34 @@ export function PacienteFichaPage({
   const recordActions = (
     <>
       {actions?.(paciente)}
-      <Can permission={PERMISSAO.PACIENTES_WRITE}>
+      <Can permission={PERMISSAO.PACIENTES_INVITE}>
         {/* The invite is what ties the app account to this record. Once one is
             tied, a new invite can only be refused: changing the account starts
             with "Desfazer vínculo", in the general tab. */}
         {paciente.convite_status !== "aceito" && (
-          <Tooltip>
-            {/* A disabled button takes no pointer events, so a title on it never
-                shows. The reason hangs on a wrapper that can be hovered and
-                focused instead. */}
-            <TooltipTrigger asChild>
-              <span tabIndex={conviteFechado ? 0 : -1} className="inline-flex">
-                <Button
-                  variant="outline"
-                  disabled={inativo || convite.isPending || conviteFechado !== null}
-                  onClick={() =>
-                    convite.mutate(paciente.id, {
-                      // O código sai uma vez só. O diálogo é o que dá a quem
-                      // emitiu a chance de anotá-lo antes de ele sumir.
-                      onSuccess: (resultado) => setConviteEmitido(resultado ?? null),
-                    })
-                  }
-                >
-                  <MessageSquareShare />
-                  {paciente.convite_status === "nao_enviado" ? "Emitir convite" : "Reemitir convite"}
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {conviteFechado && (
-              <TooltipContent className="max-w-xs">{conviteFechado}</TooltipContent>
-            )}
-          </Tooltip>
+          <DisabledReason reason={conviteFechado}>
+            <Button
+              variant="outline"
+              disabled={inativo || convite.isPending || conviteFechado !== null}
+              onClick={() => convite.mutate(paciente.id)}
+            >
+              <MessageSquareShare />
+              {paciente.convite_status === "nao_enviado" ? "Emitir convite" : "Reemitir convite"}
+            </Button>
+          </DisabledReason>
         )}
+      </Can>
 
-        <Button
-          disabled={inativo || semEdicao !== null}
-          title={semEdicao ?? undefined}
-          onClick={() => setSearchParams({ editar: "1" }, { replace: true })}
-        >
-          <SquarePen />
-          Editar
-        </Button>
+      <Can permission={PERMISSAO.PACIENTES_WRITE}>
+        <DisabledReason reason={semEdicao}>
+          <Button
+            disabled={inativo || semEdicao !== null}
+            onClick={() => setSearchParams({ editar: "1" }, { replace: true })}
+          >
+            <SquarePen />
+            Editar
+          </Button>
+        </DisabledReason>
       </Can>
 
       <Can permission={PERMISSAO.PACIENTES_DEACTIVATE}>
@@ -342,8 +328,6 @@ export function PacienteFichaPage({
           setDesvinculando(false);
         }}
       />
-
-      <ConviteEmitidoDialog convite={conviteEmitido} onClose={() => setConviteEmitido(null)} />
     </>
   );
 

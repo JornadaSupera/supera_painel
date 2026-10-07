@@ -12,6 +12,7 @@ import type {
   PacienteClinicaEntrada,
   PacienteEntrada,
   PiiRevelada,
+  ResultadoConvite,
 } from "@/types/paciente";
 
 /**
@@ -95,11 +96,28 @@ function useInvalidarPacientes() {
 }
 
 /**
+ * What became of the SMS, in the same words wherever an invite is issued. The
+ * activation code is never shown: it only exists inside the message.
+ */
+function avisarConvite(resultado: ResultadoConvite | null | undefined) {
+  if (resultado?.enviado) {
+    toast.success("Convite enviado por SMS", {
+      description: `O paciente recebe o código de ativação em ${resultado.destino ?? "seu celular"}.`,
+    });
+    return;
+  }
+
+  toast.info("O código de ativação vai por SMS", {
+    description:
+      "O envio por SMS ainda não está ativo, então nenhuma mensagem saiu agora. Quando estiver, reemita o convite pela ficha e o código chega no celular do paciente.",
+  });
+}
+
+/**
  * Cadastro, e — quando o formulário pede — o convite logo em seguida.
  *
- * As duas chamadas ficam aqui, e não dentro do adapter, por causa do código de
- * ativação: ele existe uma única vez e precisa chegar à tela. Emitido lá
- * dentro, seria descartado antes de alguém o ver.
+ * As duas chamadas ficam aqui, e não dentro do adapter, porque a tela precisa
+ * saber se o SMS saiu para dizer isso a quem cadastrou.
  *
  * > [!] Falha no convite NÃO derruba o cadastro.
  * A ficha já existe neste ponto. Propagar o erro faria a tela dizer "não foi
@@ -160,13 +178,15 @@ export function useCriarPaciente() {
         };
       }
     },
-    onSuccess: async ({ paciente, erroConvite, erroClinica }) => {
+    onSuccess: async ({ paciente, convite, erroConvite, erroClinica }) => {
       if (paciente) audit.update(RECURSO, paciente.id, { operacao: "criacao" });
       await invalidar();
 
       toast.success("Paciente cadastrado", {
         description: paciente ? `${paciente.nome} · ${paciente.codigo}` : undefined,
       });
+
+      if (convite) avisarConvite(convite);
 
       if (erroClinica) {
         toast.warning("A ficha foi criada sem o quadro clínico", {
@@ -257,12 +277,7 @@ export function useEnviarConvite() {
     },
     onSuccess: async (resultado) => {
       await invalidar();
-      // O texto não promete envio: não há provedor contratado, e o que acontece
-      // de fato é a emissão do código. Prometer "enviado por SMS" faria a
-      // recepção esperar uma mensagem que ninguém despacha.
-      toast.success("Convite emitido", {
-        description: resultado?.destino ? `Registrado para ${resultado.destino}` : undefined,
-      });
+      avisarConvite(resultado);
     },
     onError: (erro) => toast.error("Não foi possível emitir o convite", { description: erro.message }),
   });

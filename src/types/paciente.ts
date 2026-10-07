@@ -239,26 +239,19 @@ export interface PacienteClinicaEntrada {
 /**
  * Retorno de `sendInvite`.
  *
- * > [!] O token vem em texto puro UMA vez, e não há como reemiti-lo.
- * O backend guarda apenas o hash. Enquanto não houver provedor de SMS é o
- * painel que exibe o token para alguém digitar no app — e é isso que torna a
- * ativação testável. Reenviar cancela o convite pendente anterior e emite
- * outro token, porque o antigo costuma ser o que foi para o número errado.
+ * > [!] O código de ativação nunca chega ao painel.
+ * Ele só existe dentro do SMS que o paciente recebe. Reenviar cancela o convite
+ * pendente anterior, porque o antigo costuma ser o que foi para o número errado.
  */
 export interface ResultadoConvite {
   paciente_id: string;
-  /** Destino mascarado — o telefone da ficha, ou o informado no reenvio. */
-  destino: string;
-  enviado_em: string;
-  /** `null` quando a origem dos dados não expõe o token. */
-  token: string | null;
-  expira_em: string | null;
   /**
-   * `"sms"` quando a mensagem já saiu de verdade (`token` vem `null` porque
-   * ele nunca sai do backend nesse caminho); `"manual"` nos outros dois
-   * casos — sem credencial configurada, ou origem de dados que não simula
-   * envio. A tela usa isto para escolher a frase, não o `token` sozinho: os
-   * dois caminhos sem token têm mensagens diferentes.
+   * `false` quando o SMS não saiu — o envio ainda não está configurado, ou não
+   * respondeu. Nesse caso nada fica pendente: o convite é emitido de novo pela
+   * ficha quando o envio estiver ativo.
    */
-  via: "sms" | "manual";
+  enviado: boolean;
+  /** Celular mascarado para onde o SMS foi; `null` quando não saiu. */
+  destino: string | null;
+  expira_em: string | null;
 }

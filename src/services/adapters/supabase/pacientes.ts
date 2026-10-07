@@ -105,7 +105,7 @@ interface LinhaPaciente {
  *
  * O administrador tem política de `SELECT` nesta tabela — é a fila que o painel
  * lê para saber se o convite está de pé. O token não está aqui: a coluna guarda
- * o hash, e o valor em claro sai uma única vez de `invite_patient`.
+ * o hash, e o valor em claro só existe dentro do SMS que o paciente recebe.
  */
 interface LinhaConvite {
   id: string;
@@ -1256,22 +1256,20 @@ const CODIGO_DO_CONVITE_SMS: Record<string, ErrorCode> = {
 };
 
 /**
- * Tenta o envio automático por SMS antes do caminho manual.
+ * Envia o convite por SMS.
  *
- * `send-patient-invite` (Edge Function, ADR-026 §7) nunca devolve o token —
- * ele só existe dentro da mensagem que o paciente recebe. `sms_failed` é o
- * único código que cai para `invite_patient`: nos dois motivos que o geram —
- * sem credencial Twilio configurada, ou o envio real falhou — a função já
- * cancela o convite sozinha antes de responder, então não sobra nada
- * pendente para o caminho manual reemitir por cima. Um erro que não dá para
- * ler (rede fora, função inalcançável) cai no mesmo lugar, pelo mesmo motivo:
- * o caminho manual sempre funciona e é isso que mantém a ativação testável.
+ * `send-patient-invite` (Edge Function) nunca devolve o token — ele só existe
+ * dentro da mensagem que o paciente recebe. `sms_failed` vira "não saiu": nos
+ * dois motivos que o geram — sem credencial Twilio configurada, ou o envio real
+ * falhou — a função já cancela o convite sozinha antes de responder, então não
+ * sobra nada pendente. Um erro que não dá para ler (rede fora, função
+ * inalcançável) é tratado do mesmo jeito.
  *
  * Qualquer outro código é recusa de verdade — ficha errada, já vinculada,
  * inativa, celular fora de formato — e sobe para a tela como qualquer outra
  * chamada deste adapter.
  */
-async function tentarConviteSms(
+async function enviarConviteSms(
   supabase: ReturnType<typeof getSupabaseClient>,
   patientId: string,
 ): Promise<{ enviado: true; resultado: ResultadoConvite } | { enviado: false } | FailResult> {
@@ -1286,11 +1284,9 @@ async function tentarConviteSms(
       enviado: true,
       resultado: {
         paciente_id: patientId,
+        enviado: true,
         destino: resposta.phone_masked,
-        enviado_em: new Date().toISOString(),
-        token: null,
         expira_em: paraIso(resposta.expires_at),
-        via: "sms",
       },
     };
   }
@@ -1315,14 +1311,12 @@ async function tentarConviteSms(
 }
 
 /**
- * Emite o convite de acesso ao app.
+ * Emite o convite de acesso ao app, por SMS.
  *
- * Tenta o SMS automático primeiro (`tentarConviteSms`); sem credencial
- * configurada, cai para o caminho manual de sempre — devolve o token em
- * texto puro **uma vez**, e não há como reemiti-lo: o banco guarda só o
- * hash. Enquanto não houver provedor de envio, é o painel que o exibe para
- * alguém passar ao paciente, e é isso que torna a ativação testável em vez
- * de bloqueada por uma credencial de terceiro.
+ * Não há caminho manual: o painel não mostra código de ativação a ninguém. Sem
+ * envio por SMS configurado, a resposta diz que nada saiu, e a ficha continua
+ * sem convite — o que é verdade —, pronta para reemitir quando o envio estiver
+ * ativo.
  *
  * Emitir cancela o convite pendente anterior. Não é cortesia: quem reemite
  * costuma estar corrigindo o telefone, e manter o token antigo vivo manteria
@@ -1330,32 +1324,14 @@ async function tentarConviteSms(
  */
 export async function sendInvite({ id }: { id: string }): Promise<SingleResult<ResultadoConvite>> {
   return executar(async () => {
-    const supabase = getSupabaseClient();
+    const sms = await enviarConviteSms(getSupabaseClient(), id);
+    if ("error" in sms) return sms;
 
-    const viaSms = await tentarConviteSms(supabase, id);
-    if ("error" in viaSms) return viaSms;
-    if (viaSms.enviado) return okOne(viaSms.resultado);
-
-    const { data, error } = await supabase.rpc("invite_patient", { p_patient_id: id });
-    if (error) return falhaDe(error);
-
-    const emitido = ((data ?? []) as { invitation_id: string; token: string }[])[0];
-    if (!emitido) return fail(ERROR_CODE.UNKNOWN, "O convite não devolveu o código de ativação.");
-
-    // Destino e validade saem da fila, não da RPC: `invite_patient` devolve só
-    // o par (id, token). Se esta leitura falhar, o convite continua emitido —
-    // por isso ela não derruba a resposta, apenas deixa os dois campos vazios.
-    const convite = await carregarConvite(id);
-    const linha = convite && !("error" in convite) ? convite : null;
-
-    return okOne<ResultadoConvite>({
-      paciente_id: id,
-      destino: maskPhone(linha?.destination ?? null),
-      enviado_em: paraIso(linha?.created_at) ?? new Date().toISOString(),
-      token: emitido.token,
-      expira_em: paraIso(linha?.expires_at),
-      via: "manual",
-    });
+    return okOne<ResultadoConvite>(
+      sms.enviado
+        ? sms.resultado
+        : { paciente_id: id, enviado: false, destino: null, expira_em: null },
+    );
   });
 }
 

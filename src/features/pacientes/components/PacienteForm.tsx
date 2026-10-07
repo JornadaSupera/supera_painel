@@ -24,8 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useCan } from "@/contexts/auth-context";
 import { useCids, useEfeitosAdversos, useFasesTratamento } from "@/hooks/useCatalogos";
 import { formatDate } from "@/lib/format";
+import { PERMISSAO } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
 import type { DiagnosticoPaciente } from "@/types/paciente";
 import { applyCpfMask, applyPhoneMask, isValidBirthDate } from "@/lib/validation";
@@ -177,6 +179,13 @@ export function PacienteForm({
   // Only a complete, valid date decides: half-typed digits are not an age.
   const nascimento = form.watch("nascimento");
   const menor = isValidBirthDate(nascimento) && isBelowAppMinimumAge(nascimento);
+  const podeConvidar = useCan()(PERMISSAO.PACIENTES_INVITE);
+  // Why the invite switch is off and locked, when it is.
+  const conviteTravado = menor
+    ? UNDERAGE_INVITE_REASON
+    : podeConvidar
+      ? null
+      : "O convite de acesso ao aplicativo é emitido pela administração, depois do cadastro.";
 
   const efeitos = useEfeitosAdversos();
   const cids = useCids();
@@ -791,19 +800,19 @@ export function PacienteForm({
                     render={({ field }) => (
                       <FormItem className="border-border flex items-center justify-between gap-4 rounded-lg border p-3 sm:col-span-2">
                         <div className="flex flex-col gap-0.5">
-                          <FormLabel>Emitir convite de acesso agora</FormLabel>
+                          <FormLabel>Enviar convite por SMS</FormLabel>
                           <FormDescription>
-                            {menor
-                              ? UNDERAGE_INVITE_REASON
-                              : "Enquanto não houver envio automático, o código aparece uma vez na tela para ser passado ao paciente."}
+                            {conviteTravado ??
+                              "O código de ativação chega por SMS no celular informado acima."}
                           </FormDescription>
                         </div>
                         <FormControl>
-                          {/* Off and locked for a minor: the database would refuse
-                              the invite right after the record was saved. */}
+                          {/* Off and locked for a minor, or for whoever does not
+                              invite: the database would refuse the invite right
+                              after the record was saved. */}
                           <Switch
-                            checked={field.value && !menor}
-                            disabled={menor}
+                            checked={field.value && conviteTravado === null}
+                            disabled={conviteTravado !== null}
                             onCheckedChange={field.onChange}
                           />
                         </FormControl>
