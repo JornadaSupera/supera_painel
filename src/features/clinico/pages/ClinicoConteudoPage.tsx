@@ -1,4 +1,4 @@
-import { ArrowRight, Eye, FileText, FileType2, Plus, Video, type LucideIcon } from "lucide-react";
+import { ArrowRight, Eye, Plus } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -21,10 +21,10 @@ import {
   STATUS_CONTEUDO_LABEL,
   TIPO_CONTEUDO_LABEL,
   type StatusConteudo,
-  type TipoConteudo,
 } from "@/lib/enums";
 import { formatNumber, relativeTime } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
+import { CONTENT_KIND_ICON } from "../content-kind-icons";
 import { useMinhasOrientacoes } from "../hooks/useOrientacoes";
 
 /**
@@ -44,12 +44,6 @@ import { useMinhasOrientacoes } from "../hooks/useOrientacoes";
  */
 
 type Filtro = StatusConteudo | "todas";
-
-const ICONE_DO_FORMATO: Record<TipoConteudo, LucideIcon> = {
-  artigo: FileText,
-  video: Video,
-  pdf: FileType2,
-};
 
 /** The path a text takes to the patient, as the prototype draws it above the cards. */
 function FaixaDoFluxo() {
@@ -147,7 +141,7 @@ export function ClinicoConteudoPage() {
 
           <ul className="grid gap-3 md:grid-cols-2">
             {visiveis.map((item) => {
-              const Icone = ICONE_DO_FORMATO[item.tipo];
+              const Icone = CONTENT_KIND_ICON[item.tipo];
 
               return (
                 <li key={item.id}>
