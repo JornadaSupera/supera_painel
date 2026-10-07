@@ -33,6 +33,9 @@ import { TimelineEvent } from "./TimelineEvent";
  * confidential area seen from outside comes back with its flags only, and the
  * screen says why.
  *
+ * The administration reads it with no area of its own: it opens on Oncology,
+ * nothing is "yours", and nothing is written.
+ *
  * Validated scales and the therapeutic plan are not here: the database has no
  * place for them yet, and this screen does not draw a block it cannot fill.
  */
@@ -83,18 +86,21 @@ export function SpecialtyRecordTab({
   chatHref,
 }: {
   patient: PacienteDetalhe;
-  /** The professional's own specialty: where the view opens, and the only one they write in. */
-  area: Especialidade;
-  chatHref: string;
+  /**
+   * The professional's own specialty: where the view opens, and the only one they
+   * write in. `null` for the administration, which only reads.
+   */
+  area: Especialidade | null;
+  chatHref: string | null;
 }) {
-  const [selected, setSelected] = useState<Especialidade>(area);
+  const [selected, setSelected] = useState<Especialidade>(area ?? ESPECIALIDADE.MEDICO);
   const [writing, setWriting] = useState<Writing>(null);
 
   // The whole history: an area's record is read as a whole, not by period.
   const patientId = patient.id;
   const timeline = usePatientTimeline(patientId, null);
 
-  const own = selected === area;
+  const own = area !== null && selected === area;
   const field = SPECIALTY_FIELD_LABEL[selected];
   const confidential = (timeline.data?.confidential_specialties ?? []).includes(selected);
   const events = (timeline.data?.events ?? []).filter((event) => event.specialty === selected);
@@ -141,7 +147,7 @@ export function SpecialtyRecordTab({
         </CardContent>
       </Card>
 
-      {!own && <OtherAreaNotice area={area} />}
+      {area && !own && <OtherAreaNotice area={area} />}
 
       {timeline.isLoading && <SkeletonRows count={3} />}
 
@@ -180,7 +186,7 @@ export function SpecialtyRecordTab({
                 {writing === "flag" && (
                   <SpecialtyNoteForm
                     patientId={patientId}
-                    specialty={area}
+                    specialty={selected}
                     flagByDefault
                     onDone={() => setWriting(null)}
                   />
@@ -232,7 +238,7 @@ export function SpecialtyRecordTab({
                 </div>
 
                 {writing === "note" && (
-                  <SpecialtyNoteForm patientId={patientId} specialty={area} onDone={() => setWriting(null)} />
+                  <SpecialtyNoteForm patientId={patientId} specialty={selected} onDone={() => setWriting(null)} />
                 )}
 
                 {events.length === 0 ? (

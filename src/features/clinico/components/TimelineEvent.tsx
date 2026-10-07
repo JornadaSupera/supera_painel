@@ -147,7 +147,7 @@ function FlagButton({ note }: { note: NoteRecordEvent }) {
   );
 }
 
-function Content({ event, chatHref }: { event: RecordEvent; chatHref: string }): ReactNode {
+function Content({ event, chatHref }: { event: RecordEvent; chatHref: string | null }): ReactNode {
   switch (event.kind) {
     case "diary":
       return (
@@ -190,12 +190,14 @@ function Content({ event, chatHref }: { event: RecordEvent; chatHref: string }):
           <StatusBadge tone={event.status_tone} size="sm" dot>
             {STATUS_CONVERSA_LABEL[event.status]}
           </StatusBadge>
-          <Link
-            to={chatHref}
-            className="text-primary-ink text-xs underline-offset-2 hover:underline"
-          >
-            Abrir no chat
-          </Link>
+          {chatHref && (
+            <Link
+              to={chatHref}
+              className="text-primary-ink text-xs underline-offset-2 hover:underline"
+            >
+              Abrir no chat
+            </Link>
+          )}
         </p>
       );
 
@@ -240,7 +242,8 @@ function Content({ event, chatHref }: { event: RecordEvent; chatHref: string }):
   }
 }
 
-export function TimelineEvent({ event, chatHref }: { event: RecordEvent; chatHref: string }) {
+/** `chatHref` is `null` for whoever has no clinical chat to open: the administration. */
+export function TimelineEvent({ event, chatHref }: { event: RecordEvent; chatHref: string | null }) {
   const Icon = ICON[event.kind];
   const isFlag = event.kind === "flag";
 

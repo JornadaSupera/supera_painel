@@ -29,6 +29,9 @@ import { TimelineEvent } from "./TimelineEvent";
  * did. The diary and the alerts are the patient's own reports and belong to no
  * area, so they only show under "Todas as áreas".
  *
+ * Without an area (the administration reads the record too) there is nothing to
+ * write, so the note button is not there.
+ *
  * Secrecy is the database's, not this screen's. What Psychology restricted does
  * not arrive for anyone else; the screen only explains the gap when that area is
  * picked, and keeps showing the flags, which are meant for everyone.
@@ -70,9 +73,9 @@ export function PatientRecordPanel({
   chatHref,
 }: {
   patientId: string;
-  /** The professional's own specialty: the one they can write in. */
-  area: Especialidade;
-  chatHref: string;
+  /** The professional's own specialty, the one they can write in. `null` for the administration. */
+  area: Especialidade | null;
+  chatHref: string | null;
 }) {
   const [days, setDays] = useState<TimelineWindow>(30);
   const [filter, setFilter] = useState<AreaFilter>(ALL);
@@ -154,18 +157,19 @@ export function PatientRecordPanel({
           <>
             <NextAppointment appointment={timeline.data.next_appointment} />
 
-            {writing ? (
-              <SpecialtyNoteForm
-                patientId={patientId}
-                specialty={area}
-                onDone={() => setWriting(false)}
-              />
-            ) : (
-              <Button type="button" variant="outline" className="w-fit" onClick={() => setWriting(true)}>
-                <Plus />
-                Nova anotação · {ESPECIALIDADE_LABEL[area]}
-              </Button>
-            )}
+            {area &&
+              (writing ? (
+                <SpecialtyNoteForm
+                  patientId={patientId}
+                  specialty={area}
+                  onDone={() => setWriting(false)}
+                />
+              ) : (
+                <Button type="button" variant="outline" className="w-fit" onClick={() => setWriting(true)}>
+                  <Plus />
+                  Nova anotação · {ESPECIALIDADE_LABEL[area]}
+                </Button>
+              ))}
 
             {withheld && (
               <Alert role="status">

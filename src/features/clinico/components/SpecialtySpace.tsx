@@ -39,7 +39,7 @@ interface SpaceProps {
   own: boolean;
   patient: PacienteDetalhe;
   timeline: PatientTimeline;
-  chatHref: string;
+  chatHref: string | null;
 }
 
 function firstNameOf(name: string): string {
