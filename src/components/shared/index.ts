@@ -29,6 +29,8 @@ export type { ConfirmDialogProps } from "./ConfirmDialog";
 
 export { DataTable } from "./DataTable";
 
+export { ErrorBoundary } from "./ErrorBoundary";
+
 export { DecisionList } from "./DecisionList";
 export type { Decision } from "./DecisionList";
 export type { Column, DataTableProps } from "./DataTable";

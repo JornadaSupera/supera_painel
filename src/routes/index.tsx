@@ -1,7 +1,7 @@
-import { lazy, Suspense } from "react";
+import { Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 
-import { Loading } from "@/components/shared";
+import { ErrorBoundary, Loading } from "@/components/shared";
 import { AvisoSessao } from "@/features/auth/components/AvisoSessao";
 import { carriesRecoveryLink, recoveryLinkPurpose } from "@/features/auth/recovery-link";
 import { LoginPage } from "@/features/auth/pages/LoginPage";
@@ -13,6 +13,7 @@ import { ClinicoLayout } from "@/layouts/ClinicoLayout";
 import { PERMISSAO } from "@/lib/rbac";
 import { AreaRoute } from "./AreaRoute";
 import { HomeRedirect } from "./HomeRedirect";
+import { lazyPage } from "./lazyPage";
 import { NotFoundRoute } from "./NotFoundRoute";
 import { PermissionRoute } from "./PermissionRoute";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -33,48 +34,56 @@ import { ProtectedRoute } from "./ProtectedRoute";
 /* One chunk per module: the panel loads only the screen being opened.
    The authentication screens stay in the main bundle — they are the first
    destination for anyone arriving, and an extra load there is visible
-   friction. */
-const DashboardPage = lazy(() => import("@/features/dashboard/pages/DashboardPage"));
-const PacientesPage = lazy(() => import("@/features/pacientes/pages/PacientesPage"));
-const PacienteNovoPage = lazy(() => import("@/features/pacientes/pages/PacienteNovoPage"));
-const UsuariosPage = lazy(() => import("@/features/usuarios/pages/UsuariosPage"));
-const UsuarioFormPage = lazy(() => import("@/features/usuarios/pages/UsuarioFormPage"));
-const UsuarioDetalhePage = lazy(() => import("@/features/usuarios/pages/UsuarioDetalhePage"));
-const ConteudoPage = lazy(() => import("@/features/conteudo/pages/ConteudoPage"));
-const RelatoriosPage = lazy(() => import("@/features/relatorios/pages/RelatoriosPage"));
-const SatisfacaoPage = lazy(() => import("@/features/satisfaction/pages/SatisfacaoPage"));
-const EstatisticasClinicasPage = lazy(
+   friction. `lazyPage` reloads once when a deploy replaced the chunk. */
+const DashboardPage = lazyPage(() => import("@/features/dashboard/pages/DashboardPage"));
+const PacientesPage = lazyPage(() => import("@/features/pacientes/pages/PacientesPage"));
+const PacienteNovoPage = lazyPage(() => import("@/features/pacientes/pages/PacienteNovoPage"));
+const UsuariosPage = lazyPage(() => import("@/features/usuarios/pages/UsuariosPage"));
+const UsuarioFormPage = lazyPage(() => import("@/features/usuarios/pages/UsuarioFormPage"));
+const UsuarioDetalhePage = lazyPage(() => import("@/features/usuarios/pages/UsuarioDetalhePage"));
+const ConteudoPage = lazyPage(() => import("@/features/conteudo/pages/ConteudoPage"));
+const RelatoriosPage = lazyPage(() => import("@/features/relatorios/pages/RelatoriosPage"));
+const SatisfacaoPage = lazyPage(() => import("@/features/satisfaction/pages/SatisfacaoPage"));
+const EstatisticasClinicasPage = lazyPage(
   () => import("@/features/estatisticas/pages/EstatisticasClinicasPage"),
 );
-const EstatisticasOperacionaisPage = lazy(
+const EstatisticasOperacionaisPage = lazyPage(
   () => import("@/features/estatisticas/pages/EstatisticasOperacionaisPage"),
 );
-const AuditoriaPage = lazy(() => import("@/features/auditoria/pages/AuditoriaPage"));
-const ConfiguracoesPage = lazy(() => import("@/features/configuracoes/pages/ConfiguracoesPage"));
+const AuditoriaPage = lazyPage(() => import("@/features/auditoria/pages/AuditoriaPage"));
+const ConfiguracoesPage = lazyPage(
+  () => import("@/features/configuracoes/pages/ConfiguracoesPage"),
+);
 /* The account's own security screen, shared by both panels. */
-const SegurancaContaPage = lazy(() => import("@/features/auth/pages/SegurancaContaPage"));
+const SegurancaContaPage = lazyPage(() => import("@/features/auth/pages/SegurancaContaPage"));
 
 /* Painel clínico — fundação (PA-07). Um chunk por módulo, mesmo critério. */
-const ClinicoDashboardPage = lazy(() => import("@/features/clinico/pages/ClinicoDashboardPage"));
-const ClinicoPacientesPage = lazy(() => import("@/features/clinico/pages/ClinicoPacientesPage"));
-const ClinicoAgendaPage = lazy(() => import("@/features/clinico/pages/ClinicoAgendaPage"));
-const ClinicoChatPage = lazy(() => import("@/features/clinico/pages/ClinicoChatPage"));
-const ClinicoAlertasPage = lazy(() => import("@/features/clinico/pages/ClinicoAlertasPage"));
-const ClinicoConteudoPage = lazy(() => import("@/features/clinico/pages/ClinicoConteudoPage"));
-const ClinicoOrientacaoPage = lazy(() => import("@/features/clinico/pages/ClinicoOrientacaoPage"));
-const ClinicoPerfilPage = lazy(() => import("@/features/clinico/pages/ClinicoPerfilPage"));
+const ClinicoDashboardPage = lazyPage(
+  () => import("@/features/clinico/pages/ClinicoDashboardPage"),
+);
+const ClinicoPacientesPage = lazyPage(
+  () => import("@/features/clinico/pages/ClinicoPacientesPage"),
+);
+const ClinicoAgendaPage = lazyPage(() => import("@/features/clinico/pages/ClinicoAgendaPage"));
+const ClinicoChatPage = lazyPage(() => import("@/features/clinico/pages/ClinicoChatPage"));
+const ClinicoAlertasPage = lazyPage(() => import("@/features/clinico/pages/ClinicoAlertasPage"));
+const ClinicoConteudoPage = lazyPage(() => import("@/features/clinico/pages/ClinicoConteudoPage"));
+const ClinicoOrientacaoPage = lazyPage(
+  () => import("@/features/clinico/pages/ClinicoOrientacaoPage"),
+);
+const ClinicoPerfilPage = lazyPage(() => import("@/features/clinico/pages/ClinicoPerfilPage"));
 /* The patient record in tabs, in both panels: composed in `routes/`, where two
    features may meet. */
-const AdminPatientRecord = lazy(() => import("./AdminPatientRecord"));
-const ClinicalPatientRecord = lazy(() => import("./ClinicalPatientRecord"));
-const ClinicalNewPatient = lazy(() => import("./ClinicalNewPatient"));
+const AdminPatientRecord = lazyPage(() => import("./AdminPatientRecord"));
+const ClinicalPatientRecord = lazyPage(() => import("./ClinicalPatientRecord"));
+const ClinicalNewPatient = lazyPage(() => import("./ClinicalNewPatient"));
 /* Not a panel screen: its audience is app users, so it stays out of the bundle
    that panel staff load first. */
-const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
+const PasswordRecoveryPage = lazyPage(() => import("@/features/auth/pages/PasswordRecoveryPage"));
 /* Public legal documents. Same reasoning: their readers are app users, store
    reviewers and anyone following a link, not the panel's staff. */
-const TermsOfUsePage = lazy(() => import("@/features/legal/pages/TermsOfUsePage"));
-const PrivacyPolicyPage = lazy(() => import("@/features/legal/pages/PrivacyPolicyPage"));
+const TermsOfUsePage = lazyPage(() => import("@/features/legal/pages/TermsOfUsePage"));
+const PrivacyPolicyPage = lazyPage(() => import("@/features/legal/pages/PrivacyPolicyPage"));
 
 /**
  * Routes that CONSUME a recovery link. The gate below leaves them alone.
@@ -149,169 +158,177 @@ export function AppRoutes() {
     <>
       <AvisoSessao />
 
-      <Suspense fallback={<Loading />}>
-        <Routes>
-          {/* ------------------------------------------------------- public */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/login/mfa" element={<MfaPage />} />
-          <Route path="/recuperar-senha" element={<RecuperarSenhaPage />} />
-          <Route path="/nova-senha" element={<NovaSenhaPage />} />
+      {/* The last net: a failure outside the layouts (sign-in, public pages, the
+          frame itself) shows an error instead of a blank page. Inside a layout
+          the content area has its own, and the sidebar stays. */}
+      <ErrorBoundary resetKey={location.pathname}>
+        <Suspense fallback={<Loading />}>
+          <Routes>
+            {/* ------------------------------------------------------- public */}
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/login/mfa" element={<MfaPage />} />
+            <Route path="/recuperar-senha" element={<RecuperarSenhaPage />} />
+            <Route path="/nova-senha" element={<NovaSenhaPage />} />
 
-          {/* App accounts (patients and caregivers) land here from the
-              recovery e-mail. Outside every guard and layout of the panel:
-              the page changes the password and leads nowhere else. */}
-          <Route path="/redefinir-senha" element={<PasswordRecoveryPage />} />
+            {/* App accounts (patients and caregivers) land here from the
+                recovery e-mail. Outside every guard and layout of the panel:
+                the page changes the password and leads nowhere else. */}
+            <Route path="/redefinir-senha" element={<PasswordRecoveryPage />} />
 
-          {/* Terms of use and privacy policy — the addresses the app, the
-              stores and the sign-in footer link to. Outside every guard: a
-              document someone must accept is readable before any account. */}
-          <Route path="/termos" element={<TermsOfUsePage />} />
-          <Route path="/privacidade" element={<PrivacyPolicyPage />} />
-          <Route path="/termos-de-uso" element={<Navigate to="/termos" replace />} />
-          <Route path="/politica-de-privacidade" element={<Navigate to="/privacidade" replace />} />
-
-          {/* ---------------------------------------------------- protected */}
-          <Route element={<ProtectedRoute />}>
+            {/* Terms of use and privacy policy — the addresses the app, the
+                stores and the sign-in footer link to. Outside every guard: a
+                document someone must accept is readable before any account. */}
+            <Route path="/termos" element={<TermsOfUsePage />} />
+            <Route path="/privacidade" element={<PrivacyPolicyPage />} />
+            <Route path="/termos-de-uso" element={<Navigate to="/termos" replace />} />
             <Route
-              element={
-                <AreaRoute area="admin">
-                  <AdminLayout />
-                </AreaRoute>
-              }
-            >
-              <Route element={<PermissionRoute permission={PERMISSAO.DASHBOARD_READ} />}>
-                <Route path="/dashboard" element={<DashboardPage />} />
-              </Route>
+              path="/politica-de-privacidade"
+              element={<Navigate to="/privacidade" replace />}
+            />
 
-              {/* Creating requires write access, not read — hence its own
-                  group. The Router picks the most specific route, so
-                  "/pacientes/novo" beats "/pacientes/:id" regardless of the
-                  order the two appear in. */}
-              <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_WRITE} />}>
-                <Route path="/pacientes/novo" element={<PacienteNovoPage />} />
-              </Route>
-
-              <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
-                <Route path="/pacientes" element={<PacientesPage />} />
-                <Route path="/pacientes/:id" element={<AdminPatientRecord />} />
-              </Route>
-
-              {/* Creating and editing a professional is access management: it
-                  requires `usuarios:manage`, not the list read. */}
-              <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_MANAGE} />}>
-                <Route path="/usuarios/novo" element={<UsuarioFormPage />} />
-                <Route path="/usuarios/:id/editar" element={<UsuarioFormPage />} />
-              </Route>
-
-              {/* The record is READ, and it belongs with the list.
-                  It used to sit under `usuarios:manage`, which a person with
-                  only `usuarios:read` (an individual grant, not a role) does
-                  not hold: they saw the list, clicked a row and were blocked by
-                  the guard — a screen that offers a link it will refuse. The
-                  form keeps its own route above, so editing stays behind
-                  `manage`. */}
-              <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_READ} />}>
-                <Route path="/usuarios" element={<UsuariosPage />} />
-                <Route path="/usuarios/:id" element={<UsuarioDetalhePage />} />
-              </Route>
-
-              <Route element={<PermissionRoute permission={PERMISSAO.CONTEUDO_READ} />}>
-                <Route path="/conteudo" element={<ConteudoPage />} />
-              </Route>
-
-              <Route element={<PermissionRoute permission={PERMISSAO.RELATORIOS_READ} />}>
-                <Route path="/relatorios" element={<RelatoriosPage />} />
-                {/* A MESMA tela, e não uma rota de detalhe: o relatório abre
-                    numa janela sobre a lista. O que a rota acrescenta é o
-                    endereço — é o "link interno" do escopo, que transforma um
-                    resultado em algo que se manda para alguém. */}
-                <Route path="/relatorios/:slug" element={<RelatoriosPage />} />
-              </Route>
-
-              <Route element={<PermissionRoute permission={PERMISSAO.SATISFACAO_READ} />}>
-                <Route path="/satisfacao" element={<SatisfacaoPage />} />
-              </Route>
-
-              <Route
-                element={<PermissionRoute permission={PERMISSAO.ESTATISTICAS_CLINICAS_READ} />}
-              >
-                <Route path="/estatisticas/clinicas" element={<EstatisticasClinicasPage />} />
-              </Route>
-
+            {/* ---------------------------------------------------- protected */}
+            <Route element={<ProtectedRoute />}>
               <Route
                 element={
-                  <PermissionRoute
-                    anyOf={[PERMISSAO.ESTATISTICAS_READ_ALL, PERMISSAO.ESTATISTICAS_READ_SELF]}
-                  />
+                  <AreaRoute area="admin">
+                    <AdminLayout />
+                  </AreaRoute>
                 }
               >
+                <Route element={<PermissionRoute permission={PERMISSAO.DASHBOARD_READ} />}>
+                  <Route path="/dashboard" element={<DashboardPage />} />
+                </Route>
+
+                {/* Creating requires write access, not read — hence its own
+                    group. The Router picks the most specific route, so
+                    "/pacientes/novo" beats "/pacientes/:id" regardless of the
+                    order the two appear in. */}
+                <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_WRITE} />}>
+                  <Route path="/pacientes/novo" element={<PacienteNovoPage />} />
+                </Route>
+
+                <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
+                  <Route path="/pacientes" element={<PacientesPage />} />
+                  <Route path="/pacientes/:id" element={<AdminPatientRecord />} />
+                </Route>
+
+                {/* Creating and editing a professional is access management: it
+                    requires `usuarios:manage`, not the list read. */}
+                <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_MANAGE} />}>
+                  <Route path="/usuarios/novo" element={<UsuarioFormPage />} />
+                  <Route path="/usuarios/:id/editar" element={<UsuarioFormPage />} />
+                </Route>
+
+                {/* The record is READ, and it belongs with the list.
+                    It used to sit under `usuarios:manage`, which a person with
+                    only `usuarios:read` (an individual grant, not a role) does
+                    not hold: they saw the list, clicked a row and were blocked by
+                    the guard — a screen that offers a link it will refuse. The
+                    form keeps its own route above, so editing stays behind
+                    `manage`. */}
+                <Route element={<PermissionRoute permission={PERMISSAO.USUARIOS_READ} />}>
+                  <Route path="/usuarios" element={<UsuariosPage />} />
+                  <Route path="/usuarios/:id" element={<UsuarioDetalhePage />} />
+                </Route>
+
+                <Route element={<PermissionRoute permission={PERMISSAO.CONTEUDO_READ} />}>
+                  <Route path="/conteudo" element={<ConteudoPage />} />
+                </Route>
+
+                <Route element={<PermissionRoute permission={PERMISSAO.RELATORIOS_READ} />}>
+                  <Route path="/relatorios" element={<RelatoriosPage />} />
+                  {/* A MESMA tela, e não uma rota de detalhe: o relatório abre
+                      numa janela sobre a lista. O que a rota acrescenta é o
+                      endereço — é o "link interno" do escopo, que transforma um
+                      resultado em algo que se manda para alguém. */}
+                  <Route path="/relatorios/:slug" element={<RelatoriosPage />} />
+                </Route>
+
+                <Route element={<PermissionRoute permission={PERMISSAO.SATISFACAO_READ} />}>
+                  <Route path="/satisfacao" element={<SatisfacaoPage />} />
+                </Route>
+
                 <Route
-                  path="/estatisticas/operacionais"
-                  element={<EstatisticasOperacionaisPage />}
+                  element={<PermissionRoute permission={PERMISSAO.ESTATISTICAS_CLINICAS_READ} />}
+                >
+                  <Route path="/estatisticas/clinicas" element={<EstatisticasClinicasPage />} />
+                </Route>
+
+                <Route
+                  element={
+                    <PermissionRoute
+                      anyOf={[PERMISSAO.ESTATISTICAS_READ_ALL, PERMISSAO.ESTATISTICAS_READ_SELF]}
+                    />
+                  }
+                >
+                  <Route
+                    path="/estatisticas/operacionais"
+                    element={<EstatisticasOperacionaisPage />}
+                  />
+                </Route>
+
+                <Route element={<PermissionRoute permission={PERMISSAO.AUDITORIA_READ} />}>
+                  <Route path="/auditoria" element={<AuditoriaPage />} />
+                </Route>
+
+                <Route element={<PermissionRoute permission={PERMISSAO.CONFIGURACOES_READ} />}>
+                  <Route path="/configuracoes" element={<ConfiguracoesPage />} />
+                </Route>
+
+                {/* Every administrator manages their own second factor: no module
+                    permission, because it is the account's, not the panel's. */}
+                <Route path="/seguranca" element={<SegurancaContaPage />} />
+
+                {/* "Estatísticas" alone is not a screen: it leads to the first child. */}
+                <Route
+                  path="/estatisticas"
+                  element={<Navigate to="/estatisticas/clinicas" replace />}
                 />
               </Route>
 
-              <Route element={<PermissionRoute permission={PERMISSAO.AUDITORIA_READ} />}>
-                <Route path="/auditoria" element={<AuditoriaPage />} />
-              </Route>
-
-              <Route element={<PermissionRoute permission={PERMISSAO.CONFIGURACOES_READ} />}>
-                <Route path="/configuracoes" element={<ConfiguracoesPage />} />
-              </Route>
-
-              {/* Every administrator manages their own second factor: no module
-                  permission, because it is the account's, not the panel's. */}
-              <Route path="/seguranca" element={<SegurancaContaPage />} />
-
-              {/* "Estatísticas" alone is not a screen: it leads to the first child. */}
+              {/* ----------------------------------------------------- clínico */}
+              {/* Foundation only (PA-07): routing, frame and navigation are
+                  real; the six screens still show what is missing instead of
+                  a number that isn't there yet. */}
               <Route
-                path="/estatisticas"
-                element={<Navigate to="/estatisticas/clinicas" replace />}
-              />
+                path="/clinico/:especialidade"
+                element={
+                  <AreaRoute area="clinico">
+                    <ClinicoLayout />
+                  </AreaRoute>
+                }
+              >
+                <Route index element={<ClinicoDashboardPage />} />
+                <Route path="pacientes" element={<ClinicoPacientesPage />} />
+                {/* "novo" outranks ":id" by being static. */}
+                <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_WRITE} />}>
+                  <Route path="pacientes/novo" element={<ClinicalNewPatient />} />
+                </Route>
+                <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
+                  <Route path="pacientes/:id" element={<ClinicalPatientRecord />} />
+                </Route>
+                <Route path="agenda" element={<ClinicoAgendaPage />} />
+                <Route path="chat" element={<ClinicoChatPage />} />
+                <Route path="alertas" element={<ClinicoAlertasPage />} />
+                {/* Writing is the professional's, in their own area: the list and the
+                    editor share the module permission, and the database still decides
+                    who is the author. "nova" outranks ":id" by being static. */}
+                <Route element={<PermissionRoute permission={PERMISSAO.CONTEUDO_WRITE} />}>
+                  <Route path="conteudo" element={<ClinicoConteudoPage />} />
+                  <Route path="conteudo/nova" element={<ClinicoOrientacaoPage />} />
+                  <Route path="conteudo/:id" element={<ClinicoOrientacaoPage />} />
+                </Route>
+                <Route path="perfil" element={<ClinicoPerfilPage />} />
+                <Route path="seguranca" element={<SegurancaContaPage />} />
+              </Route>
             </Route>
 
-            {/* ----------------------------------------------------- clínico */}
-            {/* Foundation only (PA-07): routing, frame and navigation are
-                real; the six screens still show what is missing instead of
-                a number that isn't there yet. */}
-            <Route
-              path="/clinico/:especialidade"
-              element={
-                <AreaRoute area="clinico">
-                  <ClinicoLayout />
-                </AreaRoute>
-              }
-            >
-              <Route index element={<ClinicoDashboardPage />} />
-              <Route path="pacientes" element={<ClinicoPacientesPage />} />
-              {/* "novo" outranks ":id" by being static. */}
-              <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_WRITE} />}>
-                <Route path="pacientes/novo" element={<ClinicalNewPatient />} />
-              </Route>
-              <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
-                <Route path="pacientes/:id" element={<ClinicalPatientRecord />} />
-              </Route>
-              <Route path="agenda" element={<ClinicoAgendaPage />} />
-              <Route path="chat" element={<ClinicoChatPage />} />
-              <Route path="alertas" element={<ClinicoAlertasPage />} />
-              {/* Writing is the professional's, in their own area: the list and the
-                  editor share the module permission, and the database still decides
-                  who is the author. "nova" outranks ":id" by being static. */}
-              <Route element={<PermissionRoute permission={PERMISSAO.CONTEUDO_WRITE} />}>
-                <Route path="conteudo" element={<ClinicoConteudoPage />} />
-                <Route path="conteudo/nova" element={<ClinicoOrientacaoPage />} />
-                <Route path="conteudo/:id" element={<ClinicoOrientacaoPage />} />
-              </Route>
-              <Route path="perfil" element={<ClinicoPerfilPage />} />
-              <Route path="seguranca" element={<SegurancaContaPage />} />
-            </Route>
-          </Route>
-
-          {/* ------------------------------------------------------ default */}
-          <Route path="/" element={<HomeRedirect />} />
-          <Route path="*" element={<NotFoundRoute />} />
-        </Routes>
-      </Suspense>
+            {/* ------------------------------------------------------ default */}
+            <Route path="/" element={<HomeRedirect />} />
+            <Route path="*" element={<NotFoundRoute />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </>
   );
 }
