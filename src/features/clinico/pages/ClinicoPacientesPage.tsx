@@ -1,4 +1,4 @@
-import { ChevronRight, Download } from "lucide-react";
+import { ChevronRight, Download, UserPlus } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -10,9 +10,11 @@ import {
   UserAvatar,
   type Column,
 } from "@/components/shared";
+import { DisabledReason } from "@/components/shared/DisabledReason";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { useExportarPacientes } from "@/hooks/useExportarPacientes";
+import { useMotivoIndisponivel } from "@/hooks/useMotivoIndisponivel";
 import { relativeDay } from "@/lib/agenda";
 import {
   ESPECIALIDADE_LABEL,
@@ -128,6 +130,20 @@ export function ClinicoPacientesPage() {
 
   const { pacientes, isLoading, isError, error, refetch, total, params } = useMeusPacientes();
   const exportar = useExportarPacientes(params);
+  const semCadastro = useMotivoIndisponivel("pacientes.create");
+  const novoPaciente = (
+    <Can permission={PERMISSAO.PACIENTES_WRITE}>
+      <DisabledReason reason={semCadastro}>
+        <Button
+          disabled={semCadastro !== null}
+          onClick={() => navigate(`/clinico/${especialidade}/pacientes/novo`)}
+        >
+          <UserPlus />
+          Novo paciente
+        </Button>
+      </DisabledReason>
+    </Can>
+  );
 
   const busca = useCarteiraStore((estado) => estado.busca);
   const filtros = useCarteiraStore((estado) => estado.filtros);
@@ -157,16 +173,19 @@ export function ClinicoPacientesPage() {
                 : `${pluralize(total, "paciente", "pacientes")} · use filtros para segmentar`
         }
         actions={
-          <Can permission={PERMISSAO.PACIENTES_EXPORT}>
-            <Button
-              variant="outline"
-              onClick={() => exportar.mutate()}
-              disabled={exportar.isPending || total === 0}
-            >
-              <Download />
-              Exportar CSV
-            </Button>
-          </Can>
+          <>
+            <Can permission={PERMISSAO.PACIENTES_EXPORT}>
+              <Button
+                variant="outline"
+                onClick={() => exportar.mutate()}
+                disabled={exportar.isPending || total === 0}
+              >
+                <Download />
+                Exportar CSV
+              </Button>
+            </Can>
+            {novoPaciente}
+          </>
         }
       />
 
@@ -200,8 +219,9 @@ export function ClinicoPacientesPage() {
               description={
                 filtrada
                   ? "Nenhuma ficha corresponde à busca e aos filtros aplicados."
-                  : "Quando a clínica cadastrar pacientes, eles aparecem aqui."
+                  : "Cadastre o primeiro paciente para começar o acompanhamento pelo aplicativo."
               }
+              action={filtrada ? undefined : novoPaciente}
             />
           }
         />

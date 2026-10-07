@@ -67,6 +67,7 @@ const ClinicoPerfilPage = lazy(() => import("@/features/clinico/pages/ClinicoPer
    features may meet. */
 const AdminPatientRecord = lazy(() => import("./AdminPatientRecord"));
 const ClinicalPatientRecord = lazy(() => import("./ClinicalPatientRecord"));
+const ClinicalNewPatient = lazy(() => import("./ClinicalNewPatient"));
 /* Not a panel screen: its audience is app users, so it stays out of the bundle
    that panel staff load first. */
 const PasswordRecoveryPage = lazy(() => import("@/features/auth/pages/PasswordRecoveryPage"));
@@ -283,6 +284,10 @@ export function AppRoutes() {
             >
               <Route index element={<ClinicoDashboardPage />} />
               <Route path="pacientes" element={<ClinicoPacientesPage />} />
+              {/* "novo" outranks ":id" by being static. */}
+              <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_WRITE} />}>
+                <Route path="pacientes/novo" element={<ClinicalNewPatient />} />
+              </Route>
               <Route element={<PermissionRoute permission={PERMISSAO.PACIENTES_READ} />}>
                 <Route path="pacientes/:id" element={<ClinicalPatientRecord />} />
               </Route>
