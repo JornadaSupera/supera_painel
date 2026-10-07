@@ -52,13 +52,20 @@ export function usePatientSearch(term: string) {
   });
 }
 
-/** What booking, moving or closing an appointment must refresh: the agenda and what is counted from it. */
+/**
+ * What booking, moving or closing an appointment must refresh: the agenda and
+ * what is counted from it — the day's panel and the patient's agenda tab (both
+ * under the agenda key), the record's timeline, and the executive dashboard's
+ * sessions. The bell is refreshed by the mutation cache.
+ */
 function useRefreshAgenda() {
   const queryClient = useQueryClient();
 
   return async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.clinico.agendaAll() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.clinico.records() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all }),
     ]);
   };
 }

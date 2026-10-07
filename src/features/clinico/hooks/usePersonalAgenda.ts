@@ -38,8 +38,22 @@ export function useMyBlocks(window: { from: string; to: string }) {
   });
 }
 
-export function useSaveBlock() {
+/**
+ * A block is the professional's own agenda and, for whoever books, a busy
+ * window (`read_professional_busy_intervals` reads blocks): both must refresh.
+ */
+function useRefreshBlocks() {
   const queryClient = useQueryClient();
+
+  return () =>
+    Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.clinico.blocks() }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.clinico.busyAll() }),
+    ]);
+}
+
+export function useSaveBlock() {
+  const refresh = useRefreshBlocks();
 
   return useMutation({
     mutationFn: async (params: PersonalBlockInput & { id?: string }) => {
@@ -51,7 +65,7 @@ export function useSaveBlock() {
     },
     onSuccess: async (saved, params) => {
       if (saved) audit.update("professional_blocks", saved.id, { operation: params.id ? "update" : "create" });
-      await queryClient.invalidateQueries({ queryKey: queryKeys.clinico.blocks() });
+      await refresh();
       toast.success(params.id ? "Bloqueio atualizado" : "Horário bloqueado");
 
       // The block is accepted where appointments already are, and none is
@@ -71,13 +85,13 @@ export function useSaveBlock() {
 }
 
 export function useDeleteBlock() {
-  const queryClient = useQueryClient();
+  const refresh = useRefreshBlocks();
 
   return useMutation({
     mutationFn: async (id: string) => (await call(() => clinicoApi.deleteBlock({ id }))).data,
     onSuccess: async (_data, id) => {
       audit.delete("professional_blocks", id, "Bloqueio removido pelo próprio profissional");
-      await queryClient.invalidateQueries({ queryKey: queryKeys.clinico.blocks() });
+      await refresh();
       toast.success("Bloqueio removido");
     },
     onError: (error) => toast.error("Não foi possível remover o bloqueio", { description: error.message }),
