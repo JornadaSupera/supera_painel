@@ -159,6 +159,8 @@ export const queryKeys = {
     conversas: () => ["clinico", "conversas"] as const,
     /** Average minutes to the first reply over the last N days. */
     tempoDeResposta: (dias: number) => ["clinico", "tempo-de-resposta", dias] as const,
+    /** The signed-in professional's own numbers between two instants. */
+    desempenho: (de: string, ate: string) => ["clinico", "desempenho", de, ate] as const,
     perfil: () => ["clinico", "perfil"] as const,
     mensagens: (conversaId: string) => ["clinico", "conversas", conversaId, "mensagens"] as const,
     /** Fora de `clinico.all` de propósito: o anexo não muda, e invalidar a fila não deve baixá-lo de novo. */

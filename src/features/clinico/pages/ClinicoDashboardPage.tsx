@@ -30,7 +30,8 @@ import { SEVERITY_DOT, SEVERITY_RANK } from "../alert-tones";
 import { ConversaSemResposta } from "../components/ConversaSemResposta";
 import { useAgendaClinica } from "../hooks/useAgendaClinica";
 import { useAlertasClinicos } from "../hooks/useAlertasClinicos";
-import { useConversasClinicas, useTempoDeResposta } from "../hooks/useConversasClinicas";
+import { useConversasClinicas } from "../hooks/useConversasClinicas";
+import { useMeuDesempenho } from "../hooks/useMeuDesempenho";
 import { usePacientesPorId } from "../hooks/useMeusPacientes";
 
 /**
@@ -38,25 +39,25 @@ import { usePacientesPorId } from "../hooks/useMeusPacientes";
  *
  * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/psicologo/
  *
- * Leituras reais: a agenda de hoje (`read_my_agenda`, recortada para o dia
- * corrente no fuso da clínica), as filas de chat e de alertas — as mesmas que as
- * telas Chat e Alertas mostram por inteiro — e o tempo médio de resposta do
- * chat (`summarize_chat_response_times`). Protocolo e CID de cada paciente do
- * dia saem de UMA leitura da lista, não de três leituras de ficha por pessoa.
+ * O painel é de quem está logado, não da equipe:
+ *  - a agenda de hoje é a sua (`read_my_agenda`, recortada para o dia corrente
+ *    no fuso da clínica);
+ *  - as conversas são as suas e as sem responsável da sua área — a mesma lista
+ *    da tela Chat;
+ *  - os alertas são os que estão com você e os que ainda não têm responsável.
+ *    Esses ficam à vista de todos de propósito: alerta não é roteado a ninguém
+ *    até alguém assumir, e esconder a fila arriscaria um alerta grave sem dono;
+ *  - resolvidas no mês e tempo de resposta são os seus
+ *    (`summarize_my_portfolio`).
  *
- * Os quatro cartões do topo saem das MESMAS leituras das listas logo abaixo, não
- * de uma conta paralela: o cartão e a lista não podem discordar. O de alertas
- * nas últimas 24 h e o de resolvidas no mês dependem de `read_alerts`, que
- * entrega no máximo 200 por situação e do mais antigo para o mais novo; quando a
- * leitura bate no teto o cartão diz "≥" em vez de exibir um total que parece
- * exato.
+ * Protocolo e CID de cada paciente do dia saem de UMA leitura da lista, não de
+ * três leituras de ficha por pessoa. Os cartões do topo saem das mesmas leituras
+ * das listas logo abaixo: o cartão e a lista não podem discordar.
  *
  * Fica de fora o risco de cada paciente: ele vem do Gemed, que não está ligado.
  */
 
 const LIMITE_RESUMO = 5;
-/** O teto de `read_alerts` por situação. */
-const TETO_ALERTAS = 200;
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
 const GRAVES: ReadonlySet<Severidade> = new Set([SEVERIDADE.ALTA, SEVERIDADE.CRITICA]);
 
@@ -79,11 +80,16 @@ function diaPorExtenso(agora: Date): string {
   });
 }
 
-/** O primeiro dia do mês corrente e do anterior, como instantes. */
-function inicioDosMeses(hoje: string): { atual: number; anterior: number } {
+/** O início do mês anterior, do corrente e do próximo, em ISO 8601 UTC. */
+function inicioDosMeses(hoje: string): { anterior: string; atual: string; proximo: string } {
   const primeiro = `${hoje.slice(0, 7)}-01`;
   const anterior = addDays(primeiro, -1).slice(0, 7);
-  return { atual: Date.parse(dayStart(primeiro)), anterior: Date.parse(dayStart(`${anterior}-01`)) };
+  const proximo = addDays(primeiro, 32).slice(0, 7);
+  return {
+    anterior: dayStart(`${anterior}-01`),
+    atual: dayStart(primeiro),
+    proximo: dayStart(`${proximo}-01`),
+  };
 }
 
 /** Cabeçalho de um bloco: título, apoio e o atalho para a tela inteira. */
@@ -194,19 +200,22 @@ export function ClinicoDashboardPage() {
   const compromissos = agendaDeHoje.data ?? [];
   const pacientes = usePacientesPorId(compromissos.length > 0);
 
+  // Suas conversas e as sem responsável da sua área: a lista já chega assim.
   const conversas = useConversasClinicas();
   const semResposta = (conversas.data ?? [])
     .filter((c) => c.status === STATUS_CONVERSA.ABERTA && c.nao_lida_pela_equipe)
     .sort((a, b) => a.ultima_mensagem_em.localeCompare(b.ultima_mensagem_em));
-  const tempoDeResposta = useTempoDeResposta();
-  const minutos = tempoDeResposta.data?.minutos ?? null;
+
+  // Os seus números no mês e no anterior, para a variação.
+  const meses = inicioDosMeses(hoje);
+  const noMes = useMeuDesempenho(meses.atual, meses.proximo);
+  const noMesAnterior = useMeuDesempenho(meses.anterior, meses.atual);
+  const minutos = noMes.data?.tempo_medio_minutos ?? null;
 
   // Por situação, como a tela de Alertas: numa leitura só, os resolvidos antigos
   // ocupariam o teto e esconderiam os alertas novos em aberto.
   const pendentes = useAlertasClinicos("pendente");
   const emAtendimento = useAlertasClinicos("assumido");
-  // Só para contar: o nome de cada paciente seria uma leitura na trilha.
-  const resolvidos = useAlertasClinicos("resolvido", { semNomes: true });
 
   const alertas = {
     isLoading: pendentes.isLoading || emAtendimento.isLoading,
@@ -214,15 +223,16 @@ export function ClinicoDashboardPage() {
     error: pendentes.error ?? emAtendimento.error,
     refetch: () => void Promise.all([pendentes.refetch(), emAtendimento.refetch()]),
   };
-  const naFila = [...(pendentes.data ?? []), ...(emAtendimento.data ?? [])].sort(
+  // Sem responsável, e os que estão com você. Os que um colega assumiu ficam
+  // na tela Alertas.
+  const comigo = (emAtendimento.data ?? []).filter((alerta) => alerta.meu);
+  const naFila = [...(pendentes.data ?? []), ...comigo].sort(
     (a, b) =>
       SEVERITY_RANK[a.severidade] - SEVERITY_RANK[b.severidade] || a.criado_em.localeCompare(b.criado_em),
   );
   const graves = naFila.filter((alerta) => GRAVES.has(alerta.severidade)).length;
 
   const instante = agora.getTime();
-  const meses = inicioDosMeses(hoje);
-  const resolvidosLimitados = (resolvidos.data?.length ?? 0) >= TETO_ALERTAS;
 
   const pacientesHoje = new Set(compromissos.map((compromisso) => compromisso.paciente_id)).size;
   const proximo = compromissos
@@ -231,21 +241,15 @@ export function ClinicoDashboardPage() {
     )
     .sort((a, b) => a.inicio.localeCompare(b.inicio))[0];
 
-  const gravesEm24h = [...naFila, ...(resolvidos.data ?? [])].filter(
+  const gravesEm24h = naFila.filter(
     (alerta) => GRAVES.has(alerta.severidade) && instante - Date.parse(alerta.criado_em) <= UM_DIA_MS,
   ).length;
 
-  const resolvidoEntre = (de: number, ate: number) =>
-    (resolvidos.data ?? []).filter((alerta) => {
-      const em = alerta.resolvido_em ? Date.parse(alerta.resolvido_em) : NaN;
-      return em >= de && em < ate;
-    }).length;
-  const resolvidosNoMes = resolvidoEntre(meses.atual, Infinity);
-  const resolvidosNoAnterior = resolvidoEntre(meses.anterior, meses.atual);
-  // Variação só com base: sem resolvidas no mês anterior não há porcentagem que signifique algo,
-  // e com a leitura no teto o mês anterior pode estar cortado.
+  const resolvidosNoMes = noMes.data?.alertas_resolvidos ?? 0;
+  const resolvidosNoAnterior = noMesAnterior.data?.alertas_resolvidos ?? 0;
+  // Variação só com base: sem resolvidas no mês anterior não há porcentagem que signifique algo.
   const variacao =
-    !resolvidosLimitados && resolvidosNoAnterior > 0
+    noMesAnterior.data && resolvidosNoAnterior > 0
       ? Math.round(((resolvidosNoMes - resolvidosNoAnterior) / resolvidosNoAnterior) * 100)
       : undefined;
 
@@ -295,18 +299,10 @@ export function ClinicoDashboardPage() {
         <StatCard
           icon={<TriangleAlert />}
           accent="bg-destructive/10 text-destructive"
-          label="Alertas 24 h"
-          loading={alertas.isLoading || resolvidos.isLoading}
-          value={
-            alertas.isError || resolvidos.isError
-              ? "—"
-              : `${resolvidosLimitados ? "≥ " : ""}${formatNumber(gravesEm24h)}`
-          }
-          context={
-            alertas.isError || resolvidos.isError
-              ? "não foi possível ler a fila"
-              : "Severidade alta / crítica"
-          }
+          label="Alertas graves 24 h"
+          loading={alertas.isLoading}
+          value={alertas.isError ? "—" : formatNumber(gravesEm24h)}
+          context={alertas.isError ? "não foi possível ler a fila" : "Sem responsável ou com você"}
           invertColor
         />
         <StatCard
@@ -319,29 +315,21 @@ export function ClinicoDashboardPage() {
             conversas.isError
               ? "não foi possível ler o chat"
               : minutos === null
-                ? "Tempo médio: sem respostas no mês"
-                : `Tempo médio: ${formatNumber(minutos)} min`
+                ? "Seu tempo médio: sem respostas no mês"
+                : `Seu tempo médio: ${formatNumber(minutos)} min`
           }
           invertColor
         />
         <StatCard
           icon={<CircleCheck />}
           accent="bg-success/10 text-success-foreground"
-          label="Resolvidas (mês)"
-          loading={resolvidos.isLoading}
-          value={
-            resolvidos.isError
-              ? "—"
-              : `${resolvidosLimitados ? "≥ " : ""}${formatNumber(resolvidosNoMes)}`
-          }
+          label="Resolvidas por você (mês)"
+          loading={noMes.isLoading}
+          value={noMes.isError ? "—" : formatNumber(resolvidosNoMes)}
           delta={variacao}
           period="vs anterior"
           context={
-            resolvidos.isError
-              ? "não foi possível ler o histórico"
-              : resolvidosLimitados
-                ? "leitura limitada, pode haver mais"
-                : "alertas com conduta registrada"
+            noMes.isError ? "não foi possível ler os seus números" : "alertas com conduta registrada"
           }
         />
       </section>
@@ -392,7 +380,7 @@ export function ClinicoDashboardPage() {
         <section className="bg-card overflow-hidden rounded-2xl border">
           <BlockHeader
             title="Fila de alertas"
-            subtitle="Priorizada por gravidade"
+            subtitle="Sem responsável e os seus, por gravidade"
             to={`${base}/alertas`}
             linkLabel="Ver fila"
           />
@@ -430,11 +418,7 @@ export function ClinicoDashboardPage() {
       <section className="bg-card overflow-hidden rounded-2xl border">
         <BlockHeader
           title="Mensagens não respondidas"
-          subtitle={
-            minutos === null
-              ? "Tempo médio de resposta da clínica: sem respostas no mês"
-              : `Tempo médio de resposta da clínica: ${formatNumber(minutos)} min`
-          }
+          subtitle="Suas conversas e as sem responsável da sua área"
           to={`${base}/chat`}
           linkLabel="Abrir chat"
         />
