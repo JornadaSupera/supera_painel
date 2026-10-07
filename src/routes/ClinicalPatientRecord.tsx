@@ -47,7 +47,7 @@ export function ClinicalPatientRecord() {
         {
           value: "especialidades",
           label: "Especialidades",
-          content: <SpecialtyRecordTab patientId={id} area={area} chatHref={chatHref} />,
+          content: (paciente) => <SpecialtyRecordTab patient={paciente} area={area} chatHref={chatHref} />,
         },
         { value: "diario", label: `Diário${diaryCount}`, content: <PatientDiaryTab patientId={id} /> },
         { value: "agenda", label: "Agenda", content: <PatientAgendaTab patientId={id} /> },

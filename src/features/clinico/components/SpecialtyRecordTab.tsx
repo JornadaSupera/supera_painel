@@ -1,4 +1,4 @@
-import { Flag, Layers, Lock, Plus } from "lucide-react";
+import { Eye, Flag, Layers, Lock, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { EmptyState, ErrorState, SectionHeading, SkeletonRows } from "@/components/shared";
@@ -18,17 +18,20 @@ import {
   SPECIALTY_FIELD_LABEL,
   type Especialidade,
 } from "@/lib/enums";
+import type { PacienteDetalhe } from "@/types/paciente";
 import { usePatientTimeline } from "../hooks/usePatientRecord";
 import { SpecialtyNoteForm } from "./SpecialtyNoteForm";
+import { SpecialtySpace } from "./SpecialtySpace";
 import { TimelineEvent } from "./TimelineEvent";
 
 /**
  * The record of one specialty — the multidisciplinary view, area by area.
  *
- * It opens on the professional's own area, and any other one can be picked. What
- * shows up is what the database returns for that area: notes, distress flags,
- * conversations and appointments. Secrecy is the database's: a confidential area
- * seen from outside comes back with its flags only, and the screen says why.
+ * It opens on the professional's own area, and any other one can be picked. Each
+ * area shows its own workspace (see `SpecialtySpace`) and then its records: notes,
+ * distress flags, conversations and appointments. Secrecy is the database's: a
+ * confidential area seen from outside comes back with its flags only, and the
+ * screen says why.
  *
  * Validated scales and the therapeutic plan are not here: the database has no
  * place for them yet, and this screen does not draw a block it cannot fill.
@@ -37,6 +40,22 @@ import { TimelineEvent } from "./TimelineEvent";
 const AREAS = Object.values(ESPECIALIDADE);
 
 type Writing = "note" | "flag" | null;
+
+/** Said every time the record on screen is not the viewer's own area. */
+function OtherAreaNotice({ area }: { area: Especialidade }) {
+  return (
+    <p
+      role="status"
+      className="bg-muted/50 flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm"
+    >
+      <Eye size={16} aria-hidden="true" className="text-muted-foreground shrink-0" />
+      <span>
+        Você está visualizando a ficha de outra especialidade. Sua área é{" "}
+        <strong>{ESPECIALIDADE_LABEL[area]}</strong>.
+      </span>
+    </p>
+  );
+}
 
 function ConfidentialNotice({ field }: { field: string }) {
   return (
@@ -59,11 +78,11 @@ function ConfidentialNotice({ field }: { field: string }) {
 }
 
 export function SpecialtyRecordTab({
-  patientId,
+  patient,
   area,
   chatHref,
 }: {
-  patientId: string;
+  patient: PacienteDetalhe;
   /** The professional's own specialty: where the view opens, and the only one they write in. */
   area: Especialidade;
   chatHref: string;
@@ -72,6 +91,7 @@ export function SpecialtyRecordTab({
   const [writing, setWriting] = useState<Writing>(null);
 
   // The whole history: an area's record is read as a whole, not by period.
+  const patientId = patient.id;
   const timeline = usePatientTimeline(patientId, null);
 
   const own = selected === area;
@@ -106,19 +126,22 @@ export function SpecialtyRecordTab({
               setWriting(null);
             }}
           >
-            <SelectTrigger className="w-56" aria-label="Especialidade">
+            <SelectTrigger className="w-64" aria-label="Especialidade">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {AREAS.map((option) => (
                 <SelectItem key={option} value={option}>
                   {ESPECIALIDADE_LABEL[option]}
+                  {option === area && " · sua área"}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </CardContent>
       </Card>
+
+      {!own && <OtherAreaNotice area={area} />}
 
       {timeline.isLoading && <SkeletonRows count={3} />}
 
@@ -177,50 +200,61 @@ export function SpecialtyRecordTab({
             </Alert>
           )}
 
-          <Card>
-            <CardContent className="flex flex-col gap-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex flex-col gap-0.5">
-                  <SectionHeading>Registros de {field}</SectionHeading>
-                  <p className="text-muted-foreground text-xs">
-                    {confidential && own
-                      ? "Anotações da área, sob sigilo, e o que mais a área fez com o paciente."
-                      : "Anotações, sinalizações, conversas e compromissos da área, do mais recente para trás."}
-                  </p>
+          <SpecialtySpace
+            specialty={selected}
+            own={own}
+            patient={patient}
+            timeline={timeline.data}
+            chatHref={chatHref}
+          />
+
+          {/* Oncology's space already lists every source of the last 30 days, its
+              own notes included, and writes from there. */}
+          {selected !== ESPECIALIDADE.MEDICO && (
+            <Card>
+              <CardContent className="flex flex-col gap-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex flex-col gap-0.5">
+                    <SectionHeading>Registros de {field}</SectionHeading>
+                    <p className="text-muted-foreground text-xs">
+                      {confidential && own
+                        ? "Anotações da área, sob sigilo, e o que mais a área fez com o paciente."
+                        : "Anotações, sinalizações, conversas e compromissos da área, do mais recente para trás."}
+                    </p>
+                  </div>
+
+                  {own && writing === null && (
+                    <Button type="button" variant="outline" onClick={() => setWriting("note")}>
+                      <Plus />
+                      Nova anotação
+                    </Button>
+                  )}
                 </div>
 
-                {own && writing === null && (
-                  <Button type="button" variant="outline" onClick={() => setWriting("note")}>
-                    <Plus />
-                    Nova anotação
-                  </Button>
+                {writing === "note" && (
+                  <SpecialtyNoteForm patientId={patientId} specialty={area} onDone={() => setWriting(null)} />
                 )}
-              </div>
 
-              {writing === "note" && (
-                <SpecialtyNoteForm patientId={patientId} specialty={area} onDone={() => setWriting(null)} />
-              )}
-
-              {events.length === 0 ? (
-                <EmptyState
-                  compact
-                  title={`Nada registrado por ${field}`}
-                  description={
-                    own
-                      ? "As anotações que você escrever aqui ficam na ficha, com seu nome e a data."
-                      : "Quando a área registrar algo com este paciente, aparece aqui."
-                  }
-                />
-              ) : (
-                <ol className="flex flex-col gap-4" aria-label={`Registros de ${field}`}>
-                  {events.map((event) => (
-                    <TimelineEvent key={`${event.kind}-${event.id}`} event={event} chatHref={chatHref} />
-                  ))}
-                </ol>
-              )}
-            </CardContent>
-          </Card>
-
+                {events.length === 0 ? (
+                  <EmptyState
+                    compact
+                    title={`Nada registrado por ${field}`}
+                    description={
+                      own
+                        ? "As anotações que você escrever aqui ficam na ficha, com seu nome e a data."
+                        : "Quando a área registrar algo com este paciente, aparece aqui."
+                    }
+                  />
+                ) : (
+                  <ol className="flex flex-col gap-4" aria-label={`Registros de ${field}`}>
+                    {events.map((event) => (
+                      <TimelineEvent key={`${event.kind}-${event.id}`} event={event} chatHref={chatHref} />
+                    ))}
+                  </ol>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
