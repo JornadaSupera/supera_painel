@@ -64,9 +64,21 @@ export interface AlertaClinico {
   conduta_notas: string | null;
   /** Quem cuida do alerta agora: quem o assumiu, ou quem recebeu a designação. */
   atribuido_a: string | null;
+  /** Who handles the alert now is the signed-in professional. */
+  meu: boolean;
   criado_em: string;
   assumido_em: string | null;
   resolvido_em: string | null;
+}
+
+/** What the signed-in professional did in a window — their own numbers, not the team's. */
+export interface DesempenhoProfissional {
+  alertas_assumidos: number;
+  alertas_resolvidos: number;
+  /** Conversations opened in the window whose first team reply was this person's. */
+  primeiras_respostas: number;
+  /** Average minutes to those first replies; `null` when there were none. */
+  tempo_medio_minutos: number | null;
 }
 
 /** Uma conversa da fila de chat — mesma leitura de equipe que `AlertaClinico`. */

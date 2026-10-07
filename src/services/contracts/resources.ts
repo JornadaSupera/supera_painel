@@ -318,6 +318,7 @@ export const RESOURCES = {
       "resolverConversa",
       "marcarConversaLida",
       "getTempoDeResposta",
+      "getMeuDesempenho",
       "getPatientTimeline",
       "listDiarySymptoms",
       "listPatientDiary",

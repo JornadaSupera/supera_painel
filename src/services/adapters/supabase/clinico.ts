@@ -13,6 +13,7 @@ import type {
   AnexoMensagem,
   CompromissoAgenda,
   ConversaClinico,
+  DesempenhoProfissional,
   MensagemClinico,
 } from "@/types/clinico";
 import {
@@ -36,6 +37,21 @@ import { getSupabaseClient } from "./client";
 import { paraEspecialidade } from "./mapping";
 
 type SupabaseClientLike = ReturnType<typeof getSupabaseClient>;
+
+/** The professional's current specialties, by id — the ones `claim_conversation` accepts. */
+async function areasVigentes(
+  supabase: SupabaseClientLike,
+  profissionalId: string,
+): Promise<Set<string> | ReturnType<typeof falhaDe>> {
+  const { data, error } = await supabase
+    .from("professional_specialties")
+    .select("specialty_id")
+    .eq("professional_id", profissionalId)
+    .is("ended_at", null);
+  if (error) return falhaDe(error);
+
+  return new Set(((data ?? []) as { specialty_id: string }[]).map((linha) => linha.specialty_id));
+}
 
 /** Quanto tempo uma segunda consulta da mesma tela ainda aproveita o nome já lido. */
 const NOME_DE_PACIENTE_VALIDADE_MS = 30_000;
@@ -229,6 +245,11 @@ export async function listAlertas(params?: {
     const linhas = (data ?? []) as LinhaAlert[];
     if (linhas.length === 0) return ok([]);
 
+    // Who is signed in, to mark the alerts that are theirs. An administrator
+    // has no professional profile, and no alert is "theirs".
+    const eu = await profissionalDaSessao();
+    const meuId = "error" in eu ? null : eu.profissionalId;
+
     const idsPacientes = [...new Set(linhas.map((linha) => linha.patient_id))];
     const idsSintomas = [
       ...new Set(linhas.map((linha) => linha.symptom_id).filter((id): id is string => Boolean(id))),
@@ -278,6 +299,7 @@ export async function listAlertas(params?: {
         atribuido_a: linha.assigned_professional_id
           ? (nomePorResponsavel.get(linha.assigned_professional_id) ?? null)
           : null,
+        meu: meuId !== null && linha.assigned_professional_id === meuId,
         criado_em: linha.created_at,
         assumido_em: linha.assigned_at,
         resolvido_em: linha.resolved_at,
@@ -392,17 +414,27 @@ export async function listConversas(): Promise<ListResult<ConversaClinico>> {
     });
     if (error) return falhaDe(error);
 
-    // Conversa assumida é de quem assumiu: a leitura ainda a entrega aos colegas
-    // da área, então ela sai da lista aqui. A barreira de verdade é do banco — isto
-    // só impede que a tela mostre, e deixe responder, o que é de outra pessoa.
-    // Quem não tem perfil de profissional (o administrador) vê a fila inteira.
+    // A fila de cada um. Conversa assumida é de quem assumiu: a leitura ainda a
+    // entrega aos colegas, então ela sai daqui. Sem responsável, fica a da própria
+    // área ou a sem área: a roteada a outra área só quem é de lá assume
+    // (`claim_conversation`), e mostrá-la seria oferecer o que não dá para pegar.
+    // A barreira de verdade é do banco. Quem não tem perfil de profissional (o
+    // administrador) vê a fila inteira.
     const eu = await profissionalDaSessao();
     const meuId = "error" in eu ? null : eu.profissionalId;
 
-    const linhas = ((data ?? []) as LinhaConversation[]).filter(
-      (linha) =>
-        meuId === null || !linha.assigned_professional_id || linha.assigned_professional_id === meuId,
-    );
+    let minhasAreas: Set<string> | null = null;
+    if (meuId) {
+      const areas = await areasVigentes(supabase, meuId);
+      if (!(areas instanceof Set)) return areas;
+      minhasAreas = areas;
+    }
+
+    const linhas = ((data ?? []) as LinhaConversation[]).filter((linha) => {
+      if (meuId === null || minhasAreas === null) return true;
+      if (linha.assigned_professional_id) return linha.assigned_professional_id === meuId;
+      return !linha.origin_specialty_id || minhasAreas.has(linha.origin_specialty_id);
+    });
     if (linhas.length === 0) return ok([]);
 
     const idsPacientes = [...new Set(linhas.map((linha) => linha.patient_id))];
@@ -717,6 +749,46 @@ export async function marcarConversaLida(params: { id: string }): Promise<Single
  * conversation and one with forty would otherwise weigh the same. `null` when
  * nothing was answered in the window — which is not zero minutes.
  */
+/**
+ * The signed-in professional's own numbers in a window.
+ *
+ * `summarize_my_portfolio` repeats these numbers on every specialty row — the
+ * rows differ only in the comparison with peers, which is not read here — so
+ * the first row is enough. It always returns at least one.
+ */
+export async function getMeuDesempenho(params: {
+  de: string;
+  ate: string;
+}): Promise<SingleResult<DesempenhoProfissional>> {
+  return executar(async () => {
+    const { data, error } = await getSupabaseClient().rpc("summarize_my_portfolio", {
+      p_from: params.de,
+      p_to: params.ate,
+    });
+    if (error) return falhaDe(error);
+
+    const linha = ((data ?? []) as LinhaCarteira[])[0];
+
+    return okOne<DesempenhoProfissional>({
+      alertas_assumidos: Number(linha?.alerts_triaged_count ?? 0),
+      alertas_resolvidos: Number(linha?.alerts_resolved_count ?? 0),
+      primeiras_respostas: Number(linha?.first_response_count ?? 0),
+      tempo_medio_minutos:
+        linha?.first_response_avg_seconds == null
+          ? null
+          : Math.round(Number(linha.first_response_avg_seconds) / 60),
+    });
+  });
+}
+
+/** Counts arrive as numbers or, for `bigint`, as strings. */
+interface LinhaCarteira {
+  alerts_triaged_count: number | string;
+  alerts_resolved_count: number | string;
+  first_response_count: number | string;
+  first_response_avg_seconds: number | string | null;
+}
+
 export async function getTempoDeResposta(params: {
   dias: number;
 }): Promise<SingleResult<{ minutos: number | null }>> {

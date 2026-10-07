@@ -23,6 +23,7 @@ import type {
   AlertaClinico,
   CompromissoAgenda,
   ConversaClinico,
+  DesempenhoProfissional,
   MensagemClinico,
 } from "@/types/clinico";
 import type { PerfilProfissional } from "@/types/professional-profile";
@@ -694,7 +695,10 @@ export interface ClinicoOperations {
   /** O cadastro de quem está logado: quando entrou e as áreas em que atua. */
   getMeuPerfil(): Promise<SingleResult<PerfilProfissional>>;
 
-  /** As conversas — mesma fila de equipe da fila de alertas. */
+  /**
+   * As conversas de quem está logado: as que assumiu e, sem responsável, as da
+   * própria área ou sem área. O administrador vê a fila inteira.
+   */
   listConversas(): Promise<ListResult<ConversaClinico>>;
   /** Histórico de uma conversa, com os anexos de cada mensagem. */
   listMensagens(params: { conversaId: string }): Promise<ListResult<MensagemClinico>>;
@@ -727,6 +731,14 @@ export interface ClinicoOperations {
    * the conversations this person can see. `null` when nothing was answered.
    */
   getTempoDeResposta(params: { dias: number }): Promise<SingleResult<{ minutos: number | null }>>;
+  /**
+   * The signed-in professional's own numbers in a window (ISO 8601 UTC):
+   * alerts taken and resolved, and conversations they answered first.
+   */
+  getMeuDesempenho(params: {
+    de: string;
+    ate: string;
+  }): Promise<SingleResult<DesempenhoProfissional>>;
 
   /**
    * A linha do tempo de um paciente: diário, alertas, conversas, compromissos,
