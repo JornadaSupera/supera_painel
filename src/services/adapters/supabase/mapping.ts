@@ -219,5 +219,8 @@ export const QUALIDADES_POR_ORIGEM: Record<string, string[] | undefined> = Objec
  * função sai.
  */
 export function codigoExibidoDoPaciente(id: string): string {
-  return `PAC-${id.replace(/-/g, "").slice(0, 6).toUpperCase()}`;
+  // The END of the id, not the start: the ids are UUID v7, whose first
+  // characters are the creation time, so every record created within the same
+  // few hours got the same code. The last ones are random.
+  return `PAC-${id.replace(/-/g, "").slice(-6).toUpperCase()}`;
 }
