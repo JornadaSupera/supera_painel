@@ -14,7 +14,6 @@ import { DisabledReason } from "@/components/shared/DisabledReason";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { useExportarPacientes } from "@/hooks/useExportarPacientes";
-import { useMotivoIndisponivel } from "@/hooks/useMotivoIndisponivel";
 import { relativeDay } from "@/lib/agenda";
 import {
   ESPECIALIDADE_LABEL,
@@ -24,6 +23,7 @@ import {
 } from "@/lib/enums";
 import { ageInYears, formatTime, pluralize, relativeTime } from "@/lib/format";
 import { PERMISSAO } from "@/lib/rbac";
+import { motivoIndisponivel } from "@/services/apiClient";
 import { useCarteiraStore } from "@/stores/clinicoPacientes";
 import { hasActiveFilters } from "@/stores/listStore";
 import type { PacienteListItem } from "@/types/paciente";
@@ -130,7 +130,7 @@ export function ClinicoPacientesPage() {
 
   const { pacientes, isLoading, isError, error, refetch, total, params } = useMeusPacientes();
   const exportar = useExportarPacientes(params);
-  const semCadastro = useMotivoIndisponivel("pacientes.create");
+  const semCadastro = motivoIndisponivel("pacientes.create");
   const novoPaciente = (
     <Can permission={PERMISSAO.PACIENTES_WRITE}>
       <DisabledReason reason={semCadastro}>

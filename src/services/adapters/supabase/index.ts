@@ -1,7 +1,6 @@
 // Both adapters register the same resources on purpose — `RESOURCES` checks
 // the surface at compile time — so this block mirrors the other adapter.
 // jscpd:ignore-start
-import type { Papel } from "@/lib/enums";
 import type { PartialAdapterModules } from "../../contracts/operations";
 import { buildAdapter } from "../_stub";
 import * as aprovacoes from "./aprovacoes";
@@ -93,24 +92,6 @@ export const INDISPONIVEIS: Readonly<Record<string, string>> = {
     "Não há classificação de risco disponível, e não vai haver nesta fase: “risco” são as etiquetas da sistematização de enfermagem do Gemed, que estão fora do escopo de leitura contratado. Calcular no painel seria inferência clínica no front-end.",
   "auditoria.summary.exportacao":
     "Exportação não gera linha na trilha: baixar um CSV do que já está na tela acontece no navegador, sem passar pelo banco.",
-};
-
-/**
- * O que o banco executa para um papel e recusa a outro.
- *
- * Mesma regra da lista acima, só que por papel: a operação existe, o
- * administrador a faz, e para o papel listado a função do banco ainda responde
- * `forbidden`. Sai daqui no dia em que a função aceitar esse papel.
- */
-export const INDISPONIVEIS_POR_PAPEL: Readonly<Record<string, Partial<Record<Papel, string>>>> = {
-  "pacientes.create": {
-    profissional:
-      "O banco ainda só aceita cadastro de ficha feito pela administração. A liberação para o profissional já foi pedida; até lá, peça o cadastro à administração.",
-  },
-  "pacientes.update": {
-    profissional:
-      "O banco ainda só aceita correção de ficha feita pela administração. A liberação para o profissional já foi pedida; até lá, peça a correção à administração.",
-  },
 };
 
 export const supabaseAdapter = buildAdapter({ name: "supabase", implemented });

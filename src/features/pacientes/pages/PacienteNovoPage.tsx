@@ -2,8 +2,8 @@ import { useNavigate } from "react-router-dom";
 
 import { BackendPendente, PageHeader } from "@/components/shared";
 import { useCan } from "@/contexts/auth-context";
-import { useMotivoIndisponivel } from "@/hooks/useMotivoIndisponivel";
 import { PERMISSAO } from "@/lib/rbac";
+import { motivoIndisponivel } from "@/services/apiClient";
 import { PacienteForm } from "../components/PacienteForm";
 import { useCriarPaciente } from "../hooks/usePacientes";
 import { paraClinica, paraEntrada, VALORES_INICIAIS, type PacienteForm as Valores } from "../schemas";
@@ -33,7 +33,7 @@ export function PacienteNovoPage({
   // A rota continua alcançável pela URL mesmo com o botão desabilitado na
   // listagem. Barrar aqui evita o pior caminho: o formulário inteiro preenchido
   // para receber uma recusa no envio.
-  const indisponivel = useMotivoIndisponivel("pacientes.create");
+  const indisponivel = motivoIndisponivel("pacientes.create");
 
   const salvar = (valores: Valores) => {
     // Quem não convida não dispara convite, mesmo que o valor inicial da chave

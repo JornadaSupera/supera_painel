@@ -17,7 +17,6 @@ import { Tabs, TabsContent, TabsTrigger } from "@/components/ui/tabs";
 import { STATUS_PACIENTE } from "@/lib/enums";
 import { formatDateTime } from "@/lib/format";
 import { useCan } from "@/contexts/auth-context";
-import { useMotivoIndisponivel } from "@/hooks/useMotivoIndisponivel";
 import { PERMISSAO } from "@/lib/rbac";
 import type { PacienteDetalhe } from "@/types/paciente";
 import { DeactivatePatientDialog } from "../components/DeactivatePatientDialog";
@@ -139,7 +138,7 @@ export function PacienteFichaPage({
   const convite = useEnviarConvite();
   const desvincular = useDesvincularConta();
   const can = useCan();
-  const semEdicao = useMotivoIndisponivel("pacientes.update");
+  const semEdicao = motivoIndisponivel("pacientes.update");
 
   // The address alone does not open the form: whoever cannot edit, or whose
   // edit the backend still refuses, reads the record instead.
