@@ -1,7 +1,16 @@
+import { CircleCheck, Clock, NotebookPen } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { EmptyState, ErrorState, PageHeader, SkeletonCards, StatusBadge } from "@/components/shared";
+import {
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  SectionHeading,
+  SkeletonCards,
+  StatusBadge,
+  UserAvatar,
+} from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import {
@@ -13,8 +22,10 @@ import {
   type CondutaAlerta,
   type Severidade,
 } from "@/lib/enums";
-import { formatDateTime, pluralize, relativeTime } from "@/lib/format";
+import { pluralize, relativeTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { AlertaClinico } from "@/types/clinico";
+import { SEVERITY_EDGE } from "../alert-tones";
 import { DesignarAlertaDialog } from "../components/DesignarAlertaDialog";
 import { DialogResolverAlerta } from "../components/DialogResolverAlerta";
 import { useAlertasClinicos, useAssumirAlerta, useResolverAlerta } from "../hooks/useAlertasClinicos";
@@ -22,7 +33,11 @@ import { useAlertasClinicos, useAssumirAlerta, useResolverAlerta } from "../hook
 /**
  * Fila de alertas — priorizada por gravidade, compartilhada pela equipe.
  *
- * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/farmaceutico/alertas/
+ * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/psicologo/alertas/
+ *
+ * Cada alerta nasce de um registro do diário: a etiqueta de origem diz isso, e
+ * se quem registrou foi o acompanhante. O protótipo mostra alertas de chat, de
+ * sistema e de IA; o banco não tem nenhum deles, e a tela não os imita.
  *
  * `read_alerts` não recorta por profissional: qualquer um da equipe vê a fila
  * inteira e pode assumir um item em aberto — ver PA-07. A base real está com
@@ -61,13 +76,6 @@ const PASSO_HISTORICO = 10;
 /** O teto de `read_alerts`: com isto na mão, pode haver mais do que a tela alcança. */
 const TETO_LEITURA = 200;
 
-/** Cor da faixa esquerda dos cartões — classes reais, não um nome de variável chutado. */
-const BORDA_POR_SEVERIDADE: Record<Severidade, string> = {
-  critica: "border-l-danger",
-  alta: "border-l-warning",
-  media: "border-l-info",
-  baixa: "border-l-border",
-};
 
 export function ClinicoAlertasPage() {
   const { user } = useAuth();
@@ -122,8 +130,8 @@ export function ClinicoAlertasPage() {
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow={area}
-        title="Alertas"
+        eyebrow={area ? `${area} · Fila de alertas` : "Fila de alertas"}
+        title="Triagem priorizada"
         subtitle={
           // Fila que não carregou não tem "0 ativos": o número é desconhecido.
           fila.isError
@@ -149,7 +157,7 @@ export function ClinicoAlertasPage() {
             {contagem.map(({ severidade, total }) => (
               <div
                 key={severidade}
-                className={`rounded-xl border border-l-4 p-3 ${BORDA_POR_SEVERIDADE[severidade]}`}
+                className={`rounded-xl border border-l-4 p-3 ${SEVERITY_EDGE[severidade]}`}
               >
                 <p className="text-muted-foreground text-[10px] font-medium tracking-wider uppercase">
                   {SEVERIDADE_LABEL[severidade]}
@@ -163,33 +171,55 @@ export function ClinicoAlertasPage() {
             <EmptyState compact title="Nenhum alerta ativo" description="Todos os alertas foram resolvidos." />
           ) : (
             <section className="flex flex-col gap-2">
-              <h2 className="text-muted-foreground text-xs font-medium tracking-wider uppercase">Ativos</h2>
+              <SectionHeading>Ativos</SectionHeading>
 
               {ativos.map((alerta) => (
                 <article
                   key={alerta.id}
-                  className={`bg-card flex flex-col gap-3 rounded-2xl border border-l-4 p-4 md:flex-row md:items-center md:justify-between ${BORDA_POR_SEVERIDADE[alerta.severidade]}`}
+                  className={cn(
+                    "bg-card flex flex-col gap-3 rounded-2xl border border-l-4 p-4 md:flex-row md:items-start",
+                    SEVERITY_EDGE[alerta.severidade],
+                  )}
                 >
-                  <div className="min-w-0 flex-1">
+                  <UserAvatar name={alerta.paciente_nome} size="md" className="max-md:hidden" />
+
+                  <div className="flex min-w-0 flex-1 flex-col gap-1.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-foreground text-sm font-semibold">{alerta.paciente_nome}</p>
-                      <StatusBadge tone={TOM_POR_SEVERIDADE[alerta.severidade]} size="sm">
+                      <StatusBadge tone={TOM_POR_SEVERIDADE[alerta.severidade]} size="sm" pill>
                         {SEVERIDADE_LABEL[alerta.severidade]}
                       </StatusBadge>
-                      <StatusBadge tone={alerta.status_tom} size="sm">
-                        {STATUS_ALERTA_LABEL[alerta.status]}
+                      <StatusBadge tone="neutral" size="sm" pill className="bg-card">
+                        <NotebookPen size={11} aria-hidden="true" />
+                        {alerta.pelo_acompanhante ? "diário · acompanhante" : "diário"}
                       </StatusBadge>
                     </div>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {alerta.sintoma_label} · grau {alerta.grau} · {relativeTime(alerta.criado_em)}
+
+                    <p className="text-sm">
+                      {alerta.sintoma_label} (grau {alerta.grau})
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Registrado no diário {alerta.pelo_acompanhante ? "pelo acompanhante" : "pelo paciente"}
                       {alerta.atribuido_a ? ` · com ${alerta.atribuido_a}` : ""}
                     </p>
+
+                    <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <Clock size={12} aria-hidden="true" />
+                      {relativeTime(alerta.criado_em)}
+                      <span aria-hidden="true">·</span>
+                      <span>
+                        Status: <span className="text-foreground font-semibold">{STATUS_ALERTA_LABEL[alerta.status]}</span>
+                      </span>
+                    </p>
+
+                    {alerta.conduta_notas && (
+                      <p className="bg-muted/60 mt-1 rounded-lg px-3 py-2 text-xs">
+                        <span className="font-semibold">Conduta:</span> {alerta.conduta_notas}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex shrink-0 gap-2">
-                    <Button asChild size="sm" variant="ghost">
-                      <Link to={`${base}/pacientes/${alerta.paciente_id}`}>Ver ficha</Link>
-                    </Button>
+                  <div className="flex shrink-0 flex-wrap gap-2 md:flex-col md:items-end">
                     {alerta.status === "pendente" && (
                       <Button
                         size="sm"
@@ -200,15 +230,21 @@ export function ClinicoAlertasPage() {
                       </Button>
                     )}
                     {alerta.status === "assumido" && (
-                      <>
+                      <Button size="sm" variant="outline" onClick={() => setEmResolucao(alerta)}>
+                        <CircleCheck />
+                        Resolver
+                      </Button>
+                    )}
+                    <div className="flex gap-1">
+                      {alerta.status === "assumido" && (
                         <Button size="sm" variant="ghost" onClick={() => setEmDesignacao(alerta)}>
                           Designar
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEmResolucao(alerta)}>
-                          Resolver
-                        </Button>
-                      </>
-                    )}
+                      )}
+                      <Button asChild size="sm" variant="ghost">
+                        <Link to={`${base}/pacientes/${alerta.paciente_id}`}>Ver ficha</Link>
+                      </Button>
+                    </div>
                   </div>
                 </article>
               ))}
@@ -221,35 +257,41 @@ export function ClinicoAlertasPage() {
 
           {resolvidos.length > 0 && (
             <section className="flex flex-col gap-2" aria-labelledby="historico-alertas">
-              <h2
-                id="historico-alertas"
-                className="text-muted-foreground text-xs font-medium tracking-wider uppercase"
-              >
-                Histórico de resolvidos
-              </h2>
+              <SectionHeading id="historico-alertas">Resolvidos recentemente</SectionHeading>
 
               {resolvidos.map((alerta) => (
-                <article key={alerta.id} className="bg-card flex flex-col gap-1 rounded-2xl border p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      to={`${base}/pacientes/${alerta.paciente_id}`}
-                      className="text-foreground text-sm font-medium hover:underline"
-                    >
-                      {alerta.paciente_nome}
-                    </Link>
-                    <StatusBadge tone="success" size="sm">
-                      Resolvido
-                    </StatusBadge>
+                <article key={alerta.id} className="bg-card flex items-start gap-3 rounded-2xl border p-4">
+                  <CircleCheck size={16} aria-hidden="true" className="text-success mt-0.5 shrink-0" />
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <p className="text-sm">
+                      <Link
+                        to={`${base}/pacientes/${alerta.paciente_id}`}
+                        className="text-foreground font-medium hover:underline"
+                      >
+                        {alerta.paciente_nome}
+                      </Link>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        · {alerta.sintoma_label} (grau {alerta.grau})
+                      </span>
+                      <span className="sr-only">, resolvido</span>
+                    </p>
+                    {(alerta.conduta_tipo || alerta.conduta_notas) && (
+                      <p className="text-muted-foreground text-xs">
+                        Conduta:{" "}
+                        {[
+                          alerta.conduta_tipo ? CONDUTA_ALERTA_LABEL[alerta.conduta_tipo] : null,
+                          alerta.conduta_notas,
+                        ]
+                          .filter(Boolean)
+                          .join(" — ")}
+                      </p>
+                    )}
+                    <p className="text-muted-foreground text-[11px]">
+                      {alerta.resolvido_em ? `Resolvido ${relativeTime(alerta.resolvido_em)}` : "Resolvido"}
+                      {alerta.atribuido_a ? ` · responsável: ${alerta.atribuido_a}` : ""}
+                    </p>
                   </div>
-                  <p className="text-muted-foreground text-xs">
-                    {alerta.sintoma_label} · grau {alerta.grau}
-                    {alerta.conduta_tipo ? ` · ${CONDUTA_ALERTA_LABEL[alerta.conduta_tipo]}` : ""}
-                    {alerta.atribuido_a ? ` · responsável: ${alerta.atribuido_a}` : ""}
-                    {alerta.resolvido_em ? ` · ${formatDateTime(alerta.resolvido_em)}` : ""}
-                  </p>
-                  {alerta.conduta_notas && (
-                    <p className="text-muted-foreground text-xs italic">{alerta.conduta_notas}</p>
-                  )}
                 </article>
               ))}
 
