@@ -157,8 +157,12 @@ export async function getPatientTimeline(params: {
   return executar(async () => {
     const supabase = getSupabaseClient();
 
+    // The administration reads the record too, with no professional profile.
+    // The profile only says which notes are the reader's own, so its absence
+    // means none are, not that the record is closed.
     const me = await profissionalDaSessao();
-    if ("error" in me) return me;
+    if ("error" in me && me.error.code !== ERROR_CODE.FORBIDDEN) return me;
+    const myProfessionalId = "error" in me ? null : me.profissionalId;
 
     const now = Date.now();
     const from = timelineWindowStart(params.days, now);
@@ -316,7 +320,7 @@ export async function getPatientTimeline(params: {
         specialty: specialtyOf(row.origin_specialty_id),
         body: row.body,
         author_name: professionalName.get(row.author_professional_id) ?? NO_NAME,
-        mine: row.author_professional_id === me.profissionalId,
+        mine: row.author_professional_id === myProfessionalId,
         restricted: row.visibility === "specialty_restricted",
       })),
       ...flagRows.map<RecordEvent>((row) => ({
