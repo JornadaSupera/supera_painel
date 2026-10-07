@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { useMarcarLidasDoAlvo } from "@/hooks/useNotificacoes";
 import { audit } from "@/lib/audit";
 import type { CondutaAlerta, StatusAlerta } from "@/lib/enums";
 import { queryKeys } from "@/lib/queryKeys";
@@ -22,9 +23,25 @@ export function useAlertasClinicos(status?: StatusAlerta, opcoes: { semNomes?: b
   });
 }
 
+/**
+ * What an action on an alert changes: the queue and everything counted from it
+ * in the clinical panel (the day's panel, the record's timeline, the
+ * professional's own numbers), the executive dashboard's active alerts, and the
+ * bell. The bell is refreshed by the mutation cache; the notifications that
+ * pointed to this alert are marked read here, because acting on it is having
+ * seen it.
+ */
 function useInvalidarAlertas() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: queryKeys.clinico.all });
+  const marcarLidas = useMarcarLidasDoAlvo();
+
+  return (id: string) => {
+    marcarLidas.mutate({ tabela: "alerts", id });
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.clinico.all }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.dashboard.all }),
+    ]);
+  };
 }
 
 /**
@@ -37,8 +54,8 @@ export function useAssumirAlerta() {
 
   return useMutation({
     mutationFn: async (id: string) => (await call(() => clinicoApi.assumirAlerta({ id }))).data,
-    onSuccess: async () => {
-      await invalidar();
+    onSuccess: async (_data, id) => {
+      await invalidar(id);
       toast.success("Alerta assumido");
     },
     onError: (erro) => toast.error("Não foi possível assumir o alerta", { description: erro.message }),
@@ -51,8 +68,8 @@ export function useResolverAlerta() {
   return useMutation({
     mutationFn: async (params: { id: string; conduta: CondutaAlerta; notas?: string }) =>
       (await call(() => clinicoApi.resolverAlerta(params))).data,
-    onSuccess: async () => {
-      await invalidar();
+    onSuccess: async (_data, params) => {
+      await invalidar(params.id);
       toast.success("Alerta resolvido");
     },
     onError: (erro) => toast.error("Não foi possível resolver o alerta", { description: erro.message }),
@@ -72,7 +89,7 @@ export function useDesignarAlerta() {
       (await call(() => clinicoApi.designarAlerta({ id: params.id, profissionalId: params.profissionalId }))).data,
     onSuccess: (_data, params) => {
       audit.update("alerts", params.id, { operation: "assign" });
-      void invalidar();
+      void invalidar(params.id);
       toast.success(`Alerta designado a ${params.nome}`);
     },
     onError: (erro) => toast.error("Não foi possível designar o alerta", { description: erro.message }),
