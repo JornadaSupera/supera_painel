@@ -19,6 +19,7 @@ import * as configuracoes from "./configuracoes";
 import * as dashboard from "./dashboard";
 import * as estatisticasClinicas from "./estatisticasClinicas";
 import * as estatisticasOperacionais from "./estatisticasOperacionais";
+import * as notificacoes from "./notificacoes";
 import * as pacientes from "./pacientes";
 import * as permissoes from "./permissoes";
 import * as relatorios from "./relatorios";
@@ -67,6 +68,7 @@ const implemented = {
   configuracoes,
   relatorios,
   satisfacao,
+  notificacoes,
 } satisfies PartialAdapterModules;
 // jscpd:ignore-end
 

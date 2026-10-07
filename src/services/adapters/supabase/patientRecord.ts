@@ -11,6 +11,7 @@ import {
 import type {
   AppointmentRecordEvent,
   DiarySymptom,
+  DistressFlag,
   PatientDiary,
   PatientDiaryEntry,
   PatientTimeline,
@@ -372,6 +373,56 @@ export async function listDiarySymptoms(params: { entryId: string }): Promise<Li
           severity: severidadeDoGrau(row.grade),
         }))
         .sort((a, b) => b.grade - a.grade || a.symptom_label.localeCompare(b.symptom_label)),
+    );
+  });
+}
+
+/**
+ * The distress flags raised on one patient, newest first.
+ *
+ * Only the who, where and when: the flag carries no text on purpose. The
+ * database reads them one patient at a time, and each read is audited.
+ */
+export async function listDistressFlags(params: {
+  patientId: string;
+}): Promise<ListResult<DistressFlag>> {
+  return executar(async () => {
+    const supabase = getSupabaseClient();
+
+    const { data, error } = await supabase.rpc("read_specialty_flags", {
+      p_patient_id: params.patientId,
+    });
+    if (error) return falhaDe(error);
+
+    const rows = (data ?? []) as FlagRow[];
+    if (rows.length === 0) return ok([]);
+
+    const [professionalsRes, specialtiesRes] = await Promise.all([
+      professionalNamesQuery(supabase, [
+        ...new Set(rows.map((row) => row.raised_by_professional_id)),
+      ]),
+      supabase.from("specialties").select("id, code"),
+    ]);
+    if (professionalsRes.error) return falhaDe(professionalsRes.error);
+    if (specialtiesRes.error) return falhaDe(specialtiesRes.error);
+
+    const professionalName = namesById((professionalsRes.data ?? []) as ProfessionalNameRow[]);
+    const specialtyById = new Map(
+      ((specialtiesRes.data ?? []) as { id: string; code: string }[]).map((row) => [
+        row.id,
+        paraEspecialidade(row.code),
+      ]),
+    );
+
+    return ok(
+      rows
+        .map<DistressFlag>((row) => ({
+          id: row.id,
+          specialty: specialtyById.get(row.origin_specialty_id) ?? null,
+          raised_by_name: professionalName.get(row.raised_by_professional_id) ?? NO_NAME,
+          raised_at: row.created_at,
+        }))
+        .sort((a, b) => b.raised_at.localeCompare(a.raised_at)),
     );
   });
 }

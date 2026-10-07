@@ -27,6 +27,7 @@ import type {
   MensagemClinico,
 } from "@/types/clinico";
 import type { PerfilProfissional } from "@/types/professional-profile";
+import type { NotificacaoItem, PendenciasAdmin } from "@/types/notificacao";
 import type { SatisfactionResponse, SatisfactionSummary } from "@/types/satisfaction";
 import type {
   AppointmentInput,
@@ -44,6 +45,7 @@ import type { DirectedSend, SendableContent } from "@/types/directed-content";
 import type {
   AppointmentRecordEvent,
   DiarySymptom,
+  DistressFlag,
   PatientDiary,
   PatientTimeline,
 } from "@/types/patient-record";
@@ -756,6 +758,8 @@ export interface ClinicoOperations {
   listDiarySymptoms(params: { entryId: string }): Promise<ListResult<DiarySymptom>>;
   /** The patient's saved diary entries, newest first, up to the database ceiling. */
   listPatientDiary(params: { patientId: string }): Promise<SingleResult<PatientDiary>>;
+  /** The distress flags raised on one patient, newest first. */
+  listDistressFlags(params: { patientId: string }): Promise<ListResult<DistressFlag>>;
   /** The patient's appointments still to come, soonest first, whoever they are with. */
   listUpcomingAppointments(params: { patientId: string }): Promise<ListResult<AppointmentRecordEvent>>;
   /**
@@ -1203,6 +1207,23 @@ export interface RelatoriosOperations {
 }
 
 /**
+ * Notifications of the signed-in person, and the admin's pending queues.
+ *
+ * Each account reads and marks only its own notifications. The pending queues
+ * are counts: the database creates no notification for them.
+ */
+export interface NotificacoesOperations {
+  /** The newest notifications not archived, read or not. */
+  list(): Promise<ListResult<NotificacaoItem>>;
+  /** Every unread one, not only those the list shows. */
+  contarNaoLidas(): Promise<SingleResult<{ total: number }>>;
+  marcarLida(params: { id: string }): Promise<SingleResult<null>>;
+  marcarTodasLidas(): Promise<SingleResult<null>>;
+  /** Data-subject requests and content waiting for the administration. */
+  getPendenciasAdmin(): Promise<SingleResult<PendenciasAdmin>>;
+}
+
+/**
  * Satisfação dos pacientes: a pesquisa NPS e o que foi respondido.
  *
  * Leitura direta das tabelas da pesquisa, que só a administração enxerga. Nada
@@ -1257,6 +1278,7 @@ export interface ResourceOperations {
   configuracoes: ConfiguracoesOperations;
   relatorios: RelatoriosOperations;
   satisfacao: SatisfacaoOperations;
+  notificacoes: NotificacoesOperations;
 }
 
 /**

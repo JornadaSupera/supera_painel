@@ -66,6 +66,10 @@ export interface AlertaClinico {
   atribuido_a: string | null;
   /** Who handles the alert now is the signed-in professional. */
   meu: boolean;
+  /** The diary entry that raised it: its text and its other symptoms are the context. */
+  diario_id: string | null;
+  /** The symptom belongs to the psychological group, not the physical one. */
+  sintoma_psicologico: boolean;
   criado_em: string;
   assumido_em: string | null;
   resolvido_em: string | null;

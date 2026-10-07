@@ -200,6 +200,7 @@ interface LinhaAlert {
   /** Who wrote the diary entry that raised it — copied to the alert for the queue. */
   source_actor_kind: "patient" | "caregiver";
   symptom_id: string | null;
+  diary_entry_id: string | null;
   grade: number;
   status: "open" | "in_progress" | "resolved";
   conduct_kind: "guidance" | "scheduling" | "referral" | null;
@@ -265,8 +266,11 @@ export async function listAlertas(params?: {
       // de paciente gravada na trilha.
       params?.semNomes ? Promise.resolve(new Map<string, string>()) : nomesDePacientes(supabase, idsPacientes),
       idsSintomas.length
-        ? supabase.from("symptoms").select("id, label").in("id", idsSintomas)
-        : Promise.resolve({ data: [] as { id: string; label: string }[], error: null }),
+        ? supabase.from("symptoms").select("id, label, is_psychological").in("id", idsSintomas)
+        : Promise.resolve({
+            data: [] as { id: string; label: string; is_psychological: boolean }[],
+            error: null,
+          }),
       idsResponsaveis.length
         ? professionalNamesQuery(supabase, idsResponsaveis)
         : Promise.resolve({ data: [] as ProfessionalNameRow[], error: null }),
@@ -279,7 +283,7 @@ export async function listAlertas(params?: {
 
     const nomePorResponsavel = namesById((responsaveisRes.data ?? []) as ProfessionalNameRow[]);
 
-    const labelPorSintoma = new Map((sintomasRes.data ?? []).map((sintoma) => [sintoma.id, sintoma.label]));
+    const sintomaPorId = new Map((sintomasRes.data ?? []).map((sintoma) => [sintoma.id, sintoma]));
 
     const alertas: AlertaClinico[] = linhas.map((linha) => {
       const statusApp = STATUS_ALERTA_POR_CODIGO[linha.status];
@@ -288,7 +292,11 @@ export async function listAlertas(params?: {
         id: linha.id,
         paciente_id: linha.patient_id,
         paciente_nome: nomePorPaciente.get(linha.patient_id) ?? "Paciente",
-        sintoma_label: (linha.symptom_id && labelPorSintoma.get(linha.symptom_id)) || "Sintoma",
+        sintoma_label: (linha.symptom_id && sintomaPorId.get(linha.symptom_id)?.label) || "Sintoma",
+        sintoma_psicologico: Boolean(
+          linha.symptom_id && sintomaPorId.get(linha.symptom_id)?.is_psychological,
+        ),
+        diario_id: linha.diary_entry_id,
         grau: linha.grade,
         severidade: severidadeDoGrau(linha.grade),
         pelo_acompanhante: linha.source_actor_kind === "caregiver",

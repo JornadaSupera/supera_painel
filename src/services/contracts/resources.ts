@@ -321,6 +321,7 @@ export const RESOURCES = {
       "getMeuDesempenho",
       "getPatientTimeline",
       "listDiarySymptoms",
+      "listDistressFlags",
       "listPatientDiary",
       "listUpcomingAppointments",
       "addSpecialtyNote",
@@ -337,6 +338,11 @@ export const RESOURCES = {
     table: "nps_responses",
     fase: 17,
     operations: ["getSummary", "list"],
+  },
+  notificacoes: {
+    table: "notifications",
+    fase: 17,
+    operations: ["list", "contarNaoLidas", "marcarLida", "marcarTodasLidas", "getPendenciasAdmin"],
   },
   catalogos: {
     table: "catalogos",

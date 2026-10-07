@@ -145,6 +145,13 @@ export const queryKeys = {
   },
 
   /** Painel clínico — ver PA-07. Recortado pela sessão; sem parâmetro de "quem sou eu" na chave. */
+  notifications: {
+    all: ["notifications"] as const,
+    list: () => ["notifications", "list"] as const,
+    unread: () => ["notifications", "unread"] as const,
+    /** The admin's pending queues, counted. */
+    pending: () => ["notifications", "pending"] as const,
+  },
   clinico: {
     all: ["clinico"] as const,
     agenda: <R extends QueryKeyParams<R>>(range?: R | null) => ["clinico", "agenda", range ?? {}] as const,
@@ -185,6 +192,8 @@ export const queryKeys = {
     diarySymptoms: (entryId: string) => ["clinico", "diary", entryId, "symptoms"] as const,
     /** One patient's diary, as a list. */
     patientDiary: (patientId: string) => ["clinico", "patient-diary", patientId] as const,
+    /** Distress flags on one patient — under `records()`, so raising one refreshes them. */
+    distressFlags: (patientId: string) => ["clinico", "record", "flags", patientId] as const,
     /**
      * One patient's appointments still to come. Under the agenda prefix on purpose:
      * booking, moving or closing an appointment refreshes it with the agenda.

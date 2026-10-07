@@ -67,6 +67,17 @@ export interface NoteRecordEvent extends RecordEventBase {
   restricted: boolean;
 }
 
+/**
+ * A distress flag raised to the team on a patient. Like the timeline event, it
+ * carries no text: who raised it, from which area and when.
+ */
+export interface DistressFlag {
+  id: string;
+  specialty: Especialidade | null;
+  raised_by_name: string;
+  raised_at: string;
+}
+
 /** The flag carries no text on purpose: it says that something happened, never what. */
 export interface FlagRecordEvent extends RecordEventBase {
   kind: "flag";

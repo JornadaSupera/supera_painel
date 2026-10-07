@@ -11,6 +11,7 @@ import type {
   DashboardOperations,
   EstatisticasClinicasOperations,
   EstatisticasOperacionaisOperations,
+  NotificacoesOperations,
   PacientesOperations,
   RelatoriosOperations,
   SatisfacaoOperations,
@@ -104,5 +105,6 @@ export const estatisticasOperacionaisApi = api.estatisticasOperacionais as unkno
 export const configuracoesApi = api.configuracoes as unknown as ConfiguracoesOperations;
 export const relatoriosApi = api.relatorios as unknown as RelatoriosOperations;
 export const satisfacaoApi = api.satisfacao as unknown as SatisfacaoOperations;
+export const notificacoesApi = api.notificacoes as unknown as NotificacoesOperations;
 
 export default api;
