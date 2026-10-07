@@ -1,4 +1,9 @@
-import { INDISPONIVEIS as INDISPONIVEIS_SUPABASE, supabaseAdapter } from "./adapters/supabase";
+import type { Papel } from "@/lib/enums";
+import {
+  INDISPONIVEIS as INDISPONIVEIS_SUPABASE,
+  INDISPONIVEIS_POR_PAPEL as INDISPONIVEIS_POR_PAPEL_SUPABASE,
+  supabaseAdapter,
+} from "./adapters/supabase";
 import { throwIfError, type ApiError } from "./contracts";
 import type {
   AprovacoesOperations,
@@ -50,10 +55,18 @@ export const api = adapter;
    ------------------------------------------------------------------------- */
 
 const indisponiveis = INDISPONIVEIS_SUPABASE;
+const indisponiveisPorPapel = INDISPONIVEIS_POR_PAPEL_SUPABASE;
 
-/** `"pacientes.create"` → motivo, ou `null` quando a operação está disponível. */
-export function motivoIndisponivel(operacao: string): string | null {
-  return indisponiveis[operacao] ?? null;
+/**
+ * `"pacientes.create"` → motivo, ou `null` quando a operação está disponível.
+ *
+ * Com `papel`, inclui o que o backend recusa só a esse papel. Nas telas, use
+ * `useMotivoIndisponivel`, que já passa o papel da sessão.
+ */
+export function motivoIndisponivel(operacao: string, papel?: Papel): string | null {
+  return (
+    indisponiveis[operacao] ?? (papel ? indisponiveisPorPapel[operacao]?.[papel] : null) ?? null
+  );
 }
 
 export function operacaoDisponivel(operacao: string): boolean {
