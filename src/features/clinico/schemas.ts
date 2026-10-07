@@ -149,7 +149,15 @@ export const blockSchema = z
     endTime: TIME_FIELD,
   })
   .superRefine((values, ctx) => {
-    const input = blockFormToInput(values);
+    // A date or time still missing has its own message above, and without it
+    // there is no window to check: converting it threw, and the save button did
+    // nothing at all instead of saying what was missing.
+    let input: ReturnType<typeof blockFormToInput>;
+    try {
+      input = blockFormToInput(values);
+    } catch {
+      return;
+    }
     const problem = blockError(input);
     if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endDate"], message: problem });
   });
