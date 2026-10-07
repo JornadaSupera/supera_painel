@@ -116,7 +116,8 @@ export interface RecordTab {
   /** Goes in the address (`?aba=diario`), so it stays plain and lowercase. */
   value: string;
   label: ReactNode;
-  content: ReactNode;
+  /** A function when the tab needs the patient, which only loads here. */
+  content: ReactNode | ((paciente: PacienteDetalhe) => ReactNode);
 }
 
 /** The first tab is the record's own; its value is never written to the address. */
@@ -399,7 +400,7 @@ export function PacienteFichaPage({
 
           {tabs.map((tab) => (
             <TabsContent key={tab.value} value={tab.value}>
-              {tab.content}
+              {typeof tab.content === "function" ? tab.content(paciente) : tab.content}
             </TabsContent>
           ))}
         </Tabs>
