@@ -35,6 +35,8 @@ export type { Column, DataTableProps } from "./DataTable";
 
 export { ClearFiltersButton, FilterSelect } from "./FilterBar";
 
+export { FilterChip, FilterChipGroup } from "./FilterChips";
+
 export { FilterPanel } from "./FilterPanel";
 export type { FilterPanelProps } from "./FilterPanel";
 

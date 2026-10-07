@@ -1,5 +1,5 @@
 import { FilterX, SlidersHorizontal } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -34,6 +34,10 @@ import { ClearFiltersButton } from "./FilterBar";
  * Filters apply as they change, in both layouts: the sheet only groups the
  * controls, it does not hold a draft. Its button closes it and shows the
  * result, which is already there.
+ *
+ * `collapsible` keeps the desktop row short too: the search and a "Filtros"
+ * button, with the filters in a strip that opens under them. For listings where
+ * the search and a few quick chips are the usual way in.
  */
 
 export interface FilterPanelProps {
@@ -47,6 +51,34 @@ export interface FilterPanelProps {
   onClear?: () => void;
   /** Whether anything is applied — search included. Defaults to `activeCount > 0`. */
   canClear?: boolean;
+  /** On desktop too, the filters wait behind a "Filtros" button. Opens on its own when one is applied. */
+  collapsible?: boolean;
+}
+
+function FiltersButton({
+  activeCount,
+  className,
+  ...props
+}: {
+  activeCount: number;
+  className?: string;
+  onClick: () => void;
+  "aria-haspopup"?: "dialog";
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+}) {
+  return (
+    <Button variant="outline" className={className} {...props}>
+      <SlidersHorizontal />
+      Filtros
+      {activeCount > 0 && (
+        <span className="bg-primary text-primary-foreground ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums">
+          {activeCount}
+          <span className="sr-only"> aplicados</span>
+        </span>
+      )}
+    </Button>
+  );
 }
 
 export function FilterPanel({
@@ -55,9 +87,35 @@ export function FilterPanel({
   activeCount = 0,
   onClear,
   canClear = activeCount > 0,
+  collapsible = false,
 }: FilterPanelProps) {
   const desktop = useMediaQuery(BREAKPOINT.md);
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(activeCount > 0);
+  const stripId = useId();
+
+  if (desktop && collapsible) {
+    return (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          {lead}
+          <FiltersButton
+            activeCount={activeCount}
+            className="shrink-0"
+            onClick={() => setExpanded((value) => !value)}
+            aria-expanded={expanded}
+            aria-controls={stripId}
+          />
+        </div>
+        {expanded && (
+          <div id={stripId} className="bg-card flex flex-wrap items-center gap-2 rounded-xl border p-3">
+            {children}
+            {onClear && <ClearFiltersButton visible={canClear} onClick={onClear} />}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (desktop) {
     return (
@@ -76,21 +134,12 @@ export function FilterPanel({
       <div className="flex items-center gap-2">
         {lead && <div className="min-w-0 flex-1 [&>*]:max-w-none [&>*]:min-w-0">{lead}</div>}
 
-        <Button
-          variant="outline"
+        <FiltersButton
+          activeCount={activeCount}
           onClick={() => setOpen(true)}
           aria-haspopup="dialog"
           className={lead ? "shrink-0" : "w-full"}
-        >
-          <SlidersHorizontal />
-          Filtros
-          {activeCount > 0 && (
-            <span className="bg-primary text-primary-foreground ml-0.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold tabular-nums">
-              {activeCount}
-              <span className="sr-only"> aplicados</span>
-            </span>
-          )}
-        </Button>
+        />
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
