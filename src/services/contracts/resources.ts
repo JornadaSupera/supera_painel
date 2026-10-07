@@ -342,7 +342,14 @@ export const RESOURCES = {
   notificacoes: {
     table: "notifications",
     fase: 17,
-    operations: ["list", "contarNaoLidas", "marcarLida", "marcarTodasLidas", "getPendenciasAdmin"],
+    operations: [
+      "list",
+      "contarNaoLidas",
+      "marcarLida",
+      "marcarTodasLidas",
+      "getPendenciasAdmin",
+      "nomesDosPacientes",
+    ],
   },
   catalogos: {
     table: "catalogos",

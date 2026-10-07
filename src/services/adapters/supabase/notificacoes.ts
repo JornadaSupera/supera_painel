@@ -5,6 +5,7 @@ import {
   type PendenciasAdmin,
 } from "@/types/notificacao";
 import { executar, falhaDe, umDe } from "./_helpers";
+import { nomesDePacientes } from "./_patientNames";
 import { getSupabaseClient } from "./client";
 
 /**
@@ -18,6 +19,9 @@ import { getSupabaseClient } from "./client";
  * The admin's pending queues are counted apart (`getPendenciasAdmin`): the
  * database creates no notification for a data-subject request or for content
  * sent to review, so the count is the only signal there is.
+ *
+ * Whose each notification is comes apart too (`nomesDosPacientes`): the name
+ * is an audited read, so it is not part of the list the bell rereads.
  */
 
 /** How many notifications the inbox shows. Older ones are still in the database. */
@@ -137,5 +141,27 @@ export async function getPendenciasAdmin(): Promise<SingleResult<PendenciasAdmin
       pedidos_titular_com_falha: comFalha.count ?? 0,
       conteudos_em_revisao: emRevisao.count ?? 0,
     });
+  });
+}
+
+/**
+ * Whose each notification is, for the open inbox.
+ *
+ * `read_patient` per patient, the same read the agenda and the alert queue make,
+ * shared with them for a few seconds: each one is a line on the audit trail,
+ * which is why the bell asks only when it opens, and keeps the answer.
+ */
+export async function nomesDosPacientes({
+  ids,
+}: {
+  ids: string[];
+}): Promise<SingleResult<Record<string, string>>> {
+  return executar(async () => {
+    if (ids.length === 0) return okOne({});
+
+    const nomes = await nomesDePacientes(getSupabaseClient(), ids);
+    if (!(nomes instanceof Map)) return nomes;
+
+    return okOne(Object.fromEntries(nomes));
   });
 }

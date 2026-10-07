@@ -2,8 +2,9 @@
  * The signed-in person's notifications, and the admin's pending queues.
  *
  * A notification carries no text of its own: the title is the label of its
- * type, and what it points to is a table and a row. Never the patient's name —
- * resolving names is an audited read, and an inbox is opened all the time.
+ * type, and what it points to is a table and a row. The patient's name is not
+ * in it: the bell asks for the names apart, only when it opens
+ * (`nomesDosPacientes`), because each name is an audited read.
  */
 
 export interface NotificacaoItem {

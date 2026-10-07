@@ -1226,6 +1226,11 @@ export interface NotificacoesOperations {
   marcarTodasLidas(): Promise<SingleResult<null>>;
   /** Data-subject requests and content waiting for the administration. */
   getPendenciasAdmin(): Promise<SingleResult<PendenciasAdmin>>;
+  /**
+   * The names of the patients the open inbox points to, by patient id. One
+   * audited read per patient, so the bell asks only when it opens.
+   */
+  nomesDosPacientes(params: { ids: string[] }): Promise<SingleResult<Record<string, string>>>;
 }
 
 /**
