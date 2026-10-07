@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { useSearchParams } from "react-router-dom";
 
 import { Ban, Check, FileText, Pencil, Plus, RotateCcw, X } from "lucide-react";
 
@@ -351,8 +352,33 @@ function Catalogo({
   );
 }
 
+/** The tabs a link can open with `?aba=` — the bell sends the admin to "lgpd". */
+const ABAS = [
+  "identidade",
+  "catalogos",
+  "alertas",
+  "metas",
+  "motivos",
+  "legais",
+  "seguranca",
+  "integracao",
+  "lgpd",
+] as const;
+
 export function ConfiguracoesPage() {
   const configuracoes = useConfiguracoes();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const pedida = searchParams.get("aba");
+  const aba = ABAS.find((valor) => valor === pedida) ?? "catalogos";
+  const trocarAba = (valor: string) =>
+    setSearchParams(
+      (atual) => {
+        const proximo = new URLSearchParams(atual);
+        proximo.set("aba", valor);
+        return proximo;
+      },
+      { replace: true },
+    );
   const termos = useTermos();
 
   const dados = configuracoes.data;
@@ -375,7 +401,7 @@ export function ConfiguracoesPage() {
         <ErrorState error={configuracoes.error} onRetry={() => void configuracoes.refetch()} />
       )}
 
-      <Tabs defaultValue="catalogos" className="flex flex-col gap-5">
+      <Tabs value={aba} onValueChange={trocarAba} className="flex flex-col gap-5">
         {/* Seven sections do not fit side by side below ~1100px. The list
             scrolls inside its own strip, so the page keeps its width. */}
         <ScrollableTabsList>
