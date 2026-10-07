@@ -1,22 +1,26 @@
-import { Search } from "lucide-react";
+import { Forward, X } from "lucide-react";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import chatGlass from "@/assets/images/chat-bamboo-glass.webp";
-import { EmptyState, ErrorState, Loading, PageHeader, StatusBadge } from "@/components/shared";
+import {
+  EmptyState,
+  ErrorState,
+  FilterChip,
+  FilterChipGroup,
+  Loading,
+  PageHeader,
+  SearchInput,
+  SkeletonRows,
+  StatusBadge,
+  UserAvatar,
+  type StatusTone,
+} from "@/components/shared";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAuth } from "@/contexts/auth-context";
 import { AUTOR_MENSAGEM, ESPECIALIDADE_LABEL, STATUS_CONVERSA_LABEL } from "@/lib/enums";
-import { formatDateTime, relativeTime } from "@/lib/format";
+import { formatDateTime, formatNumber, relativeTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ConversaClinico, MensagemClinico } from "@/types/clinico";
 import { AnexoDaMensagem } from "../components/AnexoDaMensagem";
@@ -37,12 +41,13 @@ import {
   useMarcarConversaLida,
   useMensagensClinicas,
   useResolverConversa,
+  useTempoDeResposta,
 } from "../hooks/useConversasClinicas";
 
 /**
  * Conversas — fila compartilhada pela equipe, uma janela por paciente.
  *
- * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/farmaceutico/chat/
+ * Protótipo: https://strawti.com.br/prototipos/jornada-supera/clinico/psicologo/chat/
  *
  * > [!] A resposta é um INSERT direto, não uma RPC
  * O banco prevê assim: a política de INSERT em `messages` decide quem responde
@@ -52,6 +57,10 @@ import {
  *
  * A conversa aberta e a lista se atualizam sozinhas de tempos em tempos; ver
  * `useConversasClinicas`.
+ *
+ * A tela abre na fila em largura total, como no protótipo; clicar numa conversa
+ * a abre ao lado de uma fila estreita, e "Voltar à fila" fecha. Busca e recortes
+ * ficam acima das duas formas e valem para as duas.
  */
 
 const RESUMO_AUTOR: Record<string, string> = {
@@ -61,49 +70,82 @@ const RESUMO_AUTOR: Record<string, string> = {
   [AUTOR_MENSAGEM.SISTEMA]: "Sistema",
 };
 
-function subtituloDaFila(lista: ConversaClinico[]): string {
-  const abertas = lista.filter((c) => c.status === "aberta");
-  const novas = abertas.filter((c) => c.nao_lida_pela_equipe).length;
-  const base = `${abertas.length} ${abertas.length === 1 ? "conversa aberta" : "conversas abertas"}`;
-
-  if (novas === 0) return base;
-  return `${base} · ${novas} com ${novas === 1 ? "mensagem nova" : "mensagens novas"}`;
+/** "2 pendentes · tempo médio de resposta 18 min". Pendente: aberta, com mensagem nova do paciente. */
+function subtituloDaFila(lista: ConversaClinico[], minutos: number | null | undefined): string {
+  const pendentes = lista.filter((c) => c.status === "aberta" && c.nao_lida_pela_equipe).length;
+  const base = `${pendentes} ${pendentes === 1 ? "pendente" : "pendentes"}`;
+  if (minutos === undefined) return base;
+  return minutos === null
+    ? `${base} · tempo médio de resposta: sem respostas no mês`
+    : `${base} · tempo médio de resposta ${formatNumber(minutos)} min`;
 }
+
+/** Como a conversa está para quem a lê na fila: a cor acompanha, nunca substitui, o texto. */
+function situacao(conversa: ConversaClinico): { label: string; tone: StatusTone } {
+  if (conversa.status === "resolvida") return { label: STATUS_CONVERSA_LABEL.resolvida, tone: "success" };
+  if (conversa.nao_lida_pela_equipe) return { label: "Aguarda resposta", tone: "danger" };
+  return { label: STATUS_CONVERSA_LABEL.aberta, tone: "info" };
+}
+
+/** "atribuída a você", "na fila", ou nada quando a conversa não está com ninguém em particular. */
+function comQuem(conversa: ConversaClinico): string | null {
+  if (conversa.minha) return "atribuída a você";
+  if (!conversa.atribuida && conversa.status === "aberta") return "na fila";
+  return null;
+}
+
+const RECORTES: { value: RecorteDeConversas; label: string }[] = [
+  { value: "todas", label: "Todas" },
+  { value: "nao_resolvidas", label: "Não resolvidas" },
+  { value: "minhas", label: "Atribuídas a mim" },
+  { value: "da_minha_area", label: "Da minha área" },
+];
+
+const FILTRO_INICIAL: FiltroDeConversas = { busca: "", recorte: "todas", assunto: TODOS_OS_ASSUNTOS };
 
 export function ClinicoChatPage() {
   const { user } = useAuth();
   const area = user?.especialidade ? ESPECIALIDADE_LABEL[user.especialidade] : "";
 
   const conversas = useConversasClinicas();
+  const tempoDeResposta = useTempoDeResposta();
   const [selecionada, setSelecionada] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<FiltroDeConversas>(FILTRO_INICIAL);
+  const [encaminhar, setEncaminhar] = useState<ConversaClinico | null>(null);
 
-  // A ficha do paciente leva para cá com `?paciente=`: a conversa dele abre no
-  // lugar da primeira da fila. A lista vem da mais recente para a mais antiga,
-  // então o primeiro que casa é a conversa mais recente daquele paciente.
+  // A ficha do paciente leva para cá com `?paciente=`: a conversa dele abre
+  // direto. A lista vem da mais recente para a mais antiga, então o primeiro que
+  // casa é a conversa mais recente daquele paciente. Sem isso, a tela abre na
+  // fila inteira, como no protótipo, e a conversa abre ao clicar.
   const pacienteDaFicha = useSearchParams()[0].get("paciente");
   const conversaDoPaciente = pacienteDaFicha
     ? conversas.data?.find((conversa) => conversa.paciente_id === pacienteDaFicha)
     : undefined;
 
-  // A primeira conversa da lista abre sozinha assim que a fila carrega —
-  // uma tela de conversas vazia à direita não convida ninguém a clicar.
+  const [abriuDaFicha, setAbriuDaFicha] = useState(false);
   useEffect(() => {
-    if (!selecionada && conversas.data && conversas.data.length > 0) {
-      setSelecionada((conversaDoPaciente ?? conversas.data[0])?.id ?? null);
+    if (!abriuDaFicha && conversaDoPaciente) {
+      setSelecionada(conversaDoPaciente.id);
+      setAbriuDaFicha(true);
     }
-  }, [conversas.data, conversaDoPaciente, selecionada]);
-
-  const conversaAtual = conversas.data?.find((conversa) => conversa.id === selecionada) ?? null;
+  }, [abriuDaFicha, conversaDoPaciente]);
 
   const lista = conversas.data ?? [];
+  const conversaAtual = lista.find((conversa) => conversa.id === selecionada) ?? null;
   const vazio = !conversas.isLoading && !conversas.isError && lista.length === 0;
+
+  const assuntos = assuntosDaLista(lista);
+  const visiveis = filtrarConversas(lista, filtro, user?.especialidade ?? null);
+  const filtrando =
+    filtro.busca.trim() !== "" || filtro.recorte !== "todas" || filtro.assunto !== TODOS_OS_ASSUNTOS;
+  const minutos = tempoDeResposta.isSuccess ? tempoDeResposta.data?.minutos : undefined;
 
   return (
     <div className="flex flex-col gap-5">
       <PageHeader
-        eyebrow={area}
-        title="Chat"
-        subtitle={subtituloDaFila(lista)}
+        eyebrow={area ? `${area} · Chat` : "Chat"}
+        title="Conversas"
+        subtitle={subtituloDaFila(lista, minutos)}
       />
 
       {pacienteDaFicha && conversas.data && !conversaDoPaciente && (
@@ -114,7 +156,7 @@ export function ClinicoChatPage() {
         </Alert>
       )}
 
-      {conversas.isLoading && <Loading />}
+      {conversas.isLoading && <SkeletonRows count={4} />}
       {conversas.isError && <ErrorState error={conversas.error} onRetry={() => void conversas.refetch()} />}
       {vazio && (
         <EmptyState
@@ -124,130 +166,204 @@ export function ClinicoChatPage() {
       )}
 
       {lista.length > 0 && (
-        <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-          <ListaConversas
-            conversas={lista}
-            selecionadaId={selecionada}
-            onSelecionar={setSelecionada}
-          />
+        <>
+          <div className="flex flex-col gap-3">
+            <SearchInput
+              value={filtro.busca}
+              onChange={(busca) => setFiltro({ ...filtro, busca })}
+              placeholder="Buscar conversa por paciente…"
+              label="Buscar conversa por paciente"
+              className="max-w-none"
+            />
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <FilterChipGroup label="Mostrar conversas">
+                {RECORTES.map((recorte) => (
+                  <FilterChip
+                    key={recorte.value}
+                    active={filtro.recorte === recorte.value}
+                    onClick={() => setFiltro({ ...filtro, recorte: recorte.value })}
+                  >
+                    {recorte.label}
+                  </FilterChip>
+                ))}
+              </FilterChipGroup>
+
+              {/* Um assunto só não é recorte: com todas as conversas num assunto, a ficha
+                  repetiria a lista inteira. */}
+              {assuntos.length > 1 && (
+                <FilterChipGroup label="Assunto" className="sm:border-l sm:pl-4">
+                  {assuntos.map((assunto) => (
+                    <FilterChip
+                      key={assunto}
+                      active={filtro.assunto === assunto}
+                      onClick={() =>
+                        setFiltro({
+                          ...filtro,
+                          assunto: filtro.assunto === assunto ? TODOS_OS_ASSUNTOS : assunto,
+                        })
+                      }
+                    >
+                      {assunto}
+                    </FilterChip>
+                  ))}
+                </FilterChipGroup>
+              )}
+            </div>
+
+            {/* Filtrar é escolher entre o que chegou. Com a leitura no teto, pode haver
+                conversa que nem chegou, e a lista filtrada não deve parecer completa. */}
+            {(filtrando || lista.length >= LIMITE_DA_LEITURA) && (
+              <p className="text-muted-foreground text-xs" role="status">
+                {`${visiveis.length} de ${lista.length} conversas carregadas${
+                  lista.length >= LIMITE_DA_LEITURA ? ". A leitura entrega no máximo 200: pode haver mais." : ""
+                }`}
+              </p>
+            )}
+          </div>
 
           {conversaAtual ? (
-            // `key`: o campo de resposta e a leitura são de UMA conversa; sem
-            // ela, o rascunho de uma seguiria para a outra ao trocar na lista.
-            <PainelConversa key={conversaAtual.id} conversa={conversaAtual} />
-          ) : (
-            <div className="bg-card hidden items-center justify-center rounded-2xl border p-8 lg:flex">
-              <p className="text-muted-foreground text-sm">Selecione uma conversa.</p>
+            <div className="grid gap-4 lg:grid-cols-[340px_1fr]">
+              <ListaConversas
+                conversas={visiveis}
+                selecionadaId={conversaAtual.id}
+                onSelecionar={setSelecionada}
+              />
+              {/* `key`: o campo de resposta e a leitura são de UMA conversa; sem
+                  ela, o rascunho de uma seguiria para a outra ao trocar na lista. */}
+              <PainelConversa
+                key={conversaAtual.id}
+                conversa={conversaAtual}
+                onFechar={() => setSelecionada(null)}
+              />
             </div>
+          ) : (
+            <ListaDaFila conversas={visiveis} onAbrir={setSelecionada} onEncaminhar={setEncaminhar} />
           )}
-        </div>
+        </>
+      )}
+
+      {encaminhar && (
+        <TransferConversationDialog
+          conversation={encaminhar}
+          open
+          onOpenChange={(open) => !open && setEncaminhar(null)}
+        />
       )}
     </div>
   );
 }
 
-const RECORTES: { value: RecorteDeConversas; label: string }[] = [
-  { value: "todas", label: "Todas" },
-  { value: "minhas", label: "Minhas" },
-  { value: "nao_resolvidas", label: "Não resolvidas" },
-  { value: "da_minha_area", label: "Da minha área" },
-];
+/**
+ * A fila em largura total, como no protótipo: quem, sobre o quê, com quem está,
+ * quando e em que situação. O texto das mensagens não aparece aqui — lê-lo para
+ * cada conversa seria uma leitura de conteúdo clínico por linha, só para uma
+ * prévia; ele aparece ao abrir a conversa.
+ */
+function ListaDaFila({
+  conversas,
+  onAbrir,
+  onEncaminhar,
+}: {
+  conversas: ConversaClinico[];
+  onAbrir: (id: string) => void;
+  onEncaminhar: (conversa: ConversaClinico) => void;
+}) {
+  if (conversas.length === 0) {
+    return (
+      <EmptyState
+        compact
+        variant="search"
+        title="Nenhuma conversa no recorte"
+        description="Nenhuma conversa corresponde à busca e aos filtros."
+      />
+    );
+  }
 
+  return (
+    <ul className="bg-card divide-y overflow-hidden rounded-2xl border">
+      {conversas.map((conversa) => {
+        const { label, tone } = situacao(conversa);
+        const quem = comQuem(conversa);
+
+        return (
+          <li key={conversa.id} className="flex items-start gap-3 px-4 py-3.5">
+            <button
+              type="button"
+              onClick={() => onAbrir(conversa.id)}
+              aria-label={`Abrir a conversa de ${conversa.paciente_nome} sobre ${conversa.assunto_label}`}
+              className="focus-visible:ring-ring flex min-w-0 flex-1 items-start gap-3 rounded-lg text-left focus-visible:ring-2 focus-visible:outline-none"
+            >
+              <UserAvatar name={conversa.paciente_nome} size="md" />
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="truncate text-sm">
+                  <span className={cn(conversa.nao_lida_pela_equipe ? "font-semibold" : "font-medium")}>
+                    {conversa.paciente_nome}
+                  </span>
+                  <span className="text-muted-foreground"> · {conversa.assunto_label}</span>
+                </span>
+                <span className="flex flex-wrap items-center gap-1.5 text-xs">
+                  <StatusBadge tone="neutral" size="sm" pill className="bg-card">
+                    {conversa.assunto_label}
+                  </StatusBadge>
+                  {quem && <span className="text-muted-foreground">· {quem}</span>}
+                </span>
+              </span>
+            </button>
+
+            <div className="flex shrink-0 flex-col items-end gap-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-xs">{relativeTime(conversa.ultima_mensagem_em)}</span>
+                <StatusBadge tone={tone} size="sm" pill>
+                  {label}
+                </StatusBadge>
+              </div>
+              {/* Encaminhar é de quem está com a conversa. */}
+              {conversa.status === "aberta" && conversa.minha && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground h-7"
+                  onClick={() => onEncaminhar(conversa)}
+                >
+                  <Forward />
+                  Encaminhar
+                </Button>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** A fila estreita, ao lado da conversa aberta: para trocar de conversa sem voltar. */
 function ListaConversas({
   conversas,
   selecionadaId,
   onSelecionar,
 }: {
   conversas: ConversaClinico[];
-  selecionadaId: string | null;
+  selecionadaId: string;
   onSelecionar: (id: string) => void;
 }) {
-  const { user } = useAuth();
-  const [filtro, setFiltro] = useState<FiltroDeConversas>({
-    busca: "",
-    recorte: "todas",
-    assunto: TODOS_OS_ASSUNTOS,
-  });
-
-  const assuntos = assuntosDaLista(conversas);
-  const visiveis = filtrarConversas(conversas, filtro, user?.especialidade ?? null);
-  const filtrando =
-    filtro.busca.trim() !== "" || filtro.recorte !== "todas" || filtro.assunto !== TODOS_OS_ASSUNTOS;
-
   return (
     <div className="bg-card flex max-h-[70vh] flex-col overflow-hidden rounded-2xl border">
-      <div className="border-border flex flex-col gap-2 border-b p-3">
-        <div className="relative">
-          <Search
-            size={14}
-            aria-hidden="true"
-            className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
-          />
-          <Input
-            type="search"
-            value={filtro.busca}
-            onChange={(evento) => setFiltro({ ...filtro, busca: evento.target.value })}
-            placeholder="Buscar paciente"
-            aria-label="Buscar conversa por paciente"
-            className="h-8 pl-8 text-xs"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Select
-            value={filtro.recorte}
-            onValueChange={(valor) => setFiltro({ ...filtro, recorte: valor as RecorteDeConversas })}
-          >
-            <SelectTrigger size="sm" aria-label="Mostrar conversas" className="w-full text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {RECORTES.map((recorte) => (
-                <SelectItem key={recorte.value} value={recorte.value}>
-                  {recorte.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filtro.assunto} onValueChange={(valor) => setFiltro({ ...filtro, assunto: valor })}>
-            <SelectTrigger size="sm" aria-label="Assunto" className="w-full text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={TODOS_OS_ASSUNTOS}>Todos os assuntos</SelectItem>
-              {assuntos.map((assunto) => (
-                <SelectItem key={assunto} value={assunto}>
-                  {assunto}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Filtrar é escolher entre o que chegou. Com a leitura no teto, pode haver
-            conversa que nem chegou, e a lista filtrada não deve parecer completa. */}
-        {(filtrando || conversas.length >= LIMITE_DA_LEITURA) && (
-          <p className="text-muted-foreground text-[11px]" role="status">
-            {`${visiveis.length} de ${conversas.length} conversas carregadas${
-              conversas.length >= LIMITE_DA_LEITURA ? ". A leitura entrega no máximo 200: pode haver mais." : ""
-            }`}
-          </p>
-        )}
-      </div>
-
       <div className="flex flex-col overflow-y-auto">
-        {visiveis.length === 0 && (
+        {conversas.length === 0 && (
           <p className="text-muted-foreground p-4 text-center text-xs">
             Nenhuma conversa corresponde à busca e aos filtros.
           </p>
         )}
 
-        {visiveis.map((conversa) => (
+        {conversas.map((conversa) => (
           <button
             key={conversa.id}
             type="button"
             onClick={() => onSelecionar(conversa.id)}
+            aria-current={conversa.id === selecionadaId ? "true" : undefined}
             className={cn(
               "border-border/60 relative flex flex-col gap-1 border-b p-3 text-left transition-colors last:border-b-0",
               conversa.id === selecionadaId
@@ -302,7 +418,7 @@ function ListaConversas({
   );
 }
 
-function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
+function PainelConversa({ conversa, onFechar }: { conversa: ConversaClinico; onFechar: () => void }) {
   const { user } = useAuth();
   const mensagens = useMensagensClinicas(conversa.id);
   const assumir = useAssumirConversa();
@@ -362,7 +478,7 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {!conversa.atribuida && aberta && (
             <Button size="sm" onClick={() => assumir.mutate(conversa.id)} disabled={assumir.isPending}>
               Assumir
@@ -385,6 +501,10 @@ function PainelConversa({ conversa }: { conversa: ConversaClinico }) {
               Encaminhar
             </Button>
           )}
+          <Button size="sm" variant="ghost" onClick={onFechar} aria-label="Fechar a conversa e voltar à fila">
+            <X />
+            <span className="max-sm:sr-only">Voltar à fila</span>
+          </Button>
         </div>
       </header>
 
